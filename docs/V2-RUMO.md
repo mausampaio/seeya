@@ -23,6 +23,15 @@ duas coisas: a memória passa a ser o projeto, e o tempo passa a ser contínuo.
 
 ## A proposta
 
+**Três nomes, fixados em 2026-09-12 depois da revisão de um segundo harness, para o resto do
+documento e para a especificação futura:**
+
+| termo | significado |
+|---|---|
+| **espaço de trabalho** | o único repositório git que o seeya administra e sincroniza |
+| **projeto** (ou frente) | um diretório dentro do espaço de trabalho |
+| **repositório associado** | repositório de código da pessoa, que o seeya só observa |
+
 ### Projeto persistente
 
 O seeya cria e mantém um diretório para cada frente de trabalho. É um repositório de contexto que
@@ -104,6 +113,12 @@ mapa por dispositivo:
 - **`config` para dizer sem ser perguntado**: um comando explícito no `~/.seeya/` deste
   dispositivo, para quem prefere configurar de uma vez ou não quer prompt.
 
+**A identidade é canônica, não a URL literal.** Dois dispositivos podem chegar ao mesmo
+repositório por `git@host:owner/repo.git` e por `https://host/owner/repo.git`; se a identidade
+fosse a string, seriam dois repositórios. O `seeya.json` guarda `{ host, owner, repository }`
+como identidade e a URL como foi vista como `remote`; para provedores desconhecidos, uma
+normalização conservadora da URL.
+
 **Repositório sem remoto** (só local) tem identidade só neste dispositivo: o seeya registra isso e
 declara, em outro dispositivo, que aquele repositório não pode ser resolvido lá — em vez de fingir
 que existe (D-025).
@@ -119,7 +134,10 @@ com cada projeto como diretório dentro dele.** Os motivos:
 
 - **Descoberta sai de graça.** É o requisito que ele mesmo colocou: o seeya, com a conta da
   pessoa, sabe quais projetos existem no remoto **mesmo os que não estão clonados aqui**, e no
-  `open` de um projeto nunca aberto neste dispositivo, materializa só aquele diretório.
+  `open` de um projeto nunca aberto neste dispositivo, já tem o diretório dele. **O clone é do
+  espaço inteiro**, sem `sparse-checkout`: os projetos são Markdown e arquivos pequenos, e o
+  checkout parcial traria estados e casos de recuperação que não se pagam. Se o volume real um
+  dia justificar, entra depois.
 - **Um remoto, uma sincronização, uma branch de estado, uma escada de níveis** (seção abaixo).
   Com um repositório por projeto seriam N remotos para configurar e um índice em algum lugar
   dizendo quais existem — e esse índice seria… um repositório.
@@ -178,7 +196,7 @@ seeya end-day                       pausa/consolida as frentes ativas e gera a v
   projeto:** tudo o que ele produz fica em `~/.seeya/`, fora do git (mantenedor, 2026-09-12).
 - **`pause` é entendimento: caro, com modelo, por evento e por frente.** É o "vou almoçar, seeya".
   Roda o detector de lacunas sobre o delta desde o último checkpoint e **propõe** o ponto de
-  retomada e a entrada do `journal/`. **O commit no repositório do projeto só acontece com aceite
+  retomada e a entrada do `journal/`. **O commit no espaço de trabalho só acontece com aceite
   humano**, e o push idem. A terminação é opcional e continua opt-in por projeto: a D-002 não muda
   de lado.
 - **`end-day` é para o humano.** Pausa o que ainda não foi pausado, consolida e produz a visão
@@ -208,11 +226,17 @@ do projeto — e, com remoto, para fora da máquina — sem ninguém ter olhado.
 - **`~/.seeya/` guarda o operacional:** cursores, filas, identificadores de sessão, checkpoints,
   propostas ainda não aceitas, e os fatos crus (prompts, mensagens do assistente). Nada disso vai
   para o git.
-- **O repositório do projeto carrega só o que precisa atravessar sessões e máquinas:** decisões,
+- **O espaço de trabalho carrega só o que precisa atravessar sessões e máquinas:** decisões,
   estado, plano, ponto de retomada, entradas do `journal/` aceitas, e referências. **Por padrão,
   resumo e ponteiro, nunca prompt cru** — o que cruza é o que a pessoa aceitou ver cruzar.
 - **A proposta mostra exatamente o que vai ser commitado**, não um resumo do que vai ser commitado.
   Aceitar às cegas é o mesmo que automático.
+- **O operacional local tem retenção, porque concentra o sensível.** Prompts, mensagens, fatos
+  crus, checkpoints, propostas pendentes e rejeitadas se acumulam em `~/.seeya/`. Regra inicial,
+  a especificar: o conteúdo cru existe para produzir e verificar a próxima consolidação; depois
+  do aceite ficam cursores, assinaturas de evidência e metadados mínimos (o bastante para não
+  reprocessar), e o cru expira por política configurável (D-035) — com purge explícito e opção
+  de desligar a captura textual. Limites e prazos são decisões de quando virar especificação.
 
 **Sem sincronização, a continuidade entre máquinas fica fraca demais** (mantenedor, 2026-09-12):
 outra máquina só enxergaria o que foi aceito, e não teria como saber que existe rascunho pendente
@@ -285,7 +309,10 @@ projeto já tem.
 
 ### Quatro ajustes
 
-1. **O centro do produto é o detector de lacunas.** A proposta depende de os agentes manterem os
+1. **O que só o seeya faz é o detector de lacunas.** A proposta de valor inteira é manter frentes
+   de trabalho retomáveis — criar, organizar, abrir, pausar, encerrar, retomar — e **verificar se
+   o estado registrado continua compatível com a evidência**; o detector é a parte que nenhuma
+   outra peça entrega e a primeira a validar em uso. A proposta depende de os agentes manterem os
    documentos em dia, e eles não fazem isso sozinhos: neste repositório funciona porque o PO
    revisa cada tarefa. O que só o seeya consegue fazer é cruzar o que mudou (git, transcript) com
    o que foi registrado e apontar a diferença. Qualquer um copia o template; o detector é o
@@ -311,8 +338,11 @@ spike, então que ela confira **sem ser instruída** fica provável, não medido
 conta com isso: o detector de lacunas é do seeya, não da boa vontade da sessão.) **O [spike
 L](spikes/L-outro-harness.md), em 2026-09-12, fechou essa lacuna:** uma sessão limpa do **Codex**
 (GPT-5.6), num clone sem histórico e sem protocolo à vista, retomou o trabalho pelo `AGENTS.md`
-nativo e apontou três documentos desatualizados antes de ler qualquer menção a teste. A costura
-com um segundo harness funciona sem adaptação; o custo é o das permissões do sandbox dele.
+nativo e apontou três documentos desatualizados antes de ler qualquer menção a teste. **O que
+isso valida é a retomada documental** por um segundo harness, sem adaptação do projeto. A
+abertura gerenciada (`project open --with codex`), o acesso a repositórios associados fora do
+`cwd` e a configuração do sandbox **ainda precisam de adapter e de spike próprios** — ver "Próximo
+spike" abaixo.
 
 ### Privacidade
 
@@ -367,9 +397,12 @@ metade (`commitsToday`, `dirty`, `touchedFiles`, `lastPrompts`).
 **Três camadas, da mais barata para a mais cara** (fato é barato e contínuo; entendimento é caro e
 por evento):
 
-1. **Estrutural, determinística, sem modelo.** O checkpoint do projeto é um commit no repositório
-   dele. Atividade nos repositórios associados depois dessa data sem mudança nos documentos é
-   lacuna candidata: um `git log --since` contra um `git diff`. Pode rodar a cada ciclo do daemon.
+1. **Estrutural, determinística, sem modelo.** Há dois marcos, e não se confundem: a **última
+   consolidação aceita** (um commit no espaço de trabalho) e o **último checkpoint observado**
+   (local, do dispositivo, em `~/.seeya/`). Atividade nos repositórios associados posterior à
+   última consolidação aceita, vista pelos checkpoints locais, sem atualização correspondente nos
+   documentos do projeto, é lacuna candidata: um `git log --since` contra um `git diff`. Pode
+   rodar a cada ciclo do daemon.
 2. **Afirmações verificáveis.** Os quatro erros que o spike K achou eram **todos conferíveis por
    máquina**: estado da CI, dia do daemon, data do arquivo, status de uma questão. Em vez de o
    modelo ler prosa e adivinhar o que ela afirma, o estado atual declara suas afirmações em forma
@@ -385,9 +418,24 @@ por evento):
 **A saída** é uma seção do encerramento: evidência, o que falta ou contradiz, e onde deveria ser
 registrado.
 
+**Nem toda lacuna tem a mesma certeza, e só uma classe é afirmativa:**
+
+| classe | exemplo | como aparece |
+|---|---|---|
+| contradição comprovada | o estado diz "CI verde" para um SHA cuja execução falhou | afirmação |
+| registro possivelmente velho | o tracker avançou depois da última atualização do estado | candidata |
+| atividade sem registro | commits ou discussão sem mudança nos documentos | candidata |
+
 **Risco conhecido: falso positivo.** Muita atividade não precisa de registro (exploração que não
-deu em nada). As lacunas são sugestões ordenadas pelo peso da evidência, e precisa existir um jeito
-barato de dizer "isto não precisa de registro" sem que ele volte a apontar no dia seguinte.
+deu em nada). Por isso a dispensa é **persistente** desde a primeira versão: dispensar uma lacuna
+grava `{ findingId, resolution: "no-record-needed", reason, resolvedAt }`, e o detector não a
+aponta de novo no dia seguinte. Sem isso ele vira alarme diário e a pessoa para de ler.
+
+**Decisões abertas têm forma estruturada no estado.** O spike L mostrou uma sessão transformar
+uma decisão pendente do mantenedor na própria recomendação. O estado passa a declarar
+`open_decisions` com `id`, pergunta, `status: pending-user`, a recomendação de quem escreveu e
+`decided_by`, separando **decisão confirmada**, **decisão que espera a pessoa** e **recomendação
+do agente** — uma sessão pode recomendar sem perder de vista de quem é a escolha.
 
 **O K2 testa isso à mão:** estado envelhecido, e ver se a sessão detecta as contradições.
 
@@ -445,11 +493,11 @@ depende dele.
   Conflito entre dois dispositivos é problema do git, e o seeya mostra o conflito, sem resolver
   por conta própria (D-039).
 - **A D-037 continua intacta** (esclarecido pelo mantenedor em 2026-09-11). Quem atravessa
-  dispositivos e sistemas é o **repositório do projeto**, que é só dado. O seeya é a instalação de
+  dispositivos e sistemas é o **espaço de trabalho**, que é só dado. O seeya é a instalação de
   cada máquina, segue o sistema dela e trabalha sobre o clone local. Nenhum seeya enxerga dois
   sistemas: em cada mundo há um seeya, e todos leem o mesmo projeto.
 - **Continuar pelo celular sem o computador ligado** dependeria de uma sessão na nuvem abrir o
-  repositório do projeto. Isso só funciona se o remoto for acessível por ela, o que volta ao
+  espaço de trabalho. Isso só funciona se o remoto for acessível por ela, o que volta ao
   primeiro cuidado.
 
 **O transcript é da máquina; o resto não** (levantado pelo mantenedor em 2026-09-11). Começar o
@@ -474,9 +522,9 @@ PO). Uma config só, em que cada nível inclui o anterior:
 | nível | o que cruza | para onde |
 |---|---|---|
 | `off` | nada; tudo fica local | — |
-| `state` | só metadados: identidade do dispositivo, último checkpoint, "há rascunho aberto" — **sem conteúdo** | uma branch de estado do seeya no remoto |
-| `accepted` | o que a pessoa aceitou: decisões, estado, `journal/` | `main` do repositório do projeto |
-| `drafts` | também os rascunhos não aceitos, como **documentos de proposta**, nunca como árvore modificada | a mesma branch de estado do seeya, nunca `main` |
+| `state` | só metadados: identidade do dispositivo, último checkpoint, "há rascunho aberto" — **sem conteúdo** | a branch de estado **deste dispositivo** (`seeya/state/<device-id>`) |
+| `accepted` | o que a pessoa aceitou: decisões, estado, `journal/` | `main` do espaço de trabalho |
+| `drafts` | também os rascunhos não aceitos, como **documentos de proposta**, nunca como árvore modificada | a mesma branch de estado do dispositivo, nunca `main` |
 
 Regras que decorrem:
 
@@ -485,7 +533,7 @@ Regras que decorrem:
 - **`end-day` agendado gera rascunho** e o sincroniza só no nível `drafts`. O `start-day` em
   outra máquina **detecta o rascunho vindo de outro dispositivo** e oferece revisar e aceitar ali.
 - **O rascunho é dado, não árvore** (mantenedor, 2026-09-12). Em vez de uma branch com o
-  repositório do projeto já modificado, o seeya guarda um **documento de proposta**: evidência
+  espaço de trabalho já modificado, o seeya guarda um **documento de proposta**: evidência
   (repositórios, trackers, sessões) e mudanças propostas (estado atual, questões abertas, próximos
   passos, ponto de retomada, lacunas achadas), com identidade do dispositivo, carimbo de hora e
   status (`pending`/`accepted`/`rejected`). Esboço:
@@ -507,9 +555,16 @@ Regras que decorrem:
   fere a D-039 — o documento é território do seeya, e quem aceita o commit continua sendo a
   pessoa. Várias propostas pendentes de vários dispositivos são aplicadas em ordem de
   `capturedAt`, cada uma mostrada antes de entrar.
-- **Conflito de git só existe no caso sem sincronização:** a pessoa muda para um dispositivo
-  desatualizado, o trabalho continua lá, e `main` já andou em outro lugar. Aí é resolução de
-  conflito normal do git, e o seeya **mostra** sem resolver por conta própria (D-039).
+- **O aceite autoriza um diff sobre uma base específica.** Dois dispositivos podem aceitar
+  propostas ao mesmo tempo, e `main` pode andar entre o fetch e o push do mesmo dispositivo. A
+  regra: antes de mostrar o commit, o seeya atualiza a base remota; antes do push, confere que a
+  base continua a mesma; se mudou, **recompõe a proposta sobre a árvore atual e pede novo
+  aceite** — porque o diff que a pessoa aprovou pode não ser mais o mesmo. Nunca resolve
+  divergência de conteúdo em silêncio (D-039).
+- **Conflito de conteúdo de verdade** só sobra no caso sem sincronização — a pessoa muda para um
+  dispositivo desatualizado, o trabalho continua lá, e `main` já andou — ou quando a recomposição
+  toca a mesma seção que outro dispositivo mudou. Aí é resolução normal do git, e o seeya
+  **mostra** sem resolver.
 - **Consequência para o template:** para "aplicar mudanças propostas" não ser adivinhação sobre
   prosa, os arquivos que o seeya escreve precisam ter **seções que ele reconhece** (cabeçalho
   estruturado ou blocos delimitados). O que a pessoa escreve fora dessas seções é dela e o seeya
@@ -522,13 +577,17 @@ Regras que decorrem:
 
 **Aberto, para quando virar especificação:** o identificador de dispositivo ficou resolvido na
 seção "Um repositório para todos os projetos" (gerado na instalação, com rótulo). A dúvida anterior sobre `state` versus `accepted` se
-resolveu com o rascunho-como-dado: `state` e `drafts` usam a **mesma** branch de estado do seeya —
-`state` carrega só o cabeçalho da proposta (dispositivo, hora, status), `drafts` carrega o
-documento inteiro.
+resolveu com o rascunho-como-dado: `state` e `drafts` usam a branch de estado **do dispositivo**
+(`seeya/state/<device-id>`) — `state` carrega só o cabeçalho da proposta (dispositivo, hora,
+status), `drafts` carrega o documento inteiro. **Uma branch por dispositivo, e cada dispositivo é o
+único escritor da sua**: duas máquinas avançando a mesma branch a partir de bases diferentes
+teriam push recusado mesmo gravando propostas independentes. Os outros dispositivos só buscam
+(`refs/heads/seeya/state/*`) e agregam. O aceite de uma proposta alheia é registrado em `main`; o
+dispositivo dono atualiza a própria branch no sync seguinte.
 - **O que reduz o problema:** na v2 o transcript é complementar. O que a sessão registrou nos
   documentos e commitou já viajou pelo caminho normal; o transcript só importa para o que não foi
   registrado, e isso é detectado onde ele vive.
-- Fatos derivados de transcript só entram no repositório do projeto como resumo aceito, com teto
+- Fatos derivados de transcript só entram no espaço de trabalho como resumo aceito, com teto
   de tamanho; o cru fica em `~/.seeya/`.
 - O cenário multi-máquina fica **depois** do passo 5 do recorte, mas a regra "declare quando a
   visão é parcial" entra desde a primeira versão, para o caso de duas máquinas degradar de forma
@@ -539,8 +598,20 @@ oferece a opção**, porque toda a sincronização depende dela e deixar para a 
 deixar a funcionalidade principal sem chão. Mas a oferta vem com aviso claro, no momento da
 escolha, de que **um remoto público expõe o contexto de trabalho** do projeto — decisões,
 estado, fatos derivados de transcript. O seeya nunca escolhe o provedor nem cria o repositório
-remoto; só aponta para o que a pessoa indicou, e recusa silêncio: sem remoto configurado, o
-`checkpoint` diz que não sincronizou, em vez de parecer que sincronizou.
+remoto; só aponta para o que a pessoa indicou, e recusa silêncio: sem remoto configurado,
+`pause`, `end-day` e `start-day` declaram que o estado está restrito a esta máquina, em vez de
+parecerem sincronizados. O `checkpoint` é local por definição e não acusa ausência de
+sincronização como falha.
+
+## Próximo spike: a abertura gerenciada (M, ainda não rodado)
+
+O spike L validou a estrutura documental com um segundo harness. O que falta validar é a
+**costura operacional**: criar um projeto no espaço de trabalho; associar dois repositórios
+externos; executar `project open --with claude` (ou o equivalente manual); verificar leitura e
+alteração nos repositórios associados fora do `cwd`; verificar qual instrução o harness carrega;
+testar as restrições de sandbox e permissões; encerrar a sessão por completo; abrir uma sessão
+limpa e retomar pelo projeto; repetir com o Codex. Cada harness terá seu custo de permissões — o L
+já mostrou o do Codex no Windows.
 
 ## Relação com o Sprint 5
 

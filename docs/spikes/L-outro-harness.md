@@ -97,7 +97,9 @@ com conhecimento total também deixa passar, e o detector de lacunas precisa ser
 ## O que muda
 
 - Os três documentos foram corrigidos na mesma leva deste registro.
-- A **costura com o Codex funciona pelo `AGENTS.md`** sem nenhuma adaptação; o custo é o de
-  permissões do sandbox dele, não do repositório.
+- A **retomada documental pelo Codex funciona pelo `AGENTS.md`** sem adaptação do projeto; o
+  custo é o de permissões do sandbox dele. **Isto não valida a costura inteira:** abertura
+  gerenciada, acesso a repositórios associados fora do `cwd` e configuração do sandbox ficam para
+  um spike próprio (M, em `../V2-RUMO.md`).
 - **K2 continua valendo** (estado envelhecido), e deve rodar com os controles deste spike: clone
   raso, sem remoto, protocolo fora.
