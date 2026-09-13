@@ -941,7 +941,7 @@ exatamente o risco de deriva que a tabela existe para evitar.
 **Opções que enxergo:** A) fixar `forkCleanupDays: number` (default 7, conforme D-012) na tabela do
 glossário agora, para a S2-T6 já encontrar o nome certo. B) esperar a S2-T6 abrir a própria questão
 quando chegar lá.
-**Resposta:** _(em aberto)_
+**Resposta:** ver a resposta "FECHADA" acima, nesta mesma questão (o marcador abaixo era sobra do texto original).
 
 ---
 
@@ -1008,7 +1008,7 @@ nenhuma medição por trás.
 **Opções:** A) 10 fica, é só um valor inicial e pode virar config (`config.json`) mais adiante se
 algum dia importar. B) o número deveria vir de `config.json` desde já, na mesma família de
 `relevanceHours`/`idleMinutes`.
-**Resposta:** (preenchida pelo PO)
+**Resposta:** ver a resposta "FECHADA" acima, nesta mesma questão (o marcador abaixo era sobra do texto original).
 
 **3) "Arquivos tocados" = `file_path` de chamadas `tool_use` para `Edit`, `Write` e
 `NotebookEdit`, excluindo ferramentas de leitura (`Read`, `Grep`, `Glob`, ...).** Nenhum documento
@@ -1024,7 +1024,7 @@ supus errado) faria um arquivo realmente editado desaparecer de `touchedFiles` s
 "tocado" deveria incluir leitura também (mais fiel ao nome, mais ruidoso). C) o conjunto de
 ferramentas deveria ser confirmado contra uma amostra real antes de travar (mas isso reabriria a
 questão de anonimização que motivou fixtures sintéticas nesta tarefa).
-**Resposta:** (preenchida pelo PO)
+**Resposta:** ver a resposta "FECHADA" acima, nesta mesma questão (o marcador abaixo era sobra do texto original).
 
 **4) Turnos de sub-agente (`isSidechain: true`) contam para `touchedFiles` mas não para
 `lastPrompts`.** A leitura que fiz: um `tool_use` dentro de um sub-agente é trabalho real da
@@ -1035,7 +1035,7 @@ forma — é inferência minha a partir do que cada campo serve para responder n
 **Opções:** A) a assimetria fica, cada campo segue a pergunta que responde. B) `isSidechain`
 deveria excluir a entrada de ambos os fatos, por simetria e simplicidade. C) deveria excluir de
 nenhum dos dois — todo conteúdo do transcript é "da sessão".
-**Resposta:** (preenchida pelo PO)
+**Resposta:** ver a resposta "FECHADA" acima, nesta mesma questão (o marcador abaixo era sobra do texto original).
 
 **5) `adapters/transcript/index.ts` localiza o `.jsonl` chamando `locateTranscriptFile`, uma
 função nova em `adapters/discovery/transcript-lookup.ts`, em vez de reaproveitar `findTranscript`
@@ -1053,7 +1053,7 @@ tratou para `SessaoDescoberta`: preferir não adiantar mudança em módulo de ta
 e `TranscriptReader.readFacts` deixaria de precisar localizar o arquivo de novo — mudança de tipo
 de domínio, fora do escopo desta tarefa. C) `findTranscript` deveria ganhar o campo `path` mesmo
 assim, e `session-mapping.ts` ajustado para não espalhar o objeto inteiro.
-**Resposta:** (preenchida pelo PO)
+**Resposta:** ver a resposta "FECHADA" acima, nesta mesma questão (o marcador abaixo era sobra do texto original).
 
 ---
 
@@ -5434,6 +5434,15 @@ contém o texto que a de uma chave forjada contém, nos dois sentidos (`get` e `
 
 **Cobertura e portão:** ver relatório da tarefa em `docs/PLANO-DE-ENTREGA.md` S4-T6.
 
+**Fechamento do PO (2026-09-13).** (1) inventário confirmado e verificado à mão: os três
+`spawn` sem `windowsHide` estão certos por construção (detached, POSIX-only, e a janela do
+`start-day`, que é o produto). (2) confirmado: nenhum teste prova a parte 1, e a prova foi o
+mantenedor rodando o daemon de verdade — S4-T6 aceita assim. (3) **decidido: virou a D-038 e a
+S4-T9** — todo processo lançado é invisível por padrão, com guarda de lint e uma exceção
+declarada. (4) **decidido: virou a S4-T7** — o mantenedor achou o furo da primeira proposta
+(avisos legítimos com um minuto de intervalo) e a resposta foi histerese por tipo, com prazo novo
+devolvendo os avisos. (5) confirmado; o mesmo tratamento chegou à `projectPolicy` na S4-T8.
+
 ---
 
 ## Q-060 — S4-T7 (histerese por tipo, alertas precoces num aviso só, e prazo novo devolve avisos): como o "tipo" é representado, onde mora a decisão pura, e o desenho da parte 3
@@ -5922,6 +5931,15 @@ instante.
 
 **Prova final, que não é minha:** os três pushes seguintes à mesclagem, na CI real do Windows —
 o único ambiente onde a contenção medida aqui realmente acontece.
+
+**Fechamento do PO (2026-09-13): confirmado.** Os dois grupos com justificativa própria são
+melhores que uma alegação genérica — a medição mostrou que só metade dos arquivos era "lançamento
+de processo"; a outra metade é disco. O residual (contenção de CPU entre os projetos `guards` e
+`integration` no runner) fica registrado, não resolvido: os três pushes seguintes passaram no
+Windows e a S4-T11 foi aceita com isso declarado. Se voltar, o próximo passo é o agendamento dos
+projetos no runner, não serializar mais arquivos.
+
+---
 
 ## Q-065 — S4-T12: onde a normalização de `projectPolicy` mora, a escolha de resolver (não recusar) caminho relativo, e por que `buildDaemonContext` perdeu seu único `readConfig` de startup
 
