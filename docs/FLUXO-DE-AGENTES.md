@@ -114,6 +114,12 @@ certa. Duas consequências:
 - **Quando o PO recebe a notificação de um agente parado "esperando"**, a mensagem de reativação
   manda **commitar primeiro** e só depois continuar. Reativar dizendo apenas "continue" deixa o
   trabalho no mesmo risco em que já estava.
+- **O portão roda em primeiro plano.** O caso que se repete (S4-T9, S4-T10, S5-T1 — cinco vezes
+  até 2026-09-13) é sempre o mesmo: no fim da tarefa, o agente dispara `npm run verificar` ou
+  `verificar:linux` em segundo plano "para não estourar o tempo" e para esperando. Se o comando
+  estourar o limite da ferramenta, **quebre em pedaços** (`npm run typecheck`, `npm run lint`,
+  `npx vitest run --project <nome>`), cada um em primeiro plano com o código de saída lido.
+  Segundo plano só para o que não precisa de resposta — e o portão sempre precisa.
 
 ## Revisor — Sonnet 5, contexto limpo
 
