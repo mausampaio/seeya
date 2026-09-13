@@ -310,9 +310,11 @@ duas raízes de composição (`cli/` e `app/`), ambas nomeando adapters concreto
   mecanismo, e a interface não "vê" o conteúdo da aba.
 
 **Em nenhum dos três a interface vem do npm:** aplicação de desktop se distribui como instalador
-(GitHub Releases), e o escopo npm fica para `cli` e `core`. O spike começa pelo terceiro caminho,
-que é o mais barato para validar o fluxo de trabalho; se o painel-mais-abas bastar, o terminal
-embutido nem precisa existir. Decide no Windows primeiro.
+(GitHub Releases), e o escopo npm fica para `cli` e `core`. **Decidido em 2026-09-13 (D-042): o
+primeiro caminho.** O terceiro caiu porque gerir o terminal padrão de cada distro e de cada
+sistema é complexidade sem fim, e validar com um mecanismo que não é o do produto valida pouco.
+O spike M valida PTY e TUI dos harnesses dentro do `xterm.js` **no Linux (o dia a dia do
+mantenedor) e no Windows**.
 
 1. renomear para `seeya` (S5-T0, D-040) e organizar o monorepo com os escopos;
 2. `seeya project create`, `list`, `show` e `open`, com o template mínimo (`AGENTS.md`,

@@ -87,8 +87,9 @@ do mantenedor: **S5-T0**. O resultado do spike K está em
 
 Não faz parte do projeto, mas afeta o trabalho:
 
-- Windows 11, com Git Bash e PowerShell. O `seeya` foi instalado com `npm link` e aponta para este
-  repositório, então **`npm run build` troca o binário que ele usa no dia a dia**.
+- Este notebook é Windows 11, com Git Bash e PowerShell; **o dia a dia de trabalho dele é Linux**
+  (D-042), e é lá que a interface precisa funcionar primeiro. O `seeya` foi instalado com
+  `npm link` e aponta para este repositório, então **`npm run build` troca o binário que ele usa**.
 - Ele roda o daemon de verdade. Reconstruir ou reiniciar no meio de um teste dele muda o que ele
   está medindo — combine antes.
 - Ele lança o `claude` da pasta pai dos repositórios de propósito, para ter uma memória única
