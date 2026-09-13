@@ -3627,7 +3627,7 @@ texto, mas não são a fila.
       (`@seeya-ai/cli -> C:\code\seeya`, `seeya --version` respondendo) e portão verde (1472
       testes). **A pasta antiga continua no disco** até o handle soltar — apagar quando nada mais
       a segurar; nada nela é único.
-- [~] **S5-T1 — Autostart do daemon** por SO (Task Scheduler, launchd, systemd user).
+- [x] **S5-T1 — Autostart do daemon** por SO (Task Scheduler, launchd, systemd user). **Aceita em 2026-09-13:** reinício real, tarefa executada no logon, daemon no ar sozinho, `status` com `enabled`, e **nenhuma janela** com o daemon rodando (o mantenedor observou por um minuto; uma piscada isolada logo após o reinício não se repetiu e foi atribuída ao próprio boot). Linux e macOS seguem não medidos.
       Especificada pelo PO em 2026-09-13; a linha acima era tudo o que existia, e uma sessão
       limpa apontou que despachar assim seria pedir ao agente para inventar comportamento.
 
@@ -3864,9 +3864,23 @@ texto, mas não são a fila.
          `args.ts` já cita, e manter o fallback como último recurso — declarando no aviso quantos
          caracteres sobraram.
 
+      **Parte 2 — o fallback avisa ANTES, e pergunta.** Hoje o motivo do fallback só aparece
+      **depois** que a sessão nova termina: o `start-day` imprime o resumo ao final, e com
+      `stdio` herdado a pessoa fica dentro da sessão limpa sem saber por que está ali. Nas palavras
+      do mantenedor: *"eu como usuário só consegui ler essa informação dando um exit na sessão; eu
+      deveria ter recebido essa informação, nem que tivesse um 'deseja ir para uma sessão nova
+      mesmo assim?'"*. Regra: **antes** de abrir qualquer sessão de fallback, o `start-day` imprime
+      o motivo (o mesmo texto de hoje) e pergunta se abre a sessão nova; **o padrão é não abrir**
+      (Enter = pular esta sessão e seguir para a próxima), porque a sessão nova é o caminho que
+      perde histórico e não pode ser escolhido por distração. A resposta e o resultado continuam
+      no resumo final, como hoje. `start-day` já é interativo por construção (TTY herdado), então
+      perguntar cabe; a resposta inválida aborta a retomada daquela sessão com mensagem, sem laço
+      (mesmo padrão do `start-day` atual, Q-028).
+
       *Aceite:* um handoff de 4.135 caracteres (o caso real) retoma a sessão original; o teste de
-      contrato prova o mecanismo escolhido; a mensagem de fallback, quando ainda existir, diz o
-      motivo e o tamanho, como já faz.
+      contrato prova o mecanismo escolhido; quando o fallback ainda acontecer, a pessoa vê o motivo
+      **antes** e escolhe, com o padrão sendo não abrir; a mensagem diz o motivo e o tamanho, como
+      já faz.
 
 ## Definição de pronto (vale para toda tarefa)
 

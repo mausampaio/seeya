@@ -85,16 +85,16 @@ S5-T6 segurança) **e depois a v2**, com a interface básica adiantada para o co
 workflow do CodeQL com `security-extended`; varredura de segredos já estava ligada no repositório).
 Aceitas na primeira CI depois da mesclagem: o aviso de runtime obsoleto sumiu do log e o CodeQL
 rodou com sucesso. **Primeiro achado real do CodeQL:** 1 (alto: js/insecure-temporary-file em scripts/spike-j-measure.mjs:404 — script de spike, não código do produto). **Sprint 5 mínimo concluído no código;**
-falta confirmar a janela da S5-T1. **Achado da primeira retomada pós-reinício:** o `start-day`
+o **Sprint 5 mínimo está aceito**. **Achado da primeira retomada pós-reinício:** o `start-day`
 trocou a sessão do PO por uma sessão limpa porque o plano tinha 4.135 caracteres e o teto do
-argumento é 4.096 — virou a **S5-T9**, planejada e não despachada. **Decidido em 13/09: o portão
+argumento é 4.096 — virou a **S5-T9** (despachada em 13/09, com a parte 2: o fallback avisa antes e pergunta). **Decidido em 13/09: o portão
 de segurança reporta, não reprova**
 (Q-068); o achado do CodeQL em `scripts/spike-j-measure.mjs` **é corrigido na próxima tarefa que
 tocar `scripts/`** — quem despachar essa tarefa inclui isto no briefing. **Verificado em 13/09 depois de um reinício real:** a tarefa rodou no logon (resultado 0), o
 daemon subiu sozinho às 15:43, recuperou o lock, fez o reset do dia e tentou a captura atrasada
-(sem sessão viva, listou as fechadas); `seeya status` mostra `enabled` com o caminho novo. **O que
-falta para aceitar a S5-T1:** o mantenedor viu *uma* janela piscar depois disso e não soube
-atribuir; se piscar a cada 30 s com o daemon no ar, é nosso. Linux e macOS não foram medidos. O resultado do spike K está em
+(sem sessão viva, listou as fechadas); `seeya status` mostra `enabled` com o caminho novo. **S5-T1
+aceita em 13/09:** nenhuma janela com o daemon no ar (observação de um minuto); a piscada isolada
+logo após o reinício não se repetiu. Linux e macOS não foram medidos. O resultado do spike K está em
 [`spikes/K-sessao-limpa.md`](spikes/K-sessao-limpa.md).
 
 ## Renomeação (S5-T0, 2026-09-13)
