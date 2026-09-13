@@ -313,6 +313,10 @@ justamente para que quem os implementar não invente nome:
 | notificador / aviso | `Notifier` / `Notice` | S4-T1 |
 | notificar (método) | `notify` | S4-T1 |
 | está disponível / suporta ações (métodos) | `isAvailable` / `supportsActions` | S4-T1 |
+| autostart (porta) | `Autostart` | S5-T1 |
+| ligado / desligado / ligado com caminho quebrado / não consegui verificar | `enabled` / `disabled` / `brokenPath` / `unknown` | S5-T1 |
+| registrado / já registrado / atualizado (resultado de enable) | `registered` / `alreadyRegistered` / `updated` | S5-T1 |
+| removido / não estava registrado (resultado de disable) | `removed` / `notRegistered` | S5-T1 |
 | armazenamento | `Storage` | S1-T5 |
 | briefing do dia | `saveBriefing` / `listHandoffs` | S2-T4 |
 | salvar handoff / ler briefing / ler config (métodos) | `saveHandoff` / `readBriefing` / `readConfig` | S1-T5 |

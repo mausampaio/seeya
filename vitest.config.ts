@@ -186,6 +186,7 @@ const PRODUCTION_DIRECTORY_THRESHOLDS = {
   // now carries the same 80% floor every other adapter does instead of staying uncovered by
   // default. See tests/integration/guards/_coverage-directories.ts.
   'src/cli/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
+  'src/adapters/autostart/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
   'src/adapters/clock/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
   'src/adapters/discovery/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
   'src/adapters/generation/**': { statements: 80, branches: 80, functions: 80, lines: 80 },

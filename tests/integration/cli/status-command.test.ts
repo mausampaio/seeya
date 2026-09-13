@@ -16,6 +16,7 @@ import { runStatusCommand } from '../../../src/cli/status-command.js';
 import type { Config } from '../../../src/core/types.js';
 import { FakeClock } from '../discovery/_fake-clock.js';
 import { FakeProcessControl } from '../discovery/_fake-process-control.js';
+import { FakeAutostart } from '../../unit/cli/_autostart-fakes.js';
 import {
   createDiscoveryFixture,
   removeDiscoveryFixture,
@@ -76,13 +77,18 @@ function provider(): DiscoverySessionProvider {
  * (D-025) — `checkLiveLock` never calls `ProcessControl.isAlive` at all in that path, so the
  * `FakeProcessControl` here is never actually exercised, only structurally required.
  */
-function daemonPorts(): { storage: StorageAdapter; processControl: FakeProcessControl } {
+function daemonPorts(): {
+  storage: StorageAdapter;
+  processControl: FakeProcessControl;
+  autostart: FakeAutostart;
+} {
   if (fixture === undefined) {
     throw new Error('call createDiscoveryFixture() first');
   }
   return {
     storage: new StorageAdapter(fixture.seeyaHome),
     processControl: new FakeProcessControl(),
+    autostart: new FakeAutostart(),
   };
 }
 

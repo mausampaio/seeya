@@ -8,6 +8,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import type {
+  Autostart,
   Clock,
   Notifier,
   ProcessControl,
@@ -19,6 +20,7 @@ import type { Config } from '../core/types.js';
 import { processControl as realProcessControl } from '../adapters/process/index.js';
 import { systemClock } from '../adapters/clock/index.js';
 import { StorageAdapter } from '../adapters/storage/index.js';
+import { buildAutostart } from '../adapters/autostart/index.js';
 import {
   DiscoverySessionProvider,
   DiscoveryForkCleanup,
@@ -50,6 +52,10 @@ export interface CliContext {
    */
   readonly storage: Storage;
   readonly processControl: ProcessControl;
+  /** S5-T1: `seeya status` needs `Autostart` to render the autostart line through
+   * `cli/autostart-state.ts#describeAutostartState` — the same function `seeya autostart status`
+   * calls. `seeya sessions` (the other consumer of `CliContext`) never reads this field. */
+  readonly autostart: Autostart;
 }
 
 /**
@@ -108,7 +114,14 @@ export async function buildCliContext(homeDir: string = os.homedir()): Promise<C
     realProcessControl,
     config.relevanceHours,
   );
-  return { sessionProvider, config, clock, storage, processControl: realProcessControl };
+  return {
+    sessionProvider,
+    config,
+    clock,
+    storage,
+    processControl: realProcessControl,
+    autostart: buildAutostart(homeDir),
+  };
 }
 
 export interface EndDayContext {
@@ -314,4 +327,19 @@ export function buildDaemonContext(homeDir: string = os.homedir()): Promise<Daem
       return result.earlyWarnings;
     },
   });
+}
+
+export interface AutostartContext {
+  readonly autostart: Autostart;
+}
+
+/**
+ * `seeya autostart enable | disable | status`'s own composition (S5-T1): just the `Autostart`
+ * port, one per OS (`adapters/autostart/index.ts`). `binaryPath` itself is NOT resolved here —
+ * `cli/index.ts` resolves it the same way `seeya daemon`'s own self-relaunch already does
+ * (`fileURLToPath(import.meta.url)`) and passes it straight to `runAutostartEnableCommand`,
+ * rather than this function reaching for it a second, different way.
+ */
+export function buildAutostartContext(homeDir: string = os.homedir()): AutostartContext {
+  return { autostart: buildAutostart(homeDir) };
 }

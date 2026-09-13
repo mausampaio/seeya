@@ -3627,7 +3627,7 @@ texto, mas não são a fila.
       (`@seeya-ai/cli -> C:\code\seeya`, `seeya --version` respondendo) e portão verde (1472
       testes). **A pasta antiga continua no disco** até o handle soltar — apagar quando nada mais
       a segurar; nada nela é único.
-- [ ] **S5-T1 — Autostart do daemon** por SO (Task Scheduler, launchd, systemd user).
+- [~] **S5-T1 — Autostart do daemon** por SO (Task Scheduler, launchd, systemd user).
       Especificada pelo PO em 2026-09-13; a linha acima era tudo o que existia, e uma sessão
       limpa apontou que despachar assim seria pedir ao agente para inventar comportamento.
 
@@ -3671,6 +3671,54 @@ texto, mas não são a fila.
       **Cuidados:** nada de `exec` com string (AGENTS.md § "Processos"); `spawnHidden` (D-038)
       para chamar `schtasks`/`systemctl`/`launchctl`; mensagens com o valor e o esperado
       (AGENTS.md § "Mensagens de erro"); texto em inglês, concentrado.
+
+      **Relatório (2026-09-13).** Medição do Windows feita antes do código, com três tarefas
+      agendadas descartáveis (prefixo `seeya-spike-`, removidas ao final — confirmado com
+      `Get-ScheduledTask -TaskName "seeya-spike-*"` vazio). Detalhe completo, com os comandos
+      exatos e o achado de que `schtasks.exe /Create` exige elevação nesta máquina enquanto o
+      módulo PowerShell `ScheduledTasks` não, em **Q-067**.
+
+      | Candidato | Sessão interativa | Sem janela | Toast |
+      |---|---|---|---|
+      | `conhost.exe --headless` | medido: `SessionId` igual ao da sessão corrente | medido: nenhuma janela nova | medido: `Show()` sem exceção |
+      | `.vbs` via `wscript.exe` (`Run ..., 0, False`) | medido: idem | medido: idem | medido: idem |
+      | `powershell.exe -WindowStyle Hidden` | medido: idem | medido: **falhou** — uma janela nova apareceu (o "pisca" que o próprio despacho já previa) | medido: idem |
+
+      Dois candidatos satisfizeram os três critérios; escolhido **`conhost.exe --headless`** por
+      não exigir um arquivo auxiliar em disco (o `.vbs` precisaria de um lançador próprio,
+      registrado e limpo à parte). O caminho registrado fica no campo `Description` da tarefa
+      (Windows) ou num marcador que só o próprio adapter escreve (`# seeyaBinaryPath=` no unit
+      file do Linux, `<!-- seeyaBinaryPath:...-->` no plist do macOS) — nunca reconstituído por
+      parsing da linha de comando real, que precisa ficar com aspas de verdade para o SO
+      executar.
+
+      **Medido:** os três candidatos do Windows (tabela acima); que `schtasks.exe /Create` exige
+      elevação nesta máquina e `Register-ScheduledTask` não (Q-067); portão (`npm run
+      verificar`) e `npm run verificar:linux` verdes, códigos lidos separadamente; cobertura —
+      `core/` 100%/99.11%/100%/100% (statements/branches/functions/lines), `adapters/autostart`
+      89.92%/89.77%/80.55%/90.55%, `cli` agregado 96.51%/94.9%/94.32%/96.95%, todos acima do piso
+      exigido.
+
+      **Inferido, não medido:** que o daemon de verdade (lançado em dois saltos — a tarefa sobe
+      `seeya daemon`, que por sua vez sobe o worker desanexado via `spawnDetachedDaemon`, D-005)
+      herda a mesma sessão interativa do primeiro salto — a medição usou um script que envia o
+      próprio toast, um salto só, não a topologia real de dois processos. A herança de sessão por
+      um processo desanexado (sem console, mas com o mesmo token/sessão do pai) é comportamento
+      documentado do Windows, não uma segunda medição própria desta tarefa. Linux (`systemd
+      --user`) e macOS (LaunchAgent) **não foram medidos** — implementados conforme os mecanismos
+      documentados que a própria S5-T1 nomeia, testados só contra fakes injetados (nunca um
+      systemd/launchd real, AGENTS.md § "Testes"). "Sem janela" e "toast chega" no Windows foram
+      medidos por proxy objetivo (diferença de janelas visíveis via `EnumWindows`, e ausência de
+      exceção na chamada WinRT), não por confirmação visual humana em tempo real.
+
+      **O que o mantenedor precisa fazer à mão, no mínimo:** `seeya autostart enable`; reiniciar a
+      máquina (ou deslogar/logar de novo); conferir com `seeya status` (ou `seeya autostart
+      status`) que o autostart aparece como `enabled` e, principalmente, observar que o daemon
+      subiu **sem nenhuma janela de console aparecendo** durante o logon — esse é exatamente o
+      ponto que a medição automatizada não conseguiu confirmar sozinha (só o proxy de
+      `EnumWindows`). Testar a validação prática do texto do despacho ("a linha acima era tudo o
+      que existia") de ponta a ponta: fechar a tampa/suspender, a máquina acordar, e o `seeya
+      status` continuar respondendo sem ninguém ter subido o daemon à mão.
 
       **Testes:** os comandos gerados por SO, por unidade, com o runner injetado — nunca tocando
       o Agendador/systemd/launchd reais da máquina de quem roda a suíte. O aceite real é manual:

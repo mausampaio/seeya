@@ -13,6 +13,7 @@ import { emptyDayState } from '../../../src/core/schedule.js';
 import { createConfig } from '../core/_fixtures.js';
 import { InMemoryDaemonStorage } from '../scheduler/_fakes.js';
 import { FakeClock, FakeSessionProvider } from '../application/_fakes.js';
+import { FakeAutostart } from './_autostart-fakes.js';
 
 const NOW = new Date('2026-09-05T10:00:00.000Z');
 
@@ -55,6 +56,7 @@ async function buildContext(storage: InMemoryDaemonStorage, processControl: Proc
     clock: new FakeClock(NOW),
     storage,
     processControl,
+    autostart: new FakeAutostart(),
   };
 }
 

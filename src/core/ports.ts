@@ -722,3 +722,58 @@ export interface Notice {
 export interface Notifier {
   notify(notice: Notice): Promise<void>;
 }
+
+// Own block at the end of the file on purpose (S5-T1), same pattern `Notifier`/`SessionResumer`
+// above already established: a new interface, appended rather than inserted mid-file.
+
+/**
+ * `Autostart.status()`'s return shape — the four states docs/PLANO-DE-ENTREGA.md S5-T1 names,
+ * never flattened into "is something registered or not" (D-024):
+ * - `enabled` — registered, and the path it points at still exists on disk.
+ * - `disabled` — nothing registered on this machine.
+ * - `brokenPath` — registered, but the recorded path no longer exists. Not hypothetical: the
+ *   2026-09-13 project folder rename (docs/PLANO-DE-ENTREGA.md S5-T0) is the real case.
+ * - `unknown` — the OS query itself failed (permission denied, the OS tool missing) — D-025:
+ *   neither "on" nor "off" is something this call actually knows, so neither is claimed.
+ */
+export type AutostartStatus =
+  | { readonly kind: 'enabled'; readonly registeredPath: string }
+  | { readonly kind: 'disabled' }
+  | { readonly kind: 'brokenPath'; readonly registeredPath: string }
+  | { readonly kind: 'unknown'; readonly error: string };
+
+/**
+ * `Autostart.enable()`'s return shape (S5-T1's cuidado (f)): "enable diz o que registrou;
+ * repetido, diz que já existia e o que mudou (caminho antigo vs. novo), sem duplicar."
+ */
+export type AutostartEnableResult =
+  | { readonly kind: 'registered'; readonly path: string }
+  | { readonly kind: 'alreadyRegistered'; readonly path: string }
+  | { readonly kind: 'updated'; readonly previousPath: string; readonly newPath: string };
+
+/** `Autostart.disable()`'s return shape. Never an error to disable something already off
+ * (D-025) — same "already gone is not an error" contract `Storage.clearDaemonLock` documents. */
+export type AutostartDisableResult =
+  { readonly kind: 'removed' } | { readonly kind: 'notRegistered' };
+
+/**
+ * Registers/removes/queries `seeya daemon` in the current OS's own autostart mechanism
+ * (docs/PLANO-DE-ENTREGA.md S5-T1: Task Scheduler on Windows, `systemd --user` on Linux, a
+ * LaunchAgent on macOS). Implemented in `adapters/autostart/`, one class per OS, picked by
+ * `process.platform` in that adapter's own `index.ts` — same shape `adapters/notification/`
+ * already uses for its per-OS backend choice.
+ *
+ * **No new key in `~/.seeya/` (D-027).** The "on/off" state lives entirely in the OS's own
+ * mechanism; this port never persists anything of its own, and `status()`'s job is only ever to
+ * ask the OS and report back, honestly (D-025), never to remember a previous answer.
+ *
+ * `enable`'s `binaryPath` is the `dist/cli/index.js` currently in use (S5-T1's cuidado (f)) —
+ * `cli/index.ts` resolves it the same way `seeya daemon`'s own self-relaunch already does
+ * (`fileURLToPath(import.meta.url)`), so autostart always points at the binary that registered
+ * it, never a hardcoded install location.
+ */
+export interface Autostart {
+  enable(binaryPath: string): Promise<AutostartEnableResult>;
+  disable(): Promise<AutostartDisableResult>;
+  status(): Promise<AutostartStatus>;
+}

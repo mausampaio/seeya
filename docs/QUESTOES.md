@@ -6165,3 +6165,89 @@ leitura de `config.json` fica: é o comando manual mais barato do projeto, e mud
 isso seria escopo sem pedido. (5) o teste dependente de fuso que só falhou no contêiner vira
 método em `docs/TESTES.md`: horário **próximo** de `NOW` se calcula a partir de `NOW`, nunca
 literal, porque a máquina do mantenedor está em UTC-3 e o contêiner em UTC.
+
+**Resposta:** (preenchida pelo PO)
+
+---
+
+## Q-067 — S5-T1 (autostart do daemon): a medição do Windows, e por que o adapter acabou usando o módulo PowerShell `ScheduledTasks` em vez do `schtasks.exe` que o despacho sugeria
+
+**Contexto.** A tarefa pedia para medir, antes de escrever qualquer adapter, qual mecanismo do
+Windows satisfaz os três critérios que a S5-T1 exige ao mesmo tempo: o processo sobe na **sessão
+interativa** (senão o toast do Spike B não aparece), **sem janela** (D-038), e o toast enviado a
+partir dele **chega**. Os três candidatos citados no despacho foram medidos com uma tarefa
+agendada descartável (prefixo `seeya-spike-`, removida ao final de cada rodada, sem exceção),
+disparada por `Start-ScheduledTask` sobre um script PowerShell que grava o próprio PID/SessionId
+num arquivo-marcador e tenta mostrar um toast (mesma técnica WinRT de
+`adapters/notification/windows-toast.ts`). Janela nova foi medida por diferença de
+`EnumWindows`/`IsWindowVisible` (P/Invoke via `Add-Type`) antes/depois do disparo, não por
+inspeção visual humana — ver "O que não foi confirmado visualmente" no fim.
+
+**Medição (Windows 11, build 10.0.26200, 2026-09-13, sessão interativa local `SessionId=1`).**
+
+| Candidato | Sessão interativa | Sem janela | Toast (WinRT `Show()` sem exceção) |
+|---|---|---|---|
+| `conhost.exe --headless <cmd>` | ✅ `SessionId=1` (igual à sessão corrente) | ✅ nenhuma janela nova além de ruído não relacionado (título do próprio terminal mudando por conta própria) | ✅ |
+| `.vbs` via `wscript.exe` (`WshShell.Run cmd, 0, False`) | ✅ `SessionId=1` | ✅ nenhuma janela nova | ✅ |
+| `powershell.exe -WindowStyle Hidden` | ✅ `SessionId=1` | ❌ **pisca**: uma janela nova de `powershell.exe` foi detectada (o título da aba do terminal mudou momentaneamente para o caminho do executável) — bate exatamente com o aviso já registrado no despacho ("que pisca") | ✅ |
+
+**Escolha: `conhost.exe --headless`.** Dois candidatos passaram nos três critérios
+(`conhost.exe --headless` e o lançador `.vbs`); escolhi o primeiro por não exigir escrever um
+arquivo `.vbs` auxiliar em disco — o comando inteiro cabe nos argumentos da própria tarefa
+agendada, o que também simplifica `enable`/`disable` (nada para limpar além da tarefa em si).
+`powershell.exe -WindowStyle Hidden` foi descartado por medição direta, não por suposição.
+
+**Achado adicional, fora do que o despacho previa: `schtasks.exe /Create` exige elevação nesta
+máquina; o módulo PowerShell `ScheduledTasks` (`Register-ScheduledTask` e companhia), não.**
+O despacho e o AGENTS.md (cuidado (a)) pediam `spawnHidden` para chamar `schtasks`/`systemctl`/
+`launchctl`. Medido: com o token desta sessão (`whoami /groups` mostra
+`BUILTIN\Administradores` como "Grupo usado apenas para negar" — token UAC dividido, conta
+administradora mas processo não elevado), `schtasks /Create` — inclusive na forma mais simples
+possível, sem `/RL`, sem `/RU`, só `/TN`+`/TR`+`/SC ONLOGON`+`/F` — falha sempre com
+`ERRO: Acesso negado.` (testado por `spawnSync` a partir do Node, não da PowerShell, para excluir
+requoting da própria PowerShell como causa). `schtasks /Query` (leitura) funciona sem elevação.
+`Register-ScheduledTask`/`Get-ScheduledTask`/`Unregister-ScheduledTask` (o módulo `ScheduledTasks`,
+que fala com a API COM do Task Scheduler, não com o binário `schtasks.exe`) funcionam sob o mesmo
+token, sem elevação, na mesma tarefa de teste. **Não sei se isto é uma política deste host
+específico ou um comportamento geral do Windows 11 com UAC dividido** — não tenho como comparar
+com outra máquina aqui. Registrando como medido nesta máquina, não como fato universal.
+
+**Decisão tomada, seguindo AGENTS.md ("a solução tiver efeito além da sua tarefa: abra a questão
+e siga com a solução mínima"):** o adapter Windows (`src/adapters/autostart/windows.ts`,
+`windows-scripts.ts`) chama `powershell.exe` (via `spawnHidden`, D-038) executando
+`Register-ScheduledTask`/`Get-ScheduledTask`/`Unregister-ScheduledTask`, nunca `schtasks.exe`
+diretamente — mesma técnica `-EncodedCommand` já usada em `windows-toast.ts`/`console-signal.ts`,
+reaproveitada (`buildPowerShellArgs`/`escapeForPowerShellSingleQuotedString` importados de
+`adapters/notification/windows-toast.ts`, não duplicados). O caminho registrado (`binaryPath`)
+fica no campo `Description` da tarefa — não é parseado de volta de `Arguments` (que precisa ficar
+com aspas de verdade para o `conhost.exe` tokenizar `--headless "<node>" "<script>" daemon`);
+ler `Description` é um acesso de propriedade, não parsing de linha de comando. `status()` também
+passa por PowerShell (`ConvertTo-Json -Compress`), não por `schtasks /Query /FO LIST` — os nomes
+de campo desse formato são localizados por idioma do Windows, e JSON evita isso de vez.
+
+**O que não foi medido: Linux e macOS.** Os adapters `linux.ts` (`systemd --user`, unidade em
+`~/.config/systemd/user/seeya-daemon.service`) e `macos.ts` (`LaunchAgent` em
+`~/Library/LaunchAgents/com.seeya.daemon.plist`) seguem os mecanismos documentados que a S5-T1
+já nomeia, mas **não foram verificados contra um systemd ou launchd reais** — só contra
+`CommandRunner`/leitor-de-arquivo fakes nos testes de unidade (AGENTS.md: "nenhum teste toca...
+o systemd"). O caminho registrado, em ambos, fica num marcador que só o próprio adapter escreve
+(`# seeyaBinaryPath=` no unit file; `<!-- seeyaBinaryPath:...-->` no plist) em vez de parseado de
+volta de `ExecStart`/`ProgramArguments` — mesma razão do `Description` no Windows.
+
+**O que não foi confirmado visualmente.** "Sem janela" foi medido por diferença de janelas
+visíveis (`EnumWindows`/`IsWindowVisible`) antes/depois do disparo da tarefa de teste, num período
+de ~15s sem nenhuma outra interação — não por um humano olhando a tela no momento exato. "Toast
+chega" foi medido como "a chamada WinRT `Show()` não lançou exceção, rodando na SessionId
+correta" — não como confirmação visual de que o toast realmente apareceu na tela. Os dois são a
+melhor medição possível sem um humano parado em frente ao monitor durante o teste; ficam como
+proxy objetivo, não como prova de percepção humana. O relatório da S5-T1 registra isto
+explicitamente como parte do que é medido vs. inferido.
+
+**Ferramentas usadas na medição, todas descartáveis e já removidas:** script PowerShell
+`run-candidate.ps1` + `worker.ps1` + `winenum.cs` (fora do repositório, em
+`$TEMP/claude/.../scratchpad/autostart-spike/`), tarefas agendadas `seeya-spike-conhost-headless`,
+`seeya-spike-vbs-wscript-hidden` e `seeya-spike-powershell-windowstyle-hidden` (as três removidas
+via `Unregister-ScheduledTask` ao fim de cada rodada — confirmado vazio com
+`Get-ScheduledTask -TaskName "seeya-spike-*"` antes de encerrar a tarefa).
+
+**Resposta:** (preenchida pelo PO)

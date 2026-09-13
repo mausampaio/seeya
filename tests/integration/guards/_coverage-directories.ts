@@ -48,6 +48,7 @@ export const DECLARED_COVERAGE_DIRECTORIES: readonly DeclaredCoverageDirectory[]
   { path: 'core', expectation: { kind: 'covered', threshold: 95 } },
   { path: 'application', expectation: { kind: 'covered', threshold: 80 } },
   { path: 'scheduler', expectation: { kind: 'covered', threshold: 80 } },
+  { path: 'adapters/autostart', expectation: { kind: 'covered', threshold: 80 } },
   { path: 'adapters/clock', expectation: { kind: 'covered', threshold: 80 } },
   { path: 'adapters/discovery', expectation: { kind: 'covered', threshold: 80 } },
   { path: 'adapters/generation', expectation: { kind: 'covered', threshold: 80 } },

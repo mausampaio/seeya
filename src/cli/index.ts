@@ -17,6 +17,7 @@ import { Command } from 'commander';
 import { z } from 'zod';
 import packageJson from '../../package.json' with { type: 'json' };
 import {
+  buildAutostartContext,
   buildCliContext,
   buildConfigContext,
   buildDaemonContext,
@@ -35,6 +36,11 @@ import {
   runDaemonStop,
 } from './daemon-command.js';
 import { runSnoozeCommand, runSkipTodayCommand } from './snooze-command.js';
+import {
+  runAutostartEnableCommand,
+  runAutostartDisableCommand,
+  runAutostartStatusCommand,
+} from './autostart-command.js';
 import {
   runConfigGetCommand,
   runConfigPolicyCommand,
@@ -185,6 +191,45 @@ program
     const { storage, processControl } = await buildDaemonContext();
     const scriptPath = fileURLToPath(import.meta.url);
     console.log(await runDaemonLauncher(storage, processControl, { scriptPath, args: ['daemon'] }));
+  });
+
+const autostartCommand = program
+  .command('autostart')
+  .description(
+    "Register (or remove) seeya daemon in this OS's own autostart mechanism (Task Scheduler / " +
+      'systemd --user / LaunchAgent, S5-T1), so it comes back up after a reboot or logout ' +
+      'without anyone remembering to run "seeya daemon" by hand.',
+  );
+
+autostartCommand
+  .command('enable')
+  .description(
+    'Register seeya daemon to start on login, pointing at the binary currently in use. Safe to ' +
+      'run again: updates the registered path instead of duplicating the registration.',
+  )
+  .action(async () => {
+    const { autostart } = buildAutostartContext();
+    const binaryPath = fileURLToPath(import.meta.url);
+    console.log(await runAutostartEnableCommand(autostart, binaryPath));
+  });
+
+autostartCommand
+  .command('disable')
+  .description('Remove the autostart registration, if any. Not an error when none is registered.')
+  .action(async () => {
+    const { autostart } = buildAutostartContext();
+    console.log(await runAutostartDisableCommand(autostart));
+  });
+
+autostartCommand
+  .command('status')
+  .description(
+    'Show whether autostart is enabled, disabled, or enabled but pointing at a path that no ' +
+      'longer exists. Read-only. Same result as the autostart line in "seeya status".',
+  )
+  .action(async () => {
+    const { autostart } = buildAutostartContext();
+    console.log(await runAutostartStatusCommand(autostart));
   });
 
 program
