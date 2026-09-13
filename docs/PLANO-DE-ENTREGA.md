@@ -3916,6 +3916,31 @@ texto, mas não são a fila.
       2. Um `seeya start-day` real com um handoff de mais de 16.384 caracteres, para ver o fallback
          disparar de verdade, a pergunta aparecer antes, e o "pulada a pedido" no resumo final.
 
+## v2 — o projeto como unidade (rumo em `docs/V2-RUMO.md`)
+
+- [ ] **V2-T0 — Spike M: o terminal embutido.** Aprovado pelo mantenedor em 2026-09-13. A maior
+      incógnita da v2 (D-042): o harness roda dentro de uma aba com `xterm.js` e um PTY, no Windows
+      e no Linux? Protótipo **descartável, fora do repositório** (`C:\code\seeya-spike-M`);
+      no repositório entra só o registro em `docs/spikes/M-terminal-embutido.md`.
+
+      **O que medir, no Windows agora (Linux fica para o mantenedor, na máquina dele):**
+      1. **Montagem:** Electron + `xterm.js` + `node-pty` sobem numa janela com uma aba de
+         terminal? Quanto custou montar — em especial o módulo nativo `node-pty` contra a ABI do
+         Electron (prebuild disponível ou compilação, e o que a compilação exige nesta máquina).
+      2. **`claude` dentro da aba:** o TUI abre, aceita entrada, redimensiona, cores e caixas
+         corretas, `Ctrl+C` chega ao processo, saída detectada quando o processo termina. Um prompt
+         curto de verdade ("say ok"), custo mínimo.
+      3. **`codex` dentro da aba:** o mesmo.
+      4. **D-038:** nenhuma janela de console aparece ao abrir a aba (ConPTY cria pseudoconsole; o
+         que aparece na tela é só a janela do Electron).
+      5. **Identidade:** a sessão do `claude` aberta na aba aparece no registro do Claude Code
+         (`~/.claude/sessions/`) com `cwd` igual ao diretório do projeto — é o que a descoberta do
+         seeya precisa para "ver" a sessão da aba.
+      6. **Custo:** memória do Electron com uma e com três abas abertas.
+
+      *Aceite:* tabela medida por item, com o que **não** foi medido declarado (Linux, macOS);
+      recomendação clara sobre a stack; processos e sessões de teste removidos ao final.
+
 ## Definição de pronto (vale para toda tarefa)
 
 1. Código implementa exatamente a spec; divergência virou questão, não improviso.
