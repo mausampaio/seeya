@@ -22,11 +22,19 @@
 // the wrong one (`rimraf`-as-a-dependency, or a `rd /s /q` that only works in cmd.exe) is exactly
 // the kind of platform assumption this project has been burned by before (docs/DECISOES.md D-015,
 // Spike C: PowerShell silently mangling something that worked fine as a plain array/API call).
+//
+// V2-T1 (D-043): one `dist/` per workspace package now, not one at the repo root — each package
+// builds and ships its own. `force: true` (a missing directory already satisfies "make sure
+// dist/ doesn't exist") is what keeps this a no-op for packages/app, reserved but not created yet.
 import { rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const distDir = path.join(repoRoot, 'dist');
+const packageDistDirs = ['packages/engine', 'packages/cli'].map((pkg) =>
+  path.join(repoRoot, pkg, 'dist'),
+);
 
-rmSync(distDir, { recursive: true, force: true });
+for (const distDir of packageDistDirs) {
+  rmSync(distDir, { recursive: true, force: true });
+}

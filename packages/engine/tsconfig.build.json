@@ -1,0 +1,20 @@
+{
+  // Composite build project for @seeya-ai/engine (V2-T1, D-043), the `tsc -b` leaf the root
+  // tsconfig.build.json references first. Named tsconfig.build.json (not tsconfig.json) on
+  // purpose: typescript-eslint's projectService auto-discovers the nearest file literally called
+  // "tsconfig.json" walking up from each linted file, and this package has none — so typed lint
+  // of packages/engine/src falls through to the root tsconfig.json, the one whole-repo program
+  // (this file's own compilerOptions never need to matter to ESLint). This file's only job is
+  // producing `dist/` with declarations for packages/cli (and, later, packages/app) to import at
+  // runtime through @seeya-ai/engine's package.json "exports".
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src"]
+}

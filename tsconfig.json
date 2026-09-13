@@ -1,30 +1,26 @@
 {
+  // Flat, non-composite whole-repo type checker (V2-T1): a single TS program over both packages'
+  // source AND tests/, so a test that misuses a type in packages/engine or packages/cli is still
+  // caught in one pass — exactly what `tsc -p tsconfig.json --noEmit` did before the monorepo
+  // split. Deliberately NOT part of the `tsc -b` project-reference graph (tsconfig.build.json):
+  // this program never emits and must never require a prior build, mirroring how tests resolve
+  // `@seeya-ai/engine` to source (see "paths" below), not to `packages/engine/dist`.
+  //
+  // V2-T1 steps (a)/(b): "tests" is deliberately left OUT of "include" below until step (c)
+  // migrates its imports off the old `../../../src/...` paths — lint-staged's pre-commit hook
+  // runs this exact command unscoped (lint-staged.config.js), so a tests/ directory still on the
+  // pre-move paths would fail every commit before the migration is done, not just the last one.
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2023",
-    "lib": ["ES2023"],
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    // Explicit, not relying on TypeScript's automatic @types/* discovery: that auto-inclusion
-    // turned out to depend on which files happen to be in the program (S1-T2 found it by
-    // accident — `tsconfig.json`, which also includes vitest.config.ts, picked up @types/node
-    // that way; `tsconfig.build.json`, which only includes `src` and doesn't extend the file
-    // list, silently didn't, and every `node:*` import in the first adapter to use one failed to
-    // build with "Cannot find name 'process'"). Declaring it here makes both configs agree and
-    // stops depending on which unrelated file happens to pull the package in.
-    "types": ["node"],
-    "strict": true,
-    "exactOptionalPropertyTypes": true,
-    "noUncheckedIndexedAccess": true,
-    "noImplicitOverride": true,
-    "noFallthroughCasesInSwitch": true,
-    "forceConsistentCasingInFileNames": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "isolatedModules": true,
-    "verbatimModuleSyntax": true,
-    "resolveJsonModule": true,
     "noEmit": true,
-    "newLine": "lf"
+    // V2-T1 (D-043): `@seeya-ai/engine`'s package.json "exports" point at its build output, so
+    // that the *published* boundary is what cli actually runs against. Type-checking (this file)
+    // and the test suite (vitest.config.ts's alias) both bypass that and resolve straight to
+    // source instead, so neither depends on a build having happened first — same reasoning as
+    // D-020's "no test touches disk": here, no check touches `dist/`.
+    "paths": {
+      "@seeya-ai/engine/*": ["./packages/engine/src/*"]
+    }
   },
-  "include": ["src", "tests", "vitest.config.ts", "eslint.config.js"]
+  "include": ["packages/engine/src"]
 }

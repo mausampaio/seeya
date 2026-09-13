@@ -1,0 +1,21 @@
+{
+  // Dedicated, self-contained (no "extends") config just for dependency-cruiser's own module
+  // resolution (V2-T1, D-043): dependency-cruiser's tsconfig loader did not resolve the nested
+  // "extends": "../../tsconfig.base.json" used by packages/*/tsconfig.build.json correctly when
+  // pointed at a package-level file (it collapsed the ".." segments against the wrong base and
+  // looked for "packages/cli/tsconfig.base.json", which doesn't exist) — inlining the handful of
+  // resolution-relevant options here avoids that entirely. Deliberately NOT part of the `tsc -b`
+  // graph and NOT used by ESLint or `npm run verificar`'s type-check step; it exists only so
+  // .dependency-cruiser.cjs resolves `@seeya-ai/engine/*` the same way Node does at runtime
+  // (through the package.json "exports" map into packages/engine/dist), never redirected to
+  // source the way the root tsconfig.json's "paths" does for type-checking and tests.
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2023",
+    "resolveJsonModule": true,
+    "noEmit": true
+  },
+  // V2-T1 step (a): packages/cli is added to this list in step (b)'s commit.
+  "include": ["packages/engine/src"]
+}

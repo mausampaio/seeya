@@ -1,0 +1,43 @@
+{
+  "name": "@seeya-ai/engine",
+  "version": "0.1.0",
+  "description": "Session discovery, evidence capture, and scheduling core for seeya. Consumed in-process by @seeya-ai/cli (and, later, @seeya-ai/app) — never spawned as a subprocess (D-043).",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    "./core/*.js": {
+      "types": "./dist/core/*.d.ts",
+      "import": "./dist/core/*.js"
+    },
+    "./application/*.js": {
+      "types": "./dist/application/*.d.ts",
+      "import": "./dist/application/*.js"
+    },
+    "./adapters/*.js": {
+      "types": "./dist/adapters/*.d.ts",
+      "import": "./dist/adapters/*.js"
+    },
+    "./scheduler/*.js": {
+      "types": "./dist/scheduler/*.d.ts",
+      "import": "./dist/scheduler/*.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mausampaio/seeya.git",
+    "directory": "packages/engine"
+  },
+  "license": "MIT"
+}
