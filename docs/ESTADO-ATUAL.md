@@ -75,8 +75,12 @@ Isto se perderia se a sessão que o viveu terminasse:
 
 ## Próximo passo
 
-S4-T11, S4-T12 e S4-T13 mescladas em 12/09; a fila do Sprint 4 está vazia. Decisão ainda
-aberta: a ordem entre Sprint 5 e v2. A v2 está sendo desenhada em `V2-RUMO.md` em paralelo. O resultado do spike K está em
+S4-T11, S4-T12 e S4-T13 mescladas em 12/09; a fila do Sprint 4 está vazia. **Decidido em
+13/09 (D-040, D-041):** o produto passa a se chamar `seeya` (repositório, pasta, binário; npm
+`@seeya/cli`), e a ordem é **Sprint 5 mínimo** (S5-T0 renomear, S5-T1 autostart, S5-T5 CI,
+S5-T6 segurança) **e depois a v2**, com a interface básica adiantada para o começo dela
+(`V2-RUMO.md`, recorte reordenado). Publicação só na fronteira da v2. Próximo despacho com aval
+do mantenedor: **S5-T0**. O resultado do spike K está em
 [`spikes/K-sessao-limpa.md`](spikes/K-sessao-limpa.md).
 
 ## Ambiente do mantenedor

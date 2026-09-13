@@ -3602,10 +3602,25 @@ como tarefa aberta, já decidida, fora do aceite.
 
 ## Sprint 5 — Entregar
 
+**Sprint 5 mínimo (D-041, 2026-09-13):** entram S5-T0, S5-T1, S5-T5 e S5-T6. S5-T2, S5-T3,
+S5-T4 e S5-T7 ficam **adiadas para a fronteira da v2** — continuam listadas para não perder o
+texto, mas não são a fila.
+
+- [ ] **S5-T0 — Renomear para `seeya` (D-040).** Numa leva só, sem agente no ar: renomear o
+      repositório no GitHub (a URL antiga redireciona) e a pasta local; refazer o `npm link`;
+      podar as worktrees antigas; `package.json` → `@seeya/cli` (sem publicar); atualizar as
+      menções ao nome longo onde ele é identificador (README, CI, `AGENTS.md` título, `INDEX.md`)
+      e **não** onde é história (decisões, spikes, relatórios). *Aceite:* portão verde na pasta
+      nova, `seeya --version` funcionando pelo link novo, CI verde no repositório renomeado, e o
+      `ESTADO-ATUAL.md` dizendo o caminho novo — a chave de memória do Claude Code para a pasta
+      muda, e quem retomar precisa saber disso.
 - [ ] **S5-T1 — Autostart do daemon** por SO (Task Scheduler, launchd, systemd user).
-- [ ] **S5-T2 — `seeya init`**: config guiada na primeira execução.
-- [ ] **S5-T3 — README** e empacotamento npm.
-- [ ] **S5-T4 — Bateria manual nos 3 SOs** e correção do que aparecer.
+- [ ] **S5-T2 — `seeya init`**: config guiada na primeira execução. **Adiada para a fronteira
+      da v2** (D-041): a v2 redefine a instalação (espaço de trabalho, remoto, dispositivo).
+- [ ] **S5-T3 — README** e empacotamento npm. **Adiada para a fronteira da v2** (D-041), sob
+      `@seeya/cli` (D-040).
+- [ ] **S5-T4 — Bateria manual nos 3 SOs** e correção do que aparecer. **Adiada para a
+      fronteira da v2** (D-041).
 
 ---
 

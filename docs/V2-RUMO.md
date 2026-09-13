@@ -273,16 +273,42 @@ evolução:  projeto persistente → sessão temporária → atualização do pr
 A v1 continua valendo para sessões abertas fora do seeya e como mecanismo de recuperação. A
 descoberta de sessões, a leitura do git, o handoff e a retomada são reaproveitados.
 
-### Recorte incremental proposto
+### Recorte incremental — reordenado em 2026-09-13: a interface entra cedo
 
-1. `seeya project create`, `list`, `show` e `open`;
-2. template com `AGENTS.md`, `INDEX.md`, contexto, decisões, plano e estado;
-3. associação de repositórios locais;
-4. `checkpoint` e `pause <id>`, usando os documentos e a atividade no git;
-5. `end-day` geral, consolidando as frentes ativas;
-6. integração opcional com trackers;
-7. detecção de sessões sem projeto e sugestão de associação;
-8. interface gráfica organizada por projeto, com botões de ação nas notificações (D-034).
+**Por que a interface saiu do fim** (mantenedor, 2026-09-13): *"no meu dia a dia eu não consigo
+ficar criando projeto e configurando via CLI; aqui no PC pessoal ainda dá, mas lá eu tenho dez
+sessões reais. Não adianta eu ter um projeto com repo e sync e ainda ter dez terminais abertos e
+continuar perdido."* O modelo de projeto organiza o **conhecimento**; quem organiza as **sessões
+vivas** é a interface. Sem ela, a v2 resolve metade da dor e a validação fica presa ao PC pessoal.
+
+**O que é "básico", proposta do PO a confirmar:** uma janela com os projetos na lateral (nome,
+prioridade, estado) e, para cada projeto, **abas de sessão** — terminais embutidos que abrem o
+harness escolhido no contexto do projeto. Botões de `pause` e `end-day` por projeto; as
+notificações passam a ter ações, que a D-034 já reservava para a interface. **Uma limitação
+honesta desde o começo:** só entra numa aba a sessão que a interface abriu; uma sessão já aberta
+num terminal externo não pode ser "puxada" para dentro — ela aparece na lista das descobertas, com
+retomada pelo mecanismo da v1. A interface **organiza e abre a pedido**; não inicia trabalho sozinha
+(D-039).
+
+**Arquitetura, para não nascer duas implementações:** um monorepo com `@seeya/core` (o que hoje é
+`core` + `application` + `adapters`), `@seeya/cli` e `@seeya/app`. A interface consome o núcleo
+**no mesmo processo**, nunca chamando a CLI por subprocesso. Isso emenda a D-020: passam a existir
+duas raízes de composição (`cli/` e `app/`), ambas nomeando adapters concretos, e nenhuma outra.
+
+**A escolha de stack é spike, não suposição:** Electron com `xterm.js` e `node-pty` é o caminho
+batido em Node (e o terminal embutido no Windows passa pelo ConPTY — as lições de janela e console
+da S4-T6/D-038 valem aqui); Tauri exige Rust. O spike decide no Windows primeiro, onde as
+armadilhas moram.
+
+1. renomear para `seeya` (S5-T0, D-040) e organizar o monorepo com os escopos;
+2. `seeya project create`, `list`, `show` e `open`, com o template mínimo (`AGENTS.md`,
+   `INDEX.md`, estado atual, `decisions/`) e a associação de repositórios;
+3. **interface básica**: projetos na lateral, abas de sessão, `pause`/`end-day` por projeto;
+4. `checkpoint` e `pause`, com a camada de afirmações verificáveis do detector;
+5. `end-day` global, com `priority` e `status`;
+6. sincronização em níveis e continuidade entre dispositivos;
+7. trackers; detecção de sessões sem projeto; camada semântica do detector;
+8. jornada detalhada, depois de o `end-day` global rodar com frentes reais.
 
 ## Avaliação do PO (2026-09-10)
 

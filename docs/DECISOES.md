@@ -1332,3 +1332,44 @@ ele agora e não depois.
 **O nome já se resolveu sozinho.** O pacote é `see-you-tomorrow-ai`; o que se digita, o que aparece
 na notificação e o que se fala em voz alta é **`seeya`**. O nome longo é do repositório — o nome do
 produto é o curto.
+
+---
+
+## D-040 — O produto se chama `seeya`: repositório, pasta e binário; no npm, escopo `@seeya`
+
+**Decisão do mantenedor, em 2026-09-13.** O nome longo (`see-you-tomorrow-ai`) sai do
+repositório e da pasta; o produto, o binário e o escopo npm são `seeya`.
+
+**O fato que forçou a decisão:** `seeya` como pacote npm já está ocupado (um `0.0.0` parado desde
+2022). Renomear na fronteira de versão, como a D-039 previa, não era só trocar string. A saída é
+**escopo**: `@seeya/cli`, que abre espaço para outros pacotes (`@seeya/core`, `@seeya/app`) sem
+disputar nome. Verificado em 2026-09-13: nenhum usuário nem organização `seeya` no npm, nenhum
+pacote no escopo `@seeya` — a organização precisa ser criada pelo mantenedor antes de publicar. Se
+não for possível, o escopo cai para `@seeya-ai` (também livre); **o binário continua `seeya`**
+em qualquer caso.
+
+**Consequências:** o repositório no GitHub é renomeado (o GitHub redireciona a URL antiga); a
+pasta local muda, o que refaz o `npm link` e muda a chave que o Claude Code usa para memória e
+transcripts daquele diretório; `package.json` ganha o nome escopado; os documentos que citam o
+nome longo são atualizados onde ele é identificador, não onde é história. Tudo isso numa tarefa
+só (S5-T0), num momento sem agente no ar.
+
+---
+
+## D-041 — Sprint 5 mínimo, depois a v2; publicação só na fronteira da v2
+
+**Decisão do mantenedor, em 2026-09-13**, depois dos argumentos dos dois lados.
+
+**O que entra agora:** o que a v2 herda intacta e o que dói no uso diário — o autostart do daemon
+(S5-T1; a tampa fechada de 12/09 matou o daemon e o encerramento ficou sem ninguém para
+disparar), as ações da CI num runtime obsoleto (S5-T5) e o portão de segurança (S5-T6), mais a
+renomeação (S5-T0).
+
+**O que espera a fronteira da v2:** `seeya init` (a v2 redefine o fluxo de instalação por
+completo), README e publicação no npm, a bateria manual nos três sistemas e o `--sessions`.
+Publicar acontece uma vez, com o nome resolvido e a unidade de projeto no lugar.
+
+**O custo aceito, nas palavras dele:** a v1 não recebe validação externa. *"Eu estou desenvolvendo
+ele para mim e para minhas necessidades; se isso atender mais alguém, ótimo; se não, tá tudo bem
+também."* O projeto continua open source e público, mas o critério de pronto é o uso dele, não
+adoção.
