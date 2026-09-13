@@ -83,6 +83,14 @@ S5-T6 segurança) **e depois a v2**, com a interface básica adiantada para o co
 do mantenedor: **S5-T0**. O resultado do spike K está em
 [`spikes/K-sessao-limpa.md`](spikes/K-sessao-limpa.md).
 
+## Renomeação (S5-T0, 2026-09-13)
+
+O repositório no GitHub chama-se `seeya`, no mesmo dono (a URL antiga redireciona), e a pasta local é
+`C:\code\seeya`. O pacote é `@seeya-ai/cli`, binário `seeya`. **A chave que o Claude Code usa
+para memória e transcripts é derivada do caminho**, então a pasta nova começa sem memória de
+diretório e sem transcripts antigos — os de `see-you-tomorrow-ai` continuam em
+`~/.claude/projects/`, só não são desta chave. O `npm link` foi refeito na pasta nova.
+
 ## Ambiente do mantenedor
 
 Não faz parte do projeto, mas afeta o trabalho:

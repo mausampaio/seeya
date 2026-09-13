@@ -1,4 +1,4 @@
-# Contrato de trabalho — See You Tomorrow AI
+# Contrato de trabalho — seeya
 
 > **Chegou sem contexto?** Comece pelo [`INDEX.md`](INDEX.md): ele diz qual é o seu papel e onde
 > está o estado atual. Se você recebeu uma tarefa `S#-T#` num despacho, este arquivo é o seu

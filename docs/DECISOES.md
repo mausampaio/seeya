@@ -1344,9 +1344,9 @@ repositório e da pasta; o produto, o binário e o escopo npm são `seeya`.
 2022). Renomear na fronteira de versão, como a D-039 previa, não era só trocar string. A saída é
 **escopo**: `@seeya/cli`, que abre espaço para outros pacotes (`@seeya/core`, `@seeya/app`) sem
 disputar nome. Verificado em 2026-09-13: nenhum usuário nem organização `seeya` no npm, nenhum
-pacote no escopo `@seeya` — a organização precisa ser criada pelo mantenedor antes de publicar. Se
-não for possível, o escopo cai para `@seeya-ai` (também livre); **o binário continua `seeya`**
-em qualquer caso.
+pacote no escopo `@seeya` — mas o npm **recusou** a organização `seeya`, porque o nome colide com
+o pacote existente. **A organização `seeya-ai` foi criada pelo mantenedor em 2026-09-13**, e o
+pacote é `@seeya-ai/cli`; **o binário continua `seeya`**.
 
 **Consequências:** o repositório no GitHub é renomeado (o GitHub redireciona a URL antiga); a
 pasta local muda, o que refaz o `npm link` e muda a chave que o Claude Code usa para memória e

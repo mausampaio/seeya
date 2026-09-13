@@ -1,9 +1,9 @@
-# See You Tomorrow AI
+# seeya
 
 The day ends with several AI sessions in progress, across different projects. The next day, the
 expensive part isn't resuming the work — it's rebuilding the context for each one.
 
-**See You Tomorrow AI** discovers the Claude Code sessions on your machine, captures the state of
+**seeya** ("see you tomorrow") discovers the Claude Code sessions on your machine, captures the state of
 each one at the end of the day, generates a plan for tomorrow, and resumes right where you left
 off the next day.
 
@@ -45,8 +45,8 @@ inside `~/.claude/`.
 **Not published to npm yet.** Until it is, install from a clone:
 
 ```bash
-git clone https://github.com/<owner>/see-you-tomorrow-ai.git
-cd see-you-tomorrow-ai
+git clone https://github.com/<owner>/seeya.git
+cd seeya
 npm ci
 npm run build
 npm link
@@ -60,7 +60,7 @@ seeya --version
 seeya sessions
 ```
 
-To remove it: `npm unlink -g see-you-tomorrow-ai`.
+To remove it: `npm unlink -g @seeya-ai/cli`.
 
 If you'd rather install nothing, run the compiled entry point directly — `node dist/cli/index.js
 sessions` does the same thing.
