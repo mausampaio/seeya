@@ -4,12 +4,34 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ClaudeSessionResumer } from '../../../src/adapters/resumption/resumer.js';
 import { RESUME_PROMPT_ARG_LIMIT_CHARS } from '../../../src/adapters/resumption/args.js';
+import type { ResumeOutcome } from '../../../src/core/types.js';
 import {
   createFakeInteractiveClaudeFixture,
   readCapturedInteractiveClaudeCalls,
   removeFakeInteractiveClaudeFixture,
   type FakeInteractiveClaudeFixture,
 } from './_fixtures.js';
+
+/**
+ * Drives both halves of the S5-T9 split port the way `application/start-day.ts` does when the
+ * fallback question is answered "open" — this integration suite is about `ClaudeSessionResumer`'s
+ * own argv/env/timing contract, not about the ask itself (that's
+ * `tests/unit/application/start-day.test.ts` and `tests/unit/core/resume-fallback-decision.test.ts`),
+ * so always opening the fallback when one is needed keeps every assertion below unchanged from
+ * before the split.
+ */
+async function attemptAndOpenFallbackIfNeeded(
+  resumer: ClaudeSessionResumer,
+  sessionId: string,
+  cwd: string,
+  prompt: string,
+): Promise<ResumeOutcome> {
+  const primary = await resumer.attemptResume(sessionId, cwd, prompt);
+  if (primary.kind === 'resumed') {
+    return primary.outcome;
+  }
+  return resumer.runFallback(sessionId, cwd, prompt, primary.reason);
+}
 
 /** Env vars this file may set on the TEST process before spawning — every one restored to its
  * prior value in `afterEach`, same discipline `tests/integration/generation/lean-generator.test.ts`
@@ -63,7 +85,12 @@ describe('ClaudeSessionResumer — S3-T2', () => {
     process.env['FAKE_CLAUDE_EXIT_CODE'] = '0';
     const resumer = new ClaudeSessionResumer({ seeyaHome, claudeBinary: fixture.binaryPath });
 
-    const outcome = await resumer.resume('session-1', PROJECT_CWD, "yesterday's plan");
+    const outcome = await attemptAndOpenFallbackIfNeeded(
+      resumer,
+      'session-1',
+      PROJECT_CWD,
+      "yesterday's plan",
+    );
 
     expect(outcome).toStrictEqual({ sessionId: 'session-1', cwd: PROJECT_CWD, fellBack: false });
     const calls = await readCapturedInteractiveClaudeCalls(fixture);
@@ -82,7 +109,12 @@ describe('ClaudeSessionResumer — S3-T2', () => {
         fastFailureGraceMs: 2_000,
       });
 
-      const outcome = await resumer.resume('session-1', PROJECT_CWD, "yesterday's plan");
+      const outcome = await attemptAndOpenFallbackIfNeeded(
+        resumer,
+        'session-1',
+        PROJECT_CWD,
+        "yesterday's plan",
+      );
 
       expect(outcome.fellBack).toStrictEqual({ kind: 'resumeFailed', exitCode: 1 });
       const calls = await readCapturedInteractiveClaudeCalls(fixture);
@@ -105,7 +137,12 @@ describe('ClaudeSessionResumer — S3-T2', () => {
     const oversized = 'x'.repeat(RESUME_PROMPT_ARG_LIMIT_CHARS + 1);
     const resumer = new ClaudeSessionResumer({ seeyaHome, claudeBinary: fixture.binaryPath });
 
-    const outcome = await resumer.resume('session-1', PROJECT_CWD, oversized);
+    const outcome = await attemptAndOpenFallbackIfNeeded(
+      resumer,
+      'session-1',
+      PROJECT_CWD,
+      oversized,
+    );
 
     expect(outcome.fellBack).toStrictEqual({
       kind: 'promptTooLarge',
@@ -137,7 +174,7 @@ describe('ClaudeSessionResumer — S3-T2', () => {
 
       let thrown: Error | undefined;
       try {
-        await resumer.resume('session-1', PROJECT_CWD, plan);
+        await attemptAndOpenFallbackIfNeeded(resumer, 'session-1', PROJECT_CWD, plan);
       } catch (error) {
         thrown = error as Error;
       }
@@ -175,12 +212,12 @@ describe('ClaudeSessionResumer — S3-T2', () => {
 
       let thrown: Error | undefined;
       try {
-        await resumer.resume('session-1', PROJECT_CWD, oversized);
+        await attemptAndOpenFallbackIfNeeded(resumer, 'session-1', PROJECT_CWD, oversized);
       } catch (error) {
         thrown = error as Error;
       }
 
-      expect(thrown?.message).toMatch(/over the 4096-character limit/);
+      expect(thrown?.message).toMatch(/over the 16384-character limit/);
       const message = thrown?.message ?? '';
       expect(message).toContain('skipped');
       expect(message).not.toContain('--resume');
@@ -193,7 +230,7 @@ describe('ClaudeSessionResumer — S3-T2', () => {
     process.env['CLAUDE_CODE_CHILD_SESSION'] = '1';
     const resumer = new ClaudeSessionResumer({ seeyaHome, claudeBinary: fixture.binaryPath });
 
-    await resumer.resume('session-1', PROJECT_CWD, 'a short plan');
+    await attemptAndOpenFallbackIfNeeded(resumer, 'session-1', PROJECT_CWD, 'a short plan');
 
     const [call] = await readCapturedInteractiveClaudeCalls(fixture);
     expect(call?.env['CLAUDE_CODE_CHILD_SESSION']).toBeUndefined();

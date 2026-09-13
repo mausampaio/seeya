@@ -1,12 +1,16 @@
 /**
- * `SessionResumer`'s only implementation (S3-T2, D-004). Ties together this directory's other
+ * `SessionResumer`'s only implementation (S3-T2, D-004; split into `attemptResume`/`runFallback`
+ * in S5-T9 — see `core/ports.ts`'s docstring for why). Ties together this directory's other
  * modules: `args.ts` decides the argument shape and the size ceiling, `env.ts` sanitizes per
  * D-017, `spawn-interactive.ts` is the one place a real process gets spawned, and
- * `context-file.ts` is the fallback's scratch file. This file's own job is the branching: which of
- * the two attempts runs, and what `ResumeFallbackReason` (if any) the caller sees.
+ * `context-file.ts` is the fallback's scratch file.
  */
 import type { SessionResumer } from '../../core/ports.js';
-import type { ResumeFallbackReason, ResumeOutcome } from '../../core/types.js';
+import type {
+  PrimaryResumeAttempt,
+  ResumeFallbackReason,
+  ResumeOutcome,
+} from '../../core/types.js';
 import {
   buildFallbackArgs,
   buildResumeArgs,
@@ -36,40 +40,12 @@ export interface ClaudeSessionResumerOptions {
   readonly fastFailureGraceMs?: number;
 }
 
-/** Everything one `resume()` call needs to pass down to its (possible) fallback attempt, resolved
- * once at the top of `resume()` — one object instead of a growing positional-parameter list. */
-interface ResumeCallContext {
-  readonly sessionId: string;
-  readonly cwd: string;
-  readonly prompt: string;
+/** The three values both `attemptResume` and `runFallback` need to resolve from `options` before
+ * spawning anything — one small helper instead of repeating the same three lines in each method. */
+interface CallBasics {
   readonly claudeBinary: string;
   readonly env: NodeJS.ProcessEnv;
   readonly fastFailureGraceMs: number;
-}
-
-/**
- * Describes the primary `--resume` attempt for the error thrown when the fallback ALSO fails
- * (S3-T7, Q-029). Two shapes, because the primary attempt itself has two shapes:
- * `resumeFailed` means `claude --resume` actually ran and exited non-zero — show the argv it ran
- * with (redacted per `describeResumeAttempt`) plus that exit code. `promptTooLarge` means the
- * primary attempt was never even tried (`resume()` routes straight to `fallback()` before calling
- * `runInteractive` at all) — saying so plainly matters as much as the other branch: claiming an
- * attempt that never happened would be exactly the D-025 violation this task exists to avoid on
- * the "fact" side, done instead on the "action" side.
- */
-function describePrimaryAttempt(context: ResumeCallContext, reason: ResumeFallbackReason): string {
-  if (reason.kind === 'promptTooLarge') {
-    return (
-      `skipped — the plan was ${reason.promptLength} characters, over the ` +
-      `${reason.limitChars}-character limit`
-    );
-  }
-  const argv = describeResumeAttempt(context.claudeBinary, context.sessionId, context.prompt);
-  return `${argv} (exited with code ${reason.exitCode})`;
-}
-
-function isFastFailure(result: InteractiveRunResult): boolean {
-  return result.failedFast && result.exitCode !== 0;
 }
 
 /** Extracted so the default-resolution branch is unit-testable on its own (`resumer.test.ts`
@@ -83,45 +59,89 @@ export function resolveClaudeBinary(
   return options.claudeBinary ?? DEFAULT_CLAUDE_BINARY;
 }
 
+function resolveCallBasics(options: ClaudeSessionResumerOptions): CallBasics {
+  return {
+    claudeBinary: resolveClaudeBinary(options),
+    env: buildResumptionEnv(process.env),
+    fastFailureGraceMs: options.fastFailureGraceMs ?? FAST_FAILURE_GRACE_MS,
+  };
+}
+
+/**
+ * Describes the primary `--resume` attempt for the error thrown when the fallback ALSO fails
+ * (S3-T7, Q-029). Two shapes, because the primary attempt itself has two shapes:
+ * `resumeFailed` means `claude --resume` actually ran and exited non-zero — show the argv it ran
+ * with (redacted per `describeResumeAttempt`) plus that exit code. `promptTooLarge` means the
+ * primary attempt was never even tried (`attemptResume` reports `needsFallback` before calling
+ * `runInteractive` at all) — saying so plainly matters as much as the other branch: claiming an
+ * attempt that never happened would be exactly the D-025 violation this task exists to avoid on
+ * the "fact" side, done instead on the "action" side.
+ */
+function describePrimaryAttempt(
+  claudeBinary: string,
+  sessionId: string,
+  prompt: string,
+  reason: ResumeFallbackReason,
+): string {
+  if (reason.kind === 'promptTooLarge') {
+    return (
+      `skipped — the plan was ${reason.promptLength} characters, over the ` +
+      `${reason.limitChars}-character limit`
+    );
+  }
+  const argv = describeResumeAttempt(claudeBinary, sessionId, prompt);
+  return `${argv} (exited with code ${reason.exitCode})`;
+}
+
+function isFastFailure(result: InteractiveRunResult): boolean {
+  return result.failedFast && result.exitCode !== 0;
+}
+
 export class ClaudeSessionResumer implements SessionResumer {
   constructor(private readonly options: ClaudeSessionResumerOptions) {}
 
-  async resume(sessionId: string, cwd: string, prompt: string): Promise<ResumeOutcome> {
-    const context: ResumeCallContext = {
-      sessionId,
-      cwd,
-      prompt,
-      claudeBinary: resolveClaudeBinary(this.options),
-      env: buildResumptionEnv(process.env),
-      fastFailureGraceMs: this.options.fastFailureGraceMs ?? FAST_FAILURE_GRACE_MS,
-    };
-
+  /** Never spawns the fallback itself (S5-T9) — only reports whether one is needed, and why, so
+   * the caller can ask before anything opens. */
+  async attemptResume(
+    sessionId: string,
+    cwd: string,
+    prompt: string,
+  ): Promise<PrimaryResumeAttempt> {
     if (prompt.length > RESUME_PROMPT_ARG_LIMIT_CHARS) {
-      return this.fallback(context, {
-        kind: 'promptTooLarge',
-        promptLength: prompt.length,
-        limitChars: RESUME_PROMPT_ARG_LIMIT_CHARS,
-      });
+      return {
+        kind: 'needsFallback',
+        reason: {
+          kind: 'promptTooLarge',
+          promptLength: prompt.length,
+          limitChars: RESUME_PROMPT_ARG_LIMIT_CHARS,
+        },
+      };
     }
 
+    const { claudeBinary, env, fastFailureGraceMs } = resolveCallBasics(this.options);
     const primary = await runInteractive({
-      claudeBinary: context.claudeBinary,
+      claudeBinary,
       args: buildResumeArgs(sessionId, prompt),
       cwd,
-      env: context.env,
-      fastFailureGraceMs: context.fastFailureGraceMs,
+      env,
+      fastFailureGraceMs,
     });
     if (!isFastFailure(primary)) {
-      return { sessionId, cwd, fellBack: false };
+      return { kind: 'resumed', outcome: { sessionId, cwd, fellBack: false } };
     }
-    return this.fallback(context, { kind: 'resumeFailed', exitCode: primary.exitCode });
+    return { kind: 'needsFallback', reason: { kind: 'resumeFailed', exitCode: primary.exitCode } };
   }
 
-  private async fallback(
-    context: ResumeCallContext,
+  /** Only ever called after the caller decided to open it (S5-T9: after asking the person, default
+   * "skip"). `reason` is whatever `attemptResume` reported — never recomputed here, so the
+   * question shown beforehand and the fallback actually run can never disagree about why. */
+  async runFallback(
+    sessionId: string,
+    cwd: string,
+    prompt: string,
     reason: ResumeFallbackReason,
   ): Promise<ResumeOutcome> {
-    const { sessionId, cwd, prompt, claudeBinary, env, fastFailureGraceMs } = context;
+    const { claudeBinary, env, fastFailureGraceMs } = resolveCallBasics(this.options);
     const contextFilePath = await writeFallbackContextFile(
       this.options.seeyaHome,
       sessionId,
@@ -155,7 +175,7 @@ export class ClaudeSessionResumer implements SessionResumer {
       throw new Error(
         `Fallback session for "${sessionId}" (${cwd}) also failed to start (claude exited with ` +
           `code ${result.exitCode}).\n` +
-          `  primary attempt:  ${describePrimaryAttempt(context, reason)}\n` +
+          `  primary attempt:  ${describePrimaryAttempt(claudeBinary, sessionId, prompt, reason)}\n` +
           `  fallback attempt: ${describeFallbackAttempt(claudeBinary, contextFilePath)}\n` +
           `If "claude" is on PATH and "${cwd}" still exists, check next whether the installed ` +
           `claude version still recognizes the flags shown above.`,

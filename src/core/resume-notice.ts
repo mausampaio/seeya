@@ -11,7 +11,7 @@
  * the wording right, and testing it, doesn't need the command to exist yet; it only needs the
  * `ResumeOutcome` shape S3-T2 already produces.
  */
-import type { ResumeOutcome } from './types.js';
+import type { ResumeFallbackReason, ResumeOutcome } from './types.js';
 
 /** D-025: names only what's known. A bare exit code can't say WHICH of D-004's causes (expired
  * session, moved project) explains the failure — this says "could not be resumed", never invents
@@ -28,6 +28,18 @@ function describePromptTooLarge(promptLength: number, limitChars: number): strin
 }
 
 /**
+ * Shared "why" text for a `ResumeFallbackReason`, used both here (after the fact, in the final
+ * summary) and by `cli/format-start-day.ts#renderFallbackQuestion` (S5-T9: BEFORE the fallback
+ * runs, as part of the question asking whether to open it at all) — one place decides the wording,
+ * so the two never drift into describing the same reason differently.
+ */
+export function describeFallbackReason(reason: ResumeFallbackReason): string {
+  return reason.kind === 'resumeFailed'
+    ? describeResumeFailed(reason.exitCode)
+    : describePromptTooLarge(reason.promptLength, reason.limitChars);
+}
+
+/**
  * Builds the fallback warning for `outcome`, or `null` when `--resume` attached cleanly and there
  * is nothing to warn about.
  *
@@ -39,11 +51,7 @@ export function formatResumeNotice(outcome: ResumeOutcome): string | null {
   if (outcome.fellBack === false) {
     return null;
   }
-  const reason = outcome.fellBack;
-  const why =
-    reason.kind === 'resumeFailed'
-      ? describeResumeFailed(reason.exitCode)
-      : describePromptTooLarge(reason.promptLength, reason.limitChars);
+  const why = describeFallbackReason(outcome.fellBack);
   return (
     `Could not resume session "${outcome.sessionId}" (${outcome.cwd}) — ${why}. ` +
     `Opened a new session there instead, with yesterday's plan as context. ` +

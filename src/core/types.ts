@@ -633,6 +633,19 @@ export interface ResumeOutcome {
   readonly fellBack: false | ResumeFallbackReason;
 }
 
+/**
+ * `SessionResumer.attemptResume()`'s result (S5-T9). Splits what used to be one `resume()` call
+ * that decided AND executed the fallback in the same breath — that shape left no room for anyone
+ * to ask the user first (docs/PLANO-DE-ENTREGA.md S5-T9, "o fallback avisa ANTES, e pergunta").
+ * `resumed` means the original session is genuinely continuing already; `needsFallback` means the
+ * caller (`application/start-day.ts`) must decide — with the person, not for them — whether
+ * `SessionResumer.runFallback()` should actually run. D-024: a discriminated union, not a boolean
+ * plus an optional reason, because "needs fallback" and "here's why" are never meaningful apart.
+ */
+export type PrimaryResumeAttempt =
+  | { readonly kind: 'resumed'; readonly outcome: ResumeOutcome }
+  | { readonly kind: 'needsFallback'; readonly reason: ResumeFallbackReason };
+
 // Own block at the end of the file on purpose (S4-T2), same reasoning as every addition above
 // this one: a second in-flight task (S4-T1, `adapters/notification`) doesn't touch `core/types.ts`
 // at all, so there is no concurrent editor to collide with here today, but keeping the habit costs

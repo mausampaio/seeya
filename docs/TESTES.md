@@ -702,6 +702,18 @@ Testes de contrato, marcados para **não** rodar no CI padrão (`vitest --projec
   de `adapters/resumption` roda em modo interativo puro com `stdio: 'inherit'`, que não deixa o
   `seeya` ler o stdout do processo filho — supor que a construção do prompt de sistema é a mesma
   rotina nos dois modos é engenharia razoável, não medição direta.
+- `claude --resume <id> "<prompt>"` (D-004's positional argument, `buildResumeArgs`) ainda entrega
+  o conteúdo intacto num prompt do tamanho do caso real de 2026-09-13 (4.135 caracteres) — S5-T9,
+  docs/QUESTOES.md Q-069. Prova por marcador de posição (início e fim do texto) e confirmação de
+  caracteres hostis (quebra de linha, aspas dos dois tipos, `%`, acento, backtick, barra invertida
+  final), contra uma sessão real criada e apagada pelo próprio teste (transcript em
+  `~/.claude/projects/<slug>/` incluído). **Por que este teste existe:** `RESUME_PROMPT_ARG_LIMIT_CHARS`
+  subiu de 4096 para 16384 nesta tarefa exatamente porque o caso real (4135) excedia o teto antigo
+  por 39 caracteres — este teste é a prova de que o novo teto entrega esse caso específico, não só
+  um número maior no código. Sem TTY (o ambiente do agente não tinha um): a medição usa o modo
+  degradado que o Spike H já documenta (resposta única, sem UI interativa) — a fidelidade do
+  argv é a mesma nos dois modos (mesma chamada `spawn`), mas a sessão interativa de verdade com
+  TTY real continua sem medição direta neste arquivo.
 
 **Registrar sempre a versão contra a qual o contrato rodou.** O Spike D mostrou que o
 comportamento muda entre versões (2.1.201 × 2.1.233) e que **duas versões coexistem na mesma

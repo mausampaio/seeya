@@ -1,15 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import {
+  formatFallbackNoTty,
   formatInvalidSelection,
   formatNoPendingBriefing,
   formatNoSessionMatch,
   formatNoTtyInstructions,
   formatResumeProgress,
   formatStartDaySummary,
+  renderFallbackQuestion,
   renderPickerQuestion,
 } from '../../../src/cli/format-start-day.js';
 import type { ResumeSessionsResult } from '../../../src/application/start-day.js';
+import type { ResumeFallbackReason } from '../../../src/core/types.js';
 import { createHandoff } from '../core/_fixtures.js';
+
+const PROMPT_TOO_LARGE_REASON: ResumeFallbackReason = {
+  kind: 'promptTooLarge',
+  promptLength: 4135,
+  limitChars: 4096,
+};
 
 describe('formatNoPendingBriefing', () => {
   it('names how many days were scanned', () => {
@@ -95,6 +104,8 @@ describe('formatStartDaySummary', () => {
   it('lists every resumed session, with a clean resume showing no extra notice', () => {
     const result: ResumeSessionsResult = {
       resumed: [{ sessionId: 'alpha-id', cwd: 'c:\\code\\alpha', fellBack: false }],
+      skipped: [],
+      invalidFallbackAnswers: [],
       remaining: [],
       stoppedEarly: false,
     };
@@ -113,6 +124,8 @@ describe('formatStartDaySummary', () => {
           fellBack: { kind: 'resumeFailed', exitCode: 1 },
         },
       ],
+      skipped: [],
+      invalidFallbackAnswers: [],
       remaining: [],
       stoppedEarly: false,
     };
@@ -129,6 +142,8 @@ describe('formatStartDaySummary', () => {
     });
     const result: ResumeSessionsResult = {
       resumed: [{ sessionId: 'alpha-id', cwd: 'c:\\code\\alpha', fellBack: false }],
+      skipped: [],
+      invalidFallbackAnswers: [],
       remaining: [failed, neverTried],
       stoppedEarly: { handoff: failed, error: new Error('claude is not on PATH') },
     };
@@ -141,7 +156,65 @@ describe('formatStartDaySummary', () => {
   });
 
   it('nothing resumed and nothing remaining is an empty summary', () => {
-    const result: ResumeSessionsResult = { resumed: [], remaining: [], stoppedEarly: false };
+    const result: ResumeSessionsResult = {
+      resumed: [],
+      skipped: [],
+      invalidFallbackAnswers: [],
+      remaining: [],
+      stoppedEarly: false,
+    };
     expect(formatStartDaySummary(result)).toBe('');
+  });
+
+  // S5-T9 aceite: "o resumo final continua listando o que aconteceu, inclusive 'pulada a pedido'".
+  it('lists a session skipped at the fallback question, with why a fallback was offered at all', () => {
+    const skippedHandoff = createHandoff({ sessionId: 'alpha-id', cwd: 'c:\\code\\alpha' });
+    const result: ResumeSessionsResult = {
+      resumed: [],
+      skipped: [{ handoff: skippedHandoff, reason: PROMPT_TOO_LARGE_REASON }],
+      invalidFallbackAnswers: [],
+      remaining: [],
+      stoppedEarly: false,
+    };
+    const text = formatStartDaySummary(result);
+    expect(text).toContain('Skipped at your request');
+    expect(text).toContain('alpha-id');
+    expect(text).toContain('too long to pass safely');
+  });
+
+  it('lists a session whose fallback answer was invalid, with the parse reason', () => {
+    const handoff = createHandoff({ sessionId: 'alpha-id', cwd: 'c:\\code\\alpha' });
+    const result: ResumeSessionsResult = {
+      resumed: [],
+      skipped: [],
+      invalidFallbackAnswers: [{ handoff, reason: '"banana" is not a valid answer' }],
+      remaining: [],
+      stoppedEarly: false,
+    };
+    const text = formatStartDaySummary(result);
+    expect(text).toContain('invalid answer to the fallback question');
+    expect(text).toContain('"banana" is not a valid answer');
+  });
+});
+
+describe('renderFallbackQuestion', () => {
+  it('names the session, the reason, warns about a fresh conversation, and defaults to no', () => {
+    const handoff = createHandoff({ name: 'alpha', cwd: 'c:\\code\\alpha' });
+    const text = renderFallbackQuestion(handoff, PROMPT_TOO_LARGE_REASON);
+    expect(text).toContain('"alpha"');
+    expect(text).toContain('c:\\code\\alpha');
+    expect(text).toContain('too long to pass safely');
+    expect(text).toContain('FRESH conversation');
+    expect(text).toContain('[y/N]');
+  });
+});
+
+describe('formatFallbackNoTty', () => {
+  it('states the reason AND that it is skipping by default, without asking', () => {
+    const handoff = createHandoff({ name: 'alpha', cwd: 'c:\\code\\alpha' });
+    const text = formatFallbackNoTty(handoff, PROMPT_TOO_LARGE_REASON);
+    expect(text).toContain('"alpha"');
+    expect(text).toContain('too long to pass safely');
+    expect(text).toContain('skipping it by default');
   });
 });

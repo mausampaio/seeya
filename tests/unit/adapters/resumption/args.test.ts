@@ -48,8 +48,17 @@ describe('buildFallbackArgs — D-004 single fallback mechanism', () => {
 });
 
 describe('RESUME_PROMPT_ARG_LIMIT_CHARS', () => {
-  it('sits well under the Windows ~32,767-UTF-16-unit command-line ceiling (Spike H)', () => {
-    expect(RESUME_PROMPT_ARG_LIMIT_CHARS).toBeLessThan(32_767 / 4);
+  // S5-T9 (docs/QUESTOES.md Q-069) raised this from 4096 to a value measured against the real
+  // Windows command-line ceiling (~32,612-32,656 UTF-16 units, found by binary search) — roughly
+  // half of it, leaving headroom for `--resume <uuid>`, the binary's own path, and OS quoting.
+  it('sits well under the measured Windows command-line ceiling (Q-069)', () => {
+    expect(RESUME_PROMPT_ARG_LIMIT_CHARS).toBeLessThan(32_612 / 1.5);
+  });
+
+  // The 2026-09-13 real case this task exists to fix (docs/PLANO-DE-ENTREGA.md S5-T9) — with
+  // comfortable room to spare, not just barely over it.
+  it('clears the real 4,135-character handoff with margin, not just barely', () => {
+    expect(RESUME_PROMPT_ARG_LIMIT_CHARS).toBeGreaterThan(4_135 * 2);
   });
 });
 

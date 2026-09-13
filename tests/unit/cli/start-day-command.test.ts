@@ -20,8 +20,16 @@ import {
   FakeClock,
   FakeStorage,
   cleanlyResumingResumer,
+  fallbackNeedingResumer,
   throwingResumer,
 } from '../application/_fakes.js';
+import type { ResumeFallbackReason } from '../../../src/core/types.js';
+
+const PROMPT_TOO_LARGE_REASON: ResumeFallbackReason = {
+  kind: 'promptTooLarge',
+  promptLength: 4135,
+  limitChars: 4096,
+};
 
 const TODAY = new Date(2026, 7, 16, 21, 0, 0); // 2026-08-16, local
 
@@ -373,5 +381,74 @@ describe('runStartDayCommand — interactive picker (a TTY, no flags)', () => {
     // Only one candidate offered (beta) — the prompt numbers it "1)", never mentions alpha.
     expect(output()).toContain('1) beta');
     expect(output()).not.toContain('2) ');
+  });
+});
+
+describe('runStartDayCommand — the fallback question (S5-T9)', () => {
+  it('warns BEFORE asking, and "y" opens the fallback and marks the session resumed', async () => {
+    const storage = new FakeStorage(DEFAULT_TEST_CONFIG);
+    const alpha = createHandoff({ sessionId: 'alpha-id', name: 'alpha', pendingItems: ['x'] });
+    await storage.saveHandoff('2026-08-15', alpha);
+    const resumer = fallbackNeedingResumer(PROMPT_TOO_LARGE_REASON);
+    const context = makeContext({ storage, sessionResumer: resumer });
+    const { io, output } = makeIo({ isTTY: true, answer: 'y' });
+
+    const exitCode = await runStartDayCommand(context, { all: true }, io);
+
+    expect(exitCode).toBe(0);
+    expect(output()).toContain('Open a new session anyway?');
+    expect(output()).toContain('too long to pass safely');
+    expect(resumer.fallbackCalls).toHaveLength(1);
+    expect([...(await storage.readResumedSessionIds('2026-08-15'))]).toEqual(['alpha-id']);
+  });
+
+  it('a blank answer (Enter) skips — the default never opens a history-losing session', async () => {
+    const storage = new FakeStorage(DEFAULT_TEST_CONFIG);
+    const alpha = createHandoff({ sessionId: 'alpha-id', name: 'alpha', pendingItems: ['x'] });
+    await storage.saveHandoff('2026-08-15', alpha);
+    const resumer = fallbackNeedingResumer(PROMPT_TOO_LARGE_REASON);
+    const context = makeContext({ storage, sessionResumer: resumer });
+    const { io, output } = makeIo({ isTTY: true, answer: '' });
+
+    const exitCode = await runStartDayCommand(context, { all: true }, io);
+
+    expect(exitCode).toBe(0);
+    expect(output()).toContain('Skipped at your request');
+    expect(resumer.fallbackCalls).toHaveLength(0);
+    expect([...(await storage.readResumedSessionIds('2026-08-15'))]).toEqual([]);
+  });
+
+  it('an invalid answer reports the problem, resumes nothing for that session, and exits 0 (no loop, Q-028)', async () => {
+    const storage = new FakeStorage(DEFAULT_TEST_CONFIG);
+    const alpha = createHandoff({ sessionId: 'alpha-id', name: 'alpha', pendingItems: ['x'] });
+    await storage.saveHandoff('2026-08-15', alpha);
+    const resumer = fallbackNeedingResumer(PROMPT_TOO_LARGE_REASON);
+    const context = makeContext({ storage, sessionResumer: resumer });
+    const { io, output } = makeIo({ isTTY: true, answer: 'banana' });
+
+    const exitCode = await runStartDayCommand(context, { all: true }, io);
+
+    expect(exitCode).toBe(0);
+    expect(output()).toContain('invalid answer to the fallback question');
+    expect(output()).toContain('"banana"');
+    expect(resumer.fallbackCalls).toHaveLength(0);
+    expect([...(await storage.readResumedSessionIds('2026-08-15'))]).toEqual([]);
+  });
+
+  it('without a real terminal, applies the safe default (skip) automatically, after printing why', async () => {
+    const storage = new FakeStorage(DEFAULT_TEST_CONFIG);
+    const alpha = createHandoff({ sessionId: 'alpha-id', name: 'alpha', pendingItems: ['x'] });
+    await storage.saveHandoff('2026-08-15', alpha);
+    const resumer = fallbackNeedingResumer(PROMPT_TOO_LARGE_REASON);
+    const context = makeContext({ storage, sessionResumer: resumer });
+    const { io, output } = makeIo({ isTTY: false });
+
+    const exitCode = await runStartDayCommand(context, { all: true }, io);
+
+    expect(exitCode).toBe(0);
+    expect(output()).toContain('cannot ask whether to open a new session');
+    expect(output()).toContain('skipping it by default');
+    expect(resumer.fallbackCalls).toHaveLength(0);
+    expect([...(await storage.readResumedSessionIds('2026-08-15'))]).toEqual([]);
   });
 });
