@@ -3836,8 +3836,8 @@ texto, mas não são a fila.
       "estou perdido entre vinte sessões" — a metade de **decidir** o que fazer com cada uma é a
       tela do v2. Interessa agora porque é a base que essa tela vai consumir.
 
-- [ ] **S5-T9 — Plano longo não pode custar o histórico da sessão.** Achado em uso real em
-      2026-09-13, na primeira retomada depois do reinício. **Não despachada.**
+- [~] **S5-T9 — Plano longo não pode custar o histórico da sessão.** Achado em uso real em
+      2026-09-13, na primeira retomada depois do reinício.
 
       **O que aconteceu, medido no terminal do mantenedor:** o `start-day` escolheu o briefing
       pendente de 06/09 e, para a sessão `code-6d`, imprimiu: *"yesterday's plan is too long to
@@ -3881,6 +3881,40 @@ texto, mas não são a fila.
       contrato prova o mecanismo escolhido; quando o fallback ainda acontecer, a pessoa vê o motivo
       **antes** e escolhe, com o padrão sendo não abrir; a mensagem diz o motivo e o tamanho, como
       já faz.
+
+      **Relatório (worktree `C:/code/seeya-wt-S5-T9`, branch `tarefa/S5-T9-plano-longo`), medido
+      nesta máquina, sem Docker/`verificar:linux` (não solicitado rodar neste agente) — ver Q-069
+      para a medição completa e o que ficou por medir.**
+
+      **Passo 1 (medido, ramo "não entrega"):** `claude --resume <id> --append-system-prompt-file
+      <arquivo>` **não** entrega o conteúdo do arquivo a uma sessão retomada — 4 tentativas, 3
+      técnicas, 0 entregas (headless, `-p`, único modo que este agente conseguiu medir sem TTY
+      real). `RESUME_PROMPT_ARG_LIMIT_CHARS` subiu de 4096 para **16.384**, medido contra o teto
+      real do Windows (busca binária: bom até 32.612, `ENAMETOOLONG` a partir de 32.656) e contra
+      um round-trip real de conteúdo no novo teto. A ramificação por tamanho **continua existindo**
+      (não foi removida — o ramo era o certo, dado o resultado da medição). Teste de contrato novo,
+      `tests/contract/resume-argument-roundtrip.test.ts`, prova o caso real de 4.135 caracteres
+      contra o `claude` instalado (2.1.270).
+
+      **Passo 2 (feito):** `SessionResumer` dividido em `attemptResume`/`runFallback`
+      (`core/ports.ts`, `adapters/resumption/resumer.ts`) para abrir espaço para a pergunta entre
+      "precisa de fallback" e "abrir o fallback". Decisão pura em
+      `core/resume-fallback-decision.ts` (`parseFallbackAnswer`, padrão "pular" no vazio), orquestrada
+      em `application/start-day.ts` (`ResumeSessionsResult` ganhou `skipped`/`invalidFallbackAnswers`),
+      pergunta e impressão em `cli/start-day-command.ts`/`cli/format-start-day.ts`. Resposta
+      inválida não entra em laço (Q-028) e não para o `--all` inteiro — só aquela sessão fica sem
+      resumir, e o resumo final lista "Skipped at your request"/"invalid answer" por sessão.
+
+      **Portão:** `npm run verificar` verde nesta máquina — tipos, lint, `dependencias`, `build` e
+      `cobertura` cada um lido separadamente (`core/` 100%, demais acima de 80%,
+      `cli/start-day-command.ts` fechado em 100% depois de testes dedicados ao caminho sem TTY).
+      `verificar:linux` **não rodado** — não fazia parte do que foi pedido a este agente.
+
+      **O que o mantenedor precisa fazer num terminal real (Q-069 tem o detalhe):**
+      1. A medição central da Parte 1 **em modo interativo de verdade** (sem `-p`, `stdio`
+         herdado) — tudo aqui usou headless por falta de TTY no ambiente do agente.
+      2. Um `seeya start-day` real com um handoff de mais de 16.384 caracteres, para ver o fallback
+         disparar de verdade, a pergunta aparecer antes, e o "pulada a pedido" no resumo final.
 
 ## Definição de pronto (vale para toda tarefa)
 

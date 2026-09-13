@@ -6414,3 +6414,131 @@ temporária), não dispensado. As demais escolhas (job de auditoria só no CI, C
 mantenedor) confirmadas.
 
 ---
+
+## Q-069 — S5-T9 (plano longo não pode custar o histórico): a medição do `--append-system-prompt-file` contra `--resume`, o novo teto medido, e o desenho da pergunta antes do fallback
+
+**Tarefa:** S5-T9
+**Bloqueia:** não — a tarefa foi entregue com a solução mínima em cada ponto medido; registro no
+mesmo padrão de Q-027/Q-028/Q-029/Q-067/Q-068.
+
+### Passo 1 — a medição pedida pelo despacho
+
+**Pergunta:** `claude --resume <id> --append-system-prompt-file <arquivo> "<kickoff>"` entrega o
+conteúdo do arquivo a uma sessão **retomada**, em modo interativo?
+
+**Ambiente:** sem TTY real (`process.stdin.isTTY` é `undefined` neste agente — confirmado antes de
+medir). Por isso, como o próprio despacho previu, a medição foi feita com `-p --resume` (headless),
+nunca em modo interativo de verdade — **isto fica sem medir**, e é o primeiro item que o
+mantenedor precisa fechar num terminal real (ver "O que falta medir" no fim).
+
+**Resultado medido, claude 2.1.270, Windows: NÃO ENTREGA.** Quatro tentativas independentes, três
+técnicas diferentes, zero entregas:
+
+1. Sessão descartável criada com `claude -p` (persistência padrão), depois `claude -p --resume <id>
+   --append-system-prompt-file <arquivo>` perguntando pelo marcador do arquivo: resposta `NONE`
+   (o marcador não chegou). Controle (mesma pergunta, sem `--resume`) também `NONE` — nada de
+   surpreendente aí, é a sessão original que não tinha o marcador.
+2. Repetido com uma sessão nova e uma pergunta reformulada (pedindo o marcador diretamente, não uma
+   pergunta meta): `--system-prompt-file` (substitui) e `--append-system-prompt-file` (deveria
+   somar) nos dois casos com `--resume` → **os dois retornam `NONE`**. Controle **sem** `--resume`
+   (sessão nova, mesma flag `--append-system-prompt-file`, mesmo arquivo): marcador chega
+   (`SEEYA-Q069B-...`) — prova que a técnica funciona quando não há `--resume` de permeio, e que o
+   defeito é especificamente a combinação com `--resume`.
+3. Três repetições da combinação `--resume` + `--append-system-prompt-file` com marcadores
+   diferentes a cada vez: **3 de 3 `NONE`** — não é ruído de amostragem do modelo (Q-029 já mediu
+   flakiness numa pergunta parecida; aqui o padrão é 100% consistente, não intermitente).
+4. **A mais reveladora:** pedi para o modelo listar TUDO que reconhecia como anexado ao prompt de
+   sistema daquele turno, numa sessão retomada com `--append-system-prompt-file`. A resposta listou
+   12 itens — ambiente, modelo, ferramentas adiadas, servidores MCP, e-mail do usuário, data,
+   instrução de atribuição de commit — **tudo que é injetado por configuração de máquina/usuário,
+   nunca o item do arquivo anexado por este teste**. Ou seja: o prompt de sistema de uma sessão
+   retomada **é** reconstruído a cada chamada (a data muda, os hooks aparecem), mas
+   `--append-system-prompt-file`/`--system-prompt-file` especificamente **não entram** nessa
+   reconstrução quando `--resume` está presente.
+
+**Interpretação, D-025 aplicado:** não é "o flag não existe mais" nem "o flag mudou de nome" — é
+"o flag é aplicado só na criação da sessão, não na retomada", consistente com o próprio Spike H
+["a `describeFallbackAttempt` do fallback (`args.ts`) nunca usa `--resume`"] e com a suposição não
+verificada que a Q-029 já registrava ("um só ponto de tratamento de flag" entre `-p` e
+interativo) — só que agora testada, e a suposição **não se sustenta para o par `--resume` +
+`--append-system-prompt-file`** especificamente (headless).
+
+### Passo 2 — conforme a medição: "não entrega"
+
+Como o mecanismo por arquivo não entrega a uma sessão retomada, a Parte 1 seguiu o ramo "não
+entrega" do despacho: **o teto subiu, medido contra o limite real, e a ramificação por tamanho
+continua existindo** (`resumer.ts`, agora dividido em `attemptResume`/`runFallback`, ver S5-T9
+Parte 2 abaixo).
+
+**Medição 1 — o teto real do Windows.** Busca binária com `spawn(node, [...args], {shell:false})`
+(o mesmo mecanismo `spawn`+array+`shell:false` que `args.ts` já documentava como agnóstico ao
+binário) usando `node` no lugar de `claude` (instantâneo, sem custo de API): tamanho
+**bom conhecido até 32.612** unidades UTF-16, **`ENAMETOOLONG` a partir de 32.656** — confirma a
+estimativa de ~32.767 do Spike H, e fecha a lacuna que aquele spike deixava explicitamente aberta
+("não foi buscado o ponto exato de falha").
+
+**Medição 2 — fidelidade de conteúdo no novo teto.** Prompt real de 16.384 caracteres (o novo
+`RESUME_PROMPT_ARG_LIMIT_CHARS`), com os mesmos caracteres hostis que o Spike H já testava (quebra
+de linha, aspas dos dois tipos, `%`, acento, backtick, barra invertida final) mais marcadores de
+início e fim, através de `claude --resume <id> "<prompt>"` real (a forma exata de produção,
+`buildResumeArgs`): marcador inicial extraído corretamente, todos os caracteres hostis confirmados
+presentes, marcador final presente na cauda — sem truncamento nem mangling.
+
+**Decisão:** `RESUME_PROMPT_ARG_LIMIT_CHARS` subiu de 4096 para **16.384** — pouco menos da metade
+do teto real medido (margem para `--resume <uuid>`, caminho do binário, par substituto, quoting do
+SO) e ~4x o caso real de 2026-09-13 (4.135 caracteres). Registrado em detalhe no comentário de
+`src/adapters/resumption/args.ts` (cita esta questão).
+
+**Teste de contrato permanente adicionado:** `tests/contract/resume-argument-roundtrip.test.ts` —
+prova, contra o `claude` real, que um prompt do tamanho EXATO do caso real (4.135 caracteres)
+sobrevive intacto pela `--resume <id> "<prompt>"` de produção. Só 2 chamadas reais por execução
+(criar sessão descartável + retomar), sessão e transcript apagados em `~/.claude/projects/` ao
+final. Mesma ressalva do item acima: mede fidelidade de argv, não modo interativo com TTY real —
+Spike H já estabelece que a mecânica de passagem de argv independe de `-p`/TTY, mas a sessão
+resumível de verdade continua sem prova direta aqui.
+
+### Nomes novos, ainda fora do glossário de `AGENTS.md`
+
+- Porta dividida: `SessionResumer.resume()` virou `attemptResume()` (nunca spawna o fallback,
+  só reporta `PrimaryResumeAttempt` — `resumed` ou `needsFallback`) e `runFallback()` (só chamado
+  depois que alguém decidiu abrir). Escolhido em vez de manter `resume()` com um parâmetro
+  "pergunte antes?" porque a decisão pura (`core/resume-fallback-decision.ts`) não pode viver
+  dentro do adapter (`nucleo/` é puro, `adaptadores/` não pode ser chamado por ele) — a única forma
+  de intercalar uma pergunta entre "descobrir que precisa de fallback" e "abrir o fallback" é
+  `application/start-day.ts` orquestrar os dois passos separadamente.
+- `core/resume-fallback-decision.ts` — `FallbackDecision` (`open`/`skip`/`invalid`) e
+  `parseFallbackAnswer`. Decisão pura, testada com os três casos e o padrão vazio
+  (`tests/unit/core/resume-fallback-decision.test.ts`).
+- `application/start-day.ts` ganhou `FallbackConfirmer` (o tipo do callback que `cli/` injeta) e
+  `ResumeSessionsResult` ganhou dois campos novos: `skipped` (sessão cujo fallback foi recusado) e
+  `invalidFallbackAnswers` (resposta que não parseou). Nenhum dos dois é um "erro" que para o
+  laço — só `runFallback()` lançando (o binário/`cwd` realmente quebrado) continua parando tudo,
+  mesmo comportamento do Q-027 item 5, só que agora alcançável por dois caminhos (`attemptResume`
+  lançando OU `runFallback` lançando depois de "open").
+
+### Cuidados observados
+
+- `FALLBACK_KICKOFF_PROMPT` e o mecanismo `--append-system-prompt-file` do fallback (D-004,
+  sessão **nova**) não mudaram — a Q-069 mede o caso de sessão **retomada**, que é diferente do
+  caso que a Q-029 já validou (sessão nova). Os dois convivem: fallback continua indo por arquivo
+  porque é a ÚNICA situação em que a técnica funciona.
+- `context-file.ts` reaproveitado sem alteração — só o chamador (`runFallback`, antes `fallback`
+  privado) mudou de forma.
+- D-017 (ambiente saneado) continua valendo nos dois métodos (`resolveCallBasics` centraliza a
+  resolução, evitando duplicar as três linhas).
+
+### O que falta medir (para o mantenedor, num terminal real)
+
+1. **A medição central da Parte 1, em modo interativo de verdade.** Tudo acima usou `-p`
+   (headless) porque este agente não tinha TTY. Rodar, num terminal real:
+   `claude --resume <id> --append-system-prompt-file <arquivo>` (sem `-p`, `stdio` herdado) e
+   confirmar se o resultado é o mesmo (não entrega) ou diferente. Se for diferente — se o modo
+   interativo de fato aplicar o `--append-system-prompt-file` numa sessão retomada —, a Parte 1
+   pode ser revisitada (o plano poderia ir sempre pelo arquivo, como o despacho descreve no ramo
+   "entrega").
+2. **Um `seeya start-day` de verdade** com um handoff de mais de 4.096 caracteres (o caso antigo já
+   não dispara mais fallback) e, para fechar o caso extremo, um handoff acima de 16.384 caracteres
+   (para ver o fallback disparar, a pergunta aparecer ANTES, com o padrão "pular", e o resumo final
+   listar "pulada a pedido" quando a resposta for Enter).
+3. **O ponto exato de `ENAMETOOLONG`** foi medido nesta máquina (32.612–32.656) mas não em
+   POSIX/macOS — mesma ressalva que o Spike H já registrava para a integridade de conteúdo.
