@@ -87,7 +87,14 @@ Aceitas na primeira CI depois da mesclagem: o aviso de runtime obsoleto sumiu do
 rodou com sucesso. **Primeiro achado real do CodeQL:** 1 (alto: js/insecure-temporary-file em scripts/spike-j-measure.mjs:404 — script de spike, não código do produto). **Sprint 5 mínimo concluído no código;**
 o **Sprint 5 mínimo está aceito**. **Achado da primeira retomada pós-reinício:** o `start-day`
 trocou a sessão do PO por uma sessão limpa porque o plano tinha 4.135 caracteres e o teto do
-argumento é 4.096 — virou a **S5-T9** (despachada em 13/09, com a parte 2: o fallback avisa antes e pergunta). **Decidido em 13/09: o portão
+argumento é 4.096 — virou a **S5-T9, mesclada em 13/09**: o teto do argumento subiu de 4.096 para 16.384 (medido: o
+Windows aceita até ~32.600 unidades; o plano por arquivo **não** chega a uma sessão retomada — 4
+tentativas, 0 entregas, Q-069), e o fallback agora **avisa antes e pergunta**, com o padrão "não
+abrir". Portão Windows verde na `main` (1566 testes); o portão Linux local não rodou porque o
+Docker Desktop não respondeu depois do reinício — a CI do Ubuntu é a prova Linux deste push.
+**Verificação à mão para o mantenedor:** um `seeya start-day` com o handoff longo retomando a
+sessão original, e a medição interativa (TTY real) de `--resume` + `--append-system-prompt-file`,
+que o agente só conseguiu fazer em modo de impressão. **Decidido em 13/09: o portão
 de segurança reporta, não reprova**
 (Q-068); o achado do CodeQL em `scripts/spike-j-measure.mjs` **é corrigido na próxima tarefa que
 tocar `scripts/`** — quem despachar essa tarefa inclui isto no briefing. **Verificado em 13/09 depois de um reinício real:** a tarefa rodou no logon (resultado 0), o
