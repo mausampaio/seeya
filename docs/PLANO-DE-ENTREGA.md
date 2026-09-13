@@ -3918,28 +3918,39 @@ texto, mas não são a fila.
 
 ## v2 — o projeto como unidade (rumo em `docs/V2-RUMO.md`)
 
-- [ ] **V2-T0 — Spike M: o terminal embutido.** Aprovado pelo mantenedor em 2026-09-13. A maior
-      incógnita da v2 (D-042): o harness roda dentro de uma aba com `xterm.js` e um PTY, no Windows
-      e no Linux? Protótipo **descartável, fora do repositório** (`C:\code\seeya-spike-M`);
-      no repositório entra só o registro em `docs/spikes/M-terminal-embutido.md`.
+- [~] **V2-T0 — Spike M: o terminal embutido.** Aprovado pelo mantenedor em 2026-09-13. Medido no
+      Windows em 2026-09-13 (registro completo em `docs/spikes/M-terminal-embutido.md`); Linux e
+      macOS ficam para o mantenedor, na máquina dele.
 
-      **O que medir, no Windows agora (Linux fica para o mantenedor, na máquina dele):**
-      1. **Montagem:** Electron + `xterm.js` + `node-pty` sobem numa janela com uma aba de
-         terminal? Quanto custou montar — em especial o módulo nativo `node-pty` contra a ABI do
-         Electron (prebuild disponível ou compilação, e o que a compilação exige nesta máquina).
-      2. **`claude` dentro da aba:** o TUI abre, aceita entrada, redimensiona, cores e caixas
-         corretas, `Ctrl+C` chega ao processo, saída detectada quando o processo termina. Um prompt
-         curto de verdade ("say ok"), custo mínimo.
-      3. **`codex` dentro da aba:** o mesmo.
-      4. **D-038:** nenhuma janela de console aparece ao abrir a aba (ConPTY cria pseudoconsole; o
-         que aparece na tela é só a janela do Electron).
-      5. **Identidade:** a sessão do `claude` aberta na aba aparece no registro do Claude Code
-         (`~/.claude/sessions/`) com `cwd` igual ao diretório do projeto — é o que a descoberta do
-         seeya precisa para "ver" a sessão da aba.
-      6. **Custo:** memória do Electron com uma e com três abas abertas.
+      **Resultado, item por item:** os seis itens do roteiro foram medidos no Windows e todos
+      passaram. (1) Montagem: sobe sem compilar nada nesta máquina — `node-pty` 1.1.0 já vem com
+      prebuild N-API para `win32-x64`, carregado sem problema tanto em Node puro quanto dentro do
+      processo principal do Electron; achado que muda o plano do mantenedor: o pacote **não** traz
+      prebuild para `linux-x64`, então o `npm install` em Linux deve cair em `node-gyp rebuild` e
+      exigir toolchain de compilação — inferido do conteúdo do pacote, não confirmado em Linux.
+      (2) e (3) `claude` e `codex` dentro da aba: TUI abre, aceita entrada, redimensiona sem
+      quebrar, cores e caixas corretas (confirmado por captura de tela), `Ctrl+C` chega ao
+      processo, saída detectada — com duas ressalvas medidas: cada harness tem sua própria tela de
+      primeira confiança que precisa ser navegada antes do primeiro prompt real, e o `codex`
+      (diferente do `claude`) só submete a mensagem se o Enter for escrito **separado** do texto
+      (escrever tudo numa chamada só fica preso na caixa, sem enviar). (4) D-038: enumeração de
+      janelas antes/depois (técnica da Q-067) mostrou só +1 janela — a do próprio Electron; o
+      `conhost.exe` do ConPTY existe como processo mas nunca abre janela. (5) Identidade: com o
+      `claude` rodando na aba, `~/.claude/sessions/<pid>.json` trouxe `cwd` igual ao diretório da
+      aba, igual a uma sessão comum — a descoberta do seeya funciona sem adaptação. (6) Custo: 1
+      aba com shell vazio = 342 MB; 3 abas = 394 MB (custo marginal ~26 MB/aba); 1 aba com `claude`
+      de verdade ocioso = 604 MB (o harness em si pesa mais que o terminal embutido).
 
-      *Aceite:* tabela medida por item, com o que **não** foi medido declarado (Linux, macOS);
-      recomendação clara sobre a stack; processos e sessões de teste removidos ao final.
+      **Recomendação:** a D-042 se sustenta no Windows; as duas ressalvas acima são detalhes de
+      como a ponte de entrada deve escrever no pty, não motivo para reconsiderar a stack. O risco
+      que não fechou é o Linux — sem prebuild do `node-pty` lá, a medição de montagem pode não se
+      repetir.
+
+      **O que não foi medido:** Linux e macOS por inteiro; confirmação visual humana ao vivo
+      (as capturas de tela foram lidas pelo próprio agente); sessões longas; mais de três abas ou
+      várias abas com harness de verdade ao mesmo tempo; `Ctrl+Break`/encerramento gracioso do
+      spike G contra uma sessão embutida. Processos e sessões de teste (incluindo os transcripts
+      que criaram em `~/.claude/projects/` e `~/.codex/sessions/`) foram removidos ao final.
 
 ## Definição de pronto (vale para toda tarefa)
 
