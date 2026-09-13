@@ -4,6 +4,15 @@
 #
 # Não roda test:e2e nem test:contrato aqui: e2e é caro e contrato depende do ~/.claude real da
 # máquina (AGENTS.md, docs/TESTES.md).
+#
+# `actions/checkout` e `actions/setup-node` em @v7 (S5-T5): as versões @v4 são construídas para
+# Node 20, e o GitHub já força toda execução a rodar essas ações em Node 24 mesmo assim, com o
+# aviso "Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced
+# to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4." (texto exato observado em
+# run 34773415822, job "verificar (ubuntu-latest)", 2026-09-13). @v7 é a major mais recente das
+# duas, construída para Node 24 desde @v5 (release notes: "Update actions checkout/setup-node to
+# use node 24") — troca de runtime da AÇÃO, não do projeto: `node-version: 22` abaixo continua
+# valendo (D-008).
 name: CI
 
 on:
@@ -19,12 +28,16 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+    # Só precisa ler o próprio código para rodar o portão — nunca escreve de volta no
+    # repositório nem chama a API do GitHub (S5-T6, cuidado (c): mínimo necessário, comentado).
+    permissions:
+      contents: read
     steps:
       - name: Baixa o código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Configura o Node 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -34,3 +47,35 @@ jobs:
 
       - name: Roda o portão de qualidade (tipos + lint + dependency-cruiser + build + cobertura)
         run: npm run verificar
+
+  auditoria-de-dependencias:
+    name: auditoria de dependências (npm audit)
+    runs-on: ubuntu-latest
+    # Um SO só: `npm audit` lê o `package-lock.json`, que não varia por plataforma — rodar nos
+    # três SOs triplicaria o custo sem checar nada novo (S5-T6, frente "dependências").
+    #
+    # Por que este job existe SEPARADO de `verificar`, e só no CI, nunca em `npm run verificar`
+    # local: o achado de `npm audit` depende da base de avisórios do npm no momento da execução,
+    # não do diff da tarefa — uma CVE nova publicada por terceiros pode virar o portão local
+    # vermelho num commit que não tocou em nenhuma dependência, contrariando a ideia de que
+    # `verificar` reflete o trabalho desta tarefa (AGENTS.md § Testes, F.I.R.S.T. "repetível").
+    # Também exige rede (registro do npm), que o resto do portão local deliberadamente não
+    # precisa (nenhum teste toca a rede — AGENTS.md § Testes). Fica no CI, que já tem rede e já
+    # roda a cada push/PR, sem enfraquecer `verificar` (cuidado (a)).
+    permissions:
+      contents: read
+    steps:
+      - name: Baixa o código
+        uses: actions/checkout@v7
+
+      - name: Configura o Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instala as dependências
+        run: npm ci
+
+      - name: Reporta vulnerabilidades de dependências (reprova só em crítica com correção disponível)
+        run: npm run audit-report

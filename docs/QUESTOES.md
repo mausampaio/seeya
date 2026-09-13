@@ -6251,3 +6251,153 @@ via `Unregister-ScheduledTask` ao fim de cada rodada — confirmado vazio com
 `Get-ScheduledTask -TaskName "seeya-spike-*"` antes de encerrar a tarefa).
 
 **Resposta:** (preenchida pelo PO)
+
+---
+
+## Q-068 — S5-T5/S5-T6 (ações do CI e portão de segurança): onde o `npm audit` mora, a suíte do CodeQL, e a decisão reprova/reporta com o primeiro achado real
+
+**Tarefa:** S5-T5, S5-T6 (mesmo arquivo, `.github/workflows/ci.yml`, despachadas juntas)
+**Bloqueia:** não — `npm run verificar` está verde nesta máquina (1472 testes, cobertura acima
+do piso em todo diretório) e `npm run verificar:linux` também (Docker Desktop, container Linux
+real). Registro no mesmo espírito de Q-056/Q-063/Q-066: cada escolha abaixo tem leitura
+alternativa razoável, e o próprio despacho pediu para registrar em vez de decidir calado — em
+especial a decisão reprova/reporta, que o despacho disse explicitamente **não ser minha**.
+
+**1) S5-T5 — versões e o texto exato do aviso.** `actions/checkout@v4`→`@v7` e
+`actions/setup-node@v4`→`@v7` em `.github/workflows/ci.yml`. Texto **medido** no log bruto de uma
+execução real antes desta troca (`gh api repos/mausampaio/seeya/actions/jobs/103767041821/logs
+--allow-escape-sequences`, job "verificar (ubuntu-latest)", run 34773415822, 2026-09-13):
+
+```
+##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being
+forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4. For more information
+see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+```
+
+Confirmei nas release notes reais das duas ações (`gh api repos/actions/checkout/releases`,
+`repos/actions/setup-node/releases`) que a virada para Node 24 aconteceu na `v5.0.0` de cada uma
+("Update actions checkout to use node 24" / "Upgrade action to use node24") — escolhi `@v7`
+(major mais recente hoje: checkout `v7.0.1`, setup-node `v7.0.0`) em vez de fixar exatamente em
+`@v5`, para não reabrir a mesma tarefa na próxima depreciação previsível. `node-version: 22` do
+projeto (D-008) não mudou — é o runtime da AÇÃO, não do `seeya`. **O que só se vê depois da
+mesclagem:** o aviso sumir de verdade nos três SOs — não medido, porque esta troca está numa
+worktree e eu não faço push (regra do despacho).
+
+**2) S5-T6, dependências — onde o `npm audit` mora.** Implementei como job **novo e separado**
+em `.github/workflows/ci.yml` (`auditoria-de-dependencias`, um SO só — o resultado não varia por
+plataforma, só pelo `package-lock.json`), **nunca** dentro de `npm run verificar` local. Duas
+razões, as duas medíveis, não só de gosto:
+
+- **Deriva no tempo, não no diff.** O achado de `npm audit` depende da base de avisórios do npm
+  **no instante da execução**. Uma CVE nova publicada por terceiros pode virar `verificar` local
+  vermelho num commit que não tocou em nenhuma dependência — quebra a propriedade "repetível" do
+  F.I.R.S.T. que `AGENTS.md` § Testes já cobra da suíte, e o portão deixaria de refletir só o
+  trabalho desta tarefa.
+- **Rede.** `npm audit` precisa do registro do npm. Nenhum teste deste projeto toca rede
+  (`AGENTS.md` § Testes, `docs/TESTES.md` "Regras que valem para toda a suíte") — colocar isso em
+  `verificar` local introduziria a primeira dependência de rede do portão que hoje roda offline
+  (uma vez com `node_modules` já instalado).
+
+**Opção que rejeitei:** usar só a flag nativa `npm audit --audit-level=critical` direto no YAML,
+sem script. Ela falha por qualquer severidade igual ou acima do nível pedido, **mas não olha
+`fixAvailable`** — não dá para expressar "crítica **com correção**" só com essa flag, e o
+despacho pediu exatamente essa combinação. Por isso `scripts/audit-report.mjs`: roda `npm audit
+--json`, imprime todo achado (nome, severidade, título, URL, se tem correção) e só reprova
+(`exit 1`) quando alguma entrada é `severity: "critical"` **e** `fixAvailable` verdadeiro.
+
+**Achado real de hoje** (`npm audit --json`, medido nesta máquina, `npm ci` limpo):
+
+```json
+{
+  "metadata": {
+    "vulnerabilities": { "info": 0, "low": 0, "moderate": 3, "high": 0, "critical": 0, "total": 3 }
+  }
+}
+```
+
+As três são `@vitest/coverage-v8`, `@vitest/mocker` e `vitest` — todas devDependency (a árvore de
+teste, não o que vai para o pacote publicado: `package.json`'s `"files": ["dist"]` não inclui
+`node_modules`), mesmo advisório (GHSA-82fw-gwwq-j7x9, path traversal no redirect mock do
+`@vitest/mocker`), `fixAvailable: true` nas três, nenhuma crítica. **A exceção não dispara hoje**
+— o job reporta e sai `0`. Não rodei `npm audit fix`: corrigir a dependência de teste está fora
+do escopo desta tarefa (que é o portão, não a correção), e o próprio despacho pediu para trazer o
+achado real, não resolvê-lo.
+
+**A decisão reprova/reporta em si, com os dois lados, para o mantenedor decidir com o achado na
+mão (o despacho foi explícito: essa decisão não é minha):**
+
+- **A favor de só reportar (o que implementei como padrão):** reprovar por algo fora do alcance
+  do projeto (uma vulnerabilidade transitiva sem correção, por exemplo) trava contribuição por um
+  motivo que ninguém aqui pode consertar agora — exatamente o texto do despacho.
+- **A favor de reprovar mais (contra-argumento, caso o mantenedor discorde do que implementei):**
+  "reportar e ninguém olhar é o mesmo que não ter" — o próprio despacho reconhece isso. Hoje o
+  job novo aparece na lista de checks do PR (visível), mas nada além de olhar o log força alguém
+  a notar um achado moderate. Se isso for uma preocupação real, a correção mais barata não é
+  reprovar mais: é o mantenedor configurar um alerta separado (Dependabot alerts, hoje **desligado**
+  neste repositório — ver item 4 abaixo) em vez de inflar o que o CI recusa.
+- **Minha escolha:** implementei exatamente a exceção que o despacho já autorizou (crítica **e**
+  com correção reprova; todo o resto reporta) — não estendi nem afrouxei essa fronteira. Se o
+  mantenedor quiser reprovar mais (ex.: `high` também, ou moderate sem correção depois de N dias),
+  é decisão nova, não uma leitura diferente do que já estava escrito.
+
+**3) S5-T6, SAST — a suíte do CodeQL e por que nada foi excluído.** `.github/workflows/codeql.yml`
+novo, workflow separado de `ci.yml` (banco de dados próprio, tempo de execução bem maior — não
+quero que `verificar` fique vermelho, ou continue verde, pelo motivo errado de outro job).
+`queries: security-extended` em vez da suíte `security` padrão — ainda nativa do GitHub, nenhuma
+ação de terceiro nova (`AGENTS.md` § Dependências) — porque cobre mais das classes de risco reais
+do projeto: `js/path-injection`/`js/command-line-injection` e afins, que é exatamente "montagem
+de argumento de `spawn`" e "caminho de arquivo vindo de fora" que o despacho pediu para mirar.
+**"Apontar" aqui significou não excluir nenhum caminho arriscado da varredura** — em especial
+`src/adapters/discovery/fork-cleanup.ts` (a exceção do D-012 para apagar dentro de
+`~/.claude/projects/`), que fica dentro do escopo de propósito: é o único lugar do projeto
+autorizado a apagar sob um caminho de aparência externa, e onde uma regressão dessa guarda seria
+mais cara. O CodeQL não tem um jeito de eu dizer "preste atenção especial nesta função" além de
+não excluí-la — não inventei uma query customizada para isso.
+
+Confirmei com `gh api repos/mausampaio/seeya/code-scanning/default-setup` que o "default setup"
+do GitHub está `"state": "not-configured"` — um workflow avançado (o que criei) não entra em
+conflito com ele. **`codeql` CLI não está instalado nesta máquina e eu não instalei**, seguindo a
+instrução explícita do despacho ("pode não estar instalado — se não estiver, não instale"). Não
+rodei a análise localmente por nenhum outro meio. **O primeiro resultado real só existe depois da
+primeira execução deste workflow no GitHub** — não medido ainda, porque esta troca está numa
+worktree.
+
+**4) S5-T6, segredos — já ligado, nada para eu ligar.** `gh api repos/mausampaio/seeya --jq
+"{visibility, private, security_and_analysis}"` (medido nesta máquina, 2026-09-13):
+
+```json
+{
+  "private": false,
+  "visibility": "public",
+  "security_and_analysis": {
+    "secret_scanning": { "status": "enabled" },
+    "secret_scanning_push_protection": { "status": "enabled" },
+    "dependabot_security_updates": { "status": "disabled" }
+  }
+}
+```
+
+`secret_scanning` e `secret_scanning_push_protection` — os dois que o despacho pediu para
+verificar — **já estavam ligados** antes desta tarefa. Não toquei em nada (instrução: se
+estivessem desligados, eu registraria o comando exato para o mantenedor ligar, nunca ligaria
+sozinho; como já estavam ligados, não há comando a registrar).
+
+**Achado à parte, fora dos três itens que o despacho pediu, registrado só para não se perder:**
+`dependabot_security_updates` está `"disabled"`, e `gh api repos/mausampaio/seeya/vulnerability-alerts`
+devolve `404` (Dependabot Alerts desligado — o endpoint devolve `204` quando ligado). Isso é uma
+frente de segurança nativa a mais (alertas automáticos de dependência vulnerável, complementando
+o `npm audit` do item 2, que só roda quando o CI roda) que o despacho não pediu para eu mexer.
+Não liguei. Comando, se o mantenedor quiser:
+
+```
+"C:\Program Files\GitHub CLI\gh.exe" api -X PUT repos/mausampaio/seeya/vulnerability-alerts
+"C:\Program Files\GitHub CLI\gh.exe" api -X PATCH repos/mausampaio/seeya \
+  -f security_and_analysis[dependabot_security_updates][status]=enabled
+```
+
+**5) Aside, visto e não corrigido (fora do escopo desta tarefa).** O comentário de topo de
+`.github/workflows/ci.yml` ainda diz "CI do see-you-tomorrow" — nome antigo do projeto, de antes
+da S5-T0 (renomeação para `seeya`, D-040). A S5-T0 dizia atualizar menções ao nome longo "onde é
+identificador... e CI" e não pegou esta linha. Não corrigi: seria mexer em texto fora do que
+S5-T5/S5-T6 pediram, e o próprio arquivo já estava assim antes desta tarefa. Deixo registrado
+para quem revisar a S5-T0 ou pegar como tarefa de um-linha separada.

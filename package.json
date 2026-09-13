@@ -21,6 +21,7 @@
     "cobertura": "vitest run --project unit --project integration --project integration-process --project guards --coverage",
     "lint": "eslint .",
     "dependencias": "depcruise src --config .dependency-cruiser.cjs",
+    "audit-report": "node scripts/audit-report.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "verificar": "npm run format:check && tsc -p tsconfig.json --noEmit && npm run lint && npm run dependencias && npm run build && npm run cobertura",

@@ -757,3 +757,41 @@ casos que `endOfDayFired`/`skipped` decidem sem olhar a hora. **Para provar:** r
 `TZ=UTC`, `TZ=America/Sao_Paulo`, `TZ=Asia/Kolkata`, `TZ=Pacific/Kiritimati` e `TZ=Etc/GMT+12`
 (os dois extremos que existem); os cinco precisam passar.
 
+## Portão de segurança (S5-T6) — três frentes, fora da suíte de testes deste arquivo
+
+Diferente de todo o resto deste documento, as três frentes abaixo **não são teste automatizado
+que roda contra código de `src/`** — são checagem de CI e de configuração de repositório, mas
+compõem o portão que este projeto decidiu ter antes de publicar no npm como código aberto que
+executa processo e lê arquivo do usuário (docs/PLANO-DE-ENTREGA.md S5-T6, docs/QUESTOES.md
+Q-068). Registradas aqui porque "o que testar" também cobre "o que o CI verifica que `npm run
+verificar` não verifica".
+
+- **Dependências (`npm audit`).** Roda só no CI (`.github/workflows/ci.yml`, job
+  `auditoria-de-dependencias`), nunca em `npm run verificar` local — o achado depende da base de
+  avisórios do npm no instante da execução, não do diff da tarefa, e precisa de rede, que o resto
+  do portão (local e CI) deliberadamente não usa (ver "Regras que valem para toda a suíte" acima:
+  "Nenhum teste depende de rede"). `scripts/audit-report.mjs` interpreta `npm audit --json` e
+  **reporta** todo achado sem reprovar a execução, com uma exceção: vulnerabilidade **crítica com
+  correção disponível** reprova (`exit 1`) — a única combinação em que "não dava para saber" não
+  se sustenta. A decisão reprova/reporta, com os dois lados, está na Q-068.
+- **SAST (CodeQL).** Workflow dedicado `.github/workflows/codeql.yml`, `language: typescript`,
+  suíte `security-extended` (mais ampla que a padrão, ainda nativa do GitHub — sem ação de
+  terceiro nova). Mira em especial: montagem de argumento de `spawn`
+  (`src/adapters/process/`, `src/adapters/generation/`, `src/adapters/resumption/`,
+  `src/adapters/git/`), caminho de arquivo vindo de fora do processo (`src/adapters/discovery/`,
+  `src/adapters/transcript/`, `src/adapters/storage/`), e a exceção do D-012
+  (`src/adapters/discovery/fork-cleanup.ts`, o único lugar do projeto autorizado a apagar sob um
+  caminho de aparência externa) — nenhum desses caminhos é excluído da varredura. Não roda no
+  `npm run verificar` nem localmente por CLI (o `codeql` CLI não está instalado nesta máquina, e
+  a instrução foi não instalar): o primeiro resultado real só existe depois da primeira execução
+  deste workflow no GitHub.
+- **Segredos (varredura nativa + proteção de push).** `scripts/verificar-termos-locais.mjs` (já
+  descrito acima como guard de pre-commit) só protege quem commita **nesta** máquina — não pega
+  quem clona e contribui de outro lugar. Isso é coberto por configuração do **repositório**, não
+  por um workflow: `secret_scanning` e `secret_scanning_push_protection`, nativos do GitHub,
+  gratuitos em repositório público. Medido (não um teste, uma checagem de configuração) com
+  `gh api repos/<owner>/<repo> --jq "{visibility, private, security_and_analysis}"` — os dois já
+  estavam `"enabled"` neste repositório antes desta tarefa; nada foi ligado por este trabalho
+  (instrução: se estivessem desligados, o comando para ligar ficaria registrado para o
+  mantenedor rodar, nunca ligado por um agente).
+
