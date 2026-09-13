@@ -5939,6 +5939,15 @@ de processo"; a outra metade é disco. O residual (contenção de CPU entre os p
 Windows e a S4-T11 foi aceita com isso declarado. Se voltar, o próximo passo é o agendamento dos
 projetos no runner, não serializar mais arquivos.
 
+**Segunda classe de instabilidade, registrada em 2026-09-13 (push `c620b6b`, só documentação):**
+no Windows, `tests/integration/process/termination.test.ts` ("CTRL_BREAK_EVENT via console
+attach") falhou **sem estouro de tempo**: o auxiliar em PowerShell do Spike G saiu com código 5,
+stdout vazio e stderr em `#< CLIXML`. Primeira ocorrência em sete execuções; a reexecução do mesmo
+job, sem mudança nenhuma, passou. É variabilidade do runner de outro tipo — anexar ao console do
+processo-alvo pode falhar conforme o estado da sessão do runner. **Se voltar:** o primeiro passo é
+fazer o auxiliar devolver o erro legível (sem `CLIXML`) e o código 5 nomeado, para a próxima
+ocorrência dizer o motivo em vez de só o sintoma.
+
 ---
 
 ## Q-065 — S4-T12: onde a normalização de `projectPolicy` mora, a escolha de resolver (não recusar) caminho relativo, e por que `buildDaemonContext` perdeu seu único `readConfig` de startup
