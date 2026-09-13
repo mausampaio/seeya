@@ -13,15 +13,41 @@
 /**
  * Ceiling for the prompt as a positional argument, in UTF-16 code units — the same unit
  * `String.prototype.length` counts in, and the same unit Windows' `CreateProcess` counts its
- * ~32,767-unit command-line ceiling in (Spike H). Set to roughly 1/8 of that ceiling: headroom for
- * `--resume <36-char-uuid>` and the binary path, for any character that needs a surrogate pair
- * (rare in the plain text these plans are written in, but not impossible), and for whatever the
- * OS's own argv quoting adds on top of the raw text. A plan long enough to hit this is already an
- * edge case D-004 didn't anticipate — `tomorrowPlan` is documented as a short list, not a
- * document — which is why exceeding it routes to the fallback (`resumer.ts`) instead of trying
- * the argument anyway and finding out by failing.
+ * command-line ceiling in (Spike H).
+ *
+ * **Raised from 4096 to 16384 in S5-T9 (docs/QUESTOES.md Q-069), against two fresh measurements —
+ * Spike H's own "not measured" gap, closed here — not a bigger guess:**
+ *
+ * 1. **The real OS ceiling, on this machine (Windows 11): ~32,612–32,656 UTF-16 units**, found by
+ *    binary search spawning `node` itself (not `claude`) with one large argument via
+ *    `spawn(bin, [...args], { shell: false })` — the identical argv-passing mechanism this file's
+ *    own comment already describes as binary-agnostic. Below the boundary the child starts and
+ *    echoes the argument back at full length; above it, `spawn` itself fails with `ENAMETOOLONG`
+ *    before any process starts (Node/the OS reject it, `claude` never sees it). This confirms
+ *    Spike H's ~32,767-unit estimate instead of just re-citing it.
+ * 2. **Content fidelity at the new ceiling, through the exact production shape
+ *    (`buildResumeArgs` below, i.e. `claude --resume <id> "<prompt>"`, no `-p`):** a real
+ *    16,384-character prompt — hostile content Spike H already exercised (newline, both quote
+ *    types, `%`, accented characters, a backtick, a trailing backslash) plus start/end position
+ *    markers — round-tripped intact: the reply correctly extracted the start marker, confirmed
+ *    every special character present, and reproduced the tail including the end marker. No
+ *    truncation or mangling at this size.
+ *
+ * 16,384 is roughly half the measured hard ceiling — deliberate headroom for `--resume
+ * <36-char-uuid>`, the binary's own resolved path, any character needing a surrogate pair, and
+ * whatever the OS's own argv quoting adds — and about 4x the real 2026-09-13 case (4,135
+ * characters) that this task exists to fix. **What did NOT change:** the branch to the fallback
+ * still exists. Q-069 also measured, on the currently installed `claude` (2.1.270), that
+ * `--append-system-prompt-file` (D-004's fallback mechanism) does NOT deliver its file's content
+ * to an already-`--resume`d session in headless (`-p`) mode — 0/4 trials across two independent
+ * marker files and two base sessions, confirmed by a fourth trial asking the model to list
+ * everything visible in its system prompt (every OTHER dynamically-injected item appeared; the
+ * appended marker never did) — so the positional argument, not the file, remains the only channel
+ * proven to carry a plan into a session that is genuinely continuing. That measurement covers `-p`
+ * only, never a real interactive TTY (this task's own environment has none to test with) — see
+ * Q-069 for what remains unmeasured.
  */
-export const RESUME_PROMPT_ARG_LIMIT_CHARS = 4096;
+export const RESUME_PROMPT_ARG_LIMIT_CHARS = 16_384;
 
 /** `claude --resume <sessionId> "<prompt>"` — no `-p`: plain interactive mode is what makes the
  * spawned process attach to the inherited terminal instead of degrading into a single

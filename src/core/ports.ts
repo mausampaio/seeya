@@ -661,20 +661,22 @@ export interface Briefing {
 
 // Own import line on purpose (S3-T2), same pattern the `GitFacts` import above already
 // established: keeps this addition self-contained instead of folding into the top import block.
-import type { ResumeOutcome } from './types.js';
+import type { PrimaryResumeAttempt, ResumeFallbackReason, ResumeOutcome } from './types.js';
 
 /**
- * Resumes one session interactively, or falls back to a fresh one (D-004). Implemented in
- * `adapters/resumption/` (S3-T2) — spawns `claude` with the child's stdio **inherited** from
- * `seeya`'s own process, never piped. docs/spikes/H-retomada-interativa.md measured that without a
- * real terminal attached, "interactive" `claude` silently degrades into a single non-interactive
- * reply and exits — never a resumable session at all — so a genuine continuation is only possible
- * by handing the child the user's actual terminal.
+ * Resumes one session interactively, or reports that a fresh session would be needed instead
+ * (D-004). Implemented in `adapters/resumption/` (S3-T2) — spawns `claude` with the child's stdio
+ * **inherited** from `seeya`'s own process, never piped. docs/spikes/H-retomada-interativa.md
+ * measured that without a real terminal attached, "interactive" `claude` silently degrades into a
+ * single non-interactive reply and exits — never a resumable session at all — so a genuine
+ * continuation is only possible by handing the child the user's actual terminal.
  *
- * That's also why `resume()` only resolves once the user's own interactive session ends (`/exit`,
- * Ctrl+D, closing the window): there is no event that fires any sooner, and this port never gets
- * the child's stdout/stderr to inspect — they went straight to the same real screen the user is
- * already looking at, not to a pipe `seeya` could read.
+ * **Split into two methods since S5-T9, not one `resume()`.** The original shape decided AND
+ * executed the fallback in the same call, which left no room for `application/start-day.ts` to ask
+ * the person first — and the 2026-09-13 case this task exists to close was exactly that: someone
+ * only learned a fresh, history-less session had opened by reading the summary printed at the very
+ * end, from inside that same session. Now the decision to actually open the fallback belongs to
+ * the caller, informed by a person's answer, never to this port.
  *
  * `prompt` is `seeya`'s already-assembled first message for this session — S3-T1's job (reading
  * the pending briefing, building the per-session text). This port doesn't know or care what a
@@ -683,7 +685,27 @@ import type { ResumeOutcome } from './types.js';
  * process, D-015) separate from what that text says.
  */
 export interface SessionResumer {
-  resume(sessionId: string, cwd: string, prompt: string): Promise<ResumeOutcome>;
+  /**
+   * Tries the original session. Resolves once `claude --resume` either attaches for real (there is
+   * no event that fires any sooner than the user's own `/exit`, Ctrl+D, or closing the window — this
+   * port never gets the child's stdout/stderr, which went straight to the real screen the user is
+   * already looking at) or fails fast/would exceed the argument size ceiling — in which case this
+   * NEVER spawns the fallback itself, it only reports why one would be needed.
+   */
+  attemptResume(sessionId: string, cwd: string, prompt: string): Promise<PrimaryResumeAttempt>;
+
+  /**
+   * Actually opens the fallback session — called only after the caller has decided to (S5-T9: after
+   * asking the person, with "skip" as the default answer). `reason` is whatever
+   * `attemptResume`'s `needsFallback` reported; this method doesn't recompute it, so the message
+   * shown to the person and the fallback actually run can never name two different reasons.
+   */
+  runFallback(
+    sessionId: string,
+    cwd: string,
+    prompt: string,
+    reason: ResumeFallbackReason,
+  ): Promise<ResumeOutcome>;
 }
 
 // Own block at the end of the file on purpose (S4-T1), same pattern `ForkCleanup`/`Briefing`/
