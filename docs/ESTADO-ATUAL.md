@@ -48,8 +48,7 @@ Isto se perderia se a sessão que o viveu terminasse:
    minutos antes do horário, com as duas regras de aviso já vencidas. Os dias reais até agora
    seguiram o caminho saudável, que não exercita o caso.
 3. **S4-T13 mesclada e publicada em 12/09:** `seeya status` é o painel único e mostra o daemon
-   pelo mesmo bloco que `daemon --status` (teste de concordância). A Q-066 do agente ainda não foi
-   triada pelo PO. Verificação à mão para o mantenedor: `seeya status` com o daemon no ar e parado.
+   pelo mesmo bloco que `daemon --status` (teste de concordância). Q-066 fechada pelo PO em 13/09. Verificação à mão para o mantenedor: `seeya status` com o daemon no ar e parado.
    Marcada `[x]` no plano só em 12/09 à noite — quem notou a falta foi o spike L.
 4. **S4-T12 mesclada e publicada em 12/09** (política por projeto casa por `cwd` normalizado;
    `captureModel`/`budgetPerSessionUsd` valem no ciclo seguinte, sem restart). Q-065 fechada pelo

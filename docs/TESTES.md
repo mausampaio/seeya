@@ -740,3 +740,20 @@ parâmetro na entrada é exatamente o declarado, porque não há inicializador d
 - Testes de plataforma usam `describe.skipIf` explícito, nunca ficam silenciosamente verdes.
 - Fixtures anonimizadas: nenhum caminho, token, nome de cliente ou trecho de código privado
   vai para o repositório.
+
+## Teste passou aqui e falhou no contêiner? Confira o fuso antes do código
+
+Achado na S4-T13 (Q-066 item 5). Os testes fixam `NOW` em UTC (`'2026-09-05T10:00:00.000Z'`),
+mas `core/schedule.ts` decide em **hora local**. Um `endOfDayTime` literal "próximo" de `NOW`
+(`'10:15'`, por exemplo) cai em lugares diferentes da agenda conforme o fuso de quem roda: nesta
+máquina (UTC-3) `NOW` local é 07:00 e `10:15` está longe; no contêiner do `verificar:linux` (UTC)
+`NOW` local é 10:00 e `10:15` já está dentro da janela do aviso prévio — a decisão muda de
+`waiting` para `leadTimeWarning` e o teste quebra só lá.
+
+**Regra:** horário que precisa estar a uma distância específica de `NOW` se **calcula** a partir
+de `NOW` (deslocamento em minutos convertido para `"HH:MM"` local), nunca se escreve como literal.
+Literais só para horários distantes o bastante para cair do mesmo lado em qualquer fuso, ou para
+casos que `endOfDayFired`/`skipped` decidem sem olhar a hora. **Para provar:** rode a suíte com
+`TZ=UTC`, `TZ=America/Sao_Paulo`, `TZ=Asia/Kolkata`, `TZ=Pacific/Kiritimati` e `TZ=Etc/GMT+12`
+(os dois extremos que existem); os cinco precisam passar.
+

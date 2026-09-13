@@ -6138,4 +6138,12 @@ exatamente a mensagem errada). Troquei os três testes que comparam contra um ho
 fuso razoável — o mesmo padrão que `tests/unit/cli/daemon-command.test.ts` já usava antes desta
 tarefa para o mesmo motivo, sem eu precisar generalizar mais do que o arquivo já tinha.
 
-**Resposta:** (preenchida pelo PO)
+**Fechamento do PO (2026-09-13): as cinco confirmadas.** (2) é a que importava: extrair só as
+peças deixaria as duas sequências concordando por coincidência; a função combinada é o que faz
+"nunca discordam" ser verdade por construção, e o teste de concordância prova. (3) `CliContext`
+estendido em vez de uma segunda função de composição quase idêntica está certo — o custo de dois
+campos ignorados por `sessions` é menor que o de duas funções para manter iguais. (4) a segunda
+leitura de `config.json` fica: é o comando manual mais barato do projeto, e mudar a assinatura por
+isso seria escopo sem pedido. (5) o teste dependente de fuso que só falhou no contêiner vira
+método em `docs/TESTES.md`: horário **próximo** de `NOW` se calcula a partir de `NOW`, nunca
+literal, porque a máquina do mantenedor está em UTC-3 e o contêiner em UTC.
