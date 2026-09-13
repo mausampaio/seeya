@@ -3689,7 +3689,7 @@ texto, mas não são a fila.
 
 ---
 
-- [ ] **S5-T5 — Atualizar as ações do CI, que rodam num runtime obsoleto.** Não é a nossa versão
+- [~] **S5-T5 — Atualizar as ações do CI, que rodam num runtime obsoleto.** Não é a nossa versão
       do Node: o `ci.yml` pede `node-version: 22` para o projeto e isso está certo (D-008). O que
       está velho é o **runtime das ações**: `actions/checkout@v4` e `actions/setup-node@v4` são
       construídas para Node 20, e o GitHub já as força a rodar em Node 24, avisando em toda
@@ -3698,7 +3698,21 @@ texto, mas não são a fila.
       parar de forçar. A troca é de duas linhas; o custo de deixar passar é o CI quebrar num dia
       em que ninguém mexeu em nada — e aí alguém vai procurar a causa no código.
       *Aceite:* CI verde nos três sistemas **sem o aviso de runtime obsoleto** na saída.
-- [ ] **S5-T6 — Portão de segurança antes de publicar: dependências e SAST.** Pedido do mantenedor
+
+      **Relatório (2026-09-13).** `actions/checkout@v4`→`@v7` e `actions/setup-node@v4`→`@v7` em
+      `.github/workflows/ci.yml` (mesmas majors usadas no `.github/workflows/codeql.yml` novo da
+      S5-T6). **Medido:** texto exato do aviso, lido do log bruto de uma execução real de antes
+      desta troca (`gh api .../actions/jobs/103767041821/logs --allow-escape-sequences`, job
+      "verificar (ubuntu-latest)", run 34773415822, 2026-09-13): *"Node.js 20 is deprecated. The
+      following actions target Node.js 20 but are being forced to run on Node.js 24:
+      actions/checkout@v4, actions/setup-node@v4."* Confirmado nas release notes reais das duas
+      ações que a virada para Node 24 aconteceu na `v5.0.0` de cada uma; `@v7` é a major mais
+      recente hoje e já carrega essa base. `node-version: 22` do projeto (D-008) não mudou — é o
+      runtime da AÇÃO, não do `seeya`. `npm run verificar` (1472 testes) e `npm run
+      verificar:linux` verdes nesta máquina depois da troca. **Inferido/só depois da mesclagem:**
+      o aviso sumir de verdade nos três SOs — não medido, porque esta troca está numa worktree e
+      não fiz push. Detalhe em `docs/QUESTOES.md` Q-068 item 1.
+- [~] **S5-T6 — Portão de segurança antes de publicar: dependências e SAST.** Pedido do mantenedor
       em 2026-08-30, com a ressalva de que não é para agora — entra antes da publicação, não
       durante a construção.
       O motivo de existir: este projeto vai para npm como código aberto, **executa processos**,
@@ -3717,6 +3731,42 @@ texto, mas não são a fila.
       Reprovar por vulnerabilidade transitiva que não tem correção disponível trava o projeto por
       algo fora do alcance dele. Reportar e ninguém olhar é o mesmo que não ter. Não decida isso
       agora — decida com o primeiro achado real na mão.
+
+      **Relatório (2026-09-13).**
+
+      1. **Dependências.** `npm audit` roda num job novo e separado do CI
+         (`auditoria-de-dependencias`, `.github/workflows/ci.yml`), **nunca** em `npm run
+         verificar` local — o achado depende da base de avisórios do npm no instante da
+         execução, não do diff da tarefa, e precisa de rede, que o resto do portão local
+         deliberadamente não usa (justificativa completa na Q-068 item 2). Implementado em
+         `scripts/audit-report.mjs` + `npm run audit-report`: reporta todo achado e só reprova
+         (`exit 1`) se houver vulnerabilidade **crítica com correção disponível** — a única
+         exceção que o despacho autorizou.
+         **Achado real medido hoje:** 3 vulnerabilidades, todas `moderate`, todas na árvore de
+         dev do `vitest` (`@vitest/coverage-v8`, `@vitest/mocker`, `vitest`; GHSA-82fw-gwwq-j7x9,
+         `fixAvailable: true`), nenhuma crítica — a exceção não dispara, o job reporta e sai
+         verde. **A decisão reprova/reporta em si, com os dois lados, está na Q-068 item 2**, como
+         o despacho pediu.
+      2. **SAST.** `.github/workflows/codeql.yml` novo (workflow dedicado), `language:
+         typescript`, `queries: security-extended` (suíte nativa mais ampla, sem ação de
+         terceiro). Nenhum caminho excluído da varredura — em especial
+         `src/adapters/discovery/fork-cleanup.ts` (a exceção do D-012), `src/adapters/process/`
+         (montagem de `spawn`) e os adapters que leem caminho externo continuam dentro do
+         escopo, de propósito. Confirmado via `gh api .../code-scanning/default-setup`
+         (`"state": "not-configured"`) que este workflow avançado não conflita com o "default
+         setup" do GitHub. **`codeql` CLI não está instalado nesta máquina e não foi instalado**
+         (instrução do despacho): não rodei a análise localmente. **O primeiro resultado real só
+         existe depois da primeira execução deste workflow no GitHub** — não medido ainda.
+      3. **Segredos.** Medido com `gh api repos/mausampaio/seeya --jq "{visibility, private,
+         security_and_analysis}"`: `secret_scanning` e `secret_scanning_push_protection` **já
+         estavam `enabled`** neste repositório público, antes desta tarefa. Nada foi ligado —
+         não havia nada para ligar. Achado à parte (fora do pedido): `dependabot_security_updates`
+         está desligado; registrado em Q-068 item 4 com o comando exato, não acionado.
+
+      `npm run verificar` (1472 testes) e `npm run verificar:linux` (Docker Desktop, container
+      Linux real) verdes nesta máquina depois de todas as mudanças acima. Detalhe completo, as
+      escolhas com leitura alternativa e a decisão reprova/reporta na íntegra:
+      `docs/QUESTOES.md` Q-068.
 
 - [ ] **S5-T7 — Avaliar um `--sessions` que aceite lista.** Ideia do mantenedor em 2026-08-30,
       ao fechar a Q-030, **com a ressalva dele de que não é para agora** — registrada aqui para
