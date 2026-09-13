@@ -78,8 +78,13 @@ S4-T11, S4-T12 e S4-T13 mescladas em 12/09; a fila do Sprint 4 está vazia. **De
 13/09 (D-040, D-041):** o produto passa a se chamar `seeya` (repositório, pasta, binário; npm
 `@seeya/cli`), e a ordem é **Sprint 5 mínimo** (S5-T0 renomear, S5-T1 autostart, S5-T5 CI,
 S5-T6 segurança) **e depois a v2**, com a interface básica adiantada para o começo dela
-(`V2-RUMO.md`, recorte reordenado). Publicação só na fronteira da v2. **S5-T0 feita em 13/09.**
-Próximo despacho com aval do mantenedor: **S5-T1** (autostart). O resultado do spike K está em
+(`V2-RUMO.md`, recorte reordenado). Publicação só na fronteira da v2. **S5-T0 e S5-T1 feitas em
+13/09** (`seeya autostart enable|disable|status`; no Windows, tarefa agendada com
+`conhost.exe --headless`, registrada pelo módulo PowerShell `ScheduledTasks` porque `schtasks
+/Create` exige elevação nesta máquina — Q-067). **S5-T5+S5-T6 em andamento** (agente despachado em
+13/09). **Verificação à mão que fica para o mantenedor:** `seeya autostart enable`, reiniciar ou
+sair e entrar, e `seeya status` mostrando o daemon rodando e o autostart `enabled`, sem nenhuma
+janela ter aparecido no logon — Linux e macOS não foram medidos. O resultado do spike K está em
 [`spikes/K-sessao-limpa.md`](spikes/K-sessao-limpa.md).
 
 ## Renomeação (S5-T0, 2026-09-13)
