@@ -3628,6 +3628,58 @@ texto, mas não são a fila.
       testes). **A pasta antiga continua no disco** até o handle soltar — apagar quando nada mais
       a segurar; nada nela é único.
 - [ ] **S5-T1 — Autostart do daemon** por SO (Task Scheduler, launchd, systemd user).
+      Especificada pelo PO em 2026-09-13; a linha acima era tudo o que existia, e uma sessão
+      limpa apontou que despachar assim seria pedir ao agente para inventar comportamento.
+
+      **Por que agora:** em 12/09 a tampa do notebook fechou, o daemon morreu com a suspensão, e
+      o encerramento das 11:00 ficou sem ninguém para disparar — o `seeya status` novo foi o que
+      mostrou "não está rodando". Hoje o daemon só volta se alguém lembrar de subir. É a única
+      tarefa do Sprint 5 que muda o dia a dia do mantenedor (D-041).
+
+      **Comando:** `seeya autostart enable | disable | status`. Nome novo de comando; entra no
+      glossário do `AGENTS.md` antes do código. Nenhuma chave nova em disco (D-027): o estado
+      "ligado/desligado" mora no sistema operacional, e `status` o lê de lá.
+
+      **Mecanismo por sistema**, um adapter por SO atrás de uma porta (D-020):
+      - **Windows:** Agendador de Tarefas, gatilho "ao fazer logon" do usuário atual.
+      - **Linux:** unidade `systemd --user` em `~/.config/systemd/user/`, habilitada para o
+        alvo padrão da sessão do usuário.
+      - **macOS:** LaunchAgent em `~/Library/LaunchAgents/`.
+
+      **A pergunta que a tarefa precisa medir antes de escolher, no Windows:** o daemon precisa
+      rodar **na sessão interativa** (senão o toast não aparece — Spike B) **e sem janela** (D-038;
+      `node.exe` é programa de console e uma tarefa "só quando o usuário está logado" abre um
+      console). Tarefa "executar mesmo sem logon" some com a janela mas cai na sessão 0, onde
+      o toast não chega. Candidatos a medir: `conhost.exe --headless`, um lançador `.vbs` via
+      `wscript` com janela oculta, e `powershell -WindowStyle Hidden` (que pisca). **Registre a
+      medição na Q-067 e escolha o que satisfaz os três: sessão interativa, sem janela, remoção
+      limpa.** Se nenhum satisfizer os três, diga isso — é resultado.
+
+      **Comportamento:**
+      - `enable` registra o autostart apontando para o binário atual (o caminho do `dist` em uso)
+        e diz o que registrou; se já existe, diz que já existia e o que mudou (caminho antigo vs.
+        novo), sem duplicar.
+      - `disable` remove e diz que removeu; se não existia, diz isso sem erro.
+      - `status` responde ligado / desligado / **ligado mas apontando para um caminho que não
+        existe mais** (a renomeação de 13/09 é o caso real) / não consegui verificar — quatro
+        estados, nunca achatados (D-024, D-025). O `seeya status` (S4-T13, painel único) ganha
+        uma linha com esse mesmo resultado, pela mesma função.
+      - O daemon que sobe pelo autostart é o mesmo `seeya daemon`: o lock de instância única já
+        impede dois daemons se a pessoa também subir à mão, e o lock órfão de um desligamento é
+        recuperado sozinho (S4-T5). A D-036 já cobre o logon depois da virada do dia.
+
+      **Cuidados:** nada de `exec` com string (AGENTS.md § "Processos"); `spawnHidden` (D-038)
+      para chamar `schtasks`/`systemctl`/`launchctl`; mensagens com o valor e o esperado
+      (AGENTS.md § "Mensagens de erro"); texto em inglês, concentrado.
+
+      **Testes:** os comandos gerados por SO, por unidade, com o runner injetado — nunca tocando
+      o Agendador/systemd/launchd reais da máquina de quem roda a suíte. O aceite real é manual:
+      o mantenedor faz `enable` no Windows, reinicia, e o `seeya status` mostra o daemon rodando
+      sem nenhuma janela ter aparecido; Linux e macOS quando ele tiver as máquinas à mão.
+
+      *Aceite:* o daemon sobe sozinho no logon do Windows, na sessão interativa, sem janela, e o
+      toast continua funcionando; `enable`/`disable`/`status` com os quatro estados; `seeya
+      status` mostra a linha; portão e `verificar:linux` verdes; Q-067 com a medição do Windows.
 - [ ] **S5-T2 — `seeya init`**: config guiada na primeira execução. **Adiada para a fronteira
       da v2** (D-041): a v2 redefine a instalação (espaço de trabalho, remoto, dispositivo).
 - [ ] **S5-T3 — README** e empacotamento npm. **Adiada para a fronteira da v2** (D-041), sob

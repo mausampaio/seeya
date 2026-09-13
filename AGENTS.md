@@ -380,7 +380,7 @@ Valores de enum seguem a mesma regra: `alive` / `idle` / `ended` / `unknown` (j�
 `git` / `transcript` / `registry`.
 
 Nomes de comando e flags do CLI: `sessions`, `end-day`, `start-day`, `snooze`, `skip-today`,
-`status`, `config`, `daemon`, `init`, e `--session`, `--all`, `--stop`, `--dry-run`. Os três
+`status`, `config`, `daemon`, `autostart` (`enable` / `disable` / `status`, S5-T1), `init`, e `--session`, `--all`, `--stop`, `--dry-run`. Os três
 primeiros vieram do README, que já os tinha fixado e tem precedência.
 
 Variável de ambiente interna: `SEEYA_DAEMON_CHILD` (S4-T3) distingue o lançador do worker do
