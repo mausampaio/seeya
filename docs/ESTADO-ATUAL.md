@@ -72,6 +72,19 @@ Isto se perderia se a sessão que o viveu terminasse:
 - **[`V2-RUMO.md`](V2-RUMO.md):** o projeto passa a ser a unidade de continuidade. É **rumo, não
   decisão**.
 
+## v2 — começou pelo spike
+
+**Spike M (V2-T0) rodou em 13/09 no Windows e a D-042 se sustenta:** Electron 44 + `@xterm/xterm` 6
++ `node-pty` 1.1 sem compilação nativa (prebuild win32-x64); `claude` e `codex` rodam numa aba
+com TUI, redimensionamento, `Ctrl+C` e saída detectada; nenhuma janela além da do Electron
+(D-038); a sessão da aba aparece no registro do Claude Code com o `cwd` da aba, então a descoberta
+do seeya a vê sem mudança; memória: 342 MB com uma aba vazia, 394 MB com três, 604 MB com um
+`claude` ocioso dentro. Dois detalhes de ponte de entrada (prompt de confiança do harness na
+primeira execução; no `codex`, o Enter precisa ser escrito separado do texto). **O risco aberto é
+o Linux:** o `node-pty` não traz prebuild para linux-x64/arm64, então lá vai compilar — é a
+medição que fica para o mantenedor, na máquina dele, com o protótipo de `C:\code\seeya-spike-M`
+(fora do repositório; copiar a pasta sem `node_modules`). Registro: `spikes/M-terminal-embutido.md`.
+
 ## Próximo passo
 
 S4-T11, S4-T12 e S4-T13 mescladas em 12/09; a fila do Sprint 4 está vazia. **Decidido em
