@@ -79,8 +79,8 @@ S4-T11, S4-T12 e S4-T13 mescladas em 12/09; a fila do Sprint 4 está vazia. **De
 13/09 (D-040, D-041):** o produto passa a se chamar `seeya` (repositório, pasta, binário; npm
 `@seeya/cli`), e a ordem é **Sprint 5 mínimo** (S5-T0 renomear, S5-T1 autostart, S5-T5 CI,
 S5-T6 segurança) **e depois a v2**, com a interface básica adiantada para o começo dela
-(`V2-RUMO.md`, recorte reordenado). Publicação só na fronteira da v2. Próximo despacho com aval
-do mantenedor: **S5-T0**. O resultado do spike K está em
+(`V2-RUMO.md`, recorte reordenado). Publicação só na fronteira da v2. **S5-T0 feita em 13/09.**
+Próximo despacho com aval do mantenedor: **S5-T1** (autostart). O resultado do spike K está em
 [`spikes/K-sessao-limpa.md`](spikes/K-sessao-limpa.md).
 
 ## Renomeação (S5-T0, 2026-09-13)
@@ -89,7 +89,9 @@ O repositório no GitHub chama-se `seeya`, no mesmo dono (a URL antiga redirecio
 `C:\code\seeya`. O pacote é `@seeya-ai/cli`, binário `seeya`. **A chave que o Claude Code usa
 para memória e transcripts é derivada do caminho**, então a pasta nova começa sem memória de
 diretório e sem transcripts antigos — os de `see-you-tomorrow-ai` continuam em
-`~/.claude/projects/`, só não são desta chave. O `npm link` foi refeito na pasta nova.
+`~/.claude/projects/`, só não são desta chave. O `npm link` foi refeito na pasta nova. **A pasta
+antiga (`see-you-tomorrow-ai`) ainda existe** porque o Windows recusou renomeá-la (handle aberto
+por processo não identificado); a nova é um clone com o mesmo HEAD. Apagar a antiga quando soltar.
 
 ## Ambiente do mantenedor
 

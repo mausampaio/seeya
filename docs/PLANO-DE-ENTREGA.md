@@ -3606,7 +3606,7 @@ como tarefa aberta, já decidida, fora do aceite.
 S5-T4 e S5-T7 ficam **adiadas para a fronteira da v2** — continuam listadas para não perder o
 texto, mas não são a fila.
 
-- [ ] **S5-T0 — Renomear para `seeya` (D-040).** Numa leva só, sem agente no ar: renomear o
+- [x] **S5-T0 — Renomear para `seeya` (D-040).** Feita pelo PO em 2026-09-13 (não é tarefa de agente: mexe na pasta que as worktrees habitam). Numa leva só, sem agente no ar: renomear o
       repositório no GitHub (a URL antiga redireciona) e a pasta local; refazer o `npm link`;
       podar as worktrees antigas; `package.json` → `@seeya/cli` (sem publicar); atualizar as
       menções ao nome longo onde ele é identificador (README, CI, `AGENTS.md` título, `INDEX.md`)
@@ -3614,6 +3614,19 @@ texto, mas não são a fila.
       nova, `seeya --version` funcionando pelo link novo, CI verde no repositório renomeado, e o
       `ESTADO-ATUAL.md` dizendo o caminho novo — a chave de memória do Claude Code para a pasta
       muda, e quem retomar precisa saber disso.
+
+      **Relatório (2026-09-13).** GitHub renomeado com `gh repo rename` (a URL antiga
+      redireciona); 44 worktrees antigas removidas; `package.json`/lock → `@seeya-ai/cli`, binário
+      `seeya`; README, `AGENTS.md`, D-040 e estado atualizados; commit `dbcdd12` publicado, CI verde
+      nos três sistemas no repositório renomeado. **A pasta local não pôde ser renomeada:** o
+      Windows recusou (`acesso negado`) mesmo com VS Code, terminais e a janela do Explorer
+      fechados — algum processo mantém um handle nela, e o teste de controle descartou o próprio
+      Claude Code (uma pasta lida por esta sessão renomeou normalmente). Em vez de brigar com o
+      handle, a pasta nova é um **clone** (`C:\code\seeya`, mesmo HEAD, `.termos-locais` e
+      `.claude/settings.local.json` copiados), com `npm ci`, `npm link` refeito
+      (`@seeya-ai/cli -> C:\code\seeya`, `seeya --version` respondendo) e portão verde (1472
+      testes). **A pasta antiga continua no disco** até o handle soltar — apagar quando nada mais
+      a segurar; nada nela é único.
 - [ ] **S5-T1 — Autostart do daemon** por SO (Task Scheduler, launchd, systemd user).
 - [ ] **S5-T2 — `seeya init`**: config guiada na primeira execução. **Adiada para a fronteira
       da v2** (D-041): a v2 redefine a instalação (espaço de trabalho, remoto, dispositivo).
