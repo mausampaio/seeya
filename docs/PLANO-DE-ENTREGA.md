@@ -3952,6 +3952,76 @@ texto, mas não são a fila.
       spike G contra uma sessão embutida. Processos e sessões de teste (incluindo os transcripts
       que criaram em `~/.claude/projects/` e `~/.codex/sessions/`) foram removidos ao final.
 
+- [ ] **V2-T1 — O monorepo: `@seeya-ai/core` e `@seeya-ai/cli` (D-043).** Especificada pelo PO em
+      2026-09-13; **aguarda aprovação do mantenedor antes de qualquer despacho.** É a primeira
+      tarefa de código da v2 e uma reestruturação que toca tudo: por isso o aceite é "nada mudou",
+      medido.
+
+      **Layout alvo:**
+
+      ```text
+      package.json                 raiz privada: workspaces, e os scripts do portão delegando
+      packages/core/               @seeya-ai/core — src/{core,application,adapters,scheduler}
+      packages/cli/                @seeya-ai/cli  — src/ (a camada cli de hoje), bin "seeya"
+      packages/app/                reservado (D-042); NÃO criar nesta tarefa
+      tests/                       continua na raiz (unit, integration, integration-process,
+                                   guards, e2e, contract), com os imports apontando para os pacotes
+      docs/, scripts/, .github/, eslint, prettier, dependency-cruiser, vitest, husky: raiz
+      ```
+
+      **Regras do movimento:**
+      1. **`git mv`, nunca copiar.** O histórico de cada arquivo sobrevive ao movimento e o
+         `git log --follow` continua funcionando. Nenhum arquivo é renomeado além do diretório.
+      2. **Nenhuma mudança de comportamento, de API entre camadas ou de texto voltado à pessoa.**
+         Se um teste precisar mudar, é só o caminho de import. Se precisar de mais que isso, pare e
+         registre na Q-070.
+      3. **`@seeya-ai/core` exporta por subcaminho**, espelhando os diretórios (`exports` com
+         curinga, tipos incluídos), para o `cli` importar `@seeya-ai/core/adapters/storage/index.js`
+         como hoje importa `../adapters/storage/index.js`. Sem um "índice único" que force a
+         reexportação de tudo: isso apagaria as fronteiras que o dependency-cruiser enxerga.
+      4. **TypeScript com referências de projeto** (`tsc -b`), ESM/NodeNext como hoje. Os testes
+         resolvem `@seeya-ai/core` para o **fonte** (alias no vitest e `paths` no tsconfig de
+         testes), para a suíte não depender de build — como hoje não depende.
+      5. **Os guards continuam valendo, com os caminhos novos:** as sete regras do
+         `.dependency-cruiser.cjs` (a matriz de 20 pares dentro de `packages/core`, mais
+         `cli → core` só pelos subcaminhos públicos), a guarda de `new Date()`/`setTimeout`, a de
+         `spawn` (D-038), o guard de projetos de teste, e os pisos de cobertura por diretório
+         (`packages/core/src/core/**` 95%, o resto 80%).
+      6. **O portão continua um comando só na raiz:** `npm run verificar` = format:check + `tsc -b`
+         + lint + dependency-cruiser + build + cobertura, e `verificar:linux` continua copiando o
+         repositório inteiro para o contêiner. **Aceite de instrumento:** os mesmos **1.566 testes**
+         passam, nenhum a menos, nenhum pulado a mais.
+      7. **O binário e o link:** `packages/cli/package.json` tem `bin.seeya`; `npm link` roda em
+         `packages/cli`. **O autostart do mantenedor vai quebrar de propósito:** a tarefa agendada
+         aponta para `dist/cli/index.js`, que deixa de existir. É o caso `brokenPath` que a S5-T1
+         desenhou — o relatório diz que `seeya autostart status` mostra o caminho quebrado e que
+         `seeya autostart enable` reescreve. Não "conserte" a tarefa agendada por fora.
+      8. **CodeQL:** `scripts/spike-j-measure.mjs` grava o estado num caminho fixo da pasta
+         temporária (`js/insecure-temporary-file`, alto). Corrigir com `mkdtemp`, nesta tarefa,
+         porque ela já toca `scripts/` (Q-068). Conferir que o alerta fecha na CI depois da
+         mesclagem.
+      9. **Publicação: nenhuma.** Raiz `private: true`; os pacotes com `publishConfig.access:
+         public` e versão `0.1.0`, sem `npm publish` (D-041: só na fronteira da v2).
+
+      **Ordem de trabalho, com commit e portão a cada passo** (a tarefa é grande; um commit só no
+      fim é o risco que já custou uma tarefa inteira):
+      (a) raiz com workspaces e `packages/core` recebendo as quatro camadas; portão verde.
+      (b) `packages/cli` com a camada `cli/`, imports por subcaminho, `bin`; portão verde;
+      `seeya --version` pelo link novo.
+      (c) testes e ferramental apontando para os caminhos novos; guards e cobertura verdes.
+      (d) documentação: `docs/ARQUITETURA.md` (layout e a emenda da D-020), `AGENTS.md` (caminhos,
+      comandos, e a linha do glossário "pacote `@seeya-ai/core` ≠ camada `core/`"), `INDEX.md`
+      (mapa), `README.md` (instalação pelo `packages/cli`), `docs/ESTADO-ATUAL.md`.
+
+      **Cuidados:** Windows é o ambiente do mantenedor — caminhos com `node:path`, nunca
+      separador literal (AGENTS.md); os cinco arquivos de `integration-process` continuam
+      serializados (S4-T10/S4-T11); o `verificar-linux.mjs` precisa saber do layout novo.
+
+      *Aceite:* 1.566 testes verdes; portão e `verificar:linux` verdes; CI verde nos três
+      sistemas; `seeya --version`, `seeya status` e `seeya autostart status` funcionando pelo link
+      em `packages/cli` (com o `brokenPath` reportado e depois corrigido por `enable`); alerta do
+      CodeQL fechado; `git log --follow` de um arquivo movido mostrando o histórico anterior.
+
 ## Definição de pronto (vale para toda tarefa)
 
 1. Código implementa exatamente a spec; divergência virou questão, não improviso.
