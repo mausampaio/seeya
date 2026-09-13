@@ -81,8 +81,10 @@ S5-T6 segurança) **e depois a v2**, com a interface básica adiantada para o co
 (`V2-RUMO.md`, recorte reordenado). Publicação só na fronteira da v2. **S5-T0 e S5-T1 feitas em
 13/09** (`seeya autostart enable|disable|status`; no Windows, tarefa agendada com
 `conhost.exe --headless`, registrada pelo módulo PowerShell `ScheduledTasks` porque `schtasks
-/Create` exige elevação nesta máquina — Q-067). **S5-T5+S5-T6 em andamento** (agente despachado em
-13/09). **Verificação à mão que fica para o mantenedor:** `seeya autostart enable`, reiniciar ou
+/Create` exige elevação nesta máquina — Q-067). **S5-T5 e S5-T6 mescladas em 13/09** (ações do CI em `@v7`, job de `npm audit` só no CI,
+workflow do CodeQL com `security-extended`; varredura de segredos já estava ligada no repositório).
+O aceite das duas só se vê na CI depois do push: o aviso de runtime obsoleto sumir e o CodeQL rodar
+pela primeira vez. **Verificação à mão que fica para o mantenedor:** `seeya autostart enable`, reiniciar ou
 sair e entrar, e `seeya status` mostrando o daemon rodando e o autostart `enabled`, sem nenhuma
 janela ter aparecido no logon — Linux e macOS não foram medidos. O resultado do spike K está em
 [`spikes/K-sessao-limpa.md`](spikes/K-sessao-limpa.md).
@@ -110,6 +112,11 @@ Não faz parte do projeto, mas afeta o trabalho:
   (D-032).
 - No Git Bash, aspas duplas expandem `$_` e barras invertidas fora de aspas são comidas. Use barras
   normais nos caminhos.
+- **Máquina de validação macOS:** um MacBook Pro de 2012 (Intel x64) rodando **Sonoma 14** por
+  patch fora do suporte da Apple. Serve para validar o binário e a interface em macOS Intel — que a
+  CI (`macos-latest`, ARM) não cobre —, com a ressalva de que sistema com patch pode ter
+  comportamento que o macOS oficial não tem. Node 22 e Electron atuais suportam Sonoma; o piso de
+  versão dos dois está acima do que a máquina roda.
 - **A sessão do PO não aparece no `--resume` do Claude Code em `C:\code`**, porque o seletor do
   harness lista por slug do diretório e o transcript dela vive sob o slug antigo do repositório,
   embora o `cwd` do registro seja `C:\code`. **`seeya start-day` a retoma normalmente**, porque
