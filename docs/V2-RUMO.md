@@ -295,10 +295,24 @@ retomada pelo mecanismo da v1. A interface **organiza e abre a pedido**; não in
 **no mesmo processo**, nunca chamando a CLI por subprocesso. Isso emenda a D-020: passam a existir
 duas raízes de composição (`cli/` e `app/`), ambas nomeando adapters concretos, e nenhuma outra.
 
-**A escolha de stack é spike, não suposição:** Electron com `xterm.js` e `node-pty` é o caminho
-batido em Node (e o terminal embutido no Windows passa pelo ConPTY — as lições de janela e console
-da S4-T6/D-038 valem aqui); Tauri exige Rust. O spike decide no Windows primeiro, onde as
-armadilhas moram.
+**A escolha de stack é spike, não suposição**, e há três caminhos, não dois:
+
+- **Electron** com `xterm.js` e `node-pty`: tudo em TypeScript, o núcleo no mesmo processo, o
+  terminal embutido passa pelo ConPTY (as lições de janela e console da S4-T6/D-038 valem aqui).
+  Custo: binário pesado e memória.
+- **Tauri**: a casca é Rust, a interface é web em TypeScript, e o núcleo em Node só entra como
+  *sidecar* — um subprocesso com IPC, que é justamente o que a regra acima quer evitar — ou seria
+  reescrito em Rust, jogando fora o núcleo testado. Três runtimes num produto de uma pessoa.
+- **Sem terminal embutido:** a interface é um painel, e as abas de sessão são abas do terminal
+  que a pessoa já usa — no Windows, `wt -w 0 new-tab -d <projeto> <harness>` abre uma aba na
+  janela existente do Windows Terminal. Nenhum PTY para embutir, nenhuma janela nova, e a sessão
+  fica no terminal de verdade (a exceção da D-038 é exatamente essa). Custo: cada SO tem seu
+  mecanismo, e a interface não "vê" o conteúdo da aba.
+
+**Em nenhum dos três a interface vem do npm:** aplicação de desktop se distribui como instalador
+(GitHub Releases), e o escopo npm fica para `cli` e `core`. O spike começa pelo terceiro caminho,
+que é o mais barato para validar o fluxo de trabalho; se o painel-mais-abas bastar, o terminal
+embutido nem precisa existir. Decide no Windows primeiro.
 
 1. renomear para `seeya` (S5-T0, D-040) e organizar o monorepo com os escopos;
 2. `seeya project create`, `list`, `show` e `open`, com o template mínimo (`AGENTS.md`,
