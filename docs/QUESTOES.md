@@ -6401,3 +6401,16 @@ da S5-T0 (renomeação para `seeya`, D-040). A S5-T0 dizia atualizar menções a
 identificador... e CI" e não pegou esta linha. Não corrigi: seria mexer em texto fora do que
 S5-T5/S5-T6 pediram, e o próprio arquivo já estava assim antes desta tarefa. Deixo registrado
 para quem revisar a S5-T0 ou pegar como tarefa de um-linha separada.
+
+**Fechamento do PO (2026-09-13), com a decisão do mantenedor.** **O portão de segurança reporta,
+não reprova** — exceto `npm audit` com vulnerabilidade crítica com correção disponível, já
+implementado assim. O PO tria cada alerta novo na hora em que aparece, como faz com as questões;
+reportar sem ninguém olhar seria o mesmo que não ter. O motivo está no primeiro achado real:
+`js/insecure-temporary-file` (alto) em `scripts/spike-j-measure.mjs:404`, script de spike — uma
+política de "reprova" teria deixado a `main` vermelha por ferramenta de medição. **O achado será
+corrigido na próxima tarefa que tocar `scripts/`** (`mkdtemp` em vez de caminho fixo na pasta
+temporária), não dispensado. As demais escolhas (job de auditoria só no CI, CodeQL nativo com
+`security-extended`, nada excluído, varredura de segredos já ligada, Dependabot a critério do
+mantenedor) confirmadas.
+
+---
