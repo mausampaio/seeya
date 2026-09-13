@@ -11,16 +11,16 @@
  * resolves `today` from the injected `Clock` (D-019: never `new Date()` here), reads/writes
  * `Storage`, and renders the result as plain text (AGENTS.md § "Registro e saída").
  */
-import { localDayString } from '../core/day.js';
+import { localDayString } from '@seeya-ai/engine/core/day.js';
 import {
   applySkipToday,
   applySnooze,
   decideSchedule,
   emptyDayState,
   type ScheduleDecision,
-} from '../core/schedule.js';
-import type { Clock, Storage } from '../core/ports.js';
-import type { Config } from '../core/types.js';
+} from '@seeya-ai/engine/core/schedule.js';
+import type { Clock, Storage } from '@seeya-ai/engine/core/ports.js';
+import type { Config } from '@seeya-ai/engine/core/types.js';
 
 export interface SnoozeCommandContext {
   readonly storage: Storage;

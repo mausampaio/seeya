@@ -15,7 +15,7 @@
 import { fileURLToPath } from 'node:url';
 import { Command } from 'commander';
 import { z } from 'zod';
-import packageJson from '../../package.json' with { type: 'json' };
+import packageJson from '../package.json' with { type: 'json' };
 import {
   buildAutostartContext,
   buildCliContext,
@@ -46,9 +46,9 @@ import {
   runConfigPolicyCommand,
   runConfigSetCommand,
 } from './config-command.js';
-import { DAEMON_CHILD_ENV_VAR } from '../adapters/process/daemon-launch.js';
-import { captureObservedProcStart } from '../adapters/process/proc-start.js';
-import { processExists } from '../adapters/process/existence.js';
+import { DAEMON_CHILD_ENV_VAR } from '@seeya-ai/engine/adapters/process/daemon-launch.js';
+import { captureObservedProcStart } from '@seeya-ai/engine/adapters/process/proc-start.js';
+import { processExists } from '@seeya-ai/engine/adapters/process/existence.js';
 
 const PackageJsonSchema = z.object({
   version: z.string(),

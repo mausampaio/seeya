@@ -10,17 +10,17 @@
  * only READS the lock and asks `ProcessControl.isAlive`; clearing a stale lock is `runDaemonStop`'s
  * job alone (docs/PLANO-DE-ENTREGA.md S4-T13, cuidado (b)).
  */
-import type { Clock, ProcessControl, Storage } from '../core/ports.js';
-import type { DaemonLockInfo } from '../core/daemon-lock.js';
-import type { DaemonHealth, DayState } from '../core/types.js';
-import { localDayString } from '../core/day.js';
+import type { Clock, ProcessControl, Storage } from '@seeya-ai/engine/core/ports.js';
+import type { DaemonLockInfo } from '@seeya-ai/engine/core/daemon-lock.js';
+import type { DaemonHealth, DayState } from '@seeya-ai/engine/core/types.js';
+import { localDayString } from '@seeya-ai/engine/core/day.js';
 import {
   decideSchedule,
   emptyDayState,
   resetIfNewDay,
   type ScheduleDecision,
-} from '../core/schedule.js';
-import { buildDaemonUnhealthyNotice } from '../scheduler/index.js';
+} from '@seeya-ai/engine/core/schedule.js';
+import { buildDaemonUnhealthyNotice } from '@seeya-ai/engine/scheduler/index.js';
 
 export interface DaemonStateDeps {
   readonly storage: Storage;

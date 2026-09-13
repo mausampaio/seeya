@@ -17,7 +17,7 @@
     "test:contrato": "vitest run --project contract",
     "cobertura": "vitest run --project unit --project integration --project integration-process --project guards --coverage",
     "lint": "eslint .",
-    "dependencias": "depcruise packages/engine/src --config .dependency-cruiser.cjs",
+    "dependencias": "depcruise packages/engine/src packages/cli/src --config .dependency-cruiser.cjs",
     "audit-report": "node scripts/audit-report.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

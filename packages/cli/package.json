@@ -1,0 +1,40 @@
+{
+  "name": "@seeya-ai/cli",
+  "version": "0.1.0",
+  "description": "Discovers AI sessions on the machine, captures their state at the end of the day, and resumes them the next day.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "bin": {
+    "seeya": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@seeya-ai/engine": "0.1.0",
+    "commander": "^15.0.0",
+    "zod": "^4.4.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mausampaio/seeya.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/mausampaio/seeya/issues"
+  },
+  "homepage": "https://github.com/mausampaio/seeya#readme",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "cli",
+    "handoff",
+    "productivity",
+    "ai"
+  ]
+}

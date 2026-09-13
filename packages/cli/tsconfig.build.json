@@ -1,0 +1,24 @@
+{
+  // Composite build project for @seeya-ai/cli (V2-T1, D-043). References packages/engine's own
+  // build config so `tsc -b` always builds engine first; by the time cli is compiled in the same
+  // `-b` invocation, engine's `dist/` and declarations already exist, so this package resolves
+  // `@seeya-ai/engine/*` through its real package.json "exports" — no "paths" override needed
+  // here (unlike the root tsconfig.json / vitest.config.ts, which resolve engine to source
+  // specifically so type-checking and tests never depend on a prior build). Named
+  // tsconfig.build.json, not tsconfig.json, for the same ESLint-auto-discovery reason as
+  // packages/engine/tsconfig.build.json's own comment explains, and so dependency-cruiser
+  // resolves @seeya-ai/engine/* the same way Node does at runtime (dist, never src) — the
+  // distinction the "cli only imports engine's public subpaths" rule in .dependency-cruiser.cjs
+  // depends on.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src"],
+  "references": [{ "path": "../engine/tsconfig.build.json" }]
+}

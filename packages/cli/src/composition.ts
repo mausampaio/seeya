@@ -15,24 +15,27 @@ import type {
   SessionProvider,
   SessionResumer,
   Storage,
-} from '../core/ports.js';
-import type { Config } from '../core/types.js';
-import { processControl as realProcessControl } from '../adapters/process/index.js';
-import { systemClock } from '../adapters/clock/index.js';
-import { StorageAdapter } from '../adapters/storage/index.js';
-import { buildAutostart } from '../adapters/autostart/index.js';
+} from '@seeya-ai/engine/core/ports.js';
+import type { Config } from '@seeya-ai/engine/core/types.js';
+import { processControl as realProcessControl } from '@seeya-ai/engine/adapters/process/index.js';
+import { systemClock } from '@seeya-ai/engine/adapters/clock/index.js';
+import { StorageAdapter } from '@seeya-ai/engine/adapters/storage/index.js';
+import { buildAutostart } from '@seeya-ai/engine/adapters/autostart/index.js';
 import {
   DiscoverySessionProvider,
   DiscoveryForkCleanup,
   discoverEarlyWarnings,
-} from '../adapters/discovery/index.js';
-import { TranscriptFileReader } from '../adapters/transcript/index.js';
-import { GitAdapter } from '../adapters/git/index.js';
-import { LeanHandoffGenerator, DeepHandoffGenerator } from '../adapters/generation/index.js';
-import { ClaudeSessionResumer } from '../adapters/resumption/index.js';
-import { notifier as realNotifier } from '../adapters/notification/index.js';
-import type { EndDayDeps } from '../application/types.js';
-import type { DaemonDeps } from '../scheduler/index.js';
+} from '@seeya-ai/engine/adapters/discovery/index.js';
+import { TranscriptFileReader } from '@seeya-ai/engine/adapters/transcript/index.js';
+import { GitAdapter } from '@seeya-ai/engine/adapters/git/index.js';
+import {
+  LeanHandoffGenerator,
+  DeepHandoffGenerator,
+} from '@seeya-ai/engine/adapters/generation/index.js';
+import { ClaudeSessionResumer } from '@seeya-ai/engine/adapters/resumption/index.js';
+import { notifier as realNotifier } from '@seeya-ai/engine/adapters/notification/index.js';
+import type { EndDayDeps } from '@seeya-ai/engine/application/types.js';
+import type { DaemonDeps } from '@seeya-ai/engine/scheduler/index.js';
 
 export interface CliHome {
   readonly claudeHome: string;

@@ -3,9 +3,12 @@
  * e saída" — user-facing text stays concentrated here, not scattered through
  * `start-day-command.ts`). Same convention `format-end-day.ts`/`format-sessions.ts` already use.
  */
-import { describeFallbackReason, formatResumeNotice } from '../core/resume-notice.js';
-import type { Handoff, ResumeFallbackReason } from '../core/types.js';
-import type { ResumeProgressEvent, ResumeSessionsResult } from '../application/start-day.js';
+import { describeFallbackReason, formatResumeNotice } from '@seeya-ai/engine/core/resume-notice.js';
+import type { Handoff, ResumeFallbackReason } from '@seeya-ai/engine/core/types.js';
+import type {
+  ResumeProgressEvent,
+  ResumeSessionsResult,
+} from '@seeya-ai/engine/application/start-day.js';
 
 /** Same shape as `format-end-day.ts`/`core/briefing.ts`'s own local helpers — user-facing
  * counts read as English, never as "day(s)". */

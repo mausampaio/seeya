@@ -3,10 +3,9 @@
   // nothing else. `files: []` means this config itself has no source of its own; it only
   // orchestrates its references. `npm run build` runs `tsc -b tsconfig.build.json`.
   //
-  // V2-T1 step (a): only packages/engine exists so far. packages/cli's own reference is added in
-  // step (b)'s commit, once packages/cli/tsconfig.build.json exists — a "references" entry
-  // pointing at a file that doesn't exist yet is a hard `tsc -b` error, unlike a plain
-  // `"include"` glob (see tsconfig.json), which just matches nothing.
   "files": [],
-  "references": [{ "path": "packages/engine/tsconfig.build.json" }]
+  "references": [
+    { "path": "packages/engine/tsconfig.build.json" },
+    { "path": "packages/cli/tsconfig.build.json" }
+  ]
 }

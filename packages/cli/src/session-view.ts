@@ -3,10 +3,10 @@
  * I/O: `sessions`/`config`/`now` all arrive already resolved by the caller (`sessions-command.ts`)
  * — this module only decides what to show and how to sort it.
  */
-import { classifyState } from '../core/classification.js';
-import type { DiscoveredSession, SessionState, Config } from '../core/types.js';
+import { classifyState } from '@seeya-ai/engine/core/classification.js';
+import type { DiscoveredSession, SessionState, Config } from '@seeya-ai/engine/core/types.js';
 import { computeDisplaySessionIds } from './session-id-display.js';
-import { projectPolicyFor } from '../application/eligibility-assembly.js';
+import { projectPolicyFor } from '@seeya-ai/engine/application/eligibility-assembly.js';
 
 export interface SessionRow {
   readonly name: string;

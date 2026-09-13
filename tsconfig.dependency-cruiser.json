@@ -16,6 +16,5 @@
     "resolveJsonModule": true,
     "noEmit": true
   },
-  // V2-T1 step (a): packages/cli is added to this list in step (b)'s commit.
-  "include": ["packages/engine/src"]
+  "include": ["packages/engine/src", "packages/cli/src"]
 }

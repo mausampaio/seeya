@@ -15,7 +15,10 @@
  * first in `start-day-selection.ts`'s. Both were "choosing wrong is cheap to do by accident";
  * this module is what makes that impossible going forward.
  */
-import { normalizeCwdForComparison, type PathPlatformHint } from '../core/cwd-normalization.js';
+import {
+  normalizeCwdForComparison,
+  type PathPlatformHint,
+} from '@seeya-ai/engine/core/cwd-normalization.js';
 
 /** The three fields any `--session` candidate needs, regardless of whether the underlying value is
  * a `DiscoveredSession` (`end-day`) or a `Handoff` (`start-day`) — both already carry all three. */

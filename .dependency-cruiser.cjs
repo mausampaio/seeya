@@ -8,10 +8,17 @@
  * import cli/: cli/ is what builds and injects the scheduler, never the other way around —
  * importing cli/ from scheduler/ would be a composition-root dependency inversion.
  *
- * V2-T1 step (a) (D-043): the four layers moved into `packages/engine/src/*`. The matrix below
- * is unchanged and stays exhaustive INSIDE `packages/engine` — only the path prefixes did.
- * `packages/cli` (and its own dependency-cruiser rule, `cli → engine` only through the package's
- * public subpaths) lands in step (b)'s commit.
+ * V2-T1 (D-043): the layers moved into `packages/engine/src/*`, and `cli/` became
+ * `packages/cli/src`. The matrix above is unchanged and stays exhaustive INSIDE
+ * `packages/engine` — only the path prefixes did. `cli-only-imports-engine-public-subpaths` is
+ * the one rule added for the monorepo split: `packages/cli/src` may only reach
+ * `@seeya-ai/engine`'s package boundary (which resolves through its package.json "exports" into
+ * `packages/engine/dist/**`, see this file's own `tsConfig.fileName` below), never a relative
+ * path landing inside `packages/engine/src` directly. A raw relative import bypassing the
+ * package boundary resolves to a `to.path` matching `^packages/engine/src`; a legitimate
+ * `@seeya-ai/engine/<layer>/...` import resolves to `packages/engine/dist/**` once built, which
+ * this rule doesn't touch — that's the whole distinction, and it's why `npm run verificar`
+ * builds before running `dependencias` (package.json).
  *
  * `from`/`to` paths are anchored per segment (`($|/)` after the layer name): without this,
  * `^packages/engine/src/application` would also match a future `.../application-legacy/`, which
@@ -31,7 +38,9 @@ module.exports = {
         'core/ is pure: it cannot import adapters/, application/, cli/ or scheduler/. Declare ' +
         'a port in core/ports.ts and implement it in an adapter.',
       from: { path: '^packages/engine/src/core($|/)' },
-      to: { path: '^packages/engine/src/(adapters|application|scheduler)($|/)' },
+      to: {
+        path: '^packages/engine/src/(adapters|application|scheduler)($|/)|^packages/cli/src($|/)',
+      },
     },
     {
       name: 'core-does-not-import-node',
@@ -50,7 +59,9 @@ module.exports = {
         'scheduler/. Invert the dependency: it is application/ (or scheduler/) that calls the ' +
         'adapter, never the other way around.',
       from: { path: '^packages/engine/src/adapters($|/)' },
-      to: { path: '^packages/engine/src/(application|scheduler)($|/)' },
+      to: {
+        path: '^packages/engine/src/(application|scheduler)($|/)|^packages/cli/src($|/)',
+      },
     },
     {
       name: 'application-does-not-import-adapters-cli-or-scheduler',
@@ -62,7 +73,9 @@ module.exports = {
         'depend only on the port declared in core/ports.ts; cli/, the only composition root, ' +
         'is what injects the implementation.',
       from: { path: '^packages/engine/src/application($|/)' },
-      to: { path: '^packages/engine/src/(adapters|scheduler)($|/)' },
+      to: {
+        path: '^packages/engine/src/(adapters|scheduler)($|/)|^packages/cli/src($|/)',
+      },
     },
     {
       name: 'scheduler-does-not-import-adapters',
@@ -85,6 +98,17 @@ module.exports = {
       to: { path: '^packages/cli/src($|/)' },
     },
     {
+      name: 'cli-only-imports-engine-public-subpaths',
+      severity: 'error',
+      comment:
+        'packages/cli/src can only reach @seeya-ai/engine through its package export map ' +
+        '(the same @seeya-ai/engine/<layer>/... subpath imports it already uses), never a raw ' +
+        "relative path into packages/engine/src (D-043's amendment to D-020: cli is a " +
+        'composition root, but it still may not reach past the engine package boundary).',
+      from: { path: '^packages/cli/src($|/)' },
+      to: { path: '^packages/engine/src($|/)' },
+    },
+    {
       name: 'no-circular-dependency',
       severity: 'error',
       comment:
@@ -96,6 +120,12 @@ module.exports = {
   ],
   options: {
     tsPreCompilationDeps: true,
+    // tsconfig.dependency-cruiser.json (own file, own comment): the root tsconfig.json's "paths"
+    // redirects @seeya-ai/engine/* to packages/engine/src for type-checking/tests, which would
+    // make dependency-cruiser resolve EVERY @seeya-ai/engine import into packages/engine/src too
+    // — exactly the path `cli-only-imports-engine-public-subpaths` above needs to tell apart from
+    // a real export-map import into packages/engine/dist. This config carries no such override,
+    // so resolution here matches what Node does at runtime.
     tsConfig: {
       fileName: 'tsconfig.dependency-cruiser.json',
     },

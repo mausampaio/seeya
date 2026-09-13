@@ -15,11 +15,14 @@
  * chance to object first. Resolving here, against a fresh discovery snapshot, is what makes
  * ambiguity refusable instead of already-acted-on.
  */
-import { endDay } from '../application/end-day.js';
-import type { EndDayDeps, EndDayResult } from '../application/types.js';
-import type { Config, DiscoveredSession, EndDayScope } from '../core/types.js';
-import type { Notifier } from '../core/ports.js';
-import { normalizeCwdForComparison, type PathPlatformHint } from '../core/cwd-normalization.js';
+import { endDay } from '@seeya-ai/engine/application/end-day.js';
+import type { EndDayDeps, EndDayResult } from '@seeya-ai/engine/application/types.js';
+import type { Config, DiscoveredSession, EndDayScope } from '@seeya-ai/engine/core/types.js';
+import type { Notifier } from '@seeya-ai/engine/core/ports.js';
+import {
+  normalizeCwdForComparison,
+  type PathPlatformHint,
+} from '@seeya-ai/engine/core/cwd-normalization.js';
 import { resolveSessionReference, type SessionReference } from './session-reference.js';
 import { formatEndDayReport } from './format-end-day.js';
 import { buildEndDayNotice } from './end-day-notice.js';

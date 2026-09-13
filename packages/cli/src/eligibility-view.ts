@@ -15,9 +15,12 @@
  * Once `Storage` grows a way to read today's handoffs (S2-T3/S1-T5), this needs a real
  * `previousCaptureToday` per session — see Q-015 for why that isn't invented here instead.
  */
-import { evaluateEligibility } from '../core/eligibility.js';
-import { normalizedIgnoreSet, withComparableCwd } from '../application/eligibility-assembly.js';
-import type { DiscoveredSession, Config } from '../core/types.js';
+import { evaluateEligibility } from '@seeya-ai/engine/core/eligibility.js';
+import {
+  normalizedIgnoreSet,
+  withComparableCwd,
+} from '@seeya-ai/engine/application/eligibility-assembly.js';
+import type { DiscoveredSession, Config } from '@seeya-ai/engine/core/types.js';
 
 export function countEligibleSessions(
   sessions: readonly DiscoveredSession[],

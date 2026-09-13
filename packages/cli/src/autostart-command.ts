@@ -3,7 +3,7 @@
  * thin wrapper around `./autostart-state.ts#describeAutostartState` — the exact function `seeya
  * status` also calls (cuidado (c): the two can never disagree).
  */
-import type { Autostart } from '../core/ports.js';
+import type { Autostart } from '@seeya-ai/engine/core/ports.js';
 import { describeAutostartState } from './autostart-state.js';
 
 export async function runAutostartEnableCommand(

@@ -3,7 +3,7 @@
  * e saída" — user-facing text stays concentrated here, not scattered through the command's
  * orchestration or the discovery adapters).
  */
-import type { RejectedDiscoveryRecord } from '../core/ports.js';
+import type { RejectedDiscoveryRecord } from '@seeya-ai/engine/core/ports.js';
 import type { SessionRow } from './session-view.js';
 
 /**

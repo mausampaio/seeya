@@ -40,10 +40,10 @@ import {
   projectPolicyNotEditableMessage,
   schemaVersionNotEditableMessage,
   unknownConfigKeyMessage,
-} from '../adapters/storage/config-schema.js';
-import { projectPolicyFor } from '../application/eligibility-assembly.js';
-import type { Storage } from '../core/ports.js';
-import type { Config, ProjectPolicy } from '../core/types.js';
+} from '@seeya-ai/engine/adapters/storage/config-schema.js';
+import { projectPolicyFor } from '@seeya-ai/engine/application/eligibility-assembly.js';
+import type { Storage } from '@seeya-ai/engine/core/ports.js';
+import type { Config, ProjectPolicy } from '@seeya-ai/engine/core/types.js';
 
 export interface ConfigCommandContext {
   readonly storage: Storage;

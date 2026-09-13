@@ -11,12 +11,15 @@
  *   (`scheduler/loop.ts#runDaemon`), until a POSIX signal asks it to stop or `decideLockAcquisition`
  *   refuses outright (another instance won the race).
  */
-import { spawnDetachedDaemon, type DaemonLaunchTarget } from '../adapters/process/daemon-launch.js';
-import { terminateAbruptly } from '../adapters/process/termination.js';
-import { checkDaemonLock } from '../scheduler/index.js';
-import { runDaemon } from '../scheduler/index.js';
-import type { DaemonDeps } from '../scheduler/index.js';
-import type { Clock, ProcessControl, Storage } from '../core/ports.js';
+import {
+  spawnDetachedDaemon,
+  type DaemonLaunchTarget,
+} from '@seeya-ai/engine/adapters/process/daemon-launch.js';
+import { terminateAbruptly } from '@seeya-ai/engine/adapters/process/termination.js';
+import { checkDaemonLock } from '@seeya-ai/engine/scheduler/index.js';
+import { runDaemon } from '@seeya-ai/engine/scheduler/index.js';
+import type { DaemonDeps } from '@seeya-ai/engine/scheduler/index.js';
+import type { Clock, ProcessControl, Storage } from '@seeya-ai/engine/core/ports.js';
 import {
   checkLiveLock,
   describeDaemonState,

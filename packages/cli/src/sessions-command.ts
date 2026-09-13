@@ -3,8 +3,8 @@
  * with its display state, last activity and end-of-day termination policy. Read-only — it never
  * writes anything, matching the spec's "é o comando de diagnóstico".
  */
-import type { Clock, SessionProvider } from '../core/ports.js';
-import type { Config } from '../core/types.js';
+import type { Clock, SessionProvider } from '@seeya-ai/engine/core/ports.js';
+import type { Config } from '@seeya-ai/engine/core/types.js';
 import { buildSessionRows } from './session-view.js';
 import { formatSessionsReport } from './format-sessions.js';
 

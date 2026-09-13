@@ -24,13 +24,13 @@ import { createInterface } from 'node:readline/promises';
 import {
   findPendingBriefing,
   type PendingBriefingLookup,
-} from '../application/find-pending-briefing.js';
-import { resumeSessions, type FallbackConfirmer } from '../application/start-day.js';
-import { renderConsolidatedPlan } from '../core/consolidated-plan.js';
-import { unresumedHandoffs } from '../core/pending-briefing.js';
-import { parseFallbackAnswer } from '../core/resume-fallback-decision.js';
-import type { Clock, SessionResumer, Storage } from '../core/ports.js';
-import type { Config, Day, Handoff, ResumeFallbackReason } from '../core/types.js';
+} from '@seeya-ai/engine/application/find-pending-briefing.js';
+import { resumeSessions, type FallbackConfirmer } from '@seeya-ai/engine/application/start-day.js';
+import { renderConsolidatedPlan } from '@seeya-ai/engine/core/consolidated-plan.js';
+import { unresumedHandoffs } from '@seeya-ai/engine/core/pending-briefing.js';
+import { parseFallbackAnswer } from '@seeya-ai/engine/core/resume-fallback-decision.js';
+import type { Clock, SessionResumer, Storage } from '@seeya-ai/engine/core/ports.js';
+import type { Config, Day, Handoff, ResumeFallbackReason } from '@seeya-ai/engine/core/types.js';
 import {
   findHandoffBySessionReference,
   parseInteractiveSelection,

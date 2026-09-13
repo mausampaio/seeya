@@ -5,8 +5,8 @@
  * Concentrated here, not scattered (AGENTS.md § "Texto voltado ao usuário"), same convention
  * `format-end-day.ts` already uses for the terminal report.
  */
-import type { EndDayResult } from '../application/types.js';
-import type { Notice } from '../core/ports.js';
+import type { EndDayResult } from '@seeya-ai/engine/application/types.js';
+import type { Notice } from '@seeya-ai/engine/core/ports.js';
 
 function pluralize(count: number, singular: string, plural: string): string {
   return `${count} ${count === 1 ? singular : plural}`;

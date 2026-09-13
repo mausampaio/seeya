@@ -5,7 +5,7 @@
  * autostart line can never disagree (S5-T1's cuidado (c),
  * `tests/unit/cli/autostart-status-agreement.test.ts`).
  */
-import type { Autostart } from '../core/ports.js';
+import type { Autostart } from '@seeya-ai/engine/core/ports.js';
 
 export async function describeAutostartState(autostart: Autostart): Promise<string> {
   const status = await autostart.status();

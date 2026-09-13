@@ -3,11 +3,14 @@
  * saída" — user-facing text stays concentrated here, not scattered through `end-day-command.ts` or
  * `application/end-day.ts`). Same convention `format-sessions.ts`/`format-status.ts` already use.
  */
-import type { CapturedSession, EndDayResult } from '../application/types.js';
-import type { Config, Handoff } from '../core/types.js';
-import type { RejectedDiscoveryRecord } from '../core/ports.js';
-import { countUnreadableListings, formatSessionListingLine } from '../core/briefing.js';
-import { renderItemList } from '../core/consolidated-plan.js';
+import type { CapturedSession, EndDayResult } from '@seeya-ai/engine/application/types.js';
+import type { Config, Handoff } from '@seeya-ai/engine/core/types.js';
+import type { RejectedDiscoveryRecord } from '@seeya-ai/engine/core/ports.js';
+import {
+  countUnreadableListings,
+  formatSessionListingLine,
+} from '@seeya-ai/engine/core/briefing.js';
+import { renderItemList } from '@seeya-ai/engine/core/consolidated-plan.js';
 import { resolveCanTerminate } from './session-view.js';
 
 function pluralize(count: number, singular: string, plural: string): string {

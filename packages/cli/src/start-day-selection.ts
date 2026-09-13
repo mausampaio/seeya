@@ -4,7 +4,7 @@
  * `--session`/`--all` from `commander` and the actual answer text from the terminal; this module
  * only decides what either one means.
  */
-import type { Handoff } from '../core/types.js';
+import type { Handoff } from '@seeya-ai/engine/core/types.js';
 import {
   resolveSessionReference,
   type SessionReference,

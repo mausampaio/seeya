@@ -12,8 +12,14 @@
  * "os dois nunca podem discordar sobre o daemon": one implementation, two callers, not a
  * convention two implementations happen to follow (`tests/unit/cli/daemon-status-agreement.test.ts`).
  */
-import type { Autostart, Clock, ProcessControl, SessionProvider, Storage } from '../core/ports.js';
-import type { Config } from '../core/types.js';
+import type {
+  Autostart,
+  Clock,
+  ProcessControl,
+  SessionProvider,
+  Storage,
+} from '@seeya-ai/engine/core/ports.js';
+import type { Config } from '@seeya-ai/engine/core/types.js';
 import { countEligibleSessions } from './eligibility-view.js';
 import { formatStatusReport } from './format-status.js';
 import { describeDaemonState } from './daemon-state.js';
