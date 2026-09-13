@@ -1390,7 +1390,7 @@ Gerir N terminais por sistema é complexidade que não termina, e validar com um
 
 **A decisão:** a interface é uma aplicação de desktop com **terminal embutido** — `xterm.js` no
 renderer e um PTY por aba — e o harness roda dentro dela, no contexto do projeto. Um runtime só,
-TypeScript, o núcleo no mesmo processo (`@seeya-ai/core`). **Tauri está descartado** (casca em
+TypeScript, o núcleo no mesmo processo (`@seeya-ai/engine`). **Tauri está descartado** (casca em
 Rust com o núcleo em Node como subprocesso, ou reescrita do núcleo): três runtimes num produto de
 uma pessoa. A aplicação se distribui como instalador (GitHub Releases), não pelo npm.
 
@@ -1406,7 +1406,7 @@ sessão num terminal externo aparece na lista das descobertas, com retomada pela
 
 ---
 
-## D-043 — Um repositório, três pacotes: `@seeya-ai/core`, `@seeya-ai/cli`, `@seeya-ai/app`; duas raízes de composição
+## D-043 — Um repositório, três pacotes: `@seeya-ai/engine`, `@seeya-ai/cli`, `@seeya-ai/app`; duas raízes de composição
 
 **Proposta do PO em 2026-09-13, para a v2; vira decisão quando o mantenedor aprovar a V2-T1.**
 
@@ -1414,7 +1414,7 @@ sessão num terminal externo aparece na lista das descobertas, com retomada pela
 
 | pacote | conteúdo | quem consome |
 |---|---|---|
-| `@seeya-ai/core` | as camadas `core/`, `application/`, `adapters/` e `scheduler/` de hoje | `cli` e `app`, **no mesmo processo** |
+| `@seeya-ai/engine` | as camadas `core/`, `application/`, `adapters/` e `scheduler/` de hoje | `cli` e `app`, **no mesmo processo** |
 | `@seeya-ai/cli` | a camada `cli/` de hoje e o binário `seeya` | a pessoa, o autostart, o `npm link` |
 | `@seeya-ai/app` | a interface (D-042); **só o nome fica reservado agora** | a pessoa |
 
@@ -1426,14 +1426,16 @@ para isto.
 **Emenda à D-020.** "`cli/` é a única raiz de composição" passa a ser "**`cli/` e `app/` são as
 duas raízes de composição**, e nenhuma outra": os dois nomeiam adapters concretos; `core/`,
 `application/` e `scheduler/` continuam sem nomear nenhum. A matriz de camadas (D-020, 20 pares)
-continua exaustiva **dentro** de `@seeya-ai/core`, e o dependency-cruiser continua sendo o guard —
+continua exaustiva **dentro** de `@seeya-ai/engine`, e o dependency-cruiser continua sendo o guard —
 agora sobre os dois pacotes.
 
-**Uma colisão de nome, aceita e nomeada.** O pacote `@seeya-ai/core` contém a camada `core/`, que
-é só uma parte dele. "Núcleo" na documentação continua sendo **a camada** (pura, sem I/O); o
-**pacote** é sempre citado com o escopo. O glossário do `AGENTS.md` fixa isso. A alternativa (outro
-nome de pacote) foi descartada: `core` é o que a D-040 e a D-042 já usam, e o custo da colisão é
-uma linha de glossário.
+**Por que `engine`, e não `core`** (mantenedor, 2026-09-13). A primeira versão desta decisão
+chamava o pacote de `@seeya-ai/core`, e ele contém a camada `core/`: os imports ficariam
+`@seeya-ai/core/core/…`, e ninguém saberia qual dos dois é o pacote. Renomear a camada tocaria a
+D-020, a matriz de 20 pares e o glossário; renomear o pacote, que ainda não existia, custou zero.
+`engine` diz o papel: é a parte que trabalha, e `cli` e `app` são as duas cascas que a acionam. Os
+imports leem-se como "a camada `core` do motor": `@seeya-ai/engine/core/…`,
+`@seeya-ai/engine/adapters/…`.
 
 **O que não muda.** Nenhum comportamento, nenhuma API entre camadas, nenhum arquivo renomeado além
 do movimento de diretório, nenhuma chave em disco. O binário continua `seeya`; o `npm link` passa a
