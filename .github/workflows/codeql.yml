@@ -1,0 +1,52 @@
+# SAST (S5-T6, docs/PLANO-DE-ENTREGA.md e docs/QUESTOES.md Q-068). CodeQL é o encaixe nativo do
+# GitHub para TypeScript — gratuito em repositório público, sem adicionar dependência de
+# terceiro na cadeia de CI (AGENTS.md § "Dependências": "sem dependência nova sem perguntar").
+#
+# Workflow separado de ci.yml de propósito: CodeQL constrói o próprio banco de dados e roda em
+# tempo bem maior que `npm run verificar` — misturar os dois faria o job da qualidade ficar
+# vermelho (ou continuar verde) pelo motivo errado.
+#
+# Suíte de queries: security-extended (ainda first-party do GitHub, nenhuma ação de terceiro
+# nova) em vez da suíte "security" padrão, porque ela cobre mais das classes de risco que este
+# projeto tem de verdade:
+#   - montagem de argumento de `spawn`/processo externo (src/adapters/process/,
+#     src/adapters/generation/, src/adapters/resumption/, src/adapters/git/) — js/command-line-injection e afins;
+#   - caminho de arquivo vindo de fora do processo (src/adapters/discovery/,
+#     src/adapters/transcript/, src/adapters/storage/) — js/path-injection e afins.
+# Nenhum desses diretórios está excluído da varredura — em especial
+# src/adapters/discovery/fork-cleanup.ts (a exceção documentada em D-012 para apagar arquivos
+# dentro de ~/.claude/projects/), que fica DELIBERADAMENTE dentro do escopo: é exatamente o
+# único lugar do projeto autorizado a apagar sob um caminho de aparência externa, e é o lugar
+# onde uma regressão dessa guarda seria mais cara. "Apontar o CodeQL para o que é arriscado"
+# significa não excluir esses caminhos, não pedir uma query específica para eles — o CodeQL não
+# oferece esse nível de direcionamento por comportamento de domínio, só por linguagem/suíte de
+# queries e por caminho (que aqui não teria por que excluir nada).
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  analyze:
+    name: Analyze (typescript)
+    runs-on: ubuntu-latest
+    # security-events: write é o mínimo que o CodeQL action precisa para publicar os achados na
+    # aba Security do repositório. contents: read é só para o checkout. Nenhuma outra permissão
+    # (não escreve código, não abre issue, não mexe em outro workflow).
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Baixa o código
+        uses: actions/checkout@v7
+
+      - name: Inicializa o CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: typescript
+          queries: security-extended
+
+      - name: Roda a análise
+        uses: github/codeql-action/analyze@v4
