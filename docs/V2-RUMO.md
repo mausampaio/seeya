@@ -472,6 +472,11 @@ conta de "cabe/não cabe" tem base; sem isso, o seeya limita e ordena, mas não 
 dispositivos. A variação por dispositivo não existe como configuração; a exceção é o ajuste do
 dia.
 
+**Ordem, decidida em 2026-09-13:** o primeiro recorte leva só `priority` e `status` no projeto,
+mais o `endOfDayTime` que já existe. Períodos múltiplos, ajuste do dia e estimativas entram
+**depois de o `end-day` global rodar com várias frentes reais**, para serem calibrados sobre
+medição e não sobre suposição. O desenho acima fica como rumo.
+
 ## Continuidade entre dispositivos (ideia do mantenedor, 2026-09-10)
 
 **Origem:** o mantenedor acompanhava a sessão do PO pelo celular. A conexão caiu, e ao reconectar
