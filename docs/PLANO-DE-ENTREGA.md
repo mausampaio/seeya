@@ -3836,6 +3836,38 @@ texto, mas não são a fila.
       "estou perdido entre vinte sessões" — a metade de **decidir** o que fazer com cada uma é a
       tela do v2. Interessa agora porque é a base que essa tela vai consumir.
 
+- [ ] **S5-T9 — Plano longo não pode custar o histórico da sessão.** Achado em uso real em
+      2026-09-13, na primeira retomada depois do reinício. **Não despachada.**
+
+      **O que aconteceu, medido no terminal do mantenedor:** o `start-day` escolheu o briefing
+      pendente de 06/09 e, para a sessão `code-6d`, imprimiu: *"yesterday's plan is too long to
+      pass safely to an interactive session (4135 characters, limit 4096). Opened a new session
+      there instead"*. **Por 39 caracteres**, a sessão inteira (uma semana de contexto) foi
+      trocada por uma sessão limpa com o plano como nota. A mensagem foi honesta e clara — o
+      defeito é o desenho, não o aviso. Os handoffs reais medem entre 1,8 mil e 4 mil caracteres:
+      o teto de 4096 está **no meio da distribuição real**, e é um penhasco — um caractere a mais e
+      o custo é o histórico inteiro.
+
+      **Por que o teto é 4096:** ~1/8 do limite de linha de comando do Windows (32.767), escolhido
+      por folga na S3-T2 (Q-027), antes de haver handoffs reais para medir.
+
+      **O que fazer, nesta ordem:**
+      1. **Medir** se `claude --resume <id> --append-system-prompt-file <arquivo> "<kickoff curto>"`
+         entrega o conteúdo do arquivo a uma sessão **retomada** em modo interativo (o fallback já
+         usa o arquivo, mas só em sessão nova). Teste com sessão descartável e um marcador no
+         arquivo que o modelo tenha que citar. Registrar na Q-069.
+      2. Se entregar: **o plano vai sempre pelo arquivo, e o argumento posicional fica só com o
+         kickoff curto e fixo.** Some a ramificação por tamanho; o fallback fica só para o
+         `--resume` que falha de verdade (D-004). Nenhuma sessão perde histórico por comprimento.
+      3. Se não entregar: subir o teto para um valor **medido** contra o limite real (o Windows é
+         o mais apertado; POSIX é ordens de grandeza maior), com o mesmo teste de ida-e-volta que
+         `args.ts` já cita, e manter o fallback como último recurso — declarando no aviso quantos
+         caracteres sobraram.
+
+      *Aceite:* um handoff de 4.135 caracteres (o caso real) retoma a sessão original; o teste de
+      contrato prova o mecanismo escolhido; a mensagem de fallback, quando ainda existir, diz o
+      motivo e o tamanho, como já faz.
+
 ## Definição de pronto (vale para toda tarefa)
 
 1. Código implementa exatamente a spec; divergência virou questão, não improviso.
