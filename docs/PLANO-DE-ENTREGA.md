@@ -3737,7 +3737,7 @@ texto, mas não são a fila.
 
 ---
 
-- [~] **S5-T5 — Atualizar as ações do CI, que rodam num runtime obsoleto.** Não é a nossa versão
+- [x] **S5-T5 — Atualizar as ações do CI, que rodam num runtime obsoleto.** **Aceita em 2026-09-13:** na primeira execução depois da mesclagem (`d3d7b4b`), CI verde nos três sistemas e **zero ocorrências** do texto do aviso no log. Não é a nossa versão
       do Node: o `ci.yml` pede `node-version: 22` para o projeto e isso está certo (D-008). O que
       está velho é o **runtime das ações**: `actions/checkout@v4` e `actions/setup-node@v4` são
       construídas para Node 20, e o GitHub já as força a rodar em Node 24, avisando em toda
@@ -3760,7 +3760,7 @@ texto, mas não são a fila.
       verificar:linux` verdes nesta máquina depois da troca. **Inferido/só depois da mesclagem:**
       o aviso sumir de verdade nos três SOs — não medido, porque esta troca está numa worktree e
       não fiz push. Detalhe em `docs/QUESTOES.md` Q-068 item 1.
-- [~] **S5-T6 — Portão de segurança antes de publicar: dependências e SAST.** Pedido do mantenedor
+- [x] **S5-T6 — Portão de segurança antes de publicar: dependências e SAST.** **Aceita em 2026-09-13:** job de `npm audit` verde (três achados moderados na árvore de desenvolvimento, reportados); CodeQL rodou pela primeira vez com sucesso. **Primeiro achado real:** 1 (alto: js/insecure-temporary-file em scripts/spike-j-measure.mjs:404 — script de spike, não código do produto). A decisão reprovar/reportar (Q-068) fica com o mantenedor, com esse dado na mão. Pedido do mantenedor
       em 2026-08-30, com a ressalva de que não é para agora — entra antes da publicação, não
       durante a construção.
       O motivo de existir: este projeto vai para npm como código aberto, **executa processos**,

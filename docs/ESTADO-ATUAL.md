@@ -83,8 +83,9 @@ S5-T6 segurança) **e depois a v2**, com a interface básica adiantada para o co
 `conhost.exe --headless`, registrada pelo módulo PowerShell `ScheduledTasks` porque `schtasks
 /Create` exige elevação nesta máquina — Q-067). **S5-T5 e S5-T6 mescladas em 13/09** (ações do CI em `@v7`, job de `npm audit` só no CI,
 workflow do CodeQL com `security-extended`; varredura de segredos já estava ligada no repositório).
-O aceite das duas só se vê na CI depois do push: o aviso de runtime obsoleto sumir e o CodeQL rodar
-pela primeira vez. **Verificação à mão que fica para o mantenedor:** `seeya autostart enable`, reiniciar ou
+Aceitas na primeira CI depois da mesclagem: o aviso de runtime obsoleto sumiu do log e o CodeQL
+rodou com sucesso. **Primeiro achado real do CodeQL:** 1 (alto: js/insecure-temporary-file em scripts/spike-j-measure.mjs:404 — script de spike, não código do produto). **Sprint 5 mínimo concluído no código;**
+falta o aceite manual da S5-T1 e a decisão reprovar/reportar da Q-068, agora com achado na mão. **Verificação à mão que fica para o mantenedor:** `seeya autostart enable`, reiniciar ou
 sair e entrar, e `seeya status` mostrando o daemon rodando e o autostart `enabled`, sem nenhuma
 janela ter aparecido no logon — Linux e macOS não foram medidos. O resultado do spike K está em
 [`spikes/K-sessao-limpa.md`](spikes/K-sessao-limpa.md).
