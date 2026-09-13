@@ -187,6 +187,18 @@ processo do harness em si: o `claude.exe` ocioso, sozinho, pesou 254,1 MB — ma
 abas extras de shell vazio juntas. Isso não é custo do terminal embutido; é o custo do harness,
 que existiria do mesmo jeito rodando fora do Electron.
 
+## Correção depois do spike (PO, 2026-09-13)
+
+O mantenedor rodou o protótipo à mão no Windows e o botão "+" não fazia nada. Dois defeitos no
+renderer, que a medição não pegou porque o spike inteiro rodou pelo modo automatizado
+(`SPIKE_AUTO_TABS`), que não passa pelo botão: `window.prompt` não existe no renderer do Electron
+(lança em vez de perguntar), e `process.platform` não existe com `contextIsolation` ligado — a
+aba inicial também não abria. Corrigido no protótipo: uma barrinha com comando e `cwd` digitáveis
+no lugar do `prompt`, e a plataforma exposta pelo preload. **Não muda nenhum resultado medido**
+(os seis itens foram medidos pelo mesmo `newTab` que o botão chama), mas registra o limite: o que
+o spike provou foi o PTY na aba, não a interface de abrir aba — essa é trabalho da interface de
+verdade.
+
 ## O que não foi medido
 
 - **Linux e macOS por inteiro.** Ficam para o mantenedor — é o SO do dia a dia dele, e é lá que a
