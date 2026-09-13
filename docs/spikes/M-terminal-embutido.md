@@ -199,6 +199,13 @@ no lugar do `prompt`, e a plataforma exposta pelo preload. **Não muda nenhum re
 o spike provou foi o PTY na aba, não a interface de abrir aba — essa é trabalho da interface de
 verdade.
 
+**Terceiro achado, na segunda tentativa à mão:** `pty.spawn('claude', …)` dá `File not found` —
+o `node-pty` no Windows não procura no `PATH` nem completa a extensão (`claude.exe`), e o modo
+automatizado escondia isso porque usava o caminho completo do binário. Corrigido no protótipo com
+uma resolução como a do shell (`PATH` + `PATHEXT`; `.cmd`/`.bat` só rodam via `cmd.exe /c`).
+**Isto é requisito da interface de verdade:** o adapter de abertura resolve o binário do harness
+por SO antes de lançar, e o `codex` no Windows é um `.cmd` do npm, não um `.exe`.
+
 ## O que não foi medido
 
 - **Linux e macOS por inteiro.** Ficam para o mantenedor — é o SO do dia a dia dele, e é lá que a
