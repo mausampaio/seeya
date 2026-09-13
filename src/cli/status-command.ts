@@ -12,11 +12,12 @@
  * "os dois nunca podem discordar sobre o daemon": one implementation, two callers, not a
  * convention two implementations happen to follow (`tests/unit/cli/daemon-status-agreement.test.ts`).
  */
-import type { Clock, ProcessControl, SessionProvider, Storage } from '../core/ports.js';
+import type { Autostart, Clock, ProcessControl, SessionProvider, Storage } from '../core/ports.js';
 import type { Config } from '../core/types.js';
 import { countEligibleSessions } from './eligibility-view.js';
 import { formatStatusReport } from './format-status.js';
 import { describeDaemonState } from './daemon-state.js';
+import { describeAutostartState } from './autostart-state.js';
 
 export interface StatusCommandContext {
   readonly sessionProvider: SessionProvider;
@@ -24,6 +25,10 @@ export interface StatusCommandContext {
   readonly clock: Clock;
   readonly storage: Storage;
   readonly processControl: ProcessControl;
+  /** S5-T1: `seeya status` renders the autostart line through the exact same function `seeya
+   * autostart status` calls (`./autostart-state.ts#describeAutostartState`) — same "one
+   * implementation, two callers" discipline S4-T13 already established for the daemon section. */
+  readonly autostart: Autostart;
 }
 
 export async function runStatusCommand(context: StatusCommandContext): Promise<string> {
@@ -33,10 +38,12 @@ export async function runStatusCommand(context: StatusCommandContext): Promise<s
   // `describeDaemonState` itself only calls `ProcessControl.isAlive` once; nothing here calls it
   // again.
   const daemonAndScheduleReport = await describeDaemonState(context);
+  const autostartReport = await describeAutostartState(context.autostart);
   return formatStatusReport({
     endOfDayTime: context.config.endOfDayTime,
     discoveredSessionCount: discovery.sessions.length,
     eligibleSessionCount: countEligibleSessions(discovery.sessions, context.config, now),
     daemonAndScheduleReport,
+    autostartReport,
   });
 }

@@ -14,6 +14,9 @@ export interface StatusView {
   /** Pre-rendered by `./daemon-state.ts#describeDaemonState` — liveness, effective schedule
    * (adiamento/skip-today/already-ran folded in) and health, in that order, newline-joined. */
   readonly daemonAndScheduleReport: string;
+  /** Pre-rendered by `./autostart-state.ts#describeAutostartState` — the same function `seeya
+   * autostart status` calls (S5-T1's cuidado (c)), so the two can never disagree. */
+  readonly autostartReport: string;
 }
 
 function formatEndOfDayLine(endOfDayTime: string | null): string {
@@ -27,5 +30,6 @@ export function formatStatusReport(view: StatusView): string {
     formatEndOfDayLine(view.endOfDayTime),
     `Eligible sessions: ${view.eligibleSessionCount} of ${view.discoveredSessionCount} discovered`,
     view.daemonAndScheduleReport,
+    view.autostartReport,
   ].join('\n');
 }

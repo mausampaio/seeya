@@ -16,6 +16,7 @@ import { emptyDayState } from '../../../src/core/schedule.js';
 import { createConfig } from '../core/_fixtures.js';
 import { InMemoryDaemonStorage } from '../scheduler/_fakes.js';
 import { FakeClock, FakeSessionProvider } from '../application/_fakes.js';
+import { FakeAutostart } from './_autostart-fakes.js';
 
 const NOW = new Date('2026-09-05T10:00:00.000Z');
 const LOCK = { pid: 4242, startedAt: NOW, procStart: '123-456' };
@@ -51,6 +52,7 @@ async function bothReports(
     clock,
     storage,
     processControl,
+    autostart: new FakeAutostart(),
   });
   return { daemonStatus, status };
 }

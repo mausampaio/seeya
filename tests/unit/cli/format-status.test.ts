@@ -7,6 +7,7 @@ function view(overrides: Partial<StatusView> = {}): StatusView {
     discoveredSessionCount: 0,
     eligibleSessionCount: 0,
     daemonAndScheduleReport: 'Daemon: not running.\nEnd-of-day: not configured (manual only).',
+    autostartReport: 'Autostart: disabled.',
     ...overrides,
   };
 }
