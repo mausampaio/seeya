@@ -3,8 +3,8 @@
  * e saída" — user-facing text stays concentrated here, not scattered through
  * `start-day-command.ts`). Same convention `format-end-day.ts`/`format-sessions.ts` already use.
  */
-import { formatResumeNotice } from '../core/resume-notice.js';
-import type { Handoff } from '../core/types.js';
+import { describeFallbackReason, formatResumeNotice } from '../core/resume-notice.js';
+import type { Handoff, ResumeFallbackReason } from '../core/types.js';
 import type { ResumeProgressEvent, ResumeSessionsResult } from '../application/start-day.js';
 
 /** Same shape as `format-end-day.ts`/`core/briefing.ts`'s own local helpers — user-facing
@@ -88,6 +88,36 @@ export function formatResumeProgress(event: ResumeProgressEvent): string {
   return `Resuming ${event.index} of ${event.total}: ${event.handoff.name} (${event.handoff.cwd})...`;
 }
 
+/**
+ * S5-T9's "warn BEFORE, and ask" question — the reason text is identical to
+ * `core/resume-notice.ts#formatResumeNotice`'s after-the-fact wording (same `describeFallbackReason`
+ * helper) because it is the SAME fact, just shown before the fallback runs instead of after. Default
+ * is "skip" (D-004's fallback loses history, so a distracted Enter must never choose it) — spelled
+ * out as `[y/N]`, the capital letter marking the default the same way a shell prompt would.
+ */
+export function renderFallbackQuestion(handoff: Handoff, reason: ResumeFallbackReason): string {
+  const why = describeFallbackReason(reason);
+  return (
+    `Could not resume session "${handoff.name}" (${handoff.cwd}) as-is — ${why}.\n` +
+    'Opening a new session there would start a FRESH conversation: it would not have this ' +
+    "session's full history.\n" +
+    'Open a new session anyway? [y/N]: '
+  );
+}
+
+/** Printed when there is no real terminal to ask the fallback question through — the safe default
+ * (skip) is applied automatically instead of asking `node:readline` to read a line from a stream
+ * that may never send one (`start-day-command.ts`'s own `isTTY` guard). */
+export function formatFallbackNoTty(handoff: Handoff, reason: ResumeFallbackReason): string {
+  const why = describeFallbackReason(reason);
+  return (
+    `Could not resume session "${handoff.name}" (${handoff.cwd}) as-is — ${why}. ` +
+    'Not running in an interactive terminal, so seeya cannot ask whether to open a new session ' +
+    'there — skipping it by default (use "seeya start-day --session <id>" from a real terminal ' +
+    'to be asked).'
+  );
+}
+
 function formatResumedSection(resumed: ResumeSessionsResult['resumed']): string {
   if (resumed.length === 0) {
     return '';
@@ -118,8 +148,40 @@ function formatRemainingSection(result: ResumeSessionsResult): string {
   return lines.join('\n');
 }
 
+/** S5-T9 aceite: "o resumo final continua listando o que aconteceu, inclusive 'pulada a pedido'" —
+ * a session the person declined the fallback for is never silently absent from the summary. */
+function formatSkippedSection(skipped: ResumeSessionsResult['skipped']): string {
+  if (skipped.length === 0) {
+    return '';
+  }
+  const lines = ['Skipped at your request (no new session opened):'];
+  for (const { handoff, reason } of skipped) {
+    lines.push(`- ${handoff.sessionId} (${handoff.cwd}) — ${describeFallbackReason(reason)}`);
+  }
+  return lines.join('\n');
+}
+
+/** Q-028's "invalid answer aborts that one item, no retry loop" convention, applied to the
+ * fallback question instead of the session picker. */
+function formatInvalidFallbackAnswersSection(
+  invalidFallbackAnswers: ResumeSessionsResult['invalidFallbackAnswers'],
+): string {
+  if (invalidFallbackAnswers.length === 0) {
+    return '';
+  }
+  const lines = ['Not resumed — invalid answer to the fallback question:'];
+  for (const { handoff, reason } of invalidFallbackAnswers) {
+    lines.push(`- ${handoff.sessionId} (${handoff.cwd}): ${reason}`);
+  }
+  return lines.join('\n');
+}
+
 export function formatStartDaySummary(result: ResumeSessionsResult): string {
-  const sections = [formatResumedSection(result.resumed)];
+  const sections = [
+    formatResumedSection(result.resumed),
+    formatSkippedSection(result.skipped),
+    formatInvalidFallbackAnswersSection(result.invalidFallbackAnswers),
+  ];
   if (result.remaining.length > 0) {
     sections.push(formatRemainingSection(result));
   }

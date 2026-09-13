@@ -1,3 +1,4 @@
+import type { FallbackConfirmer } from '../../../src/application/start-day.js';
 import type {
   Briefing,
   Clock,
@@ -24,6 +25,8 @@ import type {
   EarlyWarningState,
   GeneratedUnderstanding,
   Handoff,
+  PrimaryResumeAttempt,
+  ResumeFallbackReason,
   ResumeOutcome,
   SessionFacts,
 } from '../../../src/core/types.js';
@@ -303,38 +306,97 @@ export class FakeStorage implements Storage {
 }
 
 /** Named double for `SessionResumer` (S3-T3, docs/TESTES.md: "duplo de I/O é classe/objeto
- * nomeado implementando a porta"). Records every call, in order, so a test can assert both the
- * outcome AND the exact sequence `application/start-day.ts#resumeSessions` produced. */
+ * nomeado implementando a porta"). Split into `attemptResume`/`runFallback` in S5-T9, mirroring
+ * the real port (`core/ports.ts`). Records every call to each, in order, so a test can assert both
+ * the outcome AND the exact sequence `application/start-day.ts#resumeSessions` produced —
+ * `fallbackCalls` stays empty for any test that never reaches a fallback at all. */
 export class FakeSessionResumer implements SessionResumer {
   readonly calls: { readonly sessionId: string; readonly cwd: string; readonly prompt: string }[] =
     [];
+  readonly fallbackCalls: {
+    readonly sessionId: string;
+    readonly cwd: string;
+    readonly prompt: string;
+    readonly reason: ResumeFallbackReason;
+  }[] = [];
 
   constructor(
-    private readonly impl: (
+    private readonly attemptImpl: (
       sessionId: string,
       cwd: string,
       prompt: string,
-    ) => Promise<ResumeOutcome>,
+    ) => Promise<PrimaryResumeAttempt>,
+    // Defaults to a loud rejection, not a silently-wrong outcome: a test whose scenario never
+    // means to reach the fallback (most of them) gets a clear failure message instead of a
+    // fabricated `ResumeOutcome` if `resumeSessions` ever calls this unexpectedly.
+    private readonly fallbackImpl: (
+      sessionId: string,
+      cwd: string,
+      prompt: string,
+      reason: ResumeFallbackReason,
+    ) => Promise<ResumeOutcome> = () =>
+      Promise.reject(new Error('FakeSessionResumer.runFallback was not configured for this test')),
   ) {}
 
-  resume(sessionId: string, cwd: string, prompt: string): Promise<ResumeOutcome> {
+  attemptResume(sessionId: string, cwd: string, prompt: string): Promise<PrimaryResumeAttempt> {
     this.calls.push({ sessionId, cwd, prompt });
-    return this.impl(sessionId, cwd, prompt);
+    return this.attemptImpl(sessionId, cwd, prompt);
+  }
+
+  runFallback(
+    sessionId: string,
+    cwd: string,
+    prompt: string,
+    reason: ResumeFallbackReason,
+  ): Promise<ResumeOutcome> {
+    this.fallbackCalls.push({ sessionId, cwd, prompt, reason });
+    return this.fallbackImpl(sessionId, cwd, prompt, reason);
   }
 }
 
-/** A `SessionResumer` whose every call attaches cleanly (`fellBack: false`). */
+/** A `SessionResumer` whose every call attaches cleanly (`fellBack: false`) — never even reaches
+ * `runFallback`. */
 export function cleanlyResumingResumer(): FakeSessionResumer {
   return new FakeSessionResumer((sessionId, cwd) =>
-    Promise.resolve({ sessionId, cwd, fellBack: false }),
+    Promise.resolve({ kind: 'resumed', outcome: { sessionId, cwd, fellBack: false } }),
   );
 }
 
-/** A `SessionResumer` whose every call throws — the "fallback also failed fast" case
- * (docs/QUESTOES.md Q-027 item 5) `resumeSessions`'s stop-the-loop behavior is tested against. */
+/** A `SessionResumer` whose `attemptResume` throws outright — the same loop-stopping shape
+ * `resumeSessions` also gives a `runFallback` that fails fast (docs/QUESTOES.md Q-027 item 5):
+ * either way, one exception from this port stops the batch, reports the exact session it happened
+ * on, and never retries the rest. */
 export function throwingResumer(message: string): FakeSessionResumer {
   return new FakeSessionResumer(() => Promise.reject(new Error(message)));
 }
+
+/** A `SessionResumer` whose `attemptResume` always reports `needsFallback` with `reason`, and
+ * whose `runFallback` attaches cleanly (`fellBack: reason`) — for testing the S5-T9 ask-before-
+ * fallback flow without needing a resumer that ever succeeds on the first try. */
+export function fallbackNeedingResumer(reason: ResumeFallbackReason): FakeSessionResumer {
+  return new FakeSessionResumer(
+    () => Promise.resolve({ kind: 'needsFallback', reason }),
+    (sessionId, cwd) => Promise.resolve({ sessionId, cwd, fellBack: reason }),
+  );
+}
+
+/** Same shape as `fallbackNeedingResumer`, but `runFallback` throws — the "fallback also failed
+ * fast" case (Q-027 item 5) reached via the S5-T9 ask step instead of directly. */
+export function fallbackNeedingThenFailingResumer(
+  reason: ResumeFallbackReason,
+  message: string,
+): FakeSessionResumer {
+  return new FakeSessionResumer(
+    () => Promise.resolve({ kind: 'needsFallback', reason }),
+    () => Promise.reject(new Error(message)),
+  );
+}
+
+/** Always answers "open" — the S5-T9 ask step's dependency in tests that exercise fallback
+ * bookkeeping but aren't themselves about the question (mirrors this file's pre-S5-T9 behavior,
+ * where a fallback happened automatically). Dedicated tests for "skip"/"invalid" pass their own
+ * `confirmFallback` instead. */
+export const alwaysOpenFallback: FallbackConfirmer = () => Promise.resolve({ kind: 'open' });
 
 /** A `Storage` whose `listHandoffs` always reports one extra unreadable entry alongside whatever
  * `FakeStorage` would otherwise return — for the briefing wiring test that checks `endDay`

@@ -25,23 +25,26 @@ import {
   findPendingBriefing,
   type PendingBriefingLookup,
 } from '../application/find-pending-briefing.js';
-import { resumeSessions } from '../application/start-day.js';
+import { resumeSessions, type FallbackConfirmer } from '../application/start-day.js';
 import { renderConsolidatedPlan } from '../core/consolidated-plan.js';
 import { unresumedHandoffs } from '../core/pending-briefing.js';
+import { parseFallbackAnswer } from '../core/resume-fallback-decision.js';
 import type { Clock, SessionResumer, Storage } from '../core/ports.js';
-import type { Config, Day, Handoff } from '../core/types.js';
+import type { Config, Day, Handoff, ResumeFallbackReason } from '../core/types.js';
 import {
   findHandoffBySessionReference,
   parseInteractiveSelection,
   resolveSelectionMode,
 } from './start-day-selection.js';
 import {
+  formatFallbackNoTty,
   formatInvalidSelection,
   formatNoPendingBriefing,
   formatNoSessionMatch,
   formatNoTtyInstructions,
   formatResumeProgress,
   formatStartDaySummary,
+  renderFallbackQuestion,
   renderPickerQuestion,
 } from './format-start-day.js';
 
@@ -118,6 +121,32 @@ async function pickSessions(
   return askInteractively(candidates, io);
 }
 
+/**
+ * S5-T9's "warn BEFORE, and ask" — the only place this command reads an answer other than the
+ * session picker. Without a real terminal, asking would mean handing `node:readline` a stream
+ * that may never send a line at all; the safe default (skip, D-004's fallback is the path that
+ * loses history) is applied directly instead, after still printing the reason (`formatFallbackNoTty`)
+ * so the person sees WHY that session was skipped, same as the TTY path would show before asking.
+ * Interpreting the raw answer is `core/resume-fallback-decision.ts#parseFallbackAnswer`'s job —
+ * this function only reads stdin and prints, per S5-T9's own "o cli/ só lê e imprime".
+ */
+function makeFallbackConfirmer(io: StartDayIo): FallbackConfirmer {
+  return async (handoff: Handoff, reason: ResumeFallbackReason) => {
+    if (!io.isTTY) {
+      io.stdout.write(`\n${formatFallbackNoTty(handoff, reason)}\n`);
+      return { kind: 'skip' };
+    }
+    const rl = createInterface({ input: io.stdin, output: io.stdout });
+    let answer: string;
+    try {
+      answer = await rl.question(`\n${renderFallbackQuestion(handoff, reason)}`);
+    } finally {
+      rl.close();
+    }
+    return parseFallbackAnswer(answer);
+  };
+}
+
 async function resumeAndReport(
   context: StartDayCommandContext,
   day: Day,
@@ -125,7 +154,11 @@ async function resumeAndReport(
   io: StartDayIo,
 ): Promise<number> {
   const result = await resumeSessions(
-    { storage: context.storage, sessionResumer: context.sessionResumer },
+    {
+      storage: context.storage,
+      sessionResumer: context.sessionResumer,
+      confirmFallback: makeFallbackConfirmer(io),
+    },
     { day, handoffs },
     (event) => io.stdout.write(`\n${formatResumeProgress(event)}\n`),
   );
