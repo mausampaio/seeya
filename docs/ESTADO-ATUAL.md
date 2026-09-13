@@ -106,3 +106,8 @@ Não faz parte do projeto, mas afeta o trabalho:
   (D-032).
 - No Git Bash, aspas duplas expandem `$_` e barras invertidas fora de aspas são comidas. Use barras
   normais nos caminhos.
+- **A sessão do PO não aparece no `--resume` do Claude Code em `C:\code`**, porque o seletor do
+  harness lista por slug do diretório e o transcript dela vive sob o slug antigo do repositório,
+  embora o `cwd` do registro seja `C:\code`. **`seeya start-day` a retoma normalmente**, porque
+  retoma por identidade (`--resume <id>`) e acha o transcript em qualquer slug. Aconteceu em
+  13/09, depois de apagar a pasta antiga; não é defeito do seeya — é argumento a favor dele.

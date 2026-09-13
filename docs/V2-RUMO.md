@@ -273,6 +273,13 @@ evolução:  projeto persistente → sessão temporária → atualização do pr
 A v1 continua valendo para sessões abertas fora do seeya e como mecanismo de recuperação. A
 descoberta de sessões, a leitura do git, o handoff e a retomada são reaproveitados.
 
+**Um dado a favor de retomar por identidade, não por diretório** (2026-09-13): o `--resume` do
+Claude Code lista sessões pelo slug do diretório atual; a sessão do PO nasceu num diretório que
+depois foi renomeado e apagado, e sumiu do seletor mesmo com `cwd` registrado em `C:\code`. O
+`seeya start-day` a retomou sem problema, porque procura o transcript pelo `sessionId` em todos os
+slugs. Na v2, a identidade de projeto e de sessão nunca deriva de caminho — é o mesmo princípio da
+separação entre identidade e resolução local dos repositórios.
+
 ### Recorte incremental — reordenado em 2026-09-13: a interface entra cedo
 
 **Por que a interface saiu do fim** (mantenedor, 2026-09-13): *"no meu dia a dia eu não consigo

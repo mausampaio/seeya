@@ -31,7 +31,10 @@ retoma as sessões de onde pararam.
 
 O Claude Code mantém um registro de processos vivos em `~/.claude/sessions/<pid>.json`, com
 `pid`, `sessionId`, `cwd`, `kind`, `entrypoint`, `startedAt`, `procStart` e `name`. O transcript
-de cada sessão fica em `~/.claude/projects/<slug-do-cwd>/<sessionId>.jsonl`.
+de cada sessão fica em `~/.claude/projects/<slug-do-cwd>/<sessionId>.jsonl`. **Nota do PO (2026-09-13):** o slug é o do diretório em que a sessão **nasceu**, e o
+`cwd` do registro pode divergir dele — uma sessão real ficou meses com transcript sob o slug do
+repositório e `cwd: C:\code`. Por isso `adapters/discovery/transcript-lookup.ts` procura o
+`<sessionId>.jsonl` em **todos** os slugs, nunca derivando o caminho do `cwd`.
 
 Regras:
 
