@@ -1408,7 +1408,7 @@ sessão num terminal externo aparece na lista das descobertas, com retomada pela
 
 ## D-043 — Um repositório, três pacotes: `@seeya-ai/engine`, `@seeya-ai/cli`, `@seeya-ai/app`; duas raízes de composição
 
-**Proposta do PO em 2026-09-13, para a v2; vira decisão quando o mantenedor aprovar a V2-T1.**
+**Decidida em 2026-09-13: o mantenedor aprovou a V2-T1 e ela foi mesclada no mesmo dia.**
 
 **O que muda.** O repositório passa a ser um monorepo com `npm workspaces`:
 

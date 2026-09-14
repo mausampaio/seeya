@@ -129,10 +129,9 @@ por processo não identificado); a nova é um clone com o mesmo HEAD. Apagar a a
 
 ## Monorepo (V2-T1, 13/09)
 
-**Feito, numa worktree isolada (`.claude/worktrees/`), aguardando revisão e mesclagem em 13/09**
-(se este arquivo não tiver uma nota de mesclagem abaixo, ainda está nesse estado — confira o
-`git log` de `main` em vez de assumir): o repositório virou monorepo `npm workspaces` (D-043). `core/`, `application/`, `adapters/` e
-`scheduler/` moveram (`git mv`) para `packages/engine/src/`; `cli/` moveu para `packages/cli/src/`.
+**Mesclado na `main` em 13/09** (feito numa worktree isolada, revisado pelo PO, fast-forward
+de sete commits): o repositório virou monorepo `npm workspaces` (D-043). `core/`,
+`application/`, `adapters/` e `scheduler/` moveram (`git mv`) para `packages/engine/src/`; `cli/` moveu para `packages/cli/src/`.
 `@seeya-ai/engine` exporta cada camada por subcaminho; `packages/cli` importa por
 `@seeya-ai/engine/<camada>/...`. Sete commits ao todo — quatro do movimento em si (um por passo:
 `packages/engine`, `packages/cli`, testes/ferramental, documentação), um achado de ferramental no

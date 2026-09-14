@@ -3953,7 +3953,9 @@ texto, mas não são a fila.
       que criaram em `~/.claude/projects/` e `~/.codex/sessions/`) foram removidos ao final.
 
 - [~] **V2-T1 — O monorepo: `@seeya-ai/engine` e `@seeya-ai/cli` (D-043).** Especificada pelo PO em
-      2026-09-13; **aguarda aprovação do mantenedor antes de qualquer despacho.** É a primeira
+      2026-09-13; aprovada pelo mantenedor e despachada no mesmo dia; **mesclada na `main` em
+      2026-09-13** (fast-forward, sete commits) depois da revisão do PO. Fica em `[~]` até o
+      mantenedor rodar `seeya autostart enable` e o CI dos três sistemas confirmar. É a primeira
       tarefa de código da v2 e uma reestruturação que toca tudo: por isso o aceite é "nada mudou",
       medido.
 
