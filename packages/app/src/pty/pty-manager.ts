@@ -15,20 +15,6 @@ export interface PtyManagerCallbacks {
   readonly onExit: (tabId: string, exitCode: number) => void;
 }
 
-/**
- * Thrown by `write`/`resize`/`closeTab` for a `tabId` this manager never created (or already
- * removed) a pty for — never a silent no-op: unlike `tabs/tab-model.ts#updateTab` (which tolerates
- * an update racing a removal because a pty CALLBACK firing late is expected and harmless), a
- * caller explicitly asking to write to/resize/close a specific tab that doesn't exist is a bug in
- * the caller, and AGENTS.md's error-message rule applies: say the id that was asked for.
- */
-export class UnknownTabError extends Error {
-  constructor(tabId: string) {
-    super(`no pty is registered for tab "${tabId}"`);
-    this.name = 'UnknownTabError';
-  }
-}
-
 export class PtyManager {
   private readonly ptys = new Map<string, PtyHandle>();
 
@@ -51,31 +37,63 @@ export class PtyManager {
     return handle.pid;
   }
 
-  private handleFor(tabId: string): PtyHandle {
-    const handle = this.ptys.get(tabId);
-    if (handle === undefined) {
-      throw new UnknownTabError(tabId);
-    }
-    return handle;
+  /**
+   * `write`/`resize`/`closeTab` below all return a boolean instead of throwing when `tabId` has
+   * no live pty — a **tolerant no-op**, not an error. A tab whose process already exited (the
+   * person typed `exit` in the shell) still sits in the renderer's tab strip (`tabs/tab-model.ts`:
+   * closing never removes a tab, only marks it), and three ordinary UI actions can still target
+   * it after that: typing into its (now inert) terminal, resizing the window (which resizes
+   * EVERY open tab, including ones that just exited), or clicking its own close button a second
+   * time. Each of those used to reach this class through an `ipcMain.on` handler with nothing
+   * catching the resulting throw — an uncaught exception in a `ipcMain.on` listener becomes an
+   * `uncaughtException` in Electron's main process, which pops "A JavaScript error occurred in
+   * the main process" and, worse, `resizeTab` hits this for EVERY exited tab on EVERY window
+   * resize, so the dialog could fire repeatedly from one resize. This is the exact same "a late
+   * event for a tab that's already gone is expected, not a bug" reasoning
+   * `tabs/tab-model.ts#updateTab`'s own docstring already gives for the identical race on the
+   * model side — `PtyManager` needed the same tolerance, not a `try/catch` bolted onto
+   * `electron/main.ts` around each call site.
+   */
+  private handleFor(tabId: string): PtyHandle | null {
+    return this.ptys.get(tabId) ?? null;
   }
 
-  write(tabId: string, data: string): void {
-    this.handleFor(tabId).write(data);
+  /** `false` when `tabId` has no live pty (see this class's own docstring above) — never throws. */
+  write(tabId: string, data: string): boolean {
+    const handle = this.handleFor(tabId);
+    if (handle === null) {
+      return false;
+    }
+    handle.write(data);
+    return true;
   }
 
   /** `electron/main.ts` calls this for every open tab when the window itself resizes
    * (docs/PLANO-DE-ENTREGA.md V2-T2: "redimensionar a janela redimensiona o pty") — one call per
-   * tab, this function only knows about one. */
-  resize(tabId: string, cols: number, rows: number): void {
-    this.handleFor(tabId).resize(cols, rows);
+   * tab, this function only knows about one. `false` when `tabId` has no live pty — never throws
+   * (see this class's own docstring above; an exited tab is exactly what a resize routinely hits). */
+  resize(tabId: string, cols: number, rows: number): boolean {
+    const handle = this.handleFor(tabId);
+    if (handle === null) {
+      return false;
+    }
+    handle.resize(cols, rows);
+    return true;
   }
 
   /** Ends the tab's process (docs/PLANO-DE-ENTREGA.md V2-T2: "fechar a aba encerra o processo").
    * The registered `onExit` callback still fires normally from the pty's own exit event — this
    * method doesn't call `callbacks.onExit` itself, so there is exactly one path that reports a
-   * tab's exit, whether it asked for it or the process ended on its own. */
-  closeTab(tabId: string): void {
-    this.handleFor(tabId).kill();
+   * tab's exit, whether it asked for it or the process ended on its own. `false` when `tabId` has
+   * no live pty — never throws (see this class's own docstring above: clicking an already-exited
+   * tab's close button is the obvious way to hit this). */
+  closeTab(tabId: string): boolean {
+    const handle = this.handleFor(tabId);
+    if (handle === null) {
+      return false;
+    }
+    handle.kill();
+    return true;
   }
 
   hasTab(tabId: string): boolean {

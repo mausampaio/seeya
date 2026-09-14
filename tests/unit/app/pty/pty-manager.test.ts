@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { PtyManager, UnknownTabError } from '../../../../packages/app/src/pty/pty-manager.js';
+import { PtyManager } from '../../../../packages/app/src/pty/pty-manager.js';
 import type {
   PtyHandle,
   PtySpawnOptions,
@@ -99,7 +99,7 @@ describe('PtyManager', () => {
     expect(onData).toHaveBeenCalledWith('tab-1', 'hello\r\n');
   });
 
-  it('forwards onExit to the callback and forgets the tab (write/resize/closeTab then throw)', () => {
+  it('forwards onExit to the callback and forgets the tab (write/resize/closeTab then become tolerant no-ops)', () => {
     const spawner = new FakePtySpawner();
     const onExit = vi.fn();
     const manager = new PtyManager(spawner, { onData: vi.fn(), onExit });
@@ -109,18 +109,18 @@ describe('PtyManager', () => {
 
     expect(onExit).toHaveBeenCalledWith('tab-1', 0);
     expect(manager.hasTab('tab-1')).toBe(false);
-    expect(() => manager.write('tab-1', 'x')).toThrow(UnknownTabError);
+    expect(manager.write('tab-1', 'x')).toBe(false);
   });
 
-  it('write/resize/closeTab route to the right handle by tab id', () => {
+  it('write/resize/closeTab route to the right handle by tab id, returning true on success', () => {
     const spawner = new FakePtySpawner();
     const manager = new PtyManager(spawner, { onData: vi.fn(), onExit: vi.fn() });
     manager.create('tab-1', OPTIONS);
     manager.create('tab-2', OPTIONS);
 
-    manager.write('tab-2', 'say ok');
-    manager.resize('tab-1', 120, 40);
-    manager.closeTab('tab-2');
+    expect(manager.write('tab-2', 'say ok')).toBe(true);
+    expect(manager.resize('tab-1', 120, 40)).toBe(true);
+    expect(manager.closeTab('tab-2')).toBe(true);
 
     expect(spawner.handles[0]!.written).toEqual([]);
     expect(spawner.handles[1]!.written).toEqual(['say ok']);
@@ -128,13 +128,36 @@ describe('PtyManager', () => {
     expect(spawner.handles[1]!.killed).toBe(true);
   });
 
-  it('write/resize/closeTab throw UnknownTabError for an id never created, with the id in the message', () => {
+  /**
+   * PO review of V2-T2: a tab whose process already exited still sits in the renderer's tab strip
+   * (marked, never removed — `tabs/tab-model.ts`), so three ordinary actions can still target it
+   * after that — typing into it, resizing the window (which resizes every open tab), or clicking
+   * its own close button again. Before this fix, each of these threw `UnknownTabError` out of an
+   * `ipcMain.on` handler with nothing catching it, which Electron turns into "A JavaScript error
+   * occurred in the main process" — `resizeTab` especially, since a window resize calls it once
+   * per open tab, including every exited one. `write`/`resize`/`closeTab` on ANY id with no live
+   * pty — never created, or already exited — are now uniform, silent no-ops returning `false`.
+   */
+  it('write/resize/closeTab never throw for an id with no live pty (never created, or already exited) — they return false', () => {
     const spawner = new FakePtySpawner();
     const manager = new PtyManager(spawner, { onData: vi.fn(), onExit: vi.fn() });
 
-    expect(() => manager.write('ghost', 'x')).toThrow(/ghost/);
-    expect(() => manager.resize('ghost', 1, 1)).toThrow(UnknownTabError);
-    expect(() => manager.closeTab('ghost')).toThrow(UnknownTabError);
+    expect(manager.write('ghost', 'x')).toBe(false);
+    expect(manager.resize('ghost', 1, 1)).toBe(false);
+    expect(manager.closeTab('ghost')).toBe(false);
+  });
+
+  it('resizing every tab after one has exited resizes the live ones and silently skips the exited one (the window-resize scenario)', () => {
+    const spawner = new FakePtySpawner();
+    const manager = new PtyManager(spawner, { onData: vi.fn(), onExit: vi.fn() });
+    manager.create('tab-1', OPTIONS);
+    manager.create('tab-2', OPTIONS);
+    spawner.handles[0]!.emitExit(0); // tab-1's process ended; the tab itself stays in the UI.
+
+    const results = ['tab-1', 'tab-2'].map((id) => manager.resize(id, 100, 30));
+
+    expect(results).toEqual([false, true]);
+    expect(spawner.handles[1]!.resizes).toEqual([{ cols: 100, rows: 30 }]);
   });
 
   it('closeTab does not itself call onExit — the pty firing its own exit event is the only path (no double-report)', () => {
