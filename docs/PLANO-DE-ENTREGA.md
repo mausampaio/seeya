@@ -4022,8 +4022,9 @@ texto, mas não são a fila.
       em `packages/cli` (com o `brokenPath` reportado e depois corrigido por `enable`); alerta do
       CodeQL fechado; `git log --follow` de um arquivo movido mostrando o histórico anterior.
 
-      **Relatório do agente (2026-09-13), numa worktree isolada, nada mesclado.** Quatro
-      commits, cada um com o portão relevante verde antes de commitar:
+      **Relatório do agente (2026-09-13), numa worktree isolada, nada mesclado.** Sete commits
+      ao todo — quatro do movimento em si, um achado de ferramental no meio do caminho, e dois de
+      ajuste pedidos na revisão do PO — cada um com o portão relevante verde antes de commitar:
 
       1. `packages/engine` recebe `core/`, `application/`, `adapters/`, `scheduler/` (`git mv`);
          `package.json` com `exports` por subcaminho; workspace raiz. Portão escopado: `tsc -b`,
@@ -4034,9 +4035,8 @@ texto, mas não são a fila.
          um arquivo de violação descartável antes de ficar valendo pra valer. `npm link` em
          `packages/cli`; `seeya --version` respondendo pelo link novo.
       3. `tests/` e ferramental (`vitest.config.ts`, `eslint.config.js`,
-         `tests/integration/guards/**`) apontando para os caminhos novos. **Medido: os mesmos
-         1.566 testes passam** (nenhum a menos, nenhum a mais, nenhum pulado a mais) — confirmado
-         rodando `npm run verificar` completo, não só inspecionando o diff. `scripts/spike-j-measure.mjs`
+         `tests/integration/guards/**`) apontando para os caminhos novos — confirmado rodando
+         `npm run verificar` completo, não só inspecionando o diff. `scripts/spike-j-measure.mjs`
          corrigido para `mkdtemp` nesta tarefa (Q-068) — **está neste commit**, por tocar
          `scripts/` junto com o resto do ferramental.
       4. Documentação: `docs/ARQUITETURA.md`, `AGENTS.md`, `INDEX.md` (mapa; sem mudança de
@@ -4051,16 +4051,42 @@ texto, mas não são a fila.
       `packages/cli/dist`). Corrigido e confirmado com dois `npm run verificar` seguidos mais o
       link funcionando nos dois.
 
-      **Medido nesta worktree:** `npm run verificar` completo verde (format, `tsc -p
-      tsconfig.json --noEmit`, `eslint .`, `tsc -b` via `npm run build`, `dependencias`,
-      `cobertura`) com **1.566 testes passando, 3 pulados** — igual à base. Cobertura por
-      diretório dentro do piso em todos (`packages/engine/src/core/**` em 100%). `git log
-      --follow -- packages/engine/src/core/schedule.ts` mostra o histórico de antes do movimento.
-      `seeya --version`/`seeya status`/`seeya autostart status` respondem certo pelo `npm link`
-      feito em `packages/cli` — `status`/`autostart status` leram o `~/.seeya` real da máquina
-      (só leitura; `enable` não foi rodado, por instrução do despacho). `npm run verificar:linux`
-      **não rodou**: Docker Desktop não respondia nesta sessão e cinco minutos de espera não
-      resolveram — fica pendente da CI, como o próprio fluxo de trabalho prevê para esse caso.
+      **Revisão do PO, dois commits mais** (depois do quinto acima, antes da mesclagem):
+
+      6. O `it()` da oitava regra, removido no commit 3 para segurar a contagem em 1.566, foi
+         **recolocado**: o invariante "os mesmos 1.566" existe para não perder ou pular teste,
+         não para impedir uma regra de guard nova de ganhar teste dedicado — ver
+         `docs/QUESTOES.md` Q-070 item 5, que registra a reversão em vez de apagar o raciocínio
+         original. **A contagem correta da tarefa é 1.567 testes passando, 3 pulados**, não
+         1.566 (1.566 da base + 1 da regra 8) — corrigida também em `docs/ESTADO-ATUAL.md`.
+         Junto, `scripts/spike-j-measure.mjs` ganhou um segundo endurecimento: a primeira correção
+         do CodeQL (`mkdtemp`, commit 3) ainda reaproveitava diretório por PREFIXO de nome em
+         `tmpdir()`, o que um processo local qualquer pode plantar de antemão (com `state.json`
+         como symlink) — trocado por entrega explícita via `SPIKE_J_STATE_DIR`, nunca mais
+         varrendo `tmpdir()`. Ver Q-070 item 2 (medição original) e o commit da revisão para o
+         detalhe.
+      7. Correções de documentação pedidas na mesma revisão: a contagem de commits (este
+         relatório dizia "quatro", eram cinco antes da revisão, sete depois) e o resultado real
+         de `npm run verificar:linux`, que este relatório chegou a registrar como "não rodou" —
+         verdadeiro no momento em que o commit 4 foi escrito (Docker Desktop não respondia
+         naquela sessão), mas **rodou verde logo depois, ainda antes da mesclagem**: primeira vez
+         com a contagem de 1.566/1.569, depois de novo já com a regra 8 recolocada (commit 6),
+         com **1.565 passando, 5 pulados (1.570 no total)** — mesmo total que o Windows
+         (1.567 + 3), a diferença de 2 pulados entre SOs sendo o mesmo comportamento
+         plataforma-condicional que já existia antes desta tarefa (blocos `describe` específicos
+         de Windows/POSIX em `termination.test.ts` e afins, não uma regressão desta tarefa).
+
+      **Medido nesta worktree, depois do commit 7:** `npm run verificar` completo verde (format,
+      `tsc -p tsconfig.json --noEmit`, `eslint .`, `tsc -b` via `npm run build`, `dependencias`,
+      `cobertura`) com **1.567 testes passando, 3 pulados**. Cobertura por diretório dentro do
+      piso em todos (`packages/engine/src/core/**` em 100%). `npm run verificar:linux` (Docker
+      Desktop respondeu) também verde, exit 0: **1.565 passando, 5 pulados** (1.570 no total,
+      igual ao Windows), 285 módulos/734 dependências sem violação, nenhum piso de cobertura
+      furado. `git log --follow -- packages/engine/src/core/schedule.ts` mostra o histórico de
+      antes do movimento. `seeya --version`/`seeya status`/`seeya autostart status` respondem
+      certo pelo `npm link` feito em `packages/cli` — `status`/`autostart status` leram o
+      `~/.seeya` real da máquina (só leitura; `enable` não foi rodado, por instrução do
+      despacho).
 
       **Inferido, não medido por este agente:** o `brokenPath` do autostart. A tarefa agendada
       real do Windows aponta para `C:\code\seeya\dist\cli\index.js`, no checkout principal — que
