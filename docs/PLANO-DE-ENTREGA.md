@@ -4129,6 +4129,152 @@ texto, mas não são a fila.
       Ver `docs/QUESTOES.md` Q-070 para as decisões de ferramental tomadas sem parar para
       perguntar (nenhuma altera comportamento, API entre camadas ou texto voltado à pessoa).
 
+- [ ] **V2-T2 — A interface, esqueleto: `@seeya-ai/app` com abas de terminal e a lista de sessões
+      (D-042, D-043).** Especificada pelo PO em 2026-09-14; **aguarda aprovação do mantenedor
+      antes de qualquer despacho.** Primeira tarefa de código da interface. Ela é deliberadamente
+      um esqueleto: prova a pilha (Electron + `xterm.js` + `node-pty`) como código de produto,
+      dentro do monorepo e dos guards, e entrega a primeira utilidade real — abrir o harness numa
+      aba e ver as sessões vivas da máquina numa lista — sem ainda nenhuma ação que custe dinheiro
+      ou encerre sessão. As ações (`start-day` abrindo abas, `end-day`, notificações com botão)
+      são a V2-T3, separada de propósito.
+
+      **Uma decisão de produto embutida, a confirmar pelo mantenedor:** o recorte da
+      `docs/V2-RUMO.md` põe `seeya project create/list/show/open` (passo 2) antes da interface
+      (passo 3), e descreve a lateral como "projetos". O projeto ainda não existe no motor. Esta
+      tarefa **inverte a ordem**: a lateral nasce mostrando as **sessões descobertas** (a unidade
+      da v1, que já existe e já funciona), e o projeto entra depois como o agrupamento dessa
+      lista. O motivo é o do próprio mantenedor ao puxar a interface para cedo ("dez terminais
+      abertos e continuar perdido"): quem organiza sessão viva é a interface, e isso não depende
+      do modelo de projeto. Se o mantenedor preferir projetos antes, a tarefa muda de lugar, não
+      de conteúdo — o esqueleto é o mesmo, só a fonte da lateral muda.
+
+      **O que entra:**
+
+      1. **O pacote.** `packages/app/` = `@seeya-ai/app`, versão `0.1.0`, `private: true` por
+         enquanto (a interface não vai para o npm, D-042: distribui-se como instalador, e isso é
+         tarefa futura). TypeScript de ponta a ponta; `contextIsolation: true`,
+         `nodeIntegration: false`, `sandbox` no renderer; o preload expõe só o que o renderer
+         precisa (criar/escrever/redimensionar/matar aba; assinar lista de sessões e estado).
+         **Sem framework de UI nesta tarefa** — HTML e TypeScript puros no renderer (D-041:
+         mínimo primeiro; um framework entra quando o painel justificar, com decisão própria).
+         **Um bundler para o renderer é inevitável** (o `xterm.js` precisa chegar ao renderer
+         isolado): o agente escolhe entre `electron-vite` e `esbuild`, o mínimo que resolver os
+         três alvos (main, preload, renderer), e registra a escolha e o porquê na Q-071.
+         `npm run app` na raiz sobe a interface em desenvolvimento.
+
+      2. **A segunda raiz de composição (D-043).** `packages/app/src/` compõe o motor no
+         **mesmo processo** (processo principal do Electron), pelos subcaminhos públicos de
+         `@seeya-ai/engine` — nunca por subprocesso da CLI, nunca importando `packages/cli`.
+         **A única duplicação permitida entre as duas raízes é a fiação** (qual adapter entra em
+         qual porta); **qualquer lógica que a interface queira reaproveitar da CLI sai da CLI e
+         vai para o motor** (`application/` ou `core/`), e a CLI passa a importar de lá. Caso
+         concreto já conhecido: `describeDaemonState` (`packages/cli/src/daemon-state.ts`) e
+         `describeAutostartState` (`autostart-state.ts`), que o painel de estado precisa — movem
+         para o motor, **na camada que a matriz permite**: `daemon-state` importa
+         `buildDaemonUnhealthyNotice` de `scheduler/`, e `application/` não pode importar
+         `scheduler/`, então ou ele pousa em `scheduler/` ou o aviso desce para `core/` — o agente
+         decide pela matriz, não pela conveniência, e registra. Testes acompanham (`git mv`), nada
+         muda de comportamento. O agente lista na Q-071 tudo o que moveu.
+
+      3. **A janela.** Três regiões, sem enfeite:
+         - **Lateral: as sessões descobertas** — a mesma lista de `seeya sessions`
+           (`buildSessionListings`, pelo `SessionProvider`), atualizada em intervalo pelo relógio
+           injetado (D-019), com os mesmos campos e o mesmo vocabulário de estado da CLI (D-024:
+           nunca achatar; "sem PID", "não inspecionável" etc. aparecem como na CLI). Uma sessão
+           aberta numa aba desta janela é marcada como tal; a correspondência é **pelo PID do
+           processo da aba** (spike M, item 5: o harness registra o próprio PID em
+           `~/.claude/sessions/`), e só por ele — sem correspondência, a sessão fica sem marca
+           (D-025), inclusive no caso conhecido do `codex` no Windows (`.cmd` via `cmd.exe`, PID
+           diferente), que fica registrado como limitação, não contornado.
+         - **Centro: abas de terminal.** "+" abre uma aba pedindo **comando** (`claude`, `codex`
+           ou o shell do sistema) e **diretório**; cada aba é um `xterm.js` ligado a um `node-pty`
+           no processo principal; fechar a aba encerra o processo; o `onExit` do processo marca a
+           aba como encerrada (com o código) em vez de sumir com ela. Redimensionar a janela
+           redimensiona o pty. **Ambiente limpo antes de cada `spawn`** (D-017: as variáveis
+           `CLAUDE*`/`AI_AGENT` da sessão que por acaso lançou a interface não entram na aba) —
+           pela mesma função que o `start-day` já usa para abrir sessão interativa
+           (`adapters/resumption/env.ts#buildResumptionEnv`), não por cópia.
+         - **Rodapé ou painel: o estado** — o mesmo conteúdo de `seeya status` (horário de
+           encerramento, sessões elegíveis, daemon, encerramento de hoje, saúde, autostart),
+           pelas mesmas funções do motor. **Só leitura nesta tarefa**: sem botão de subir/parar
+           daemon, sem `end-day` (V2-T3).
+
+      4. **Resolução do binário do harness por SO** (achado do spike M: `node-pty` no Windows
+         não consulta `PATH` nem completa `.exe`; `codex` é um `.cmd` do npm e só roda via
+         `cmd.exe /c`). Vira função no motor, `adapters/process/resolve-command.ts`, com testes
+         por unidade contra um sistema de arquivos falso — o mesmo problema vai aparecer quando o
+         `start-day` abrir abas (V2-T3), então não pertence à interface.
+
+      5. **Os guards ganham a segunda raiz**, e provam que guardam:
+         - `.dependency-cruiser.cjs`: `packages/app/src` só alcança o motor pelo mapa de exports
+           (mesma regra da CLI, `app-only-imports-engine-public-subpaths`); **motor nunca importa
+           `app`**; **`app` nunca importa `cli`** e vice-versa; a matriz de 20 pares continua
+           exaustiva dentro do motor. Testes novos em `tests/integration/guards/` para cada regra
+           nova, no padrão dos que existem.
+         - `eslint.config.js`: `electron` só pode ser importado em
+           `packages/app/src/electron/**`; `node-pty` só em `packages/app/src/pty/**` — a mesma
+           técnica de inversão de ônus da guarda de `spawn` (D-038), porque uma aba **é** um
+           processo lançado pelo seeya e a regra de "invisível por padrão" vale: o ConPTY não
+           abre janela (medido no spike M), e a guarda garante que ninguém lança de outro jeito.
+           A guarda do relógio (D-019) já cobre `packages/*/src/**` e passa a valer para a
+           interface sem mudança.
+         - Cobertura: `packages/app/src/**` com piso de 80%, **exceto `packages/app/src/electron/**`**
+           (a fiação do Electron não roda sem display; entra como `excluded` no guard
+           `_coverage-directories.ts`, com o motivo, como `packages/cli/src/index.ts` já está).
+           A consequência de desenho: **tudo que tiver lógica fica fora de `electron/`** — o
+           modelo das abas, a correspondência aba↔sessão, a montagem do estado — em módulos
+           puros com teste por unidade, e `electron/` só liga IPC a esses módulos.
+
+      6. **A medição do Linux, que o spike M deixou aberta**, entra como primeiro passo da tarefa
+         e não como esperança: `npm install` de `node-pty` (e de `electron`) dentro do contêiner
+         do `verificar:linux`, com o resultado registrado — se compila do fonte, o que a imagem
+         precisou ter (`python3`, `make`, `g++`); se veio prebuild por outro caminho, qual. Isso
+         mede "compila em Linux com toolchain", não "compila na máquina do mantenedor" — essa
+         segunda medição continua sendo dele (V2-T0), e é item de aceite desta tarefa também.
+
+      **O que não entra** (V2-T3 e depois): `start-day` abrindo as sessões retomadas em abas (o
+      `SessionResumer` implementado pela interface — é a razão de existirem duas raízes, mas é a
+      tarefa seguinte); `end-day` e `pause` pela interface; notificações com ações (D-034);
+      subir/parar o daemon; semear o primeiro prompt numa aba (as duas ressalvas do spike M —
+      tela de primeira confiança de cada harness e o Enter em escrita separada — valem aí);
+      empacotamento/instalador; projetos na lateral; qualquer sessão aberta fora da interface
+      "puxada" para dentro (limitação honesta da D-042).
+
+      **Custos que a tarefa mede e reporta, não esconde:** o `npm ci` dos três sistemas da CI
+      passa a baixar o Electron (~160 MB) e a compilar ou baixar o `node-pty` — o tempo de CI
+      antes e depois entra no relatório; a memória de 1 e 3 abas na interface real, para comparar
+      com os 342/394 MB do protótipo.
+
+      **Ordem de trabalho, com commit e portão a cada passo:** (a) medição do Linux no contêiner,
+      registrada na Q-071; (b) o pacote sobe vazio (janela, "+" abrindo uma aba de shell, build e
+      `npm run app` funcionando) com os guards e a cobertura já valendo para `packages/app`;
+      (c) o que sai da CLI para o motor (`describe*`, `resolve-command`), com a CLI continuando
+      igual — os 1.567 testes continuam passando; (d) lateral, abas com harness e painel de
+      estado; (e) documentação: `docs/ARQUITETURA.md` (a segunda raiz, de fato), `AGENTS.md`
+      (estrutura, comandos, glossário — os nomes novos, no mínimo "aba", "lançamento" e
+      "correspondência aba↔sessão", entram no glossário **antes** do código), `README.md`
+      (como rodar a interface em desenvolvimento), `docs/ESTADO-ATUAL.md`, este arquivo.
+
+      **Cuidados:** Windows é o ambiente do agente e o Linux é o do mantenedor — nenhum
+      `process.platform === 'win32'` fora de um adapter com o caso Linux/macOS ao lado; caminhos
+      só com `node:path`; nenhum `new Date()`/`setTimeout` fora de `adapters/clock/` (a
+      interface recebe o `Clock` injetado como todo mundo); mensagens com valor e esperado; texto
+      da interface em inglês, concentrado num módulo, como as mensagens da CLI. **Nenhuma
+      dependência além de `electron`, `@xterm/xterm`, `@xterm/addon-fit`, `node-pty` e o bundler
+      escolhido** sem registrar na Q-071 com o porquê. A interface **não** cria o daemon, não
+      encerra sessão, não gera handoff: organiza e abre a pedido (D-039).
+
+      *Aceite:* a janela abre no Windows via `npm run app` (o agente prova com captura de tela
+      lida por ele, como no spike M), mostra a lista real de sessões da máquina com o mesmo
+      conteúdo de `seeya sessions`, abre `claude` numa aba num diretório escolhido, a sessão
+      dessa aba aparece marcada na lateral (correspondência por PID), o painel de estado bate com
+      `seeya status`; fechar a aba encerra o processo e nenhuma janela extra aparece (contagem
+      antes/depois, técnica da Q-067); portão e `verificar:linux` verdes com os guards novos
+      provados; os 1.567 testes da base continuam passando, mais os novos; CI verde nos três
+      sistemas com o tempo antes/depois no relatório; medição do `node-pty` em Linux registrada
+      na Q-071. **Aceite manual do mantenedor:** a mesma janela abrindo no Linux dele, com uma
+      aba de `claude` funcionando (é a medição que fecha a D-042 de verdade).
+
 ## Definição de pronto (vale para toda tarefa)
 
 1. Código implementa exatamente a spec; divergência virou questão, não improviso.
