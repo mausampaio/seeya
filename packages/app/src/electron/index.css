@@ -1,3 +1,19 @@
+/*
+ * V2-T3: the interface's embedded Nerd Font, guaranteed available regardless of what the person
+ * has installed (config-schema.ts#TERMINAL_FONT_FAMILY_DEFAULT's own docstring explains why this
+ * @font-face declaration — not the system font lookup — is what makes the default stack's first
+ * entry a guarantee). FiraCode Nerd Font Mono, Regular weight only, nerd-fonts v3.5.1, SIL OFL
+ * 1.1 (license file alongside the font in packages/app/assets/fonts/, copied into dist/electron/
+ * by scripts/build.mjs).
+ */
+@font-face {
+  font-family: 'FiraCode Nerd Font Mono';
+  src: url('fonts/FiraCodeNerdFontMono-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 html,
 body {
   margin: 0;

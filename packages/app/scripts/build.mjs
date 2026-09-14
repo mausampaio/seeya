@@ -69,6 +69,12 @@ async function bundle() {
 
   cpSync(path.join(srcElectron, 'index.html'), path.join(outElectron, 'index.html'));
   cpSync(path.join(srcElectron, 'index.css'), path.join(outElectron, 'index.css'));
+  // V2-T3: the embedded Nerd Font (`assets/fonts/`, packaged alongside its own SIL OFL 1.1
+  // license file) — index.css's own @font-face rule loads it by this same relative path,
+  // `fonts/<file>`, next to index.html in dist/electron/.
+  cpSync(path.join(packageRoot, 'assets', 'fonts'), path.join(outElectron, 'fonts'), {
+    recursive: true,
+  });
   // Resolved via import.meta.resolve, not a hardcoded node_modules path: npm workspaces hoist
   // @xterm/xterm to the REPO ROOT's node_modules, not packages/app/node_modules — the same
   // resolution Node's own module loader uses, so this never drifts from wherever npm actually

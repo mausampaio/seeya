@@ -26,6 +26,22 @@ const PLATFORM_HINT: PathPlatformHint = process.platform === 'win32' ? 'win32' :
  * (`index.ts`) before this module ever sees the document. */
 export const CONFIG_SCHEMA_VERSION = 1;
 
+/**
+ * `terminalFontFamily`'s default (V2-T3, D-035): a CSS `font-family` stack whose first entry names
+ * the exact Nerd Font this interface embeds (`packages/app/assets/fonts/FiraCodeNerdFontMono-Regular.ttf`,
+ * FiraCode Nerd Font Mono, nerd-fonts v3.5.1, SIL OFL 1.1 — licensed alongside the font file).
+ * **Putting the embedded font's exact name FIRST, not last, is what makes it a guarantee rather
+ * than a wish:** a page's own `@font-face` declaration always wins over a same-named font already
+ * installed on the system (`packages/app/src/electron/index.css`), so this entry resolves to the
+ * embedded file whether or not the person already has a font under this exact name — there is no
+ * "prefer the system one" case to order around. The remaining entries exist for a person reading
+ * this value, not for the browser's own resolution: `Fira Code` (the plain, non-Nerd font
+ * `oh-my-posh`/`starship` users sometimes already have under a shorter name) and a generic
+ * `monospace` as the final fallback if `@font-face` itself somehow fails to load.
+ */
+export const TERMINAL_FONT_FAMILY_DEFAULT =
+  "'FiraCode Nerd Font Mono', 'FiraCode Nerd Font', 'Fira Code', monospace";
+
 const projectPolicySchema = z.object({
   canTerminate: z.boolean().optional(),
   deepCapture: z.boolean().optional(),
@@ -108,6 +124,14 @@ const configFileSchema = z.object({
   // second leadTimeWarning notice, no matter how close together"), not a mistake, the same
   // reasoning maxBriefingScanDays above already applies to its own zero.
   leadTimeHysteresisMinutes: z.number().nonnegative().optional(),
+  // V2-T3 (D-035): a CSS font-family value — any non-empty string is a legitimate stack (a person
+  // can point this at a font this project has never heard of), so there is no shape to constrain
+  // beyond "not empty".
+  terminalFontFamily: z.string().min(1).optional(),
+  // V2-T3 (D-035): a pixel size — positive, not necessarily an integer (xterm.js itself accepts a
+  // fractional fontSize, and refusing one here would be a constraint this project invented, not one
+  // xterm.js or CSS actually has).
+  terminalFontSize: z.number().positive().optional(),
 });
 
 /**
@@ -156,6 +180,12 @@ const CONFIG_DEFAULTS: Config = {
   // S4-T7's own default (docs/PLANO-DE-ENTREGA.md: "config com padrão de 3 minutos") — not a prior
   // hardcoded constant migrating over, this field and its default are new with this task.
   leadTimeHysteresisMinutes: 3,
+  // V2-T3: TERMINAL_FONT_FAMILY_DEFAULT's own docstring (above) has the reasoning.
+  terminalFontFamily: TERMINAL_FONT_FAMILY_DEFAULT,
+  // V2-T3: a common terminal/editor default (matches, for example, VS Code's own integrated
+  // terminal default) — not a measurement, there is no "correct" size to derive from anything the
+  // machine reports (this field's own docstring in `core/types.ts`).
+  terminalFontSize: 14,
 };
 
 /** `parseConfigDocument({})` — every field at its default. Exported so callers (the adapter, on a
@@ -219,6 +249,8 @@ export const EDITABLE_CONFIG_KEYS = [
   'maxBriefingScanDays',
   'overdueFireThresholdMinutes',
   'leadTimeHysteresisMinutes',
+  'terminalFontFamily',
+  'terminalFontSize',
 ] as const;
 
 export type EditableConfigKey = (typeof EDITABLE_CONFIG_KEYS)[number];
@@ -318,11 +350,13 @@ function coerceRawConfigValue(key: EditableConfigKey, raw: string): unknown {
     case 'ignore':
       return splitCommaList(raw);
     case 'captureModel':
+    case 'terminalFontFamily':
       return raw;
     // Every remaining editable key is a bare number (int or float, `configFileSchema`'s own
     // per-field constraint decides which) — relevanceHours, idleMinutes, budgetPerSessionUsd,
-    // captureConcurrency, forkCleanupDays, and D-035's four (maxGitRootsToVisit,
-    // maxCaptureAttemptsPerSessionPerDay, maxBriefingScanDays, overdueFireThresholdMinutes).
+    // captureConcurrency, forkCleanupDays, D-035's four (maxGitRootsToVisit,
+    // maxCaptureAttemptsPerSessionPerDay, maxBriefingScanDays, overdueFireThresholdMinutes), and
+    // terminalFontSize (V2-T3).
     default:
       return Number(raw);
   }
@@ -405,6 +439,10 @@ export function applyConfigFieldUpdate(
       return { ...current, overdueFireThresholdMinutes: value as number };
     case 'leadTimeHysteresisMinutes':
       return { ...current, leadTimeHysteresisMinutes: value as number };
+    case 'terminalFontFamily':
+      return { ...current, terminalFontFamily: value as string };
+    case 'terminalFontSize':
+      return { ...current, terminalFontSize: value as number };
   }
 }
 
@@ -518,6 +556,8 @@ export function serializeConfigDocument(config: Config): Record<string, unknown>
     maxBriefingScanDays: config.maxBriefingScanDays,
     overdueFireThresholdMinutes: config.overdueFireThresholdMinutes,
     leadTimeHysteresisMinutes: config.leadTimeHysteresisMinutes,
+    terminalFontFamily: config.terminalFontFamily,
+    terminalFontSize: config.terminalFontSize,
   };
 }
 
@@ -547,5 +587,7 @@ export function parseConfigDocument(raw: unknown): Config {
       fields.overdueFireThresholdMinutes ?? CONFIG_DEFAULTS.overdueFireThresholdMinutes,
     leadTimeHysteresisMinutes:
       fields.leadTimeHysteresisMinutes ?? CONFIG_DEFAULTS.leadTimeHysteresisMinutes,
+    terminalFontFamily: fields.terminalFontFamily ?? CONFIG_DEFAULTS.terminalFontFamily,
+    terminalFontSize: fields.terminalFontSize ?? CONFIG_DEFAULTS.terminalFontSize,
   };
 }

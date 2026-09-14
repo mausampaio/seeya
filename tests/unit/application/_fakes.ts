@@ -491,4 +491,6 @@ export const DEFAULT_TEST_CONFIG: Config = {
   maxBriefingScanDays: 30,
   overdueFireThresholdMinutes: 5,
   leadTimeHysteresisMinutes: 3,
+  terminalFontFamily: "'FiraCode Nerd Font Mono', 'FiraCode Nerd Font', 'Fira Code', monospace",
+  terminalFontSize: 14,
 };

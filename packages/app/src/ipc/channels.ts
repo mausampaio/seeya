@@ -6,10 +6,15 @@
  * other); this module is the one place the string exists.
  */
 import type { SidebarRow } from '../sidebar/sidebar-data.js';
+import type { TerminalFontOptions } from '../state/terminal-font.js';
 
 export const CHANNELS = {
   /** Renderer → main: open a new tab. */
   createTab: 'seeya:create-tab',
+  /** Renderer → main: fetch the terminal's font config, once at startup
+   * (`state/terminal-font.ts`). Config is read once when the interface starts (V2-T2); the
+   * renderer never re-fetches this on its own. */
+  getTerminalFontConfig: 'seeya:get-terminal-font-config',
   /** Renderer → main: keystrokes/paste for one tab. */
   writeTab: 'seeya:write-tab',
   /** Renderer → main: the terminal element for one tab was resized. */
@@ -76,3 +81,6 @@ export interface SessionsUpdateEvent {
 export interface StatusUpdateEvent {
   readonly text: string;
 }
+
+/** `getTerminalFontConfig`'s response — the exact shape `state/terminal-font.ts` produces. */
+export type TerminalFontConfigResponse = TerminalFontOptions;

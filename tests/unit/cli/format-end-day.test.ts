@@ -89,6 +89,8 @@ function buildConfig(overrides: Partial<Config> = {}): Config {
     maxBriefingScanDays: 30,
     overdueFireThresholdMinutes: 5,
     leadTimeHysteresisMinutes: 3,
+    terminalFontFamily: "'FiraCode Nerd Font Mono', 'FiraCode Nerd Font', 'Fira Code', monospace",
+    terminalFontSize: 14,
     ...overrides,
   };
 }

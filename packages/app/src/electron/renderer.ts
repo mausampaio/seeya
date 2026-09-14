@@ -15,6 +15,7 @@ import { createTab, withPid, type Tab } from '../tabs/tab-model.js';
 import { MESSAGES } from '../text/messages.js';
 import type { SeeyaApi } from './preload.js';
 import type { SidebarRow } from '../sidebar/sidebar-data.js';
+import type { TerminalFontConfigResponse } from '../ipc/channels.js';
 
 declare global {
   interface Window {
@@ -31,6 +32,14 @@ interface OpenTab {
 
 const openTabs = new Map<string, OpenTab>();
 let nextTabId = 0;
+
+/**
+ * Fetched once, at startup (`main` below), before `wireCommandBar` is wired — no tab can be
+ * opened before this is populated, so `openTab` never needs a defensive fallback (V2-T2: "a
+ * interface lê o config uma vez ao subir"; changing `terminalFontFamily`/`terminalFontSize`
+ * needs a relaunch, documented in `README.md`, not here).
+ */
+let terminalFontConfig: TerminalFontConfigResponse;
 
 function newTabId(): string {
   nextTabId += 1;
@@ -102,7 +111,16 @@ async function openTab(command: string, args: readonly string[], cwd: string): P
   container.className = 'terminal-pane';
   terminalHost().appendChild(container);
 
-  const terminal = new Terminal({ convertEol: true });
+  // V2-T3: terminalFontConfig (fontFamily/fontSize, `state/terminal-font.ts`) — the embedded Nerd
+  // Font falls back into effect here whenever the config-supplied stack doesn't resolve to
+  // something installed, since the stack's own last entry is a generic `monospace`
+  // (`config-schema.ts#TERMINAL_FONT_FAMILY_DEFAULT`'s own docstring). `fitAddon.fit()` right
+  // below re-measures cell size against whatever font actually got applied here.
+  const terminal = new Terminal({
+    convertEol: true,
+    fontFamily: terminalFontConfig.fontFamily,
+    fontSize: terminalFontConfig.fontSize,
+  });
   const fitAddon = new FitAddon();
   terminal.loadAddon(fitAddon);
   terminal.open(container);
@@ -223,10 +241,14 @@ function wireCommandBar(): void {
   });
 }
 
-function main(): void {
+/** Fetches `terminalFontConfig` before wiring anything that could open a tab (the command bar's
+ * submit handler, and `SEEYA_APP_AUTO_OPEN_SHELL_TAB`'s own simulated click) — see
+ * `terminalFontConfig`'s own docstring for why `openTab` never needs a fallback value. */
+async function main(): Promise<void> {
+  terminalFontConfig = await window.seeya.getTerminalFontConfig();
   wireIncomingEvents();
   wireWindowResize();
   wireCommandBar();
 }
 
-main();
+void main();

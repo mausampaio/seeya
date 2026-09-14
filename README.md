@@ -151,6 +151,16 @@ runs from a checkout.
 [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md) § "A segunda raiz de composição" for how the
 interface composes `@seeya-ai/engine` in-process, independently from `@seeya-ai/cli`.
 
+**Terminal font (V2-T3).** Two config keys control it: `terminalFontFamily` (a CSS font-family
+stack) and `terminalFontSize` (pixels) — read and write them with `seeya config get/set`, same as
+every other config key. The interface embeds FiraCode Nerd Font Mono (Regular weight,
+[nerd-fonts](https://github.com/ryanoasis/nerd-fonts) v3.5.1, SIL OFL 1.1 —
+`packages/app/assets/fonts/`) as a guaranteed fallback, so a prompt that uses Nerd Font glyphs
+(`oh-my-posh`, `starship`, `powerlevel10k`) renders correctly even with no such font installed on
+the machine. **The interface reads config once at startup**: changing either key takes effect on
+the next `npm run app`, not live — close and reopen the interface after `seeya config set
+terminalFontFamily`/`terminalFontSize`.
+
 ### Before writing code
 
 Read [`AGENTS.md`](AGENTS.md). It's the project's work contract: layer boundaries, code style,

@@ -12,6 +12,7 @@ import {
   projectPolicyNotEditableMessage,
   schemaVersionNotEditableMessage,
   serializeConfigDocument,
+  TERMINAL_FONT_FAMILY_DEFAULT,
   unknownConfigKeyMessage,
 } from '@seeya-ai/engine/adapters/storage/config-schema.js';
 
@@ -146,6 +147,37 @@ describe('parseConfigDocument — leadTimeHysteresisMinutes (S4-T7)', () => {
   it('0 ("never suppress a second leadTimeWarning") is accepted, not rejected as degenerate', () => {
     expect(() => parseConfigDocument({ leadTimeHysteresisMinutes: 0 })).not.toThrow();
     expect(parseConfigDocument({ leadTimeHysteresisMinutes: 0 }).leadTimeHysteresisMinutes).toBe(0);
+  });
+});
+
+describe('parseConfigDocument — terminalFontFamily/terminalFontSize (V2-T3, D-035)', () => {
+  it('defaults to the embedded-Nerd-Font stack and 14px when the document says nothing about them', () => {
+    const result = parseConfigDocument({});
+    expect(result.terminalFontFamily).toBe(TERMINAL_FONT_FAMILY_DEFAULT);
+    expect(result.terminalFontFamily).toContain('FiraCode Nerd Font Mono');
+    expect(result.terminalFontSize).toBe(14);
+  });
+
+  it('honors an explicit value for each, independent of the other', () => {
+    const result = parseConfigDocument({
+      terminalFontFamily: "'Cascadia Code', monospace",
+      terminalFontSize: 16,
+    });
+    expect(result.terminalFontFamily).toBe("'Cascadia Code', monospace");
+    expect(result.terminalFontSize).toBe(16);
+  });
+
+  it('rejects an empty terminalFontFamily (AGENTS.md: the value and the expected shape)', () => {
+    expect(() => parseConfigDocument({ terminalFontFamily: '' })).toThrow();
+  });
+
+  it('rejects a non-positive terminalFontSize (0 and negative alike)', () => {
+    expect(() => parseConfigDocument({ terminalFontSize: 0 })).toThrow();
+    expect(() => parseConfigDocument({ terminalFontSize: -1 })).toThrow();
+  });
+
+  it('accepts a fractional terminalFontSize (xterm.js itself accepts one) — the permitted case next to the rejected ones above', () => {
+    expect(parseConfigDocument({ terminalFontSize: 13.5 }).terminalFontSize).toBe(13.5);
   });
 });
 

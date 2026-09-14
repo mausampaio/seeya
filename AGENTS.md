@@ -372,6 +372,8 @@ usa. Fixados em S1-T0g, antes de qualquer um deles existir em código.
 | teto de dias de busca do briefing pendente | `maxBriefingScanDays` | config (D-035, default 30) |
 | limiar de disparo vencido | `overdueFireThresholdMinutes` | config (D-035/D-036, default 5) |
 | histerese entre avisos prévios | `leadTimeHysteresisMinutes` | config (D-035, default 3, S4-T7) |
+| família da fonte do terminal | `terminalFontFamily` | config (D-035, V2-T3, default é uma pilha que termina na Nerd Font embutida) |
+| tamanho da fonte do terminal (px) | `terminalFontSize` | config (D-035, V2-T3, default 14) |
 | carimbo do último aviso prévio | `lastLeadTimeWarningNoticeAt` | `estado.json` (S4-T7) |
 | prazo do último aviso prévio disparado | `firedLeadTimesEffectiveEndOfDay` | `estado.json` (S4-T7) |
 | estado do dia (arquivo) | `estado.json` | raiz de `~/.seeya/` (S4-T3) |

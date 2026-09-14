@@ -18,6 +18,7 @@ import type {
   TabExitEvent,
   SessionsUpdateEvent,
   StatusUpdateEvent,
+  TerminalFontConfigResponse,
 } from '../ipc/channels.js';
 
 export interface SeeyaApi {
@@ -26,6 +27,9 @@ export interface SeeyaApi {
   writeTab(request: WriteTabRequest): void;
   resizeTab(request: ResizeTabRequest): void;
   closeTab(request: CloseTabRequest): void;
+  /** V2-T3: fetched once, at renderer startup, before any tab's `new Terminal({...})` is
+   * constructed (`electron/renderer.ts`'s own `main`). */
+  getTerminalFontConfig(): Promise<TerminalFontConfigResponse>;
   onTabData(listener: (event: TabDataEvent) => void): void;
   onTabExit(listener: (event: TabExitEvent) => void): void;
   onSessionsUpdate(listener: (event: SessionsUpdateEvent) => void): void;
@@ -42,6 +46,7 @@ const api: SeeyaApi = {
   writeTab: (request) => ipcRenderer.send(CHANNELS.writeTab, request),
   resizeTab: (request) => ipcRenderer.send(CHANNELS.resizeTab, request),
   closeTab: (request) => ipcRenderer.send(CHANNELS.closeTab, request),
+  getTerminalFontConfig: () => ipcRenderer.invoke(CHANNELS.getTerminalFontConfig),
   onTabData: (listener) => {
     ipcRenderer.on(CHANNELS.tabData, (_event, data: TabDataEvent) => listener(data));
   },

@@ -34,6 +34,8 @@ function config(overrides: Partial<Config> = {}): Config {
     maxBriefingScanDays: 30,
     overdueFireThresholdMinutes: 5,
     leadTimeHysteresisMinutes: 3,
+    terminalFontFamily: "'FiraCode Nerd Font Mono', 'FiraCode Nerd Font', 'Fira Code', monospace",
+    terminalFontSize: 14,
     ...overrides,
   };
 }
@@ -88,6 +90,17 @@ describe('runConfigGetCommand', () => {
     const report = await runConfigGetCommand({ storage }, 'schemaVersion');
     expect(report).toBe('schemaVersion: 1');
     expect(report).not.toContain('unknown');
+  });
+
+  // V2-T3: the two new keys read the same way as every other scalar field.
+  it('"terminalFontFamily"/"terminalFontSize" read like any other scalar key', async () => {
+    const storage = new InMemoryScheduleStorage(
+      config({ terminalFontFamily: "'Cascadia Code', monospace", terminalFontSize: 16 }),
+    );
+    expect(await runConfigGetCommand({ storage }, 'terminalFontFamily')).toBe(
+      "terminalFontFamily: 'Cascadia Code', monospace",
+    );
+    expect(await runConfigGetCommand({ storage }, 'terminalFontSize')).toBe('terminalFontSize: 16');
   });
 });
 
@@ -188,6 +201,40 @@ describe('runConfigSetCommand', () => {
     const message = await runConfigSetCommand({ storage }, 'captureConcurrency', '1');
     expect(message).toBe('captureConcurrency set to 1.');
     expect(storage.savedConfigs[0]?.captureConcurrency).toBe(1);
+  });
+
+  // V2-T3 (D-035): the same get/set flow every other scalar key already has, end to end through
+  // the CLI layer.
+  it('sets terminalFontFamily to an arbitrary CSS font-family stack', async () => {
+    const storage = new InMemoryScheduleStorage(config());
+    const message = await runConfigSetCommand(
+      { storage },
+      'terminalFontFamily',
+      "'Cascadia Code', monospace",
+    );
+    expect(message).toBe("terminalFontFamily set to 'Cascadia Code', monospace.");
+    expect(storage.savedConfigs[0]?.terminalFontFamily).toBe("'Cascadia Code', monospace");
+  });
+
+  it('refuses an empty terminalFontFamily', async () => {
+    const storage = new InMemoryScheduleStorage(config());
+    const message = await runConfigSetCommand({ storage }, 'terminalFontFamily', '');
+    expect(message).toContain('terminalFontFamily');
+    expect(storage.savedConfigs).toHaveLength(0);
+  });
+
+  it('sets terminalFontSize to a valid pixel size', async () => {
+    const storage = new InMemoryScheduleStorage(config());
+    const message = await runConfigSetCommand({ storage }, 'terminalFontSize', '16');
+    expect(message).toBe('terminalFontSize set to 16.');
+    expect(storage.savedConfigs[0]?.terminalFontSize).toBe(16);
+  });
+
+  it('refuses terminalFontSize: 0 — the schema requires a positive size', async () => {
+    const storage = new InMemoryScheduleStorage(config());
+    const message = await runConfigSetCommand({ storage }, 'terminalFontSize', '0');
+    expect(message).toContain('terminalFontSize');
+    expect(storage.savedConfigs).toHaveLength(0);
   });
 });
 

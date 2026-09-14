@@ -270,6 +270,28 @@ export interface Config {
    * minutes.
    */
   readonly leadTimeHysteresisMinutes: number;
+  /**
+   * CSS `font-family` value the interface's embedded terminal renders with
+   * (`packages/app/src/electron/renderer.ts`'s own `new Terminal({...})` — D-042). **Config, not a
+   * constant (D-035):** which font a prompt's glyphs need is entirely about how THIS person already
+   * has their shell configured (`oh-my-posh`/`starship`/`powerlevel10k`, each assuming a Nerd Font),
+   * never a fact this project can measure. Default is a stack that prefers whatever the person
+   * already has installed and ends at the Nerd Font the interface embeds as a guarantee
+   * (`packages/app/assets/fonts/`, V2-T3) — `adapters/storage/config-schema.ts`'s own
+   * `CONFIG_DEFAULTS` has the exact literal.
+   *
+   * **Read once, at startup (V2-T2's own "the interface reads config once").** Changing this key
+   * takes effect on the next `npm run app`/relaunch, not live — documented in `README.md`, not
+   * repeated here as CLI-facing text (AGENTS.md § "Texto voltado ao usuário").
+   */
+  readonly terminalFontFamily: string;
+  /**
+   * Pixel size the embedded terminal renders at (same call site as `terminalFontFamily` above).
+   * **Config, not a constant (D-035):** legibility at a given screen/DPI is a per-person
+   * preference, not a technical fact. Default **14** (a common terminal/editor default, not a
+   * measurement — there is no "correct" size to derive from anything the machine reports).
+   */
+  readonly terminalFontSize: number;
 }
 
 /**

@@ -20,6 +20,7 @@ import type {
   TabExitEvent,
   SessionsUpdateEvent,
   StatusUpdateEvent,
+  TerminalFontConfigResponse,
 } from '../ipc/channels.js';
 import type { Clock } from '@seeya-ai/engine/core/ports.js';
 import { buildAppContext, type AppContext } from '../composition/index.js';
@@ -37,6 +38,7 @@ import { describeAutostartState } from '@seeya-ai/engine/application/autostart-s
 import { buildSidebarRows } from '../sidebar/sidebar-data.js';
 import { buildStatusPanelText } from '../state/status-panel.js';
 import { runRefreshLoop } from '../state/refresh-loop.js';
+import { resolveTerminalFontOptions } from '../state/terminal-font.js';
 import {
   resolveAutostartReport,
   DEFAULT_AUTOSTART_REFRESH_INTERVAL_MS,
@@ -59,6 +61,19 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
  * (six ticks) to reason about.
  */
 const REFRESH_INTERVAL_MS = 10_000;
+
+/**
+ * V2-T3's own aceite: "captura de tela ... com uma linha de glifos Nerd
+ * (`  `) numa aba, renderizados e nao como caixas" -- a Powerline
+ * separator, a shell icon, and a git-branch icon, three code points spanning the
+ * Private Use Area ranges the embedded Nerd Font patches in. Sent through the SAME
+ * `CHANNELS.tabData` channel a real pty's output uses
+ * (`renderer.ts#wireIncomingEvents`'s own `onTabData`), by
+ * `SEEYA_APP_AUTO_OPEN_SHELL_TAB` below -- this exercises the exact rendering path a
+ * real prompt line would, without depending on a real shell's own console codepage
+ * to transmit these code points back through the pty faithfully.
+ */
+const NERD_GLYPH_PROOF_LINE = '  \r\n';
 
 /**
  * `screenshotPath`/`quitAfterMs` back a single verification hook (undocumented, internal, unset
@@ -130,15 +145,25 @@ function createWindow(clock: Clock): BrowserWindow {
   // blank (the same elements and handlers a person would use, for the "leave blank for a shell"
   // case), a few seconds after load, so an agent with no keyboard/mouse of its own can prove a
   // shell tab really opens a pty (docs/PLANO-DE-ENTREGA.md V2-T2 aceite: process tree, window
-  // count). Never set by `npm run app` or the README.
+  // count). Never set by `npm run app` or the README. **V2-T3:** also sends
+  // `NERD_GLYPH_PROOF_LINE` (this file's own docstring above) through the tab's data channel, so
+  // the same screenshot proves the embedded Nerd Font renders real glyphs, not boxes.
   if (process.env.SEEYA_APP_AUTO_OPEN_SHELL_TAB === '1') {
     window.webContents.once('did-finish-load', () => {
-      void clock.sleep(300).then(() => {
-        void window.webContents.executeJavaScript(
-          "document.getElementById('new-tab-button').click(); " +
-            "document.getElementById('command-bar').requestSubmit();",
-        );
-      });
+      void clock
+        .sleep(300)
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('new-tab-button').click(); " +
+              "document.getElementById('command-bar').requestSubmit();",
+          ),
+        )
+        .then(() => clock.sleep(200))
+        .then(() => {
+          // "tab-1": renderer.ts#newTabId's first id — this branch only ever opens one tab.
+          const event: TabDataEvent = { id: 'tab-1', data: NERD_GLYPH_PROOF_LINE };
+          window.webContents.send(CHANNELS.tabData, event);
+        });
     });
   }
   return window;
@@ -171,6 +196,13 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
       window.webContents.send(CHANNELS.tabExit, event);
     },
   });
+
+  // V2-T3: fetched once by `renderer.ts#main`, before any `new Terminal({...})` is constructed —
+  // the two-way handshake (`invoke`, not `send`) matches `createTab` below, the only other channel
+  // the renderer needs a value back from.
+  ipcMain.handle(CHANNELS.getTerminalFontConfig, (): TerminalFontConfigResponse =>
+    resolveTerminalFontOptions(context.config),
+  );
 
   ipcMain.handle(
     CHANNELS.createTab,
