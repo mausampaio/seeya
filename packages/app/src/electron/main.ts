@@ -33,17 +33,32 @@ import {
   withPid,
   type TabCollection,
 } from '../tabs/tab-model.js';
+import { describeAutostartState } from '@seeya-ai/engine/application/autostart-state.js';
 import { buildSidebarRows } from '../sidebar/sidebar-data.js';
 import { buildStatusPanelText } from '../state/status-panel.js';
 import { runRefreshLoop } from '../state/refresh-loop.js';
+import {
+  resolveAutostartReport,
+  DEFAULT_AUTOSTART_REFRESH_INTERVAL_MS,
+  type AutostartCacheEntry,
+} from '../state/autostart-cache.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
-/** How often the sidebar/status panel refresh (docs/PLANO-DE-ENTREGA.md V2-T2: "atualizada em
+/**
+ * How often the sidebar/status panel refresh (docs/PLANO-DE-ENTREGA.md V2-T2: "atualizada em
  * intervalo pelo relógio injetado"). Independent of the daemon's own 30s poll
  * (`scheduler/loop.ts#POLL_INTERVAL_MS`) — this is a read-only UI refresh, not a scheduling
- * decision, so a shorter interval costs nothing beyond a `SessionProvider.list()` call. */
-const REFRESH_INTERVAL_MS = 5_000;
+ * decision.
+ *
+ * **10s, not 5s (PO review of V2-T2).** One cycle does one `SessionProvider.list()` (shared by the
+ * sidebar and the status panel — see `sidebar/sidebar-data.ts`'s own docstring) plus
+ * `describeDaemonState` every time (~0.24s, measured on the PO's real machine) — cheap enough for
+ * 5s, but 10s halves the steady-state cost for a read-only refresh nobody asked to be
+ * sub-5-second, and gives `state/autostart-cache.ts`'s own 60s refresh interval a rounder multiple
+ * (six ticks) to reason about.
+ */
+const REFRESH_INTERVAL_MS = 10_000;
 
 /**
  * `screenshotPath`/`quitAfterMs` back a single verification hook (undocumented, internal, unset
@@ -141,6 +156,9 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // for the heavier ceremony `pty/pty-manager.ts`'s own class gets (that one is exported and
   // tested on its own).
   let tabs: TabCollection = emptyTabs();
+  // Same "closed-over, only this function touches it" reasoning as `tabs` above —
+  // `state/autostart-cache.ts`'s own docstring has the caching rule and the measurement behind it.
+  let autostartCache: AutostartCacheEntry | null = null;
 
   const ptyManager = context.buildPtyManager({
     onData: (id, data) => {
@@ -202,17 +220,35 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
     clock: context.clock,
     intervalMs: REFRESH_INTERVAL_MS,
     shouldStop: () => window.isDestroyed(),
+    // One discovery per cycle, shared by the sidebar and the status panel (PO review of V2-T2,
+    // `docs/QUESTOES.md` Q-071) — the old version called `sessionProvider.list()` twice per tick
+    // (once here, once inside `buildStatusPanelText`), doubling a real, measured ~239ms cost for
+    // no reason. The autostart line is cached and only re-queried every
+    // `DEFAULT_AUTOSTART_REFRESH_INTERVAL_MS` (`state/autostart-cache.ts`'s own docstring has the
+    // 6-second-on-first-call measurement that motivates this).
     onTick: async () => {
-      const rows = await buildSidebarRows(
-        context.sessionProvider,
-        context.config,
-        context.clock,
-        tabs,
-      );
+      const discovery = await context.sessionProvider.list();
+      const now = context.clock.now();
+
+      const rows = buildSidebarRows(discovery, context.config, now, tabs);
       const sessionsEvent: SessionsUpdateEvent = { rows };
       window.webContents.send(CHANNELS.sessionsUpdate, sessionsEvent);
 
-      const text = await buildStatusPanelText(context);
+      autostartCache = await resolveAutostartReport(
+        autostartCache,
+        now,
+        DEFAULT_AUTOSTART_REFRESH_INTERVAL_MS,
+        () => describeAutostartState(context.autostart),
+      );
+
+      const text = await buildStatusPanelText({
+        discovery,
+        config: context.config,
+        clock: context.clock,
+        storage: context.storage,
+        processControl: context.processControl,
+        autostartReport: autostartCache.report,
+      });
       const statusEvent: StatusUpdateEvent = { text };
       window.webContents.send(CHANNELS.statusUpdate, statusEvent);
     },

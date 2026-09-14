@@ -8,12 +8,11 @@ import {
 } from '../../../../packages/app/src/tabs/tab-model.js';
 import { createConfig } from '../../core/_fixtures.js';
 import { createSessionWithPid, createSessionWithoutPid } from '../../core/_fixtures.js';
-import { FakeClock, FakeSessionProvider } from '../../application/_fakes.js';
 
 const NOW = new Date('2026-08-29T12:00:00.000Z');
 
 describe('buildSidebarRows', () => {
-  it('every discovered session gets a row, matched to its open tab by pid when one exists', async () => {
+  it('every discovered session gets a row, matched to its open tab by pid when one exists', () => {
     const matched = createSessionWithPid({
       pid: 555,
       sessionId: '11111111-1111-4111-8111-111111111111',
@@ -27,10 +26,10 @@ describe('buildSidebarRows', () => {
     const tab = withPid(createTab({ id: 'tab-1', command: '', args: [], cwd: '/x' }), 555);
     const tabs = addTab(emptyTabs(), tab);
 
-    const rows = await buildSidebarRows(
-      new FakeSessionProvider({ sessions: [matched, unmatched], rejected: [] }),
+    const rows = buildSidebarRows(
+      { sessions: [matched, unmatched], rejected: [] },
       createConfig(),
-      new FakeClock(NOW),
+      NOW,
       tabs,
     );
 
@@ -39,13 +38,13 @@ describe('buildSidebarRows', () => {
     expect(byName.get('unmatched-session')?.matchedTabId).toBeNull();
   });
 
-  it('a session without a pid is listed with no match (D-025), never guessed', async () => {
+  it('a session without a pid is listed with no match (D-025), never guessed', () => {
     const session = createSessionWithoutPid({ name: 'no-pid-session' });
 
-    const rows = await buildSidebarRows(
-      new FakeSessionProvider({ sessions: [session], rejected: [] }),
+    const rows = buildSidebarRows(
+      { sessions: [session], rejected: [] },
       createConfig(),
-      new FakeClock(NOW),
+      NOW,
       emptyTabs(),
     );
 
@@ -53,13 +52,8 @@ describe('buildSidebarRows', () => {
     expect(rows[0]?.matchedTabId).toBeNull();
   });
 
-  it('an empty discovery produces an empty sidebar, not an error', async () => {
-    const rows = await buildSidebarRows(
-      new FakeSessionProvider({ sessions: [], rejected: [] }),
-      createConfig(),
-      new FakeClock(NOW),
-      emptyTabs(),
-    );
+  it('an empty discovery produces an empty sidebar, not an error', () => {
+    const rows = buildSidebarRows({ sessions: [], rejected: [] }, createConfig(), NOW, emptyTabs());
 
     expect(rows).toEqual([]);
   });
