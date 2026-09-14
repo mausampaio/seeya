@@ -4392,8 +4392,105 @@ texto, mas não são a fila.
       (CI verde): `electron@44` não tem script de instalação, `npm ci` deixa o binário de fora e
       `import('electron')` lança em vez de baixar — `npm run app` falharia na primeira vez numa
       máquina limpa; `packages/app/scripts/build.mjs` agora roda o `install.js` do pacote uma
-      vez quando `path.txt` não existe (testado apagando o binário). **Pendente: o aceite ao vivo
-      do mantenedor** (`npm run app` no Windows e no Linux dele) — a tarefa fica em `[~]` até lá.
+      vez quando `path.txt` não existe (testado apagando o binário).
+
+      **Aceite do mantenedor no Windows (2026-09-14): passou.** Shell, `claude` e `codex` abertos
+      em abas e funcionando como terminal normal (comandos digitados respondem); a lateral
+      mostrou três sessões, todas reais e identificadas pelo PO com o registro em
+      `~/.claude/sessions/`: esta sessão do PO (`code-…`, id confirmado), a aba aberta na
+      interface (marcada por PID — a correspondência funcionou) e um Claude Code vivo dentro da
+      extensão do **VS Code** (`Code.exe` → `claude.exe`, `c:\code\seeya`) que o mantenedor não
+      sabia estar aberto — a lista fez o trabalho dela. Painel de estado batendo com
+      `seeya status`. Dois registros de uso: o × encerra o processo e a aba fica (é o que a spec
+      pediu; o gesto de remover a aba encerrada entra na V2-T3), e o `codex` não mostrou tela de
+      confiança no diretório padrão (comportamento do harness, não do seeya). **Pendente: o
+      aceite no Linux do mantenedor** — a tarefa fica em `[~]` até lá.
+
+- [ ] **V2-T3 — A interface retoma o dia: `start-day` em abas, pergunta antes do fallback, aba
+      encerrada removível (D-042, D-043, D-039).** Especificada pelo PO em 2026-09-14; **aguarda
+      aprovação do mantenedor antes de qualquer despacho.** É a razão de existirem duas raízes de
+      composição: a mesma `resumeSessions` da CLI, com um `SessionResumer` diferente — o da CLI
+      abre a sessão no terminal atual e espera ela terminar; o da interface abre uma **aba** e
+      segue. Nenhum comportamento novo no motor; o que muda é quem implementa a porta.
+
+      **O que entra:**
+
+      1. **O painel "Hoje".** Uma região nova (ou a lateral ganha uma seção) com o briefing
+         pendente do dia, achado por `application/find-pending-briefing.ts` como o
+         `seeya start-day` faz: dia, quantas sessões o briefing tem, quais já foram retomadas hoje
+         (`Storage.readResumedSessionIds`), e uma caixa de seleção por sessão com o nome, o `cwd`
+         e a primeira linha do plano. Botão **Resume selected**. Sem briefing pendente, a região
+         diz isso, com o mesmo vocabulário da CLI (D-024/D-025: "nenhum briefing encontrado nos
+         últimos N dias" é diferente de "todas já retomadas"). A seleção interativa da CLI
+         (`packages/cli/src/start-day-selection.ts`, que usa `readline`) **não** é reaproveitada:
+         a interface tem caixas de seleção; só o que for lógica pura de seleção que as duas
+         queiram compartilhar sai da CLI para `application/`, pela regra da V2-T2.
+
+      2. **`TabSessionResumer`** (`packages/app/src/resume/`), implementando `SessionResumer`
+         (`core/ports.ts`) sobre o `PtyManager`:
+         - `attemptResume(sessionId, cwd, prompt)`: mesmos argumentos que a CLI
+           (`adapters/resumption/args.ts#buildResumeArgs`, mesmo teto
+           `RESUME_PROMPT_ARG_LIMIT_CHARS` → `needsFallback` com `promptTooLarge`, mesma descrição
+           `describeResumeAttempt`), mesmo ambiente limpo (`buildResumptionEnv`), binário
+           resolvido por `adapters/process/resolve-command.ts`. Abre a aba, e resolve como
+           **retomada** quando o processo sobrevive à janela de falha rápida
+           (`FAST_FAILURE_GRACE_MS`, 5 s, pelo `Clock` injetado) — e como `needsFallback` com o
+           código de saída se morrer antes dela com código diferente de zero. **Nunca espera a
+           sessão terminar** (a CLI espera; a aba não). A corrida entre `onExit` e
+           `clock.sleep(grace)` é lógica pura, testada com pty falso e relógio falso.
+         - `runFallback(sessionId, cwd, prompt, reason)`: mesmo arquivo de contexto e mesmos
+           argumentos da CLI (`context-file.ts`, `buildFallbackArgs`, `FALLBACK_KICKOFF_PROMPT`),
+           abrindo a sessão limpa numa aba; o arquivo de contexto é removido como a CLI remove.
+         - A aba de uma retomada é rotulada com o nome da sessão do handoff, não com "claude"; a
+           correspondência por PID da lateral marca a sessão retomada como todas as outras.
+
+      3. **A pergunta antes do fallback (S5-T9, D-025)** vira diálogo na janela, não `readline`:
+         quando `attemptResume` devolve `needsFallback`, `resumeSessions` chama o
+         `FallbackConfirmer` — o da interface manda um pedido ao renderer (IPC com resposta),
+         que mostra o motivo exato (o mesmo texto que a CLI mostra: comando tentado e código de
+         saída, ou "plano de N caracteres acima do teto de M") e dois botões: **Open a fresh
+         session** e **Skip**. A decisão passa por `core/resume-fallback-decision.ts` como na
+         CLI (aqui não existe resposta inválida; o padrão continua sendo pular, e fechar o diálogo
+         sem escolher conta como pular). Um pedido por vez; `resumeSessions` já é sequencial.
+
+      4. **Progresso e resultado.** `resumeSessions` recebe `onProgress` — a região "Hoje" mostra
+         "retomando 2 de 5: <nome>" enquanto roda; ao final, o resumo com o mesmo conteúdo de
+         `cli/format-start-day.ts` (retomadas, puladas, fallback, parou cedo em qual e por quê).
+         Se o texto for reaproveitado literalmente, a formatação sai da CLI para `application/`
+         como `format-status.ts` saiu; se a interface desenhar o resumo em DOM, só o modelo de
+         dados (o `ResumeSessionsResult`) é compartilhado, e `format-start-day.ts` fica na CLI. O
+         agente decide pelo mesmo critério da V2-T2 e registra.
+
+      5. **Aba encerrada removível**: o × numa aba cuja processo já saiu remove a aba (segundo
+         clique, ou × direto quando o estado é `exited`); `tabs/tab-model.ts#removeTab` com teste.
+         O × numa aba viva continua só encerrando o processo (V2-T2).
+
+      **O que não entra** (V2-T4, a especificar depois desta): `end-day` pela interface com a
+      prévia (`--dry-run`) como confirmação, e a notificação do resultado; a faixa de horário
+      ("encerramento às 11:00 em 12 min") com **Snooze** e **Skip today** dentro da janela, pela
+      mesma `decideSchedule` do daemon, reaproveitando o que `snooze-command.ts`/`skip-today`
+      fazem (que sai da CLI para o motor); subir/parar o daemon pela interface; notificações do
+      SO com botão (D-034: o `Notification` do Electron só tem ações no macOS — decisão a tomar
+      lá, não aqui); empacotamento; projetos.
+
+      **Cuidados:** a interface **não** retoma nada sozinha — só ao clicar (D-039); a retomada
+      registra em `resumed-sessions` como a CLI registra, então uma sessão retomada pela
+      interface não é retomada de novo pela CLI no mesmo dia, e vice-versa (é o mesmo `Storage`);
+      Windows é o ambiente do agente e o Linux o do mantenedor — o binário resolvido por SO, nada
+      de `process.platform` fora de adapter; nenhuma dependência nova; tudo com lógica fora de
+      `electron/`, com teste; as guardas da V2-T2 continuam valendo (`electron` só em
+      `electron/`, `node-pty` só em `pty/`); nenhum texto voltado à pessoa fora de
+      `text/messages.ts`; **um commit por item** acima, portão em primeiro plano a cada um.
+
+      *Aceite:* na máquina do agente, com um briefing real ou sintético num `homeDir` descartável
+      (o harness de e2e monta sessão e transcript — `tests/e2e/_harness.ts` — e `tests/e2e/start-day.test.ts` mostra como um briefing é produzido com um `claude` falso), "Resume
+      selected" abre uma aba com `claude --resume <id> …` para cada sessão marcada, a lateral
+      marca cada uma por PID, `resumed-sessions` do dia registra os ids, e uma sessão marcada com
+      plano acima do teto dispara o diálogo com o texto certo — provado por captura de tela lida
+      pelo agente e pelo conteúdo de `~/.seeya` do `homeDir` descartável; testes de unidade para
+      o resumer (falha rápida, sucesso, fallback) com pty e relógio falsos; portão e
+      `verificar:linux` verdes; CI verde nos três sistemas. **Aceite manual do mantenedor:** um
+      `start-day` real pela interface no dia seguinte a um `end-day` real, no Windows e no Linux.
 
 ## Definição de pronto (vale para toda tarefa)
 
