@@ -30,9 +30,33 @@ adapters/      ← implementam as portas do núcleo
 scheduler/     ← o daemon; orquestra application/ no tempo
 ```
 
-**Regra de dependência.** Setas apontam para dentro, e `cli/` é a **única raiz de composição** —
-só ele nomeia adapter concreto e injeta nos demais (D-020). Verificado por `dependency-cruiser`
-no CI, não por boa vontade:
+## Layout do repositório (monorepo, V2-T1/D-043)
+
+As cinco camadas acima são um diagrama de **dependência**, não de **diretório**: desde a V2-T1
+o repositório é um monorepo `npm workspaces` com dois pacotes, e as camadas se distribuem assim:
+
+| pacote | caminho no disco | contém |
+|---|---|---|
+| `@seeya-ai/engine` | `packages/engine/src/` | `core/`, `application/`, `adapters/`, `scheduler/` |
+| `@seeya-ai/cli` | `packages/cli/src/` | `cli/` (sem subpasta própria — os arquivos ficam direto na raiz do pacote) |
+| `@seeya-ai/app` | *(reservado, D-043; não criado)* | a interface (D-042), quando existir |
+
+`@seeya-ai/engine` exporta cada camada por subcaminho (`@seeya-ai/engine/core/...`,
+`@seeya-ai/engine/adapters/...`, espelhando os diretórios) — é assim que `packages/cli/src`
+importa o que antes importava por `../core/...`. `tests/`, `docs/`, `scripts/`, `.github/` e todo
+o ferramental (`eslint`, `prettier`, `dependency-cruiser`, `vitest`, `husky`) continuam na raiz,
+comuns aos dois pacotes; os testes resolvem `@seeya-ai/engine` direto para o **fonte**
+(`packages/engine/src`), nunca para `packages/engine/dist`, então a suíte nunca depende de build.
+
+**Regra de dependência.** Setas apontam para dentro. Antes da V2-T1, `cli/` era a **única raiz de
+composição** (D-020); a D-043 emenda isso: **`cli/` e `app/` são as duas raízes de composição**,
+e nenhuma outra — só elas nomeiam adapter concreto e injetam nos demais. A matriz de 20 pares
+abaixo continua exaustiva **dentro de `@seeya-ai/engine`** (todos os cinco nomes de camada
+seguem valendo, agora lidos como "camada X do motor"), e o `dependency-cruiser` ganhou uma oitava
+regra: `packages/cli/src` só pode alcançar `@seeya-ai/engine` pelo mapa de exports do pacote
+(`@seeya-ai/engine/<camada>/...`), nunca por caminho relativo cru dentro de
+`packages/engine/src` — ver `.dependency-cruiser.cjs`. Verificado por `dependency-cruiser` no
+CI, não por boa vontade:
 
 **A matriz é exaustiva de propósito.** São 5 camadas, logo 20 pares ordenados, e todos os 20
 estão abaixo. Três rodadas de review de S0-T2 acharam, cada uma, "mais um par que ninguém

@@ -127,6 +127,40 @@ diretório e sem transcripts antigos — os de `see-you-tomorrow-ai` continuam e
 antiga (`see-you-tomorrow-ai`) ainda existe** porque o Windows recusou renomeá-la (handle aberto
 por processo não identificado); a nova é um clone com o mesmo HEAD. Apagar a antiga quando soltar.
 
+## Monorepo (V2-T1, 13/09) — numa worktree, não mesclado
+
+**Feito, numa worktree isolada (`.claude/worktrees/`), aguardando revisão e mesclagem:** o
+repositório virou monorepo `npm workspaces` (D-043). `core/`, `application/`, `adapters/` e
+`scheduler/` moveram (`git mv`) para `packages/engine/src/`; `cli/` moveu para `packages/cli/src/`.
+`@seeya-ai/engine` exporta cada camada por subcaminho; `packages/cli` importa por
+`@seeya-ai/engine/<camada>/...`. Quatro commits (um por passo: `packages/engine`,
+`packages/cli`, testes/ferramental, documentação), cada um com o portão relevante verde antes de
+commitar; `npm run verificar` completo (format, tipos, lint, `tsc -b`, `dependencias`, cobertura)
+verde no fim, com os mesmos **1.566 testes**, nenhum a mais, nenhum a menos. `git log --follow`
+confirmado num arquivo movido (`packages/engine/src/core/schedule.ts`). Achado no meio do
+trabalho, corrigido na mesma tarefa: `scripts/clean-dist.mjs` limpava só o `dist/` de cada
+pacote, não o `tsconfig.build.tsbuildinfo` do `tsc -b` — um `npm run build` depois de um clean
+"tinha sucesso" (exit 0) sem realmente reconstruir nada, e o `seeya` do link quebrava com
+`MODULE_NOT_FOUND`. Corrigido antes da mesclagem.
+
+**O caminho do binário muda:** `packages/cli/package.json`'s `bin.seeya` aponta para
+`./dist/index.js` (raiz do dist do pacote, sem o antigo prefixo `cli/`) — ou seja, o artefato
+passa a ser `packages/cli/dist/index.js`, não mais `dist/cli/index.js`.
+
+**Consequência para o mantenedor, ainda não feita por ele:** a tarefa agendada do autostart
+aponta para o caminho antigo (`C:\code\seeya\dist\cli\index.js`), que deixa de existir depois
+desta mesclagem e de um `npm run build` na `main`. `seeya autostart status` vai passar a mostrar
+`brokenPath` nesse momento — é o comportamento desenhado pela S5-T1 para exatamente este caso, não
+um defeito. **`seeya autostart enable` reaponta a tarefa** para o caminho novo; é o único passo
+manual pendente, e depois disso convém conferir que o daemon volta a subir sozinho no próximo
+logon. Medido nesta tarefa, com o link apontando para a worktree (não a `main`, que não foi
+tocada): `seeya --version`, `seeya status` e `seeya autostart status` respondem certo pelo link
+novo — o `status` ainda mostra o caminho antigo porque a tarefa real da máquina não mudou.
+
+`npm link` desta tarefa roda em `packages/cli`, não na raiz — o `seeya` do PATH deste notebook
+aponta para a worktree enquanto ela existir; religar depois da mesclagem aponta de volta para
+`C:\code\seeya\packages\cli`.
+
 ## Ambiente do mantenedor
 
 Não faz parte do projeto, mas afeta o trabalho:

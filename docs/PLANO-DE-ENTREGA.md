@@ -3952,7 +3952,7 @@ texto, mas não são a fila.
       spike G contra uma sessão embutida. Processos e sessões de teste (incluindo os transcripts
       que criaram em `~/.claude/projects/` e `~/.codex/sessions/`) foram removidos ao final.
 
-- [ ] **V2-T1 — O monorepo: `@seeya-ai/engine` e `@seeya-ai/cli` (D-043).** Especificada pelo PO em
+- [~] **V2-T1 — O monorepo: `@seeya-ai/engine` e `@seeya-ai/cli` (D-043).** Especificada pelo PO em
       2026-09-13; **aguarda aprovação do mantenedor antes de qualquer despacho.** É a primeira
       tarefa de código da v2 e uma reestruturação que toca tudo: por isso o aceite é "nada mudou",
       medido.
@@ -4021,6 +4021,71 @@ texto, mas não são a fila.
       sistemas; `seeya --version`, `seeya status` e `seeya autostart status` funcionando pelo link
       em `packages/cli` (com o `brokenPath` reportado e depois corrigido por `enable`); alerta do
       CodeQL fechado; `git log --follow` de um arquivo movido mostrando o histórico anterior.
+
+      **Relatório do agente (2026-09-13), numa worktree isolada, nada mesclado.** Quatro
+      commits, cada um com o portão relevante verde antes de commitar:
+
+      1. `packages/engine` recebe `core/`, `application/`, `adapters/`, `scheduler/` (`git mv`);
+         `package.json` com `exports` por subcaminho; workspace raiz. Portão escopado: `tsc -b`,
+         `eslint packages/engine/src`, `depcruise packages/engine/src` verdes.
+      2. `packages/cli` recebe `cli/` (`git mv`); imports trocados para
+         `@seeya-ai/engine/<camada>/...`; `bin.seeya` aponta para `./dist/index.js`. Oitava regra
+         do `dependency-cruiser` (`cli-only-imports-engine-public-subpaths`) escrita e testada com
+         um arquivo de violação descartável antes de ficar valendo pra valer. `npm link` em
+         `packages/cli`; `seeya --version` respondendo pelo link novo.
+      3. `tests/` e ferramental (`vitest.config.ts`, `eslint.config.js`,
+         `tests/integration/guards/**`) apontando para os caminhos novos. **Medido: os mesmos
+         1.566 testes passam** (nenhum a menos, nenhum a mais, nenhum pulado a mais) — confirmado
+         rodando `npm run verificar` completo, não só inspecionando o diff. `scripts/spike-j-measure.mjs`
+         corrigido para `mkdtemp` nesta tarefa (Q-068) — **está neste commit**, por tocar
+         `scripts/` junto com o resto do ferramental.
+      4. Documentação: `docs/ARQUITETURA.md`, `AGENTS.md`, `INDEX.md` (mapa; sem mudança de
+         conteúdo — não referencia caminho de código), `README.md`, `docs/ESTADO-ATUAL.md`, este
+         arquivo.
+
+      Um quinto commit, fora da numeração acima porque só apareceu depois de tudo verde: o
+      `scripts/clean-dist.mjs` limpava só o `dist/` de cada pacote, não o
+      `tsconfig.build.tsbuildinfo` do `tsc -b` — um `npm run build` depois de um clean "tinha
+      sucesso" (exit 0) sem reconstruir nada, e o `seeya` do link quebrava com `MODULE_NOT_FOUND`
+      mesmo com `npm run verificar` inteiro verde (nenhum passo do portão toca
+      `packages/cli/dist`). Corrigido e confirmado com dois `npm run verificar` seguidos mais o
+      link funcionando nos dois.
+
+      **Medido nesta worktree:** `npm run verificar` completo verde (format, `tsc -p
+      tsconfig.json --noEmit`, `eslint .`, `tsc -b` via `npm run build`, `dependencias`,
+      `cobertura`) com **1.566 testes passando, 3 pulados** — igual à base. Cobertura por
+      diretório dentro do piso em todos (`packages/engine/src/core/**` em 100%). `git log
+      --follow -- packages/engine/src/core/schedule.ts` mostra o histórico de antes do movimento.
+      `seeya --version`/`seeya status`/`seeya autostart status` respondem certo pelo `npm link`
+      feito em `packages/cli` — `status`/`autostart status` leram o `~/.seeya` real da máquina
+      (só leitura; `enable` não foi rodado, por instrução do despacho). `npm run verificar:linux`
+      **não rodou**: Docker Desktop não respondia nesta sessão e cinco minutos de espera não
+      resolveram — fica pendente da CI, como o próprio fluxo de trabalho prevê para esse caso.
+
+      **Inferido, não medido por este agente:** o `brokenPath` do autostart. A tarefa agendada
+      real do Windows aponta para `C:\code\seeya\dist\cli\index.js`, no checkout principal — que
+      esta tarefa não tocou (regra de worktree isolada) e onde `dist/cli/index.js` **ainda
+      existe** fisicamente, de builds anteriores. `seeya autostart status` mostrou `enabled` com
+      esse caminho antigo, não `brokenPath`, porque o arquivo continua lá. O `brokenPath` só vai
+      aparecer de fato depois que o mantenedor mesclar esta mudança e reconstruir a `main` no
+      layout novo (quando `dist/cli/index.js` deixar de existir ali) — é o desenho da S5-T1 para
+      este caso, e o relatório o descreve por inferência da mudança de `bin.seeya`, não por
+      observação direta.
+
+      **Nenhuma dependência nova.** `@seeya-ai/engine` foi adicionado como dependência de
+      `@seeya-ai/cli` (workspace, não npm registry) — é o próprio produto desta tarefa, não uma
+      dependência externa nova; nada em `docs/QUESTOES.md` Q-070 precisou ser levantado por causa
+      de dependência.
+
+      **O que o mantenedor precisa fazer, na ordem:** (1) revisar e mesclar; (2) `npm run build`
+      na `main`; (3) `seeya autostart enable`, para reapontar a tarefa agendada — `status` deve
+      sair de `enabled`/`brokenPath` (o que aparecer primeiro) para `enabled` com o caminho novo;
+      (4) conferir que o daemon sobe sozinho no próximo logon, ou forçar um reinício de teste; (5)
+      religar o `npm link` (rodado nesta worktree, em `packages/cli`) apontando para
+      `C:\code\seeya\packages\cli` depois de apagar a worktree.
+
+      Ver `docs/QUESTOES.md` Q-070 para as decisões de ferramental tomadas sem parar para
+      perguntar (nenhuma altera comportamento, API entre camadas ou texto voltado à pessoa).
 
 ## Definição de pronto (vale para toda tarefa)
 

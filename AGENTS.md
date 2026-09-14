@@ -59,8 +59,11 @@ mínima. Não precisa parar; precisa avisar.
 - `nucleo/` é puro: não importa `node:*`, não importa nada de `adaptadores/`, `aplicacao/` ou
   `cli/`, não faz I/O, não conhece o Claude Code.
 - A matriz de dependências permitidas está em `docs/ARQUITETURA.md` e é **exaustiva**: 20 pares
-  ordenados. Par que não estiver nela é erro da matriz — vire questão, não improvise.
-- `cli/` é a **única raiz de composição** (D-020). Só ele nomeia adapter concreto.
+  ordenados, exaustiva dentro de `@seeya-ai/engine` (V2-T1, D-043). Par que não estiver nela é
+  erro da matriz — vire questão, não improvise.
+- **`cli/` e `app/` são as duas raízes de composição** (D-020, emendada pela D-043) — nenhuma
+  outra. Só elas nomeiam adapter concreto. `cli/` só alcança `@seeya-ai/engine` pelo subcaminho
+  público do pacote, nunca por caminho relativo cru dentro de `packages/engine/src`.
 - Todo acesso ao mundo passa por uma porta declarada em `nucleo/portas.ts`.
 - Nada específico do Claude Code fora de `adaptadores/`.
 
@@ -229,10 +232,20 @@ descobria quais eram os 2 erros até alguém instrumentar à mão.
 # Estrutura
 
 - A convenção deste projeto é a **arquitetura em camadas de `docs/ARQUITETURA.md`**, não a de um
-  framework. Caminhos previsíveis: `src/<camada>/`, `tests/<faixa>/`.
+  framework.
+- **Monorepo desde a V2-T1 (D-043):** `npm workspaces`, raiz `private: true`. `core/`,
+  `application/`, `adapters/` e `scheduler/` vivem em `packages/engine/src/<camada>/`;
+  `cli/` vive em `packages/cli/src/` (sem subpasta própria — os arquivos ficam direto na raiz do
+  pacote). `packages/app/` é reservado (D-042/D-043) e ainda não existe. `tests/<faixa>/`,
+  `docs/`, `scripts/` e todo o ferramental continuam na raiz, comuns aos dois pacotes.
+- `@seeya-ai/cli` importa `@seeya-ai/engine` por subcaminho (`@seeya-ai/engine/<camada>/...`),
+  nunca por caminho relativo cru dentro de `packages/engine/src` — é o `dependency-cruiser` que
+  garante isso (oitava regra, D-043).
 - Módulos pequenos e focados. Arquivo que vira depósito de funções soltas perdeu a
   responsabilidade única.
-- Teste espelha a origem: `src/core/x.ts` → `tests/unit/core/x.test.ts`.
+- Teste espelha a origem, com o caminho do pacote: `packages/engine/src/core/x.ts` →
+  `tests/unit/core/x.test.ts` (que importa de `@seeya-ai/engine/core/x.js`);
+  `packages/cli/src/y.ts` → `tests/unit/cli/y.test.ts`.
 
 ---
 
@@ -281,6 +294,7 @@ aqui antes de entrar no código.**
 | Documento (pt) | Código (en) |
 |---|---|
 | núcleo / adaptadores / aplicação / agendador | `core` / `adapters` / `application` / `scheduler` |
+| motor / interface (pacotes, V2-T1, D-043) | `@seeya-ai/engine` (`packages/engine/`, contém `core`/`application`/`adapters`/`scheduler`) / `@seeya-ai/cli` (`packages/cli/`, contém `cli`) — `@seeya-ai/app` é reservado, não criado |
 | sessão descoberta | `DiscoveredSession` |
 | sessão com PID / sem PID | `SessionWithPid` / `SessionWithoutPid` |
 | estado da sessão | `SessionState` |
@@ -417,6 +431,10 @@ npm run test:e2e         # end-to-end
 npm run test:contrato    # contra o ~/.claude real; não roda no CI padrão
 npm run format           # prettier
 ```
+
+Todos rodam na raiz do monorepo (V2-T1) e cobrem os dois pacotes de uma vez. Para instalar o
+`seeya` localmente por link (`npm link`), o comando roda dentro de `packages/cli`, não na raiz —
+ver `README.md`.
 
 # O erro clássico neste projeto
 

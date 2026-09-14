@@ -42,18 +42,21 @@ inside `~/.claude/`.
 
 ## Install
 
-**Not published to npm yet.** Until it is, install from a clone:
+**Not published to npm yet.** Until it is, install from a clone. This is a monorepo
+(`npm workspaces`, D-043): `npm ci`/`npm run build` run at the root and cover both packages, but
+`npm link` runs inside `packages/cli` — that's the package with the `seeya` binary.
 
 ```bash
 git clone https://github.com/<owner>/seeya.git
 cd seeya
 npm ci
 npm run build
+cd packages/cli
 npm link
 ```
 
 `npm link` puts a global `seeya` on your PATH pointing at this checkout, so a later
-`npm run build` takes effect without linking again. Check it:
+`npm run build` (from the repo root) takes effect without linking again. Check it:
 
 ```bash
 seeya --version
@@ -62,8 +65,8 @@ seeya sessions
 
 To remove it: `npm unlink -g @seeya-ai/cli`.
 
-If you'd rather install nothing, run the compiled entry point directly — `node dist/cli/index.js
-sessions` does the same thing.
+If you'd rather install nothing, run the compiled entry point directly — `node
+packages/cli/dist/index.js sessions` does the same thing.
 
 **On PATH.** `npm link` writes into npm's global prefix (`npm config get prefix`). If `seeya`
 isn't found afterwards, that directory isn't on your PATH — add it, or use the `node dist/...`
@@ -79,7 +82,7 @@ npm run verificar   # the gate: types + lint + layers + build + coverage
 The other commands:
 
 ```bash
-npm run build          # compiles TypeScript to dist/
+npm run build          # compiles TypeScript (tsc -b) to each package's own dist/
 npm test               # unit + integration
 npm run test:e2e       # end-to-end
 npm run test:contrato  # against the real ~/.claude; doesn't run in standard CI

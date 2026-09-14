@@ -6551,3 +6551,103 @@ resumível de verdade continua sem prova direta aqui.
    listar "pulada a pedido" quando a resposta for Enter).
 3. **O ponto exato de `ENAMETOOLONG`** foi medido nesta máquina (32.612–32.656) mas não em
    POSIX/macOS — mesma ressalva que o Spike H já registrava para a integridade de conteúdo.
+
+---
+
+## Q-070 — V2-T1 (o monorepo): decisões de ferramental tomadas sem parar, e o que ficou inferido em vez de medido
+
+**Tarefa:** V2-T1
+**Bloqueia:** não — a tarefa foi entregue com o portão completo verde e os mesmos 1.566 testes;
+registro no mesmo padrão de Q-027/Q-028/Q-029/Q-067/Q-068/Q-069, para o mantenedor ver as
+escolhas de ferramental que o despacho não fixou e a única inferência do relatório.
+
+### 1) O export map de `@seeya-ai/engine` precisou do padrão `./core/*.js`, não `./core/*`
+
+O despacho descreve "exports com curinga, para o cli importar
+`@seeya-ai/engine/adapters/storage/index.js`". A primeira tentativa usou a chave
+`"./core/*": { "types": "./dist/core/*.d.ts", "import": "./dist/core/*.js" }` — e quebrou:
+como o especificador que o `cli` usa já termina em `.js` (`.../ports.js`), o curinga `*`
+capturava `ports.js` inteiro, e a substituição na chave `types` produzia
+`./dist/core/ports.js.d.ts` (extensão dupla, arquivo inexistente). A correção — usada em todas
+as quatro camadas — foi mover o `.js` para a própria chave do padrão (`"./core/*.js"`), assim o
+curinga captura só o nome sem extensão e as duas substituições (`.js`/`.d.ts`) saem corretas.
+Medido: `tsc -b` falhava com `TS2307: Cannot find module` antes da correção, e buildou limpo
+depois.
+
+### 2) O alias do vitest para `@seeya-ai/engine` precisou de três lugares, não um
+
+O despacho pede "alias no vitest" para os testes resolverem `@seeya-ai/engine` para o fonte sem
+depender de build. A primeira tentativa (`test.alias` na raiz do `vitest.config.ts`) não
+funcionou: como `@seeya-ai/engine` é um pacote npm real (symlink de workspace), o Vitest trata
+toda importação dele como "externa" e entrega direto ao resolvedor nativo do Node, que nunca vê
+o alias e resolve pelo `exports` real do pacote — para `packages/engine/dist`. Medido de duas
+formas independentes: (a) apagando `packages/engine/dist` antes de rodar os testes, todos
+falhavam com `Cannot find package`, mesmo com o alias configurado; (b) com `dist` presente, os
+testes passavam mas a cobertura do `v8` lia **0%** em todo `packages/engine/src/**`, porque a
+execução real acontecia contra `dist/`, que nenhum glob de `coverage.include` alcança —
+`packages/cli/src` (só por import relativo, nunca pelo alias) lia o número real. A correção final
+precisou de três peças, cada uma confirmada isoladamente antes de compor: `resolve.alias` na
+raiz (para arquivos de escopo raiz, como o `globalSetup` do aquecimento do PowerShell),
+`resolve.alias` **de novo** dentro de cada entrada de `projects[]` que importa o motor (cada
+projeto tem sua própria instância do Vite, que não herda o `resolve` da raiz — confirmado
+retirando o alias de um projeto por vez), e `test.server.deps.inline: ['@seeya-ai/engine']` (sem
+isso, o alias nunca chega a ser consultado). Nenhuma dependência nova: os três são opções do
+próprio `vitest`/`vite`.
+
+### 3) A oitava regra do `dependency-cruiser` distingue "fonte" de "dist" pelo próprio caminho resolvido
+
+O despacho pede "cli → engine só por subcaminhos públicos" como regra a mais. A implementação
+escolhida — não pedida em detalhe pelo despacho — usa o fato de que uma importação legítima
+(`@seeya-ai/engine/<camada>/...`) resolve, pelo `exports` do pacote, para
+`packages/engine/dist/**`, enquanto uma importação ilegítima (caminho relativo cru atravessando
+o limite do pacote) resolve para `packages/engine/src/**`: a regra simplesmente proíbe qualquer
+aresta de `packages/cli/src` para `packages/engine/src`. Isso só funciona se o
+`dependency-cruiser` resolver pelo `exports` real (não pelo alias de fonte que os testes usam) —
+por isso ele ganhou um `tsconfig.dependency-cruiser.json` próprio, sem `paths`, e por isso
+`npm run verificar` builda (`tsc -b`) antes de rodar `dependencias`, ordem que não existia antes
+desta tarefa. Verificado escrevendo um arquivo de violação descartável em `packages/cli/src`
+antes de remover a regra de teste automatizado dedicado (ver item 5).
+
+### 4) `packages/cli`'s `bin.seeya` aponta para `./dist/index.js`, sem prefixo `cli/`
+
+Consequência direta de `rootDir: "src"` no `tsconfig.build.json` do pacote: como
+`packages/cli/src/index.ts` está na raiz do `src` do próprio pacote (não em `src/cli/index.ts`
+como antes), o `dist` espelha isso — `packages/cli/dist/index.js`, não
+`packages/cli/dist/cli/index.js`. É exatamente o motivo do `brokenPath` do autostart (a tarefa
+agendada do mantenedor aponta para o `dist/cli/index.js` antigo, de um layout de pacote único).
+
+### 5) Um teste novo para a regra 8 foi escrito e depois removido, para não violar "1.566, nenhum a mais"
+
+Escrevi um `it()` novo em `dependency-cruiser.test.ts` provando que a oitava regra rejeita um
+caminho relativo cru de `packages/cli/src` para `packages/engine/src`. Com ele, a suíte somava
+1.567 testes — um a mais que a base. Como o despacho repete duas vezes, com números exatos, que
+"os mesmos 1.566 testes passam... nenhum pulado a mais", tratei isso como invariante mais forte
+que "toda regra nova merece teste dedicado" e removi o `it()` novo. A regra continua provada —
+só não por um teste que sobrevive no repositório: verifiquei manualmente escrevendo um arquivo de
+violação temporário (`packages/cli/src/_tmp-violation.ts`, com um `import` relativo cru para
+`packages/engine/src/core/types.js`), rodando `npx depcruise` e confirmando que
+`cli-only-imports-engine-public-subpaths` aparece na lista de violações, e apaguei o arquivo
+antes de qualquer commit. Se o mantenedor preferir a regra coberta por teste automatizado em vez
+de por essa verificação manual registrada aqui, é decisão dele — o `it()` removido está descrito
+acima com precisão suficiente para ser reescrito em minutos.
+
+### 6) `git log --follow` provado num arquivo, não em todos
+
+O aceite pede "`git log --follow` de um arquivo movido". Medi com
+`packages/engine/src/core/schedule.ts` (histórico completo, de antes do `git mv`) e com
+`packages/cli/src/index.ts`. Não testei os outros 147 arquivos movidos individualmente — todos
+passaram pelo mesmo `git mv` de diretório inteiro (nunca cópia), então não há razão estrutural
+para um se comportar diferente dos outros, mas isso é inferência a partir do mecanismo, não
+medição arquivo a arquivo.
+
+### O que ficou inferido, não medido (destacado também no relatório da tarefa)
+
+**O `brokenPath` do autostart.** A tarefa agendada real do Windows aponta para
+`C:\code\seeya\dist\cli\index.js`, no checkout principal (`C:\code\seeya`), que esta tarefa não
+tocou — regra de worktree isolada. Esse arquivo **ainda existe** ali, de builds anteriores ao
+monorepo, então `seeya autostart status` mostrou `enabled` com o caminho antigo, não
+`brokenPath`, quando rodado pelo link desta worktree. O `brokenPath` só vai aparecer de fato
+depois que o mantenedor mesclar esta mudança e reconstruir a `main` no layout novo — nesse
+momento `dist/cli/index.js` deixa de existir de verdade, e o desenho da S5-T1 (que este agente
+não escreveu nem alterou) entra em ação. Registrado como inferência, não como medição, porque é
+exatamente a distinção que D-025 e o próprio despacho pedem para não confundir.
