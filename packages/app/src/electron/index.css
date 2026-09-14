@@ -86,6 +86,16 @@ body {
   background: #252525;
 }
 
+/* V2-T3 review: an ID selector (#command-bar above) is MORE specific than the browser's own
+ * default UA rule for the `hidden` attribute ([hidden] { display: none }), so `display: flex`
+ * was winning and the bar stayed visible after Cancel/submit set `hidden = true`
+ * (renderer.ts's own wireCommandBar) — the maintainer saw this on macOS: the bar stayed on
+ * screen with a tab already open. `#command-bar[hidden]` is an ID + attribute selector, strictly
+ * more specific than the plain ID rule above, so this wins regardless of source order. */
+#command-bar[hidden] {
+  display: none;
+}
+
 #command-bar label {
   display: flex;
   flex-direction: column;
