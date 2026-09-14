@@ -7,6 +7,7 @@ import {
   isRunning,
   listTabs,
   markExited,
+  removeTab,
   updateTab,
   withPid,
 } from '../../../../packages/app/src/tabs/tab-model.js';
@@ -76,5 +77,25 @@ describe('tab-model', () => {
 
     expect(findTabByPid(tabs, 111)?.id).toBe('a');
     expect(findTabByPid(tabs, 999)).toBeNull();
+  });
+
+  // V2-T3 item 2: the × on an already-exited tab removes it; a live tab's × only ends its process
+  // (electron/renderer.ts's own close-button handler decides which case applies).
+  it('removeTab drops the named tab, leaving every other one untouched', () => {
+    const t1 = createTab({ id: 'a', command: '', args: [], cwd: '/x' });
+    const t2 = createTab({ id: 'b', command: '', args: [], cwd: '/y' });
+    const tabs = addTab(addTab(emptyTabs(), t1), t2);
+
+    const next = removeTab(tabs, 'a');
+
+    expect(listTabs(next).map((t) => t.id)).toEqual(['b']);
+  });
+
+  it('removeTab is a silent no-op for an id that does not exist (never throws)', () => {
+    const tabs = addTab(emptyTabs(), createTab({ id: 'a', command: '', args: [], cwd: '/x' }));
+
+    const unchanged = removeTab(tabs, 'does-not-exist');
+
+    expect(unchanged).toBe(tabs);
   });
 });

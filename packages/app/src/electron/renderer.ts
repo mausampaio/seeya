@@ -11,7 +11,7 @@
  */
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
-import { createTab, withPid, type Tab } from '../tabs/tab-model.js';
+import { createTab, isRunning, markExited, withPid, type Tab } from '../tabs/tab-model.js';
 import { MESSAGES } from '../text/messages.js';
 import type { SeeyaApi } from './preload.js';
 import type { SidebarRow } from '../sidebar/sidebar-data.js';
@@ -81,14 +81,40 @@ function addTabButton(id: string, label: string): void {
   closeButton.type = 'button';
   closeButton.textContent = '×';
   closeButton.addEventListener('click', () => {
-    // docs/PLANO-DE-ENTREGA.md V2-T2: closing a tab ends its process; the tab itself stays
-    // visible (onTabExit below marks it, it never removes the button) until the real process
-    // exit event confirms it.
+    const open = openTabs.get(id);
+    if (open !== undefined && !isRunning(open.tab)) {
+      // V2-T3 item 2: the process already exited — × now removes the tab outright instead of
+      // asking main.ts to end a process that's already gone.
+      removeTabUi(id, wrapper, open);
+      return;
+    }
+    // docs/PLANO-DE-ENTREGA.md V2-T2: closing a LIVE tab ends its process; the tab itself stays
+    // visible (onTabExit below marks it, it never removes the button on its own) until the
+    // process really exits — a second click, once exited, is what removes it (branch above).
     window.seeya.closeTab({ id });
   });
   wrapper.appendChild(closeButton);
 
   tabStrip().appendChild(wrapper);
+}
+
+/**
+ * V2-T3 item 2: drops a tab whose process has already exited — the × handler above is the only
+ * caller. Disposes the `@xterm/xterm` instance (nothing else does) and removes both DOM pieces
+ * (`addTabButton`'s own `wrapper`, and the terminal pane); if the removed tab was the one showing,
+ * falls back to whatever tab remains, if any (`tabs/tab-model.ts#removeTab`'s own docstring: the
+ * pure model doesn't know about "which tab is showing" — that's a renderer/DOM concern).
+ */
+function removeTabUi(id: string, wrapper: HTMLElement, open: OpenTab): void {
+  const wasShown = !open.container.hidden;
+  open.terminal.dispose();
+  open.container.remove();
+  wrapper.remove();
+  openTabs.delete(id);
+  const remaining = wasShown ? openTabs.keys().next().value : undefined;
+  if (remaining !== undefined) {
+    showTab(remaining);
+  }
 }
 
 function markTabButtonExited(id: string, exitCode: number): void {
@@ -162,6 +188,13 @@ function wireIncomingEvents(): void {
     openTabs.get(id)?.terminal.write(data);
   });
   window.seeya.onTabExit(({ id, exitCode }) => {
+    // V2-T3 item 2: keeps this OpenTab's own `tab.status` in sync (mirrors what main.ts already
+    // does for its own TabCollection) — the close-button handler above reads it to decide whether
+    // × removes the tab outright or still just ends a live process.
+    const open = openTabs.get(id);
+    if (open !== undefined) {
+      openTabs.set(id, { ...open, tab: markExited(open.tab, exitCode) });
+    }
     markTabButtonExited(id, exitCode);
   });
   window.seeya.onSessionsUpdate(({ rows }) => {

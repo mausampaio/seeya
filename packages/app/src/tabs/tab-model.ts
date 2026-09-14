@@ -104,6 +104,23 @@ export function updateTab(
   return next;
 }
 
+/**
+ * Drops `id` from `tabs` — the one operation `markExited`'s own docstring says never happens on
+ * its own ("closing a tab never removes it from the list"): this is the SEPARATE, explicit
+ * gesture V2-T3 adds for a tab whose process has already exited (`electron/renderer.ts`'s own
+ * close-button handler decides WHEN to call this — `isRunning(tab)` false — this function only
+ * knows how). A no-op, same reference back, for an `id` that doesn't exist — never throws, same
+ * "a late event for a tab that's already gone is expected" tolerance `updateTab` above documents.
+ */
+export function removeTab(tabs: TabCollection, id: string): TabCollection {
+  if (!tabs.has(id)) {
+    return tabs;
+  }
+  const next = new Map(tabs);
+  next.delete(id);
+  return next;
+}
+
 export function listTabs(tabs: TabCollection): readonly Tab[] {
   return [...tabs.values()];
 }
