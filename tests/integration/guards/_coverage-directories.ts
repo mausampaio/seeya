@@ -94,4 +94,11 @@ export const DECLARED_COVERAGE_DIRECTORIES: readonly DeclaredCoverageDirectory[]
     expectation: { kind: 'covered', threshold: 80 },
   },
   { path: 'packages/cli/src', expectation: { kind: 'covered', threshold: 80 } },
+  // V2-T2: same single-flat-entry shape as packages/cli/src above — packages/app/src has no
+  // internal layer subdirectory of its own either. packages/app/src/electron/** carries no floor
+  // (it never enters coverage.include at all, vitest.config.ts's APP_ELECTRON_SOURCE), the same
+  // mechanism packages/cli/src/index.ts already uses — not a second, 'excluded' entry here, since
+  // the real leaf-directory scan below never produces that path as its own leaf (it's one flat
+  // package root, like cli, not a per-subdirectory scan like engine's adapters/*).
+  { path: 'packages/app/src', expectation: { kind: 'covered', threshold: 80 } },
 ];

@@ -7,6 +7,7 @@ import {
   PROJECT_ROOT,
   ENGINE_SRC_ROOT,
   CLI_SRC_ROOT,
+  APP_SRC_ROOT,
 } from './_support.js';
 import {
   DECLARED_COVERAGE_DIRECTORIES,
@@ -80,6 +81,11 @@ function realLeafSourceDirectories(): string[] {
   const directories = new Set<string>(engineLeafDirectories());
   if (listProductionTsFiles(path.join(PROJECT_ROOT, CLI_SRC_ROOT)).length > 0) {
     directories.add(CLI_SRC_ROOT.split(path.sep).join('/'));
+  }
+  // V2-T2: packages/app/src is scanned the same flat, single-leaf way as packages/cli/src above
+  // — it has no internal layer subdirectory of its own either (see _coverage-directories.ts).
+  if (listProductionTsFiles(path.join(PROJECT_ROOT, APP_SRC_ROOT)).length > 0) {
+    directories.add(APP_SRC_ROOT.split(path.sep).join('/'));
   }
   return [...directories].sort();
 }

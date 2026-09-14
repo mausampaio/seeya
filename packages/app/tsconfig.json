@@ -1,0 +1,35 @@
+{
+  // Unlike packages/engine and packages/cli, @seeya-ai/app DOES declare its own tsconfig.json
+  // (not just a tsconfig.build.json) — on purpose. typescript-eslint's projectService
+  // auto-discovers the nearest "tsconfig.json" walking up from each linted file; engine/cli have
+  // none so their files fall through to the root tsconfig.json (the one whole-repo program,
+  // ES2023-only lib). packages/app/src/electron/** (the renderer bootstrap and preload) touches
+  // real DOM globals (`document`, `window`, `HTMLElement` — @xterm/xterm's own API surface needs
+  // them too) that ES2023 alone doesn't declare; adding "DOM"/"DOM.Iterable" to the ROOT
+  // tsconfig.json's lib would apply browser globals to every engine/cli file too, for no reason
+  // any of them needs. This file is the narrower fix: only packages/app/src gets DOM types, found
+  // by ESLint automatically (nearest tsconfig.json wins) and used as the one project reference
+  // `npm run build` (`tsc -b tsconfig.build.json`) compiles.
+  //
+  // The root tsconfig.json's own "exclude" (see that file) drops packages/app/src/electron from
+  // the FLAT `tsc -p tsconfig.json --noEmit` program precisely so that check never needs DOM
+  // either — this file is the only program that ever type-checks electron/**.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "rootDir": "src",
+    // Deliberately NOT "dist" (unlike packages/engine and packages/cli): nothing imports
+    // @seeya-ai/app as a dependency, so this plain (unbundled) tsc output is never actually run —
+    // only `scripts/build.mjs`'s esbuild bundle, written to "dist", is. "dist-tsc" exists so
+    // `tsc -b`'s per-file emit (part of `npm run build`'s type-checking) and esbuild's runtime
+    // bundle never fight over the same files — see scripts/build.mjs's own comment.
+    "outDir": "dist-tsc",
+    "tsBuildInfoFile": "./tsconfig.tsbuildinfo"
+  },
+  "include": ["src"],
+  "references": [{ "path": "../engine/tsconfig.build.json" }]
+}

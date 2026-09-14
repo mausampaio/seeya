@@ -1,4 +1,8 @@
 dist/
+# V2-T2: packages/app's own tsc output, deliberately not named "dist" (packages/app/tsconfig.json's
+# own comment explains why) — the esbuild bundle at packages/app/dist is already covered by the
+# "dist/" pattern above.
+dist-tsc/
 coverage/
 node_modules/
 

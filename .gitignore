@@ -1,5 +1,7 @@
 node_modules/
 dist/
+# V2-T2: packages/app's own tsc output — never "dist" (packages/app/tsconfig.json explains why).
+dist-tsc/
 .claude/worktrees/
 .claude/settings.local.json
 

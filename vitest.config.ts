@@ -47,6 +47,30 @@ const WINDOWS_ONLY_SOURCE = [
 const POSIX_ONLY_SOURCE = ['packages/engine/src/adapters/process/termination-posix.ts'];
 
 /**
+ * V2-T2 (docs/PLANO-DE-ENTREGA.md, item 5): `packages/app/src/electron/**` is the main-process
+ * entry, preload script and renderer bootstrap — Electron's own wiring, which cannot run without
+ * a display the way `packages/cli/src/index.ts` cannot run without a real terminal invocation
+ * (both are thin, both are excluded from `coverage.include` entirely rather than carrying a floor
+ * they cannot clear in CI). Everything WITH logic (the tab model, session↔pid matching, state
+ * assembly, the pty and IPC ports) lives outside `electron/` on purpose, in plain modules
+ * `coverage.include` still reaches — see PRODUCTION_DIRECTORY_THRESHOLDS's own
+ * `packages/app/src/**` entry below for the floor those modules carry.
+ */
+const APP_ELECTRON_SOURCE = ['packages/app/src/electron/**'];
+
+/**
+ * V2-T2: `packages/app/src/pty/node-pty-adapter.ts` is a two-line pass-through to `node-pty`'s
+ * own `spawn` (that file's own docstring) — the ONE function in `packages/app/src` this task
+ * leaves unexercised by `vitest`, on purpose, same shape as `packages/cli/src/index.ts` above
+ * (thin wiring around a real OS process, "exercised for real" only by this task's own manual
+ * aceite — a live pty, a live shell, a captured screenshot — never by an isolated unit test that
+ * would otherwise have to launch a real child process just to cover a call it doesn't branch on).
+ * `pty/pty-manager.ts`, which DOES have real logic (tab↔handle bookkeeping, event forwarding),
+ * stays fully covered via a fake `PtySpawner` — see that file's own tests.
+ */
+const APP_NODE_PTY_ADAPTER_SOURCE = ['packages/app/src/pty/node-pty-adapter.ts'];
+
+/**
  * These five integration files launch a REAL `powershell.exe` (`adapters/process/proc-start.ts`'s
  * `captureWindows`, `adapters/process/console-signal.ts`'s `sendCtrlBreak`) rather than touching an
  * isolated tmpdir like the rest of `integration/` — they contend for the SAME scarce resource: the
@@ -189,6 +213,12 @@ const PRODUCTION_DIRECTORY_THRESHOLDS = {
   // has no internal layer subdirectory the way packages/engine/src does — see
   // tests/integration/guards/_coverage-directories.ts.
   'packages/cli/src/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
+  // V2-T2: one glob for the whole @seeya-ai/app package, same shape as packages/cli/src's own
+  // entry above (app has no internal layer subdirectory the way packages/engine/src does either).
+  // packages/app/src/electron/** carries no floor of its own — it's excluded from
+  // coverage.include below entirely, same mechanism packages/cli/src/index.ts already uses (thin
+  // wiring that cannot run headless), not a second entry in this object.
+  'packages/app/src/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
   'packages/engine/src/adapters/autostart/**': {
     statements: 80,
     branches: 80,
@@ -292,11 +322,25 @@ export default defineConfig({
     globalSetup: ['tests/_powershell-warmup-global-setup.ts'],
     coverage: {
       provider: 'v8',
-      include: ['packages/engine/src/**/*.ts', 'packages/cli/src/**/*.ts'],
+      include: [
+        'packages/engine/src/**/*.ts',
+        'packages/cli/src/**/*.ts',
+        'packages/app/src/**/*.ts',
+      ],
       exclude:
         process.platform === 'win32'
-          ? ['packages/cli/src/index.ts', ...POSIX_ONLY_SOURCE]
-          : ['packages/cli/src/index.ts', ...WINDOWS_ONLY_SOURCE],
+          ? [
+              'packages/cli/src/index.ts',
+              ...APP_ELECTRON_SOURCE,
+              ...APP_NODE_PTY_ADAPTER_SOURCE,
+              ...POSIX_ONLY_SOURCE,
+            ]
+          : [
+              'packages/cli/src/index.ts',
+              ...APP_ELECTRON_SOURCE,
+              ...APP_NODE_PTY_ADAPTER_SOURCE,
+              ...WINDOWS_ONLY_SOURCE,
+            ],
       thresholds: PRODUCTION_DIRECTORY_THRESHOLDS,
     },
     projects: [

@@ -6,6 +6,10 @@
   "files": [],
   "references": [
     { "path": "packages/engine/tsconfig.build.json" },
-    { "path": "packages/cli/tsconfig.build.json" }
+    { "path": "packages/cli/tsconfig.build.json" },
+    // V2-T2: @seeya-ai/app declares its build config as packages/app/tsconfig.json, not
+    // tsconfig.build.json (see that file's own comment for why) — this reference still points
+    // `tsc -b` at it the same way, tsc -b doesn't care about the filename.
+    { "path": "packages/app/tsconfig.json" }
   ]
 }

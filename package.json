@@ -1,7 +1,7 @@
 {
   "name": "seeya",
   "private": true,
-  "description": "Monorepo root for seeya (D-043): @seeya-ai/engine (core/application/adapters/scheduler), @seeya-ai/cli (the seeya binary). @seeya-ai/app is reserved, not created yet.",
+  "description": "Monorepo root for seeya (D-043): @seeya-ai/engine (core/application/adapters/scheduler), @seeya-ai/cli (the seeya binary), @seeya-ai/app (the desktop interface, D-042).",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -11,13 +11,14 @@
   ],
   "scripts": {
     "build": "node scripts/clean-dist.mjs && tsc -b tsconfig.build.json",
+    "app": "npm run build && npm run dev --workspace=@seeya-ai/app",
     "test": "vitest run --project unit --project integration --project integration-process --project guards",
     "pretest:e2e": "npm run build",
     "test:e2e": "vitest run --project e2e",
     "test:contrato": "vitest run --project contract",
     "cobertura": "vitest run --project unit --project integration --project integration-process --project guards --coverage",
     "lint": "eslint .",
-    "dependencias": "depcruise packages/engine/src packages/cli/src --config .dependency-cruiser.cjs",
+    "dependencias": "depcruise packages/engine/src packages/cli/src packages/app/src --config .dependency-cruiser.cjs",
     "audit-report": "node scripts/audit-report.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

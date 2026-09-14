@@ -16,5 +16,5 @@
     "resolveJsonModule": true,
     "noEmit": true
   },
-  "include": ["packages/engine/src", "packages/cli/src"]
+  "include": ["packages/engine/src", "packages/cli/src", "packages/app/src"]
 }

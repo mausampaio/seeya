@@ -20,6 +20,15 @@
  * this rule doesn't touch — that's the whole distinction, and it's why `npm run verificar`
  * builds before running `dependencias` (package.json).
  *
+ * V2-T2 (D-042/D-043): `packages/app/src` is the SECOND composition root — a sibling of `cli/`,
+ * not a sixth layer of the matrix above (the matrix stays about the engine's 5 internal layers
+ * plus `cli/`'s relationship to them, unchanged). `app/` gets its own four rules, the same shape
+ * as `cli/`'s own boundary: it can only reach `@seeya-ai/engine` through the package export map
+ * (`app-only-imports-engine-public-subpaths`, identical technique to `cli`'s own rule), the
+ * engine never imports it back (`engine-does-not-import-app`), and `app/`/`cli/` never import
+ * each other (`app-does-not-import-cli`/`cli-does-not-import-app`) — two independent composition
+ * roots over the same engine, per D-043's "duas raízes de composição".
+ *
  * `from`/`to` paths are anchored per segment (`($|/)` after the layer name): without this,
  * `^packages/engine/src/application` would also match a future `.../application-legacy/`, which
  * isn't the `application/` layer from the matrix. See
@@ -107,6 +116,44 @@ module.exports = {
         'composition root, but it still may not reach past the engine package boundary).',
       from: { path: '^packages/cli/src($|/)' },
       to: { path: '^packages/engine/src($|/)' },
+    },
+    {
+      name: 'app-only-imports-engine-public-subpaths',
+      severity: 'error',
+      comment:
+        "packages/app/src (V2-T2, D-043's second composition root) can only reach " +
+        '@seeya-ai/engine through its package export map (@seeya-ai/engine/<layer>/... subpath ' +
+        'imports, same rule cli-only-imports-engine-public-subpaths already enforces for ' +
+        'packages/cli/src), never a raw relative path into packages/engine/src.',
+      from: { path: '^packages/app/src($|/)' },
+      to: { path: '^packages/engine/src($|/)' },
+    },
+    {
+      name: 'engine-does-not-import-app',
+      severity: 'error',
+      comment:
+        '@seeya-ai/engine is consumed by both composition roots (cli/, app/, D-043) and knows ' +
+        'about neither: it cannot import packages/app/src. If application/ or scheduler/ needs ' +
+        "something app-specific, that's app/ injecting a port implementation, never the reverse.",
+      from: { path: '^packages/engine/src($|/)' },
+      to: { path: '^packages/app/src($|/)' },
+    },
+    {
+      name: 'app-does-not-import-cli',
+      severity: 'error',
+      comment:
+        'app/ and cli/ are two independent composition roots over the same engine (D-043) — ' +
+        'neither depends on the other. A behavior both want to reuse belongs in ' +
+        '@seeya-ai/engine (application/ or core/), not in a direct import between the two.',
+      from: { path: '^packages/app/src($|/)' },
+      to: { path: '^packages/cli/src($|/)' },
+    },
+    {
+      name: 'cli-does-not-import-app',
+      severity: 'error',
+      comment: 'The mirror image of app-does-not-import-cli, same reasoning.',
+      from: { path: '^packages/cli/src($|/)' },
+      to: { path: '^packages/app/src($|/)' },
     },
     {
       name: 'no-circular-dependency',

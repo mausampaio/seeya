@@ -40,10 +40,20 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const packagePathsToClean = ['packages/engine', 'packages/cli'].flatMap((pkg) => [
-  path.join(repoRoot, pkg, 'dist'),
-  path.join(repoRoot, pkg, 'tsconfig.build.tsbuildinfo'),
-]);
+const packagePathsToClean = [
+  ...['packages/engine', 'packages/cli'].flatMap((pkg) => [
+    path.join(repoRoot, pkg, 'dist'),
+    path.join(repoRoot, pkg, 'tsconfig.build.tsbuildinfo'),
+  ]),
+  // V2-T2: packages/app has no "dist"/tsconfig.build.json of its own (see
+  // packages/app/tsconfig.json's own comment) — its tsc output is "dist-tsc" (never run, only
+  // type-checked as part of `npm run build`) and its buildinfo file is named after its own
+  // tsconfig.json, not tsconfig.build.json. The esbuild bundle scripts/build.mjs writes for real
+  // ("dist") is NOT cleaned here: it isn't part of `npm run build`'s tsc graph, and `npm run app`
+  // (packages/app's own "dev" script) rebuilds it fresh on every invocation anyway.
+  path.join(repoRoot, 'packages/app', 'dist-tsc'),
+  path.join(repoRoot, 'packages/app', 'tsconfig.tsbuildinfo'),
+];
 
 for (const target of packagePathsToClean) {
   rmSync(target, { recursive: true, force: true });

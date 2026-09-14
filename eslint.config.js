@@ -22,6 +22,23 @@ const SPAWN_MESSAGE =
   'adapters/resumption/spawn-interactive.ts — each with its own comment explaining why). Import ' +
   'spawnHidden from adapters/process/spawn.ts instead, so the process stays invisible by default.';
 
+// V2-T2: the same inversion-of-onus technique as SPAWN_MESSAGE above, for the app package's two
+// framework boundaries (docs/PLANO-DE-ENTREGA.md V2-T2, item 5). Both exist so that "logic lives
+// outside electron/, electron/ only wires IPC to it" (D-041: a pure tab model, session↔pid
+// matching, state assembly) is enforced by a guard, not by discipline someone has to remember —
+// same lesson D-038 already drew from four `spawn` call sites that forgot `windowsHide` on their
+// own.
+const ELECTRON_MESSAGE =
+  "electron can only be imported in packages/app/src/electron/** — that's the one directory " +
+  'whose wiring cannot run headless (no display), which is also why it is excluded from ' +
+  "packages/app/src's coverage floor (vitest.config.ts). Every other module keeps its logic " +
+  'testable in plain Node; electron/ only wires IPC to it.';
+const NODE_PTY_MESSAGE =
+  'node-pty can only be imported in packages/app/src/pty/** — a tab is a process the seeya app ' +
+  'launches (D-038: invisible by default, which ConPTY already gives for free, spike M item 4), ' +
+  'and this guard is what makes sure nothing spawns one any other way. Import the PtySpawner ' +
+  'port from pty/ instead of node-pty directly elsewhere in packages/app/src.';
+
 export default tseslint.config(
   {
     // .dependency-cruiser.cjs is CommonJS on purpose (see the file itself) and isn't part of
@@ -36,10 +53,19 @@ export default tseslint.config(
     // directory of them.
     ignores: [
       '**/dist/**',
+      // V2-T2: packages/app's own tsc output (packages/app/tsconfig.json's own comment explains
+      // why it isn't named "dist" like packages/engine's and packages/cli's) — never run, only a
+      // type-checking side effect of `npm run build`.
+      '**/dist-tsc/**',
       '**/coverage/**',
       'node_modules/**',
       '.dependency-cruiser.cjs',
       'tests/fixtures/**/*.mjs',
+      // V2-T2: packages/app/scripts/build.mjs — same "plain Node script, never imported/compiled,
+      // not part of the TS program" reasoning as tests/fixtures/**/*.mjs above. Its nearest
+      // tsconfig.json (packages/app/tsconfig.json) only includes "src", so without this it fails
+      // typed-lint project resolution instead of just not being type-aware.
+      'packages/*/scripts/**/*.mjs',
       // `.claude/worktrees/**`: agents run in git worktrees created INSIDE the repo, so
       // `eslint .` from the root would lint every sibling agent's checkout as if it were ours.
       // Measured while three agents ran in parallel: 1077 .ts files under worktrees against 38
@@ -142,6 +168,67 @@ export default tseslint.config(
               importNames: ['spawn'],
               message: SPAWN_MESSAGE,
             },
+          ],
+        },
+      ],
+    },
+  },
+  // V2-T2: three MUTUALLY EXCLUSIVE blocks (by files/ignores), not two overlapping ones — flat
+  // config merges `no-restricted-imports` per matched file by LAST BLOCK WINS, never by union
+  // (the core-exclusion comment above already measured this the hard way for the spawn rule). Two
+  // blocks both matching, say, packages/app/src/tabs/*.ts and each setting `no-restricted-imports`
+  // would make the second silently erase the first's restriction instead of adding to it — so
+  // each of the three blocks below is self-contained: it lists every restriction that applies to
+  // ITS files, including the D-038 spawn ban the block above already set for `packages/*/src/**`
+  // (packages/app/src is inside that glob too, so the same "last wins" hazard applies to it and
+  // the spawn ban has to be repeated here, not assumed inherited).
+  {
+    // packages/app/src/electron/**: electron IS allowed here (it's the one place D-042's own
+    // wiring lives) — node-pty and a raw node:child_process spawn are not.
+    files: ['packages/app/src/electron/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            { name: 'node-pty', message: NODE_PTY_MESSAGE },
+            { name: 'node:child_process', importNames: ['spawn'], message: SPAWN_MESSAGE },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // packages/app/src/pty/**: node-pty IS allowed here (the PtySpawner adapter) — electron and a
+    // raw node:child_process spawn are not (node-pty's own `spawn`/`fork` is the process launcher
+    // here, not child_process's).
+    files: ['packages/app/src/pty/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            { name: 'electron', message: ELECTRON_MESSAGE },
+            { name: 'node:child_process', importNames: ['spawn'], message: SPAWN_MESSAGE },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // Every other packages/app/src file (composition/, tabs/, sidebar/, state/, ipc/, text/):
+    // neither electron nor node-pty nor a raw spawn — this is the pure, testable logic D-041's
+    // "tudo que tiver lógica fica fora de electron/" describes.
+    files: ['packages/app/src/**/*.ts'],
+    ignores: ['packages/app/src/electron/**/*.ts', 'packages/app/src/pty/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            { name: 'electron', message: ELECTRON_MESSAGE },
+            { name: 'node-pty', message: NODE_PTY_MESSAGE },
+            { name: 'node:child_process', importNames: ['spawn'], message: SPAWN_MESSAGE },
           ],
         },
       ],

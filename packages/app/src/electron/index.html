@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>seeya</title>
+    <link rel="stylesheet" href="xterm.css" />
+    <link rel="stylesheet" href="index.css" />
+  </head>
+  <body>
+    <div id="app">
+      <aside id="sidebar">
+        <h2>Sessions</h2>
+        <ul id="session-list"></ul>
+        <h2>Status</h2>
+        <pre id="status-panel"></pre>
+      </aside>
+      <main id="main">
+        <div id="toolbar">
+          <button id="new-tab-button" type="button">+</button>
+          <div id="tab-strip"></div>
+        </div>
+        <div id="terminal-host"></div>
+      </main>
+    </div>
+    <script type="module" src="renderer.js"></script>
+  </body>
+</html>

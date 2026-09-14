@@ -24,18 +24,26 @@ export const PROJECT_ROOT = path.resolve(HERE, '..', '..', '..');
  */
 export const ENGINE_SRC_ROOT = path.join('packages', 'engine', 'src');
 export const CLI_SRC_ROOT = path.join('packages', 'cli', 'src');
+/** V2-T2 (D-042/D-043): the second composition root's package src root — flat, same shape as
+ * `CLI_SRC_ROOT`, no internal layer subdirectory of its own either. */
+export const APP_SRC_ROOT = path.join('packages', 'app', 'src');
 
-/** The layer name that routes to `CLI_SRC_ROOT` instead of `ENGINE_SRC_ROOT` — see `guardFixturePath`
- * and `srcRootForLayer` below. */
-const CLI_LAYER_NAME = 'cli';
+/** Layer names that route to their OWN flat package root instead of `ENGINE_SRC_ROOT` — see
+ * `guardFixturePath` and `srcRootForLayer` below. Both `cli` and `app` (V2-T2) are composition
+ * roots with no internal layer subdirectory of their own, unlike the four engine layers. */
+const FLAT_PACKAGE_ROOTS: Readonly<Record<string, string>> = {
+  cli: CLI_SRC_ROOT,
+  app: APP_SRC_ROOT,
+};
 
 /**
- * Which package root a fixture/import for `layerDir` belongs to (V2-T1). `layerDir` is always
- * either `'cli'` itself or a core/application/adapters/scheduler (sub)directory — never a nested
- * `'cli/...'`, since cli's package has no internal layer subdirectories of its own.
+ * Which package root a fixture/import for `layerDir` belongs to (V2-T1, extended V2-T2).
+ * `layerDir` is always either `'cli'`/`'app'` themselves or a core/application/adapters/scheduler
+ * (sub)directory — never a nested `'cli/...'`/`'app/...'`, since neither package has internal
+ * layer subdirectories of its own.
  */
 export function srcRootForLayer(layerDir: string): string {
-  return layerDir === CLI_LAYER_NAME ? CLI_SRC_ROOT : ENGINE_SRC_ROOT;
+  return FLAT_PACKAGE_ROOTS[layerDir] ?? ENGINE_SRC_ROOT;
 }
 
 /**
@@ -337,6 +345,7 @@ export function runDependencyCruiserOnFullTree(): DependencyCruiserResult {
   const entries = [
     ...listProductionTsFiles(path.join(PROJECT_ROOT, ENGINE_SRC_ROOT)),
     ...listProductionTsFiles(path.join(PROJECT_ROOT, CLI_SRC_ROOT)),
+    ...listProductionTsFiles(path.join(PROJECT_ROOT, APP_SRC_ROOT)),
   ];
   return runDependencyCruiser(entries);
 }
@@ -489,11 +498,12 @@ export function guardSubdirectory(guardName: string): string {
  */
 export function guardFixturePath(guardName: string, layerDir: string, fileName: string): string {
   const root = srcRootForLayer(layerDir);
-  // cli's package root has no internal layer subdirectory of its own (V2-T1): its production
-  // files sit directly in `packages/cli/src`, unlike the other four layers, each a subdirectory
-  // of the shared `packages/engine/src`. Joining `''` as a path segment is harmless (path.join
-  // drops empty segments), but writing it out explicitly here says why 'cli' doesn't get one.
-  const layerSegment = layerDir === 'cli' ? '' : layerDir;
+  // cli's and app's package roots have no internal layer subdirectory of their own (V2-T1, V2-T2):
+  // their production files sit directly in `packages/cli/src`/`packages/app/src`, unlike the four
+  // engine layers, each a subdirectory of the shared `packages/engine/src`. Joining `''` as a path
+  // segment is harmless (path.join drops empty segments), but writing it out explicitly here says
+  // why 'cli'/'app' don't get one.
+  const layerSegment = layerDir === 'cli' || layerDir === 'app' ? '' : layerDir;
   return path.join(root, layerSegment, guardSubdirectory(guardName), fileName);
 }
 
@@ -508,6 +518,7 @@ export function guardFixturePath(guardName: string, layerDir: string, fileName: 
 export function cleanUpGuardResidue(guardName: string): void {
   deleteSubdirectoriesNamed(path.join(PROJECT_ROOT, ENGINE_SRC_ROOT), guardSubdirectory(guardName));
   deleteSubdirectoriesNamed(path.join(PROJECT_ROOT, CLI_SRC_ROOT), guardSubdirectory(guardName));
+  deleteSubdirectoriesNamed(path.join(PROJECT_ROOT, APP_SRC_ROOT), guardSubdirectory(guardName));
 }
 
 /**

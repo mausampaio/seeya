@@ -1,0 +1,53 @@
+/**
+ * The preload script (`contextIsolation: true`, `sandbox: true` — `main.ts`'s own
+ * `BrowserWindow` options): the only bridge between the isolated renderer and the main process.
+ * Exposes exactly what the renderer needs (docs/PLANO-DE-ENTREGA.md V2-T2, item 1: "o preload
+ * expõe só o que o renderer precisa") — never `require`, never raw `ipcRenderer`, never
+ * `process` (spike M's own "Correção depois do spike": `process.platform` doesn't exist in the
+ * renderer with `contextIsolation` on — this is the fix, not a workaround inside the renderer).
+ */
+import { contextBridge, ipcRenderer } from 'electron';
+import { CHANNELS } from '../ipc/channels.js';
+import type {
+  CreateTabRequest,
+  CreateTabResponse,
+  ResizeTabRequest,
+  CloseTabRequest,
+  WriteTabRequest,
+  TabDataEvent,
+  TabExitEvent,
+} from '../ipc/channels.js';
+
+export interface SeeyaApi {
+  readonly platform: NodeJS.Platform;
+  createTab(request: CreateTabRequest): Promise<CreateTabResponse>;
+  writeTab(request: WriteTabRequest): void;
+  resizeTab(request: ResizeTabRequest): void;
+  closeTab(request: CloseTabRequest): void;
+  onTabData(listener: (event: TabDataEvent) => void): void;
+  onTabExit(listener: (event: TabExitEvent) => void): void;
+  listSessions(): Promise<string>;
+  readStatus(): Promise<string>;
+}
+
+const api: SeeyaApi = {
+  // spike M's "Correção depois do spike": process.platform doesn't exist in an isolated
+  // renderer. process.platform DOES exist here, in the preload's own (Node-enabled) context —
+  // reading it once and exposing the value is the fix, not `process.platform` used in the
+  // renderer directly.
+  platform: process.platform,
+  createTab: (request) => ipcRenderer.invoke(CHANNELS.createTab, request),
+  writeTab: (request) => ipcRenderer.send(CHANNELS.writeTab, request),
+  resizeTab: (request) => ipcRenderer.send(CHANNELS.resizeTab, request),
+  closeTab: (request) => ipcRenderer.send(CHANNELS.closeTab, request),
+  onTabData: (listener) => {
+    ipcRenderer.on(CHANNELS.tabData, (_event, data: TabDataEvent) => listener(data));
+  },
+  onTabExit: (listener) => {
+    ipcRenderer.on(CHANNELS.tabExit, (_event, data: TabExitEvent) => listener(data));
+  },
+  listSessions: () => ipcRenderer.invoke(CHANNELS.listSessions),
+  readStatus: () => ipcRenderer.invoke(CHANNELS.readStatus),
+};
+
+contextBridge.exposeInMainWorld('seeya', api);

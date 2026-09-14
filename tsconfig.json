@@ -21,8 +21,17 @@
   "include": [
     "packages/engine/src",
     "packages/cli/src",
+    "packages/app/src",
     "tests",
     "vitest.config.ts",
     "eslint.config.js"
-  ]
+  ],
+  // V2-T2: packages/app/src/electron/** (main-process wiring, preload, renderer bootstrap) uses
+  // real DOM globals this flat, ES2023-only program doesn't declare — packages/app/tsconfig.json
+  // (its own file, own comment) is the one program that type-checks it, via `npm run build`
+  // (tsc -b) and via ESLint's per-file nearest-tsconfig auto-discovery. Everything else under
+  // packages/app/src (composition/, tabs/, sidebar/, state/, pty/, ipc/, text/ — no DOM, no
+  // Electron-only globals) stays in THIS flat program like every other package's pure code, so
+  // `tsc -p tsconfig.json --noEmit` still catches a type error in it without needing a build first.
+  "exclude": ["packages/app/src/electron"]
 }
