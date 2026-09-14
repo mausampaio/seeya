@@ -1,6 +1,6 @@
 # Estado atual
 
-_Atualizado em 2026-09-14, depois da V2-T2 (numa worktree isolada, nada mesclado ainda). Se o
+_Atualizado em 2026-09-14, depois da mesclagem da V2-T2 na `main`. Se o
 `git log`, a CI ou o `~/.seeya` contarem algo diferente do que está aqui, **este arquivo está
 atrasado**: confie na evidência e atualize o arquivo. Isso já aconteceu: a primeira versão dele,
 escrita à mão no mesmo dia, tinha quatro afirmações falsas, e quem achou foi uma sessão limpa
@@ -8,10 +8,9 @@ escrita à mão no mesmo dia, tinha quatro afirmações falsas, e quem achou foi
 
 ## Em uma frase
 
-O Sprint 5 mínimo está aceito e o monorepo (V2-T1) está mesclado. A **V2-T2 — o esqueleto da
-interface (`@seeya-ai/app`) — foi entregue numa worktree isolada**, com o portão completo verde
-(Windows e o contêiner Linux); falta a revisão do PO, a mesclagem e o aceite manual do mantenedor
-no Linux dele.
+O Sprint 5 mínimo está aceito, o monorepo (V2-T1) e o **esqueleto da interface (V2-T2,
+`@seeya-ai/app`) estão mesclados na `main`** com o portão completo verde (Windows e o contêiner
+Linux); falta o aceite manual do mantenedor: `npm run app` no Windows e, sobretudo, no Linux dele.
 
 ## Onde o código está
 
@@ -89,7 +88,8 @@ medição que fica para o mantenedor, na máquina dele, com o protótipo de `C:\
 
 ## A interface, esqueleto (V2-T2, 14/09)
 
-**Numa worktree isolada, nada mesclado.** `@seeya-ai/app` existe: janela Electron
+**Mesclado na `main` em 14/09** (worktree isolada, duas rodadas de revisão do PO, fast-forward de
+sete commits). `@seeya-ai/app` existe: janela Electron
 (`contextIsolation`/`sandbox` ligados, sem `nodeIntegration`), lateral com a lista real de sessões
 descobertas (mesma linha de `seeya sessions`), painel de estado com o texto literal de `seeya
 status`, "+" abrindo uma barra de comando (comando + diretório — nunca `window.prompt`) que lança

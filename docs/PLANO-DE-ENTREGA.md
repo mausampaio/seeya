@@ -4131,7 +4131,8 @@ texto, mas não são a fila.
 
 - [~] **V2-T2 — A interface, esqueleto: `@seeya-ai/app` com abas de terminal e a lista de sessões
       (D-042, D-043).** Especificada pelo PO em 2026-09-14; **aprovada pelo mantenedor no mesmo
-      dia, com as sessões descobertas na lateral** (projetos depois). Primeira tarefa de código da
+      dia, com as sessões descobertas na lateral** (projetos depois); **mesclada na `main` em
+      2026-09-14** depois de duas rodadas de revisão do PO. Primeira tarefa de código da
       interface. Ela é deliberadamente
       um esqueleto: prova a pilha (Electron + `xterm.js` + `node-pty`) como código de produto,
       dentro do monorepo e dos guards, e entrega a primeira utilidade real — abrir o harness numa
