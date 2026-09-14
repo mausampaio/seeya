@@ -4473,11 +4473,12 @@ texto, mas não são a fila.
       três sistemas. **Aceite manual do mantenedor:** o prompt com `oh-my-posh` legível na
       segunda máquina; e no Mac, o diagnóstico do helper e uma aba de shell abrindo.
 
-      **Entregue pelo agente em 2026-09-14, três commits, um por item, worktree isolada.** Portão
-      local completo verde a cada commit (`npm run verificar`, rodado em pedaços, código de saída
-      lido em cada um) e `npm run verificar:linux` verde no estado final dos três commits juntos —
-      161 arquivos de teste, 1.654 testes passando, 5 pulados, dentro do contêiner
-      `node:22-bookworm` (Docker respondeu em segundos, bem dentro da janela de cinco minutos).
+      **Entregue pelo agente em 2026-09-14, três commits (um por item) mais dois commits de
+      revisão do PO, worktree isolada.** Portão local completo verde a cada um dos cinco commits
+      (`npm run verificar`, rodado em pedaços, código de saída lido em cada um) e `npm run
+      verificar:linux` verde no estado final — 162 arquivos de teste, 1.658 testes passando, 4
+      pulados, dentro do contêiner `node:22-bookworm` (Docker respondeu em segundos, bem dentro
+      da janela de cinco minutos).
 
       1. **Fonte.** FiraCode Nerd Font Mono, peso Regular, baixada do release oficial
          `ryanoasis/nerd-fonts` **v3.5.1** (`FiraCode.zip`), licença SIL OFL 1.1 conferida antes de
@@ -4495,13 +4496,17 @@ texto, mas não são a fila.
       2. **Aba encerrada removível.** `tabs/tab-model.ts#removeTab` (puro, testado); o × só remove
          quando `isRunning(tab)` é falso, senão continua só encerrando o processo como antes. O
          renderer precisou passar a espelhar `markExited` na sua própria cópia da aba (antes só
-         `main.ts` fazia isso) para o botão saber qual dos dois casos aplicar. Verificação própria
-         do agente (fora da prova formalmente pedida, que citava só o item 1): captura antes/
-         depois com um `exit\r` real escrito no pty confirmou a remoção completa (botão e painel).
-         **Lacuna registrada, não corrigida:** a `TabCollection` que `main.ts` mantém no processo
-         principal não é notificada da remoção — segue guardando a entrada, como já fazia desde a
-         V2-T2. Sem efeito prático conhecido (a correspondência aba↔sessão já depende só de PID
-         vivo), mas registrado em vez de ampliar sozinho o escopo (Q-072).
+         `main.ts` fazia isso) para o botão saber qual dos dois casos aplicar. **Revisão do PO:**
+         a primeira versão deixava a `TabCollection` do processo principal sem saber da remoção
+         (registrado como lacuna); corrigido com um canal IPC novo (`CHANNELS.removeTab`) que o
+         renderer chama depois da própria limpeza, e que `main.ts` usa para aplicar `removeTab` na
+         própria `TabCollection` — sem isso, um PID reaproveitado pelo SO para uma aba nova podia
+         casar com uma entrada morta na correspondência aba↔sessão (D-025).
+         `tests/integration/app/tab-lifecycle.test.ts` prova a sequência
+         criar→sair→remover contra o modelo puro (o `main.ts` em si não dá para testar fora de um
+         Electron real — `require('electron')` sob Node puro resolve para uma string, não para a
+         API) e o cenário concreto de PID reaproveitado. Captura antes/depois (própria, fora da
+         prova formalmente pedida) confirmou a remoção completa (botão e painel) nas duas versões.
 
       3. **`spawn-helper`.** `adapters/process/resolve-command.ts`:
          `CommandResolutionFs.fileExists` virou `isExecutable`, com `access(path, X_OK)` —
@@ -4516,6 +4521,14 @@ texto, mas não são a fila.
          (mesmo sem usá-los) saíram com modo `644`, sem bit de execução, o que torna a hipótese do
          mantenedor mais plausível **sem confirmá-la** — só o `ls -l` dele no Mac de verdade
          confirma.
+
+      **Revisão do PO — item extra, achado incidental da V2-T2, corrigido junto com o item 2:** a
+      barra de comando (`#command-bar`) não sumia ao Cancelar/submeter — `index.css` tinha uma
+      regra de ID (`display: flex`) mais específica que a regra padrão do navegador para
+      `[hidden]`, então o atributo `hidden` que `renderer.ts` já setava certo nunca tinha efeito
+      visual. O mantenedor viu isso no macOS. Corrigido com `#command-bar[hidden] { display:
+      none; }` (ID + atributo, mais específico). Prova por captura de tela antes/depois de
+      Cancelar de verdade (instrumentação temporária, revertida antes do commit).
 
       Detalhes, decisões de ferramental e o que ficou inferido (não medido) em
       `docs/QUESTOES.md` Q-072.

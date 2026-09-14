@@ -6958,8 +6958,10 @@ para a descoberta.
 
 **Tarefa:** V2-T3
 **Bloqueia:** não — os três itens foram entregues com um commit cada, portão local completo verde
-(`npm run verificar`) e `npm run verificar:linux` verde no mesmo estado final. Registro no mesmo
-padrão de Q-070/Q-071.
+(`npm run verificar`) e `npm run verificar:linux` verde no mesmo estado final. **Na revisão, o PO
+pediu dois ajustes** (a barra de comando não sumia por especificidade de CSS; o processo principal
+não era avisado de uma aba removida) — corrigidos em dois commits adicionais, cada um com portão
+verde, detalhados no item 2 abaixo. Registro no mesmo padrão de Q-070/Q-071.
 
 ### 1) Item 1 — a fonte: versão exata, licença, e por que a pilha padrão funciona mesmo sem
 ### depender do que já está instalado
@@ -6998,7 +7000,7 @@ captura mostrou os três glifos renderizados como ícones de verdade (um triâng
 ícone de pasta, um ícone de branch) — não como caixas. Não afirmo nada sobre a fonte no Linux real
 do mantenedor além do que a Q-071 já tinha registrado (o achado de uso que originou esta tarefa).
 
-### 2) Item 2 — aba encerrada removível: o que `removeTab` cobre, e uma lacuna deixada de propósito
+### 2) Item 2 — aba encerrada removível: o que `removeTab` cobre, e o que a revisão do PO corrigiu
 
 `tabs/tab-model.ts#removeTab` é puro — remove uma entrada de `TabCollection`, no-op silencioso
 para um id inexistente (mesmo espírito de `updateTab`), com teste. **Quem decide QUANDO chamar** é
@@ -7009,35 +7011,40 @@ continua só pedindo o fim do processo, como já era. Isso exigiu manter o `tab.
 `markExited` na cópia local também, espelhando o que `main.ts` já fazia na própria
 `TabCollection`) — sem isso, o botão nunca saberia que a aba já tinha saído.
 
-**Deliberadamente não tocado:** a `TabCollection` que `main.ts` mantém no processo principal
-**não** é notificada quando o renderer remove uma aba — ela segue guardando a entrada (como já
-fazia desde a V2-T2, que nunca removia nada). Isso é uma lacuna conhecida, não um bug desta
-tarefa: o despacho listava só `tabs/tab-model.ts#removeTab` e "o renderer remove botão e painel",
-sem pedir um canal IPC novo de remoção, e nenhum novo `spawn` some — `findTabByPid` só é usado
-para casar aba↔sessão descoberta (D-025), e uma sessão cujo processo já morreu não aparece mais na
-descoberta de qualquer forma, então o pior caso é uma entrada morta acumulando na memória do
-processo principal ao longo de uma sessão longa de uso, não uma correspondência errada. Registro
-aqui em vez de decidir sozinho ampliar o escopo (AGENTS.md: "se a solução tiver efeito além da sua
-tarefa, abra a questão e siga com a solução mínima").
+**Corrigido na revisão do PO (commit separado):** a primeira versão desta tarefa deixava a
+`TabCollection` do processo principal sem saber da remoção — registrado aqui como "lacuna
+deixada de propósito", já que o despacho original não pedia canal IPC novo. O PO pediu a correção
+porque o risco é real, não só falta de limpeza de memória: `findTabByPid` casa aba↔sessão só por
+PID (D-025), e o sistema operacional reaproveita PIDs — uma aba nova, com um PID que por acaso
+bate com o de uma aba antiga (já removida da tela, mas ainda na `TabCollection` do `main.ts`),
+casaria incorretamente com a entrada morta. Corrigido com um canal IPC novo,
+`CHANNELS.removeTab` (`ipc/channels.ts`, exposto no preload): `renderer.ts#removeTabUi` agora
+chama `window.seeya.removeTab({ id })` depois da própria limpeza de DOM; `main.ts` aplica
+`removeTab` (o mesmo já testado) na sua `TabCollection`. `PtyManager` não precisou de chamada
+correspondente — ele já apaga a própria entrada assim que o `onExit` real dispara, antes de a
+pessoa sequer poder clicar × pela segunda vez.
 
-**Achado incidental, não corrigido (fora de escopo desta tarefa):** durante a verificação visual
-deste item, a barra de comando (`#command-bar`) apareceu sempre visível nas capturas de tela,
-mesmo depois de submetida — `index.css` declara `#command-bar { display: flex; ... }`, uma regra
-de ID mais específica que a folha de estilo padrão do navegador para `[hidden] { display: none }`,
-então o atributo `hidden` que `renderer.ts` já seta corretamente nunca ganha efeito visual. Isso é
-da V2-T2, não desta tarefa, e não afeta nenhuma prova pedida aqui (a barra continua funcionalmente
-escondida do ponto de vista de foco/submissão, só visualmente não some) — registrado para quando
-alguém for mexer em `index.css` de novo.
+**Teste de integração:** `tests/integration/app/tab-lifecycle.test.ts` replica a receita exata
+que `main.ts#wireIpc` aplica (criar → sair → remover) contra as funções puras reais de
+`tabs/tab-model.ts`, sem precisar do Electron — `main.ts` em si não dá para importar fora de um
+processo Electron real: `require('electron')`/`import('electron')` sob Node puro (o que o
+`vitest` roda) resolve para a STRING do caminho do binário (o mesmo mecanismo que
+`scripts/build.mjs#launchElectron` usa para lançá-lo), não para os objetos `ipcMain`/
+`BrowserWindow` de verdade — esses só existem dentro de um processo Electron rodando. O segundo
+teste do arquivo é o cenário concreto de regressão: um PID reaproveitado pelo SO para uma aba
+NOVA nunca mais casa com uma entrada antiga já removida.
 
-**Verificado (não é a prova pedida pelo despacho, que só citava item 1 explicitamente — feito por
-cautela própria, revertido antes do commit):** rodei a interface real duas vezes contra um
-`SEEYA_APP_HOME_OVERRIDE` descartável, escrevendo `exit\r` de verdade no pty de uma aba de shell
-(via `window.seeya.writeTab`, a mesma API de produção) para fazer o processo sair de verdade, e
-comparei a captura antes/depois de clicar × de novo: antes, a aba mostrava "shell exited (code 0)"
-com × ainda visível; depois do clique, a faixa de abas e o painel do terminal ficaram vazios. O
-código que orquestrava esse teste (mais delay/clique via `executeJavaScript`) nunca foi commitado
-— era só instrumentação temporária deste agente, e o `main.ts` commitado é idêntico ao do commit
-do item 1 mais só o handler do IPC de fonte (item 1) — `git diff` entre os dois commits confirma.
+**Achado incidental da V2-T2, também corrigido na revisão (commit separado):** a barra de comando
+(`#command-bar`) aparecia sempre visível nas capturas de tela, mesmo depois de Cancelar ou
+submeter — `index.css` declarava `#command-bar { display: flex; ... }`, uma regra de ID mais
+específica que a folha de estilo padrão do navegador para `[hidden] { display: none }`, então o
+atributo `hidden` que `renderer.ts` já setava corretamente nunca ganhava efeito visual. O
+mantenedor viu isso no macOS. Corrigido com `#command-bar[hidden] { display: none; }` — ID +
+atributo é mais específico que só ID, então vence independente da ordem no arquivo. **Prova por
+captura de tela antes/depois do Cancel** (instrumentação temporária, revertida antes do commit,
+mesmo padrão dos outros itens): antes, a barra aparece com os campos Command/Directory e os
+botões Open/Cancel; depois de clicar no Cancel de verdade, a barra desaparece por completo da
+captura.
 
 ### 3) Item 3 — `spawn-helper`: por que ele não existe no Linux, a medição real no contêiner, e o
 ### que isso diz (e não diz) sobre o macOS
@@ -7085,15 +7092,18 @@ sem efeito quando já está certo, e sem erro quando não encontra nada (o caso 
 **Medido por este agente:**
 - Fonte: versão v3.5.1, licença OFL 1.1 conferida, peso Regular, 2,76 MB.
 - Renderização dos glifos Nerd numa aba real (captura de tela, offscreen, Windows).
-- Remoção de aba encerrada funcionando (captura antes/depois, verificação própria fora do commit).
+- Remoção de aba encerrada funcionando, incluindo a notificação ao processo principal (captura
+  antes/depois; teste de integração cobrindo a sequência criar→sair→remover e o cenário de PID
+  reaproveitado).
+- A barra de comando some de verdade ao Cancelar/submeter, depois do `#command-bar[hidden]`
+  (captura antes/depois do Cancel).
 - `spawn-helper` é exclusivo de macOS no código-fonte do node-pty (`binding.gyp`); Linux não o
   compila nem precisa dele.
 - Modo `644` dos prebuilds darwin extraídos por `npm ci` dentro do contêiner Linux.
 - A lógica de localizar+corrigir funciona contra um arquivo real não-executável (mesmo contêiner).
 - `X_OK` distingue corretamente em POSIX; no Windows o comportamento não muda (teste dedicado).
-- Portão local completo verde (`npm run verificar`) e `npm run verificar:linux` verde, no estado
-  final dos três commits — 161 arquivos de teste, 1654 testes passando, 5 pulados, dentro do
-  contêiner.
+- Portão local completo verde (`npm run verificar`) a cada um dos cinco commits, e `npm run
+  verificar:linux` verde no estado final.
 
 **Inferido, não medido por este agente:**
 - Que o `chmod` do item 3 é de fato o que resolve o `posix_spawnp failed` no Mac do mantenedor —
@@ -7109,6 +7119,3 @@ sem efeito quando já está certo, e sem erro quando não encontra nada (o caso 
    aba de shell abre.
 2. Na máquina Linux do dia a dia: conferir se o prompt do `oh-my-posh` agora renderiza os glifos
    corretamente com a fonte embutida.
-3. O achado incidental do item 2 (`#command-bar` sempre visível por causa da especificidade de
-   CSS) — cosmético, não bloqueia nada desta tarefa, mas fica registrado para quando alguém tocar
-   `index.css` de novo.
