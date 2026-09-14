@@ -39,7 +39,7 @@ o repositório é um monorepo `npm workspaces` com dois pacotes, e as camadas se
 |---|---|---|
 | `@seeya-ai/engine` | `packages/engine/src/` | `core/`, `application/`, `adapters/`, `scheduler/` |
 | `@seeya-ai/cli` | `packages/cli/src/` | `cli/` (sem subpasta própria — os arquivos ficam direto na raiz do pacote) |
-| `@seeya-ai/app` | *(reservado, D-043; não criado)* | a interface (D-042), quando existir |
+| `@seeya-ai/app` | `packages/app/src/` | a interface (D-042, V2-T2) — sem subpasta própria de nível de camada, como `cli/`; ver "A segunda raiz de composição" abaixo |
 
 `@seeya-ai/engine` exporta cada camada por subcaminho (`@seeya-ai/engine/core/...`,
 `@seeya-ai/engine/adapters/...`, espelhando os diretórios) — é assim que `packages/cli/src`
@@ -82,6 +82,46 @@ manda em `application` e nunca o contrário.**
 Cada ✗ tem regra no `dependency-cruiser` **e** teste provando a reprovação. Cada ✓ tem teste
 provando que não é bloqueado por engano — sem isso, alguém aperta um regex e quebra a raiz de
 composição sem ninguém notar.
+
+## A segunda raiz de composição: `@seeya-ai/app` (D-042, D-043, V2-T2)
+
+`packages/app/src` (a interface) é a **segunda** raiz de composição, paralela a `cli/` — não uma
+sexta camada da matriz acima, que continua exaustiva só sobre as 5 camadas do motor + `cli`
+(`tests/integration/guards/_layer-matrix.ts`/`layer-matrix.test.ts`, inalterados por esta tarefa).
+`app/` compõe o motor **no mesmo processo** (o processo principal do Electron), nunca por
+subprocesso da CLI — é justamente por isso que existem duas raízes em vez de uma: `cli/` e `app/`
+nunca se importam.
+
+Quatro regras próprias no `.dependency-cruiser.cjs`, cada uma com teste dedicado em
+`tests/integration/guards/app-boundaries.test.ts` (mesmo "escreva a violação real, rode a
+ferramenta de verdade, apague depois" dos testes de `dependency-cruiser.test.ts`):
+
+| Regra | De → Para | Permitido? |
+|---|---|---|
+| `app-only-imports-engine-public-subpaths` | `packages/app/src` → caminho relativo cru em `packages/engine/src` | ✗ |
+| (controle, mesma técnica de `cli`) | `packages/app/src` → `@seeya-ai/engine/<camada>/...` (subcaminho público) | ✓ |
+| `engine-does-not-import-app` | `packages/engine/src` (qualquer camada) → `packages/app/src` | ✗ |
+| `app-does-not-import-cli` | `packages/app/src` → `packages/cli/src` | ✗ |
+| `cli-does-not-import-app` | `packages/cli/src` → `packages/app/src` | ✗ |
+
+**A única duplicação permitida entre as duas raízes é a fiação** — qual adapter concreto entra em
+qual porta (`packages/app/src/composition/index.ts`, o espelho de
+`packages/cli/src/composition.ts`). Qualquer lógica que as duas raízes queiram reaproveitar sai de
+`cli/` e entra no motor (`application/` ou `scheduler/`, pela matriz — nunca por conveniência); a
+V2-T2 moveu seis módulos por essa regra: `daemon-state.ts` (→ `scheduler/`, porque importa
+`buildDaemonUnhealthyNotice` de `scheduler/notices.ts`, e `application/` não pode importar
+`scheduler/`), `autostart-state.ts`, `session-view.ts`, `session-id-display.ts`,
+`eligibility-view.ts` e `format-status.ts` (→ `application/`, todos sem dependência de
+`scheduler/`). Ver `docs/QUESTOES.md` Q-071 item 5 para o raciocínio de cada um.
+
+**Dois guards de `eslint.config.js` fecham as duas dependências nativas da interface**, com a
+mesma técnica de inversão de ônus que já protege `spawn` (D-038) e o relógio (D-019): `electron`
+só é importável em `packages/app/src/electron/**` (a fiação que não roda sem tela — também o único
+trecho de `packages/app/src` fora do piso de cobertura de 80%, `vitest.config.ts`); `node-pty` só
+em `packages/app/src/pty/**`, atrás da porta `PtySpawner` (`pty/pty-port.ts`) que o resto do
+pacote depende — uma aba **é** um processo que o seeya lança, e a regra de "invisível por padrão"
+(D-038) vale para ela: o ConPTY não abre janela própria (medido no spike M), e a guarda garante que
+ninguém contorna o padrão.
 
 ## Portas (interfaces do núcleo)
 

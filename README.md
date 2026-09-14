@@ -132,6 +132,23 @@ respond and warns instead of failing with a cryptic error.
 Apple's license require Apple hardware. This command only covers CI's Linux job; CI on all 3 OSes
 and the manual S5-T4 pass remain mandatory.
 
+### The interface (`@seeya-ai/app`, early skeleton)
+
+```bash
+npm run app
+```
+
+Builds the engine, bundles the three Electron targets (`packages/app/scripts/build.mjs`, esbuild),
+and launches the real Electron binary. A window opens with the discovered-session list on the
+side, a status panel matching `seeya status`, and a "+" button that opens a command bar (command
+and working directory — never a native `prompt()`) for a tab backed by an embedded terminal
+(`@xterm/xterm` + `node-pty`). Distribution as an installer is future work (D-042); today this only
+runs from a checkout.
+
+**Not published, no framework in the renderer (D-041: minimum first).** See
+[`docs/ARQUITETURA.md`](docs/ARQUITETURA.md) § "A segunda raiz de composição" for how the
+interface composes `@seeya-ai/engine` in-process, independently from `@seeya-ai/cli`.
+
 ### Before writing code
 
 Read [`AGENTS.md`](AGENTS.md). It's the project's work contract: layer boundaries, code style,

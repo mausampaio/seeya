@@ -1,15 +1,17 @@
 # Estado atual
 
-_Atualizado em 2026-09-12, depois do spike L. Se o `git log`, a CI ou o `~/.seeya` contarem algo
-diferente do que está aqui, **este arquivo está atrasado**: confie na evidência e atualize o
-arquivo. Isso já aconteceu: a primeira versão dele, escrita à mão no mesmo dia, tinha quatro
-afirmações falsas, e quem achou foi uma sessão limpa (spike K)._
+_Atualizado em 2026-09-14, depois da V2-T2 (numa worktree isolada, nada mesclado ainda). Se o
+`git log`, a CI ou o `~/.seeya` contarem algo diferente do que está aqui, **este arquivo está
+atrasado**: confie na evidência e atualize o arquivo. Isso já aconteceu: a primeira versão dele,
+escrita à mão no mesmo dia, tinha quatro afirmações falsas, e quem achou foi uma sessão limpa
+(spike K)._
 
 ## Em uma frase
 
-O Sprint 4 foi **aceito pelo mantenedor em 2026-09-10**. O Sprint 5 (entregar)
-não começou. A v2 tem rumo registrado, e o **spike K passou**: uma sessão limpa retoma o trabalho a
-partir dos documentos.
+O Sprint 5 mínimo está aceito e o monorepo (V2-T1) está mesclado. A **V2-T2 — o esqueleto da
+interface (`@seeya-ai/app`) — foi entregue numa worktree isolada**, com o portão completo verde
+(Windows e o contêiner Linux); falta a revisão do PO, a mesclagem e o aceite manual do mantenedor
+no Linux dele.
 
 ## Onde o código está
 
@@ -84,6 +86,53 @@ primeira execução; no `codex`, o Enter precisa ser escrito separado do texto).
 o Linux:** o `node-pty` não traz prebuild para linux-x64/arm64, então lá vai compilar — é a
 medição que fica para o mantenedor, na máquina dele, com o protótipo de `C:\code\seeya-spike-M`
 (fora do repositório; copiar a pasta sem `node_modules`). Registro: `spikes/M-terminal-embutido.md`.
+
+## A interface, esqueleto (V2-T2, 14/09)
+
+**Numa worktree isolada, nada mesclado.** `@seeya-ai/app` existe: janela Electron
+(`contextIsolation`/`sandbox` ligados, sem `nodeIntegration`), lateral com a lista real de sessões
+descobertas (mesma linha de `seeya sessions`), painel de estado com o texto literal de `seeya
+status`, "+" abrindo uma barra de comando (comando + diretório — nunca `window.prompt`) que lança
+uma aba com `claude`/`codex`/o shell do sistema num terminal embutido (`@xterm/xterm` +
+`node-pty`). Fechar a aba encerra o processo; o `onExit` marca a aba como encerrada com o código,
+nunca a remove. Redimensionar a janela redimensiona todas as abas. Ambiente de cada aba limpo por
+`buildResumptionEnv` (D-017) antes do `spawn`.
+
+Seis commits, cada um com o portão relevante verde antes de commitar: (a) medição do Linux
+(registrada em `docs/QUESTOES.md` Q-071 — sem medição do Linux real do mantenedor, só do
+contêiner); (b) o pacote vazio (janela + "+" com shell, guards e cobertura já valendo); (c)
+`describeDaemonState`/`describeAutostartState`/`session-view.ts`/`session-id-display.ts`/
+`eligibility-view.ts`/`format-status.ts` movidos de `cli/` para o motor, mais
+`adapters/process/resolve-command.ts` novo (resolve o binário do harness por SO, com teste contra
+sistema de arquivos falso) — os 1.567 testes da base continuam passando; (d) lateral, abas com
+harness, painel de estado; (e) esta documentação.
+
+**Medido:** `npm run verificar` e `npm run verificar:linux` verdes (1.632/3 e 1.630/5
+respectivamente); os quatro guards novos de `app/` provados (cada um reprova o que deve, com
+controle do que deve aprovar); a janela abrindo de verdade nesta máquina via captura real de
+`webContents.capturePage()` — sidebar, painel de estado, barra de comando e uma aba com `cmd.exe`
+de verdade rodando dentro do terminal embutido, tudo visível na captura.
+
+**Achado de ambiente, não do produto (Q-071 item 8):** com o `daemon.lock` real do mantenedor
+presente em `~/.seeya/` (o daemon dele estava rodando durante a medição), a interface trava
+indefinidamente dentro desta sandbox de agente assim que o laço de atualização chama
+`ProcessControl.isAlive` (que lança `powershell.exe`) — reproduzido isolando a causa, não
+reproduzido com a mesma checagem pela CLI já compilada rodada fora do Electron, nem com a
+interface contra um `homeDir` descartável sem PID/lock reais para verificar. A lógica em si está
+provada por teste de unidade e integração; a prova ao vivo contra o `~/.claude`/`~/.seeya` reais
+do mantenedor fica para a aceitação manual dele, fora desta sandbox.
+
+**Não medido nesta tarefa:** memória com 1 e 3 abas na interface de produto (só a do protótipo do
+spike M, 342/394/604 MB, está registrada); contagem de janelas antes/depois por
+`EnumWindows`/`IsWindowVisible` (a janela desta medição rodou em modo *offscreen*, único jeito de
+`capturePage()` funcionar nesta sandbox sem área de trabalho interativa — um HWND visível pode não
+existir para contar). Ambas ficam para a aceitação manual do mantenedor, numa área de trabalho de
+verdade.
+
+**O que o mantenedor precisa fazer:** `npm ci` na `main` depois da mesclagem; abrir a interface
+(`npm run app`) no Linux dele — **essa é a medição que fecha a D-042 de verdade**, com uma aba de
+`claude` funcionando; comparar a lateral com `seeya sessions` e o painel de estado com `seeya
+status` ao vivo; medir memória com 1 e 3 abas.
 
 ## Próximo passo
 

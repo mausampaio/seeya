@@ -4129,7 +4129,7 @@ texto, mas não são a fila.
       Ver `docs/QUESTOES.md` Q-070 para as decisões de ferramental tomadas sem parar para
       perguntar (nenhuma altera comportamento, API entre camadas ou texto voltado à pessoa).
 
-- [ ] **V2-T2 — A interface, esqueleto: `@seeya-ai/app` com abas de terminal e a lista de sessões
+- [~] **V2-T2 — A interface, esqueleto: `@seeya-ai/app` com abas de terminal e a lista de sessões
       (D-042, D-043).** Especificada pelo PO em 2026-09-14; **aprovada pelo mantenedor no mesmo
       dia, com as sessões descobertas na lateral** (projetos depois). Primeira tarefa de código da
       interface. Ela é deliberadamente
@@ -4275,6 +4275,78 @@ texto, mas não são a fila.
       sistemas com o tempo antes/depois no relatório; medição do `node-pty` em Linux registrada
       na Q-071. **Aceite manual do mantenedor:** a mesma janela abrindo no Linux dele, com uma
       aba de `claude` funcionando (é a medição que fecha a D-042 de verdade).
+
+      **Relatório do agente (2026-09-14), numa worktree isolada, nada mesclado.** Seis commits,
+      cada um com o portão relevante verde antes de commitar:
+
+      1. Medição do Linux (Q-071 item 6): `node-pty@1.1.0` sem prebuild para `linux-x64`, cai em
+         `node-gyp rebuild` e **funciona sem instalar toolchain a mais** na imagem
+         `node:22-bookworm` (já tem `python3`/`make`/`g++`); `electron@44.3.0` baixa o binário só
+         na primeira invocação real (não no `npm install`), e rodá-lo dentro do contêiner falha por
+         faltar a pilha de bibliotecas do Chromium para Linux (`libnspr4` e o resto) — achado, não
+         corrigido (fora de escopo: nenhum passo de `npm run verificar` abre um Electron real).
+      2. `packages/app` sobe vazio: janela Electron (`contextIsolation`/`sandbox` ligados), "+"
+         abrindo uma aba do shell do sistema num terminal embutido (`@xterm/xterm` + `node-pty`
+         atrás da porta `PtySpawner`), `esbuild` como bundler (Q-071 item 1, escolhido sobre
+         `electron-vite`), guards novos (`app-only-imports-engine-public-subpaths`,
+         `engine-does-not-import-app`, `app-does-not-import-cli`, `cli-does-not-import-app`;
+         `electron`/`node-pty` restritos por diretório) cada um provado em
+         `tests/integration/guards/app-boundaries.test.ts`/`app-eslint-restrictions.test.ts`,
+         cobertura de `packages/app/src/**` em 80% com `electron/` excluído. `npm run verificar`
+         completo verde.
+      3. `describeDaemonState` → `packages/engine/src/scheduler/` (importa
+         `buildDaemonUnhealthyNotice` de `scheduler/notices.ts`; `application/` não pode importar
+         `scheduler/`); `describeAutostartState`/`session-view.ts`/`session-id-display.ts`/
+         `eligibility-view.ts`/`format-status.ts` → `packages/engine/src/application/` (os últimos
+         quatro não nomeados pelo despacho — mesma regra geral "sai da CLI para o motor", Q-071
+         item 5, que também registra uma provável imprecisão no despacho: `buildSessionListings`,
+         citado como o que a lateral reaproveitaria, é a lista de FORA de escopo do `end-day`
+         — D-031 —, não a listagem de `seeya sessions`, que na verdade usa
+         `SessionProvider.list()` + `session-view.ts#buildSessionRows`). Novo:
+         `adapters/process/resolve-command.ts` (resolução do binário do harness por SO, testada
+         contra sistema de arquivos falso). `git mv` em tudo, com os testes; **1.623 testes
+         passando, 3 pulados** (base 1.567 + 3 intacta).
+      4. Lateral (mesma linha de `seeya sessions`, correspondência por pid — D-025, sem marca sem
+         correspondência), abas com barra de comando real (nunca `window.prompt` — spike M) que
+         resolve `claude`/`codex` pelo `resolve-command.ts` contra o `PATH` real, painel de estado
+         com o texto literal de `seeya status` (as mesmas funções, agora no motor), atualização
+         periódica pelo `Clock` injetado (`state/refresh-loop.ts`, mesmo formato de laço de
+         `scheduler/loop.ts`, nunca `setInterval` cru). Fechar aba encerra o processo, `onExit`
+         marca com o código sem remover. Medido ao vivo (captura real de
+         `webContents.capturePage()`, contra um `homeDir` descartável): janela, lateral, painel de
+         estado, barra de comando e uma aba com `cmd.exe` de verdade, tudo visível na captura.
+         Achado de ambiente registrado (Q-071 item 8, não é defeito do produto): com o
+         `daemon.lock` real do mantenedor presente, a interface trava indefinidamente dentro desta
+         sandbox de agente ao chamar `ProcessControl.isAlive` (que lança `powershell.exe`) de
+         dentro do Electron aninhado — isolado por eliminação, não reproduzido pela CLI já
+         compilada rodada fora do Electron nem contra um `homeDir` sem PID/lock reais.
+      5. Esta documentação.
+
+      **Medido nesta worktree:** `npm run verificar` completo verde — **1.632 testes passando, 3
+      pulados**. `npm run verificar:linux` verde — **1.630 passando, 5 pulados** (mesma diferença
+      de pulados entre SOs já registrada na Q-070, não uma regressão desta tarefa), cobertura de
+      `packages/app/src/**` em 100% em todos os subdiretórios não excluídos dentro do contêiner.
+      Tempo do `npm ci` nesta máquina, cache HTTP quente: 10,2s antes de `electron`/`node-pty`
+      entrarem (243 pacotes), 7,6s depois (258 pacotes) — sem alta perceptível; a CI real dos três
+      sistemas é quem mede isso de verdade (Q-071 item 7).
+
+      **Não medido nesta tarefa** (Q-071, seção final): a memória da interface de produto com 1 e
+      3 abas (só a do protótipo do spike M está registrada); a contagem de janelas antes/depois
+      por `EnumWindows`/`IsWindowVisible` (a janela desta medição rodou em modo *offscreen* — o
+      único jeito de `capturePage()` funcionar nesta sandbox sem área de trabalho interativa
+      anexada; não necessariamente cria um HWND visível para contar); o Linux real do mantenedor
+      (só o contêiner Debian headless foi medido).
+
+      **O que o mantenedor precisa fazer, na ordem:** (1) revisar e mesclar; (2) `npm ci` na
+      `main`; (3) `npm run app` no Linux dele — a medição que fecha a D-042 de verdade —, com uma
+      aba de `claude` funcionando; (4) comparar a lateral com `seeya sessions` e o painel de
+      estado com `seeya status` ao vivo, contra o `~/.claude`/`~/.seeya` reais dele; (5) medir
+      memória com 1 e 3 abas (`ps`/`smem` ou equivalente, mesma técnica do spike M); (6) remover
+      processos e transcripts de teste que sobrarem, se usar um diretório descartável para a
+      verificação, do mesmo jeito que o spike M já fez.
+
+      Ver `docs/QUESTOES.md` Q-071 para as decisões de ferramental tomadas sem parar para
+      perguntar, a medição do Linux completa e o achado de ambiente do item 8.
 
 ## Definição de pronto (vale para toda tarefa)
 

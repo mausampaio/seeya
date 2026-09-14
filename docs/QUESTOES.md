@@ -6661,3 +6661,229 @@ depois que o mantenedor mesclar esta mudança e reconstruir a `main` no layout n
 momento `dist/cli/index.js` deixa de existir de verdade, e o desenho da S5-T1 (que este agente
 não escreveu nem alterou) entra em ação. Registrado como inferência, não como medição, porque é
 exatamente a distinção que D-025 e o próprio despacho pedem para não confundir.
+
+---
+
+## Q-071 — V2-T2 (a interface, esqueleto): decisões de ferramental, a medição do Linux, e um
+## achado de ambiente que não é do produto
+
+**Tarefa:** V2-T2
+**Bloqueia:** não — a tarefa foi entregue com o portão completo verde (Windows e o contêiner
+Linux) e os 1.567 testes da base continuam passando, mais os novos. Registro no mesmo padrão de
+Q-027/Q-028/Q-029/Q-067/Q-068/Q-069/Q-070.
+
+### 1) O bundler: `esbuild`, não `electron-vite`
+
+O despacho deixava a escolha para o agente, com o critério "o mínimo que resolver os três alvos
+(main, preload, renderer)". `electron-vite` traz um servidor de desenvolvimento, um plugin próprio
+por alvo, hot-reload e uma convenção de projeto (config em três blocos) — resolveria o problema,
+mas é mais ferramental do que esta tarefa precisa: um esqueleto sem hot-reload, sem HMR, e com
+`npm run app` bastando reconstruir e relançar. `esbuild` puro, chamado por um script de ~90 linhas
+(`packages/app/scripts/build.mjs`) com três chamadas de `esbuild.build()` (main: Node/ESM,
+`electron`/`node-pty` externos; preload: **CommonJS**, não ESM — ver item 2; renderer: browser/ESM,
+tudo embutido), cobre exatamente os três alvos sem servidor, sem plugin e sem uma segunda
+convenção de configuração para o resto do monorepo aprender. Medido: bundle completo em
+~150-300ms nesta máquina. `npm run app` (raiz) roda `npm run build` (motor + `cli`, via
+`tsc -b`) e depois `npm run dev --workspace=@seeya-ai/app`, que empacota e lança o binário real do
+Electron (resolvido por `import electronPath from 'electron'`, o próprio pacote exporta o caminho
+do executável).
+
+### 2) O preload é CommonJS (`.cjs`), não ESM, mesmo com o pacote inteiro `"type": "module"`
+
+Não pedido em detalhe pelo despacho. `packages/app/package.json` é `"type": "module"` como o
+resto do monorepo, e o `main`/`renderer` empacotados são ESM sem problema — mas o preload roda sob
+`sandbox: true` (D-042, item 1), e o carregador de preload em sandbox do Electron garante suporte
+CommonJS; ESM em preload sandboxado é um recurso mais novo e mais estreito, sem motivo para esta
+tarefa depender dele. `scripts/build.mjs` gera `dist/electron/preload.cjs` (extensão explícita,
+ignora o `"type": "module"` do pacote) e `main.ts` aponta `webPreferences.preload` para esse
+arquivo.
+
+### 3) `packages/app/tsconfig.json`, não `tsconfig.build.json` — e por quê
+
+`packages/engine` e `packages/cli` deliberadamente **não têm** `tsconfig.json` próprio (só
+`tsconfig.build.json`), para que o ESLint tipado (`projectService`, que descobre o `tsconfig.json`
+mais próximo por arquivo) caia no `tsconfig.json` da raiz — um programa só, sem DOM. `packages/app`
+quebra esse padrão de propósito: `packages/app/src/electron/**` usa globais de DOM reais
+(`document`, `window`, `@xterm/xterm` também precisa deles) que o programa raiz (só `ES2023`) não
+declara. Acrescentar `"DOM"`/`"DOM.Iterable"` ao `lib` da raiz daria DOM a `packages/engine`/`cli`
+también, sem necessidade. A saída: `packages/app/tsconfig.json` próprio, com `lib` incluindo DOM,
+usado pelo ESLint (descoberta automática) e pelo grafo de `tsc -b` (referenciado por
+`tsconfig.build.json` da raiz). A raiz (`tsconfig.json`, o programa plano de `tsc -p ... --noEmit`)
+ganhou `packages/app/src` em `include` **e** `packages/app/src/electron` em `exclude` — os módulos
+puros (fora de `electron/`) continuam checados pelo programa plano de sempre, sem precisar de build
+primeiro; `electron/` só é checado pelo `tsconfig.json` do próprio pacote.
+
+Consequência de nomenclatura: a saída do `tsc -b` de `packages/app` **não** se chama `dist` (isso
+colidiria com a saída real do `esbuild`, que é o que `npm run app` de fato executa) — é
+`dist-tsc`, nunca rodada, só prova de tipo como efeito colateral de `npm run build`.
+`scripts/clean-dist.mjs`, `.gitignore`, `.prettierignore` e `eslint.config.js` foram todos
+ensinados sobre esse nome.
+
+### 4) As duas raízes de composição não viram um sexto "layer" na matriz de 20 pares
+
+`packages/app/src` é uma raiz de composição paralela a `cli/` (D-043), não uma sexta camada do
+motor. `tests/integration/guards/_layer-matrix.ts`/`layer-matrix.test.ts` continuam exaustivos só
+sobre as 5 camadas do motor + `cli` (inalterados). As quatro regras novas do
+`.dependency-cruiser.cjs` (`app-only-imports-engine-public-subpaths`,
+`engine-does-not-import-app`, `app-does-not-import-cli`, `cli-does-not-import-app`) ganharam um
+arquivo de guarda dedicado, `tests/integration/guards/app-boundaries.test.ts`, no mesmo estilo dos
+existentes — nunca modificando `layer-matrix.test.ts`, que continua provando exatamente os 20 pares
+originais.
+
+Achado ao escrever os testes de violação: uma importação para um arquivo que **não existe** (ex.:
+`app/src/index.js`, que nunca existiu) não aciona a regra por caminho do `dependency-cruiser` — a
+ferramenta não relata violação nenhuma para um módulo que não consegue resolver, então o teste
+passa "sem querer" (zero violações, mas por resolução falha, não por aprovação). Corrigido
+apontando cada fixture de violação para um arquivo real (`packages/app/src/tabs/tab-model.ts`,
+`packages/cli/src/index.ts`), igual ao padrão que os testes de `cli/` já usavam para os pares
+permitidos.
+
+### 5) O que mais saiu de `cli/` para o motor, além do já nomeado pelo despacho
+
+O despacho já cita `describeDaemonState`/`describeAutostartState`/a resolução de binário por SO
+como "caso concreto já conhecido". No trabalho apareceram mais quatro, pela mesma regra geral do
+despacho ("qualquer lógica que a interface queira reaproveitar da CLI sai da CLI e vai para o
+motor"):
+
+- **`session-view.ts` (`buildSessionRows`) + `session-id-display.ts` (`computeDisplaySessionIds`).**
+  O despacho descreve a lateral como reaproveitando `buildSessionListings` — **esse nome está
+  errado ou se refere a outra coisa**: `buildSessionListings`
+  (`packages/engine/src/application/session-listing.ts`) é a lista de sessões **fora de escopo**
+  que o `end-day` mostra no resumo (D-031), não a listagem de `seeya sessions`. O que `seeya
+  sessions` de fato usa é `SessionProvider.list()` + `session-view.ts#buildSessionRows` — ambos
+  viviam em `packages/cli/src`, não no motor. Movidos (`git mv`, junto com
+  `session-id-display.ts`, único import de `session-view.ts`) para
+  `packages/engine/src/application/`, para a lateral reusar exatamente a mesma montagem de linha
+  (nome, estado, última atividade, `canTerminate`) sem uma segunda implementação que pudesse
+  divergir. **Registrado aqui como possível imprecisão do despacho, não decidido sozinho pelo
+  agente sem registrar** (AGENTS.md: "você descobriu que uma premissa técnica da spec está
+  errada" é motivo de parar e registrar — a tarefa seguiu com a solução mínima e correta, como o
+  próprio AGENTS.md permite quando o efeito é maior que a tarefa: "abra a questão e siga").
+  `format-sessions.ts` (a formatação em texto puro da CLI) **ficou** em `cli/`: a interface
+  desenha sua própria lista em DOM, não reaproveita texto ASCII.
+- **`eligibility-view.ts` (`countEligibleSessions`) + `format-status.ts` (`formatStatusReport`).**
+  Diferente da lateral, o painel de estado da interface quer o **texto literal** de `seeya
+  status` — o aceite da própria tarefa pede que os dois "batam" (comparação). Mover
+  `format-status.ts` também (não só a contagem de elegibilidade) é o que torna essa comparação
+  garantida por construção, em vez de duas implementações de formatação que por acaso produzem o
+  mesmo texto hoje.
+
+`daemon-state.ts` pousou em `scheduler/` (não `application/`): ele importa
+`buildDaemonUnhealthyNotice` de `scheduler/notices.ts`, e a matriz proíbe `application/ →
+scheduler/`. A escolha foi mover o módulo inteiro para `scheduler/` (que pode importar
+`application/` e `core/`) em vez de descer o construtor de aviso para `core/` — `core/` é puro
+(sem o vocabulário de `Notice`/texto do daemon) e `scheduler/` já é o dono de todo o resto dos
+avisos do daemon; separar só este teria criado uma segunda casa para o mesmo tipo de lógica.
+`autostart-state.ts` pousou em `application/`: só orquestra a porta `Autostart` (uma chamada de
+I/O via porta, sem I/O direto), sem nenhuma dependência de `scheduler/`.
+
+Todos os seis movimentos vieram com `git mv` (arquivo e teste), sem mudança de comportamento ou de
+texto — só o caminho de import trocou (de relativo/`./x.js` para `@seeya-ai/engine/application/x.js`
+ou `@seeya-ai/engine/scheduler/x.js`).
+
+### 6) A medição do Linux (passo (a) da ordem de trabalho)
+
+Rodada dentro de `node:22-bookworm` (a mesma imagem de `scripts/verificar-linux.mjs`), Docker
+respondendo em segundos — sem a janela de 5 minutos do despacho ter sido necessária.
+
+- **`node-pty@1.1.0`:** o pacote publicado **não** traz prebuild para `linux-x64`/`linux-arm64`
+  (só `win32-x64`, `win32-arm64`, `darwin-x64`, `darwin-arm64` — confirmado listando
+  `node_modules/node-pty/prebuilds/`), confirmando a inferência do spike M. `npm install` cai em
+  `node scripts/prebuild.js || node-gyp rebuild`, e o `node-gyp rebuild` **funciona sem instalar
+  nada a mais**: a imagem `node:22-bookworm` já tem `python3`, `make`, `g++`, `gcc` no `PATH`.
+  Medido: ~11-13s do `npm install` (compilação incluída), produz `build/Release/pty.node`,
+  `require('node-pty')` carrega e expõe `spawn`/`fork`/`createTerminal`/`open`/`native`. **O
+  mantenedor não precisa instalar toolchain a mais no Linux dele**, desde que a distro tenha algo
+  equivalente ao que a imagem Debian já trazia (o próprio `node:22-bookworm` não instala nada
+  especial para isso — é a base Debian que já vem com essas ferramentas).
+- **`electron@44.3.0`:** `npm install` sozinho **não baixa o binário** — o pacote publicado adiou
+  o download para a primeira invocação real (`cli.js`/`require('electron')`), não para o
+  `postinstall`. Medido: `npm install electron` em ~2s, sem `dist/` dentro de
+  `node_modules/electron`. Rodar `electron --version` de fato dispara "Downloading Electron
+  binary..." e falha depois: `error while loading shared libraries: libnspr4.so: cannot open
+  shared object file`. **Achado, não corrigido nesta tarefa** (fora de escopo — nenhum passo do
+  `npm run verificar:linux` precisa abrir uma janela real do Electron dentro do contêiner): a
+  imagem `node:22-bookworm` não tem a pilha de bibliotecas do Chromium/Electron para Linux
+  (`libnspr4`, `libnss3`, e o resto do conjunto padrão do Debian para navegador headless). Isso
+  não bloqueia `npm ci`/`npm run verificar` (nenhum teste deste projeto lança um Electron real —
+  `packages/app/src/electron/**` fica fora da cobertura de propósito), mas é relevante para o
+  mantenedor: no Linux real dele, se as bibliotecas já estiverem instaladas (a maioria das distros
+  desktop já tem, por causa do Chrome/outros Electrons), a janela deve abrir sem passo extra; numa
+  distro minimalista ou servidor, pode precisar instalar esse conjunto.
+- **Medido depois, com o pacote já existindo:** `npm run verificar` completo (format, `tsc -p
+  tsconfig.json --noEmit`, `eslint .`, `tsc -b`, `dependencias`, `cobertura`) dentro do contêiner,
+  exit 0: **1.630 testes passando, 5 pulados** (mesmo padrão de diferença de pulados entre SOs já
+  registrado na Q-070, não uma regressão desta tarefa), cobertura de `packages/app/src/**` em
+  100% em todos os subdiretórios não excluídos. Tempo total (cold, incluindo `npm ci` com
+  `node-pty` compilando): ~4 minutos.
+
+### 7) `npm ci` antes/depois de `electron`/`node-pty` entrarem, nesta máquina
+
+Medido nesta mesma máquina Windows, cache HTTP do npm já quente (não é medição de banda "fria"
+genérica):
+
+| Momento | Pacotes | Tempo |
+|---|---|---|
+| Antes (branch `main`, sem `packages/app`) | 243 | 10,2s (`npm ci`) |
+| Depois (com `electron`/`node-pty`/`@xterm/*`/`esbuild`) | 258 | 7,6s (`npm ci`) |
+
+O tempo não subiu — provavelmente ruído de rede/disco desta máquina específica em cada corrida
+individual, não uma medida confiável de "quanto o Electron custa". O achado que importa mais é o
+qualitativo: `node-pty` usou prebuild (sem compilar) e o binário do Electron baixou em segundos,
+igual ao spike M já tinha medido. **A CI real, nos três sistemas, é quem mede isso de verdade** —
+o PO confere depois da mesclagem, como o despacho pede.
+
+### 8) Um achado de ambiente, não do produto: `ProcessControl.isAlive` trava quando chamado de
+### dentro de um Electron aninhado *nesta sandbox de agente*
+
+Medido durante a verificação manual do passo (d): com um `daemon.lock` **real** em
+`~/.seeya/` (pid do daemon de verdade do mantenedor, rodando desde `2026-09-14T10:06:03Z`) e uma
+sessão real e viva em `~/.claude/sessions/`, rodar a interface real (`packages/app/dist/electron/main.js`
+via `node_modules/.bin/electron.cmd`, dentro desta sessão de agente) **trava indefinidamente** —
+sem screenshot, sem saída, sem sair sozinho — assim que o laço de atualização
+(`state/refresh-loop.ts`) chega em `describeDaemonState`/`SessionProvider.list()`, que no Windows
+verificam liveness via `ProcessControl.isAlive`, que **lança um `powershell.exe`**
+(`adapters/process/proc-start.ts`). Isolado por eliminação:
+
+- O mesmo `seeya sessions` (a CLI já compilada, `node packages/cli/dist/index.js sessions`),
+  rodado **sem** Electron, nesta mesma sessão de agente, respondeu normalmente e rápido, achando a
+  mesma sessão real.
+- A interface, rodada contra um `homeDir` descartável (`~/.claude`/`~/.seeya` vazios, sem PID nem
+  lock reais para verificar), **não trava** — screenshot capturado normalmente (ver o relatório da
+  tarefa).
+- Uma tentativa isolada anterior, chamando `powershell.exe` via `execFileSync` de dentro de um
+  processo Electron (antes do laço de atualização existir), já tinha travado do mesmo jeito.
+
+**Isto não é um defeito do produto** (a mesma técnica de `powershell.exe` já é usada e testada em
+outras partes do motor, `tests/integration/process/liveness.test.ts` inclusive) — é, ao que tudo
+indica, uma interação específica desta sandbox de execução de agente com processos aninhados
+(Electron → Node → `powershell.exe`), possivelmente relacionada a como ela gerencia objetos de
+job/processo. **Não investigado a fundo** (fora do escopo desta tarefa, e sem acesso para depurar
+a própria sandbox) — registrado como limitação de ambiente de medição, não do código. A lógica de
+`state/status-panel.ts`/`sidebar/sidebar-data.ts` está provada correta por teste (unidade e
+integração, com dublês e com um `tmpdir` real) independentemente disso; a prova final contra o
+`~/.claude`/`~/.seeya` reais do mantenedor, na máquina dele (fora desta sandbox), é o que fecha
+esse aceite de verdade — e é exatamente o "aceite manual do mantenedor" que a tarefa já pedia.
+
+### O que ficou inferido, não medido
+
+- **O Linux do mantenedor de verdade.** A medição do item 6 é dentro de um contêiner Debian
+  headless, não a distro/desktop real dele — o próprio despacho já separava as duas coisas
+  ("essa segunda medição continua sendo dele"). Em particular, se a janela realmente abre com
+  exibição gráfica de verdade no Linux dele (ao contrário do contêiner, que não tem X11/Wayland
+  algum) não foi medido por este agente.
+- **Memória com 1 e 3 abas na interface real** (pedida pelo aceite): **não medida nesta tarefa.**
+  O achado do item 8 (o travamento em `ProcessControl.isAlive` dentro desta sandbox) consumiu o
+  tempo que sobrava para essa medição depois de isolar a causa; a única medição de memória
+  registrada continua sendo a do protótipo do spike M (342/394/604 MB), não da interface de
+  produto. Fica pendente — o mantenedor pode medir na aceitação manual dele (`Get-Process` por
+  árvore, mesma técnica do spike M) sem depender desta sandbox.
+- **Contagem de janelas antes/depois via `EnumWindows`/`IsWindowVisible` (técnica da Q-067).**
+  Também não medida por este agente: a janela desta tarefa foi renderizada com
+  `webPreferences.offscreen` ligado (`SEEYA_APP_OFFSCREEN`, só para as capturas de tela, nunca no
+  código de produto/`npm run app`) precisamente porque esta sandbox não tem uma área de trabalho
+  interativa anexada para uma janela normal renderizar (confirmado: sem esse modo,
+  `webContents.capturePage()` lança `UnknownVizError`). Uma janela offscreen não necessariamente
+  cria um HWND visível do jeito que `EnumWindows` enumeraria, então a contagem antes/depois fica
+  sem sentido nesta sandbox especificamente — é outra medição que cabe ao mantenedor, numa área de
+  trabalho de verdade.

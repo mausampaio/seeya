@@ -236,11 +236,17 @@ descobria quais eram os 2 erros até alguém instrumentar à mão.
 - **Monorepo desde a V2-T1 (D-043):** `npm workspaces`, raiz `private: true`. `core/`,
   `application/`, `adapters/` e `scheduler/` vivem em `packages/engine/src/<camada>/`;
   `cli/` vive em `packages/cli/src/` (sem subpasta própria — os arquivos ficam direto na raiz do
-  pacote). `packages/app/` é reservado (D-042/D-043) e ainda não existe. `tests/<faixa>/`,
-  `docs/`, `scripts/` e todo o ferramental continuam na raiz, comuns aos dois pacotes.
-- `@seeya-ai/cli` importa `@seeya-ai/engine` por subcaminho (`@seeya-ai/engine/<camada>/...`),
-  nunca por caminho relativo cru dentro de `packages/engine/src` — é o `dependency-cruiser` que
-  garante isso (oitava regra, D-043).
+  pacote). **Desde a V2-T2, `packages/app/src/` existe** (D-042/D-043) — a interface, segunda raiz
+  de composição, também sem subpasta de camada própria (como `cli/`): `composition/` (a raiz em
+  si), `electron/` (fiação do Electron — janela, IPC, preload; único trecho fora do piso de
+  cobertura), `pty/` (o `PtySpawner`/`node-pty` por trás da porta), `tabs/`, `sidebar/`, `state/`,
+  `ipc/`, `text/` (módulos puros, cada um testado por unidade). `tests/<faixa>/`, `docs/`,
+  `scripts/` e todo o ferramental continuam na raiz, comuns aos três pacotes.
+- `@seeya-ai/cli` e `@seeya-ai/app` importam `@seeya-ai/engine` por subcaminho
+  (`@seeya-ai/engine/<camada>/...`), nunca por caminho relativo cru dentro de
+  `packages/engine/src` — é o `dependency-cruiser` que garante isso (oitava regra para `cli`,
+  D-043; regras próprias para `app`, V2-T2 — ver `docs/ARQUITETURA.md` § "A segunda raiz de
+  composição"). `app/` e `cli/` nunca se importam entre si.
 - Módulos pequenos e focados. Arquivo que vira depósito de funções soltas perdeu a
   responsabilidade única.
 - Teste espelha a origem, com o caminho do pacote: `packages/engine/src/core/x.ts` →
@@ -294,7 +300,10 @@ aqui antes de entrar no código.**
 | Documento (pt) | Código (en) |
 |---|---|
 | núcleo / adaptadores / aplicação / agendador | `core` / `adapters` / `application` / `scheduler` |
-| motor / interface (pacotes, V2-T1, D-043) | `@seeya-ai/engine` (`packages/engine/`, contém `core`/`application`/`adapters`/`scheduler`) / `@seeya-ai/cli` (`packages/cli/`, contém `cli`) — `@seeya-ai/app` é reservado, não criado |
+| motor / interface (pacotes, V2-T1/V2-T2, D-043) | `@seeya-ai/engine` (`packages/engine/`, contém `core`/`application`/`adapters`/`scheduler`) / `@seeya-ai/cli` (`packages/cli/`, contém `cli`) / `@seeya-ai/app` (`packages/app/`, a interface, D-042 — segunda raiz de composição, D-043) |
+| aba | `Tab` (`packages/app/src/tabs/tab-model.ts`) — um terminal embutido: comando, diretório, pid (quando já lançado), status (`running`/`exited`) |
+| lançamento | `spawn` (de uma aba, via `PtySpawner`/`node-pty` — `packages/app/src/pty/`), nunca `launch` |
+| correspondência aba↔sessão | `matchSessionsToTabs`/`matchingTabId` (`packages/app/src/sidebar/session-match.ts`) — só por pid da sessão descoberta batendo com o pid do pty da aba; sem correspondência, sem marca (D-025) |
 | sessão descoberta | `DiscoveredSession` |
 | sessão com PID / sem PID | `SessionWithPid` / `SessionWithoutPid` |
 | estado da sessão | `SessionState` |
@@ -430,9 +439,10 @@ npm test                 # unidade + integração + guards
 npm run test:e2e         # end-to-end
 npm run test:contrato    # contra o ~/.claude real; não roda no CI padrão
 npm run format           # prettier
+npm run app              # builda o motor e sobe a interface em desenvolvimento (V2-T2)
 ```
 
-Todos rodam na raiz do monorepo (V2-T1) e cobrem os dois pacotes de uma vez. Para instalar o
+Todos rodam na raiz do monorepo (V2-T1) e cobrem os três pacotes de uma vez. Para instalar o
 `seeya` localmente por link (`npm link`), o comando roda dentro de `packages/cli`, não na raiz —
 ver `README.md`.
 
