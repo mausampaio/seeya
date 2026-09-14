@@ -6422,6 +6422,12 @@ temporária), não dispensado. As demais escolhas (job de auditoria só no CI, C
 `security-extended`, nada excluído, varredura de segredos já ligada, Dependabot a critério do
 mantenedor) confirmadas.
 
+**Achado corrigido e fechado (2026-09-13, V2-T1).** A V2-T1 tocou `scripts/` e trocou o caminho
+fixo por `mkdtemp` com entrega explícita do diretório entre invocações (`SPIKE_J_STATE_DIR`; a
+primeira versão, que reaproveitava diretório por prefixo em `tmpdir()`, foi rejeitada na revisão
+por deixar o mesmo buraco de symlink — Q-070 item 2). Medido depois da mesclagem: a varredura
+do CodeQL na `main` lista o alerta como **fixed**, e a lista de alertas abertos está vazia.
+
 ---
 
 ## Q-069 — S5-T9 (plano longo não pode custar o histórico): a medição do `--append-system-prompt-file` contra `--resume`, o novo teto medido, e o desenho da pergunta antes do fallback

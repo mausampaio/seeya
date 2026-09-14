@@ -4024,6 +4024,15 @@ texto, mas não são a fila.
       em `packages/cli` (com o `brokenPath` reportado e depois corrigido por `enable`); alerta do
       CodeQL fechado; `git log --follow` de um arquivo movido mostrando o histórico anterior.
 
+      **Medido pelo PO depois da mesclagem (2026-09-13):** portão completo na `main` verde
+      (1.567 passando, 3 pulados); CI verde nos três sistemas e CodeQL verde no mesmo push; o
+      alerta `js/insecure-temporary-file` consta como **fixed** e não há alerta aberto (Q-068
+      fechada). `seeya` religado em `packages/cli`, `seeya --version` respondendo pelo link novo.
+      Pendente do mantenedor: `seeya autostart enable` (a tarefa agendada ainda aponta para
+      `dist/cli/index.js`, que continua existindo como resto de build antigo, por isso `status`
+      ainda diz `enabled` e não `brokenPath`) e reiniciar o daemon, que está rodando o código
+      antigo.
+
       **Relatório do agente (2026-09-13), numa worktree isolada, nada mesclado.** Sete commits
       ao todo — quatro do movimento em si, um achado de ferramental no meio do caminho, e dois de
       ajuste pedidos na revisão do PO — cada um com o portão relevante verde antes de commitar:
