@@ -4129,7 +4129,7 @@ texto, mas não são a fila.
       Ver `docs/QUESTOES.md` Q-070 para as decisões de ferramental tomadas sem parar para
       perguntar (nenhuma altera comportamento, API entre camadas ou texto voltado à pessoa).
 
-- [~] **V2-T2 — A interface, esqueleto: `@seeya-ai/app` com abas de terminal e a lista de sessões
+- [x] **V2-T2 — A interface, esqueleto: `@seeya-ai/app` com abas de terminal e a lista de sessões
       (D-042, D-043).** Especificada pelo PO em 2026-09-14; **aprovada pelo mantenedor no mesmo
       dia, com as sessões descobertas na lateral** (projetos depois); **mesclada na `main` em
       2026-09-14** depois de duas rodadas de revisão do PO. Primeira tarefa de código da
@@ -4403,11 +4403,75 @@ texto, mas não são a fila.
       sabia estar aberto — a lista fez o trabalho dela. Painel de estado batendo com
       `seeya status`. Dois registros de uso: o × encerra o processo e a aba fica (é o que a spec
       pediu; o gesto de remover a aba encerrada entra na V2-T3), e o `codex` não mostrou tela de
-      confiança no diretório padrão (comportamento do harness, não do seeya). **Pendente: o
-      aceite no Linux do mantenedor** — a tarefa fica em `[~]` até lá.
+      confiança no diretório padrão (comportamento do harness, não do seeya).
 
-- [ ] **V2-T3 — A interface retoma o dia: `start-day` em abas, pergunta antes do fallback, aba
-      encerrada removível (D-042, D-043, D-039).** Especificada pelo PO em 2026-09-14; **aguarda
+      **Aceite na segunda máquina do mantenedor (2026-09-14): passou** — shell e `claude` abertos
+      em abas e funcionando (`codex` não testado: não está instalado lá). Um achado de uso: o
+      terminal da máquina usa `oh-my-posh` com uma fonte Nerd (FiraCode), e a aba abriu com a
+      fonte padrão do `xterm.js`, então o prompt renderizou quebrado — vira a V2-T3 (fonte
+      configurável, com uma Nerd Font embutida como padrão). **No macOS (MacBook 2012, Sonoma):**
+      janela, lista (duas sessões vivas) e painel de estado funcionaram; abrir a aba de `claude`
+      falhou com `Error: posix_spawnp failed` vindo do `node-pty`. Hipótese do PO, a confirmar
+      pelo mantenedor quando voltar ao Mac: o `spawn-helper` do prebuild `darwin-x64` sem bit de
+      execução (o `node-pty` lança todo processo por ele; se for isso, nem o shell abre) —
+      diagnóstico: `ls -l node_modules/node-pty/prebuilds/darwin-x64/spawn-helper`, uma aba de
+      shell, e `chmod +x` no helper. **Pendência do mantenedor**, registrada na V2-T3 como
+      correção condicional. Com Windows e a segunda máquina passando, a tarefa está **aceita**.
+
+- [ ] **V2-T3 — Terminal usável no dia a dia: fonte configurável com Nerd Font embutida, aba
+      encerrada removível, helper executável no macOS/Linux (D-035, D-042).** Especificada pelo
+      PO em 2026-09-14 a partir do uso real do mantenedor no mesmo dia; **aguarda aprovação do
+      mantenedor antes de qualquer despacho.** Curta de propósito: três correções de uso que
+      valem antes do `start-day` em abas (V2-T4), porque sem elas a aba não serve para o dia a
+      dia de quem já tem o terminal configurado.
+
+      1. **Fonte do terminal.** Hoje o `xterm.js` sobe com a fonte padrão dele (`courier`), e um
+         prompt com glifos de Nerd Font (`oh-my-posh`, `starship`, `powerlevel10k`) sai quebrado.
+         Duas chaves novas de config, no mesmo estilo das existentes (planas, com padrão no
+         esquema, `seeya config get/set` funcionando, glossário do `AGENTS.md` antes do código,
+         D-027/D-035 — é sobre como a pessoa trabalha): `terminalFontFamily` (string) e
+         `terminalFontSize` (número, px). **Uma Nerd Font vem embutida na interface** como
+         padrão garantido: FiraCode Nerd Font Mono (licença SIL OFL 1.1 — o arquivo de licença
+         acompanha a fonte em `packages/app/assets/fonts/`, e só o peso Regular entra, ~1–2 MB),
+         carregada por `@font-face` no renderer; o padrão de `terminalFontFamily` é uma pilha que
+         prefere a fonte que a pessoa já tem (`'FiraCode Nerd Font Mono', 'FiraCode Nerd Font',
+         'Fira Code', …`) e termina na embutida. O renderer aplica as duas em `new Terminal({...})`
+         e refaz o `fit` das abas. A interface lê o config uma vez ao subir (V2-T2); mudar a fonte
+         exige reabrir a interface por enquanto (dito no `README.md`, sem texto novo na CLI).
+         **Prova**: captura de tela lida pelo agente com uma
+         linha de glifos Nerd (`\ue0b0 \uf115 \ue725`) numa aba, renderizados e não como caixas.
+
+      2. **Aba encerrada removível**: o × numa aba cujo processo já saiu remove a aba (o × numa
+         aba viva continua só encerrando o processo, V2-T2); `tabs/tab-model.ts#removeTab` com
+         teste, e o renderer remove o botão e o painel.
+
+      3. **`spawn-helper` executável (macOS e Linux).** O `node-pty` lança todo processo por um
+         helper (`prebuilds/darwin-*/spawn-helper` no macOS; no Linux ele é compilado no
+         `npm ci`, sem prebuild). Se o bit de execução se perder na instalação, toda aba falha
+         com `posix_spawnp failed` — o que o mantenedor viu no macOS (V2-T2). Correção no
+         lançador (`packages/app/scripts/build.mjs`), ao lado da que garante o binário do
+         Electron: em `darwin`/`linux`, conferir o modo do helper e dar `chmod +x` quando faltar,
+         dizendo o que fez. **Condicional ao diagnóstico do mantenedor no Mac**: se o `ls -l` lá
+         mostrar o helper já executável, a causa é outra e esta correção vira registro na
+         questão, não código — o agente implementa a checagem mesmo assim (é barata e não faz
+         mal), mas o relatório não afirma que ela resolve o Mac sem o mantenedor ter medido. Junto:
+         `adapters/process/resolve-command.ts` confere **permissão de execução** (`X_OK`) no
+         POSIX, não só existência — hoje um arquivo sem `x` no `PATH` é "encontrado".
+
+      **Cuidados:** nenhuma dependência nova (a fonte é um arquivo, não um pacote); a licença da
+      fonte é conferida e citada; nada de lógica em `electron/`; texto em `text/messages.ts`;
+      as guardas da V2-T2 valem; **um commit por item**, portão em primeiro plano a cada um.
+      Questão: Q-072.
+
+      *Aceite:* `seeya config get terminalFontFamily`/`terminalFontSize` respondem os padrões e
+      aceitam `set`; a captura de tela com os glifos; o × remove a aba encerrada (captura antes/
+      depois); o helper conferido e, se preciso, corrigido pelo lançador no contêiner Linux
+      (medir: modo do helper depois do `npm ci` lá); portão e `verificar:linux` verdes; CI nos
+      três sistemas. **Aceite manual do mantenedor:** o prompt com `oh-my-posh` legível na
+      segunda máquina; e no Mac, o diagnóstico do helper e uma aba de shell abrindo.
+
+- [ ] **V2-T4 — A interface retoma o dia: `start-day` em abas e pergunta antes do fallback
+      (D-042, D-043, D-039).** Especificada pelo PO em 2026-09-14; **aguarda
       aprovação do mantenedor antes de qualquer despacho.** É a razão de existirem duas raízes de
       composição: a mesma `resumeSessions` da CLI, com um `SessionResumer` diferente — o da CLI
       abre a sessão no terminal atual e espera ela terminar; o da interface abre uma **aba** e
@@ -4461,11 +4525,7 @@ texto, mas não são a fila.
          dados (o `ResumeSessionsResult`) é compartilhado, e `format-start-day.ts` fica na CLI. O
          agente decide pelo mesmo critério da V2-T2 e registra.
 
-      5. **Aba encerrada removível**: o × numa aba cuja processo já saiu remove a aba (segundo
-         clique, ou × direto quando o estado é `exited`); `tabs/tab-model.ts#removeTab` com teste.
-         O × numa aba viva continua só encerrando o processo (V2-T2).
-
-      **O que não entra** (V2-T4, a especificar depois desta): `end-day` pela interface com a
+      **O que não entra** (V2-T5, a especificar depois desta): `end-day` pela interface com a
       prévia (`--dry-run`) como confirmação, e a notificação do resultado; a faixa de horário
       ("encerramento às 11:00 em 12 min") com **Snooze** e **Skip today** dentro da janela, pela
       mesma `decideSchedule` do daemon, reaproveitando o que `snooze-command.ts`/`skip-today`
