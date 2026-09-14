@@ -4381,6 +4381,20 @@ texto, mas não são a fila.
       Ver `docs/QUESTOES.md` Q-071 para as decisões de ferramental tomadas sem parar para
       perguntar, a medição do Linux completa e o achado de ambiente do item 8.
 
+      **Medido pelo PO depois da mesclagem (2026-09-14):** portão na `main` verde, rodado em
+      pedaços (a execução inteira foi morta por falta de memória na máquina — a VM do Docker
+      Desktop ligada pelo `verificar:linux` do agente somava 1,9 GB — e os guards de ESLint
+      reprovavam em 11–17 ms, o padrão "portão vermelho sem defeito" do `docs/TESTES.md`; em
+      pedaços, com `--maxWorkers 2` na cobertura, tudo saiu 0): 1.638 testes passando, 3 pulados.
+      CI verde nos três sistemas, e o custo do Electron/`node-pty` na CI ficou pequeno: Ubuntu
+      1:16 → 2:01, macOS 1:32 → 1:46, Windows 2:46 → 3:21 (duração do job `verificar`, antes e
+      depois de `packages/app` existir). Um achado meu, corrigido e publicado no mesmo dia
+      (CI verde): `electron@44` não tem script de instalação, `npm ci` deixa o binário de fora e
+      `import('electron')` lança em vez de baixar — `npm run app` falharia na primeira vez numa
+      máquina limpa; `packages/app/scripts/build.mjs` agora roda o `install.js` do pacote uma
+      vez quando `path.txt` não existe (testado apagando o binário). **Pendente: o aceite ao vivo
+      do mantenedor** (`npm run app` no Windows e no Linux dele) — a tarefa fica em `[~]` até lá.
+
 ## Definição de pronto (vale para toda tarefa)
 
 1. Código implementa exatamente a spec; divergência virou questão, não improviso.
