@@ -4276,25 +4276,21 @@ texto, mas não são a fila.
       na Q-071. **Aceite manual do mantenedor:** a mesma janela abrindo no Linux dele, com uma
       aba de `claude` funcionando (é a medição que fecha a D-042 de verdade).
 
-      **Relatório do agente (2026-09-14), numa worktree isolada, nada mesclado.** Seis commits,
-      cada um com o portão relevante verde antes de commitar:
+      **Relatório do agente (2026-09-14), numa worktree isolada, nada mesclado.** Quatro commits
+      (passos (b) a (e) — o passo (a), a medição do Linux, não gerou commit próprio: virou texto
+      na Q-071, dentro do commit do passo (e)), cada um com o portão relevante verde antes de
+      commitar:
 
-      1. Medição do Linux (Q-071 item 6): `node-pty@1.1.0` sem prebuild para `linux-x64`, cai em
-         `node-gyp rebuild` e **funciona sem instalar toolchain a mais** na imagem
-         `node:22-bookworm` (já tem `python3`/`make`/`g++`); `electron@44.3.0` baixa o binário só
-         na primeira invocação real (não no `npm install`), e rodá-lo dentro do contêiner falha por
-         faltar a pilha de bibliotecas do Chromium para Linux (`libnspr4` e o resto) — achado, não
-         corrigido (fora de escopo: nenhum passo de `npm run verificar` abre um Electron real).
-      2. `packages/app` sobe vazio: janela Electron (`contextIsolation`/`sandbox` ligados), "+"
-         abrindo uma aba do shell do sistema num terminal embutido (`@xterm/xterm` + `node-pty`
-         atrás da porta `PtySpawner`), `esbuild` como bundler (Q-071 item 1, escolhido sobre
-         `electron-vite`), guards novos (`app-only-imports-engine-public-subpaths`,
+      1. **Passo (b).** `packages/app` sobe vazio: janela Electron (`contextIsolation`/`sandbox`
+         ligados), "+" abrindo uma aba do shell do sistema num terminal embutido (`@xterm/xterm` +
+         `node-pty` atrás da porta `PtySpawner`), `esbuild` como bundler (Q-071 item 1, escolhido
+         sobre `electron-vite`), guards novos (`app-only-imports-engine-public-subpaths`,
          `engine-does-not-import-app`, `app-does-not-import-cli`, `cli-does-not-import-app`;
          `electron`/`node-pty` restritos por diretório) cada um provado em
          `tests/integration/guards/app-boundaries.test.ts`/`app-eslint-restrictions.test.ts`,
          cobertura de `packages/app/src/**` em 80% com `electron/` excluído. `npm run verificar`
          completo verde.
-      3. `describeDaemonState` → `packages/engine/src/scheduler/` (importa
+      2. **Passo (c).** `describeDaemonState` → `packages/engine/src/scheduler/` (importa
          `buildDaemonUnhealthyNotice` de `scheduler/notices.ts`; `application/` não pode importar
          `scheduler/`); `describeAutostartState`/`session-view.ts`/`session-id-display.ts`/
          `eligibility-view.ts`/`format-status.ts` → `packages/engine/src/application/` (os últimos
@@ -4302,33 +4298,32 @@ texto, mas não são a fila.
          item 5, que também registra uma provável imprecisão no despacho: `buildSessionListings`,
          citado como o que a lateral reaproveitaria, é a lista de FORA de escopo do `end-day`
          — D-031 —, não a listagem de `seeya sessions`, que na verdade usa
-         `SessionProvider.list()` + `session-view.ts#buildSessionRows`). Novo:
-         `adapters/process/resolve-command.ts` (resolução do binário do harness por SO, testada
-         contra sistema de arquivos falso). `git mv` em tudo, com os testes; **1.623 testes
-         passando, 3 pulados** (base 1.567 + 3 intacta).
-      4. Lateral (mesma linha de `seeya sessions`, correspondência por pid — D-025, sem marca sem
-         correspondência), abas com barra de comando real (nunca `window.prompt` — spike M) que
-         resolve `claude`/`codex` pelo `resolve-command.ts` contra o `PATH` real, painel de estado
-         com o texto literal de `seeya status` (as mesmas funções, agora no motor), atualização
-         periódica pelo `Clock` injetado (`state/refresh-loop.ts`, mesmo formato de laço de
-         `scheduler/loop.ts`, nunca `setInterval` cru). Fechar aba encerra o processo, `onExit`
-         marca com o código sem remover. Medido ao vivo (captura real de
+         `SessionProvider.list()` + `session-view.ts#buildSessionRows`, confirmado pelo PO na
+         revisão). Novo: `adapters/process/resolve-command.ts` (resolução do binário do harness
+         por SO, testada contra sistema de arquivos falso). `git mv` em tudo, com os testes;
+         **1.623 testes passando, 3 pulados** (base 1.567 + 3 intacta).
+      3. **Passo (d).** Lateral (mesma linha de `seeya sessions`, correspondência por pid — D-025,
+         sem marca sem correspondência), abas com barra de comando real (nunca `window.prompt` —
+         spike M) que resolve `claude`/`codex` pelo `resolve-command.ts` contra o `PATH` real,
+         painel de estado com o texto literal de `seeya status` (as mesmas funções, agora no
+         motor), atualização periódica pelo `Clock` injetado (`state/refresh-loop.ts`, mesmo
+         formato de laço de `scheduler/loop.ts`, nunca `setInterval` cru). Fechar aba encerra o
+         processo, `onExit` marca com o código sem remover. Medido ao vivo (captura real de
          `webContents.capturePage()`, contra um `homeDir` descartável): janela, lateral, painel de
          estado, barra de comando e uma aba com `cmd.exe` de verdade, tudo visível na captura.
-         Achado de ambiente registrado (Q-071 item 8, não é defeito do produto): com o
-         `daemon.lock` real do mantenedor presente, a interface trava indefinidamente dentro desta
-         sandbox de agente ao chamar `ProcessControl.isAlive` (que lança `powershell.exe`) de
-         dentro do Electron aninhado — isolado por eliminação, não reproduzido pela CLI já
-         compilada rodada fora do Electron nem contra um `homeDir` sem PID/lock reais.
-      5. Esta documentação.
+      4. **Passo (e).** Esta documentação, incluindo a medição do Linux (passo (a), Q-071 item 6)
+         e o achado de travamento observado nesta sandbox durante a verificação manual (Q-071 item
+         8, na versão original deste relatório) — **revisto na íntegra pela revisão do PO
+         abaixo**, que não reproduziu o travamento e mediu a causa real (uma consulta cara, não um
+         deadlock).
 
-      **Medido nesta worktree:** `npm run verificar` completo verde — **1.632 testes passando, 3
-      pulados**. `npm run verificar:linux` verde — **1.630 passando, 5 pulados** (mesma diferença
-      de pulados entre SOs já registrada na Q-070, não uma regressão desta tarefa), cobertura de
-      `packages/app/src/**` em 100% em todos os subdiretórios não excluídos dentro do contêiner.
-      Tempo do `npm ci` nesta máquina, cache HTTP quente: 10,2s antes de `electron`/`node-pty`
-      entrarem (243 pacotes), 7,6s depois (258 pacotes) — sem alta perceptível; a CI real dos três
-      sistemas é quem mede isso de verdade (Q-071 item 7).
+      **Medido nesta worktree, antes da revisão:** `npm run verificar` completo verde — **1.632
+      testes passando, 3 pulados**. `npm run verificar:linux` verde — **1.630 passando, 5
+      pulados** (mesma diferença de pulados entre SOs já registrada na Q-070, não uma regressão
+      desta tarefa), cobertura de `packages/app/src/**` em 100% em todos os subdiretórios não
+      excluídos dentro do contêiner. Tempo do `npm ci` nesta máquina, cache HTTP quente: 10,2s
+      antes de `electron`/`node-pty` entrarem (243 pacotes), 7,6s depois (258 pacotes) — sem alta
+      perceptível; a CI real dos três sistemas é quem mede isso de verdade (Q-071 item 7).
 
       **Não medido nesta tarefa** (Q-071, seção final): a memória da interface de produto com 1 e
       3 abas (só a do protótipo do spike M está registrada); a contagem de janelas antes/depois
@@ -4336,6 +4331,43 @@ texto, mas não são a fila.
       único jeito de `capturePage()` funcionar nesta sandbox sem área de trabalho interativa
       anexada; não necessariamente cria um HWND visível para contar); o Linux real do mantenedor
       (só o contêiner Debian headless foi medido).
+
+      **Revisão do PO (2026-09-14), mesma branch, três commits mais:**
+
+      5. **Correção de defeito:** `PtyManager.write`/`resize`/`closeTab` lançavam `UnknownTabError`
+         para uma aba sem pty vivo (já encerrada) — sem nada capturando isso em `electron/main.ts`
+         (os três chegam por `ipcMain.on`), uma exceção não tratada ali vira
+         `uncaughtException` no processo principal, que o Electron mostra como "A JavaScript error
+         occurred in the main process". `resizeTab` era o pior caso: chama todas as abas abertas a
+         cada redimensionamento de janela, então uma única ação do usuário (redimensionar depois
+         de uma aba ter saído) já bastava. Corrigido no modelo (`pty/pty-manager.ts`, não com
+         `try/catch` em `main.ts`): os três métodos agora são tolerantes — devolvem `boolean`
+         (nunca lançam) para um id sem pty vivo, tratando "nunca existiu" e "já encerrou" da mesma
+         forma, porque o renderer não distingue os dois. `UnknownTabError` removida. Teste novo
+         para os três métodos, mais um caso dedicado ao cenário do redimensionamento.
+      6. **Correção de desenho:** o laço de atualização fazia duas descobertas por ciclo
+         (`sidebar/sidebar-data.ts` e `state/status-panel.ts`, cada um o seu próprio
+         `SessionProvider.list()`) mais `describeAutostartState` a cada ciclo — medido pelo PO
+         contra o `~/.claude`/`~/.seeya` reais dele, com o daemon vivo: `buildSidebarRows` 239ms,
+         `describeDaemonState` 237ms, **`describeAutostartState` 6.017ms na primeira chamada**
+         (módulo `ScheduledTasks` do PowerShell, frio). Corrigido: uma única descoberta por ciclo,
+         compartilhada pelos dois (`buildSidebarRows`/`buildStatusPanelText` agora recebem a
+         descoberta já feita, não chamam `SessionProvider` por conta própria); intervalo do laço
+         subiu de 5s para 10s; a linha de autostart ganhou cache dedicado
+         (`state/autostart-cache.ts#resolveAutostartReport`, módulo puro testado com um
+         `fetchReport` falso), reconsultada só a cada 60s — pelo tempo decorrido no `Clock`
+         injetado, nunca por contador de ciclos (um ciclo de 6s não pode contar como "1 tick de
+         10s" sem mentir sobre o tempo real decorrido).
+      7. Esta correção de relatório, mais a reescrita da Q-071 item 8: **o travamento que este
+         agente observou não foi reproduzido pelo PO.** A hipótese "interação desta sandbox de
+         agente com processos aninhados" fica registrada como hipótese não confirmada, não como
+         causa (D-025) — a medição do PO mostra `ProcessControl.isAlive`/`powershell.exe`
+         respondendo normalmente sob condições equivalentes (mesmo daemon vivo). A correção do
+         item 6 acima resolve o custo real medido de qualquer forma, independente da causa do
+         travamento específico.
+
+      **Medido depois da revisão:** `npm run verificar` completo verde — **1.638 testes passando,
+      3 pulados**. `npm run verificar:linux` verde — **1.636 passando, 5 pulados**.
 
       **O que o mantenedor precisa fazer, na ordem:** (1) revisar e mesclar; (2) `npm ci` na
       `main`; (3) `npm run app` no Linux dele — a medição que fecha a D-042 de verdade —, com uma

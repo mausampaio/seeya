@@ -413,6 +413,16 @@ primeiros vieram do README, que já os tinha fixado e tem precedência.
 Variável de ambiente interna: `SEEYA_DAEMON_CHILD` (S4-T3) distingue o lançador do worker do
 daemon. Atravessa um `spawn`, nunca vai para disco, e ninguém digita.
 
+Variáveis de ambiente só de instrumentação de verificação (`packages/app/src/electron/main.ts`,
+V2-T2): `SEEYA_APP_OFFSCREEN`, `SEEYA_APP_SCREENSHOT_PATH`, `SEEYA_APP_QUIT_AFTER_MS`,
+`SEEYA_APP_AUTO_OPEN_SHELL_TAB`, `SEEYA_APP_HOME_OVERRIDE` — mesma categoria de `SEEYA_DAEMON_CHILD`
+acima (nunca vão para disco, ninguém digita), mas nenhuma delas é lida por `npm run app` nem
+documentada no `README.md`: existem só para um agente sem tela/teclado próprios provar a janela
+real (`webContents.capturePage()`) e o fluxo de uma aba contra um `homeDir` descartável, o mesmo
+"instrumentação só do spike" que `docs/spikes/M-terminal-embutido.md` já usou
+(`SPIKE_AUTO_TABS_FILE` e companhia). O uso de cada uma está documentado no próprio
+`electron/main.ts`, junto de onde é lida.
+
 **Nomes de decisão não se traduzem.** `D-021` é `D-021` em qualquer idioma, e é assim que o
 código aponta para o porquê.
 

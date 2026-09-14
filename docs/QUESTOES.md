@@ -6833,37 +6833,102 @@ qualitativo: `node-pty` usou prebuild (sem compilar) e o binário do Electron ba
 igual ao spike M já tinha medido. **A CI real, nos três sistemas, é quem mede isso de verdade** —
 o PO confere depois da mesclagem, como o despacho pede.
 
-### 8) Um achado de ambiente, não do produto: `ProcessControl.isAlive` trava quando chamado de
-### dentro de um Electron aninhado *nesta sandbox de agente*
+### 8) Um travamento observado nesta sandbox, não reproduzido pelo PO — causa fica em aberto (D-025)
 
-Medido durante a verificação manual do passo (d): com um `daemon.lock` **real** em
-`~/.seeya/` (pid do daemon de verdade do mantenedor, rodando desde `2026-09-14T10:06:03Z`) e uma
-sessão real e viva em `~/.claude/sessions/`, rodar a interface real (`packages/app/dist/electron/main.js`
-via `node_modules/.bin/electron.cmd`, dentro desta sessão de agente) **trava indefinidamente** —
-sem screenshot, sem saída, sem sair sozinho — assim que o laço de atualização
-(`state/refresh-loop.ts`) chega em `describeDaemonState`/`SessionProvider.list()`, que no Windows
-verificam liveness via `ProcessControl.isAlive`, que **lança um `powershell.exe`**
-(`adapters/process/proc-start.ts`). Isolado por eliminação:
+**O que este agente observou (14/09, verificação manual do passo (d)):** com um `daemon.lock`
+**real** em `~/.seeya/` (pid do daemon de verdade do mantenedor, rodando desde
+`2026-09-14T10:06:03Z`) e uma sessão real e viva em `~/.claude/sessions/`, rodar a interface real
+(`packages/app/dist/electron/main.js` via `node_modules/.bin/electron.cmd`, dentro desta sessão de
+agente) **travou indefinidamente** — sem screenshot, sem saída, sem sair sozinho — no primeiro
+ciclo do laço de atualização (então na versão anterior a este item, que ainda chamava
+`SessionProvider.list()` duas vezes por ciclo e `autostart.status()` sem cache). Isolado por
+eliminação, então: `seeya sessions` pela CLI já compilada, sem Electron, nesta mesma sessão de
+agente, respondeu normalmente; a interface contra um `homeDir` descartável (sem PID nem lock reais
+para verificar) não travou; uma tentativa isolada anterior, chamando `powershell.exe` via
+`execFileSync` de dentro de um processo Electron, também tinha travado. A partir disso, registrei
+a hipótese de que o travamento estivesse ligado a `ProcessControl.isAlive` (que lança
+`powershell.exe`) chamado de dentro de um Electron aninhado nesta sandbox especificamente.
 
-- O mesmo `seeya sessions` (a CLI já compilada, `node packages/cli/dist/index.js sessions`),
-  rodado **sem** Electron, nesta mesma sessão de agente, respondeu normalmente e rápido, achando a
-  mesma sessão real.
-- A interface, rodada contra um `homeDir` descartável (`~/.claude`/`~/.seeya` vazios, sem PID nem
-  lock reais para verificar), **não trava** — screenshot capturado normalmente (ver o relatório da
-  tarefa).
-- Uma tentativa isolada anterior, chamando `powershell.exe` via `execFileSync` de dentro de um
-  processo Electron (antes do laço de atualização existir), já tinha travado do mesmo jeito.
+**O que o PO mediu depois (14/09, na própria máquina dele), e que corrige a conclusão acima:**
+dentro de um processo principal do Electron de verdade, sem janela, contra o `~/.claude`/`~/.seeya`
+reais **com o mesmo daemon vivo** (pid 2960):
 
-**Isto não é um defeito do produto** (a mesma técnica de `powershell.exe` já é usada e testada em
-outras partes do motor, `tests/integration/process/liveness.test.ts` inclusive) — é, ao que tudo
-indica, uma interação específica desta sandbox de execução de agente com processos aninhados
-(Electron → Node → `powershell.exe`), possivelmente relacionada a como ela gerencia objetos de
-job/processo. **Não investigado a fundo** (fora do escopo desta tarefa, e sem acesso para depurar
-a própria sandbox) — registrado como limitação de ambiente de medição, não do código. A lógica de
+| Chamada | Tempo medido |
+|---|---|
+| `buildAppContext` | 8 ms |
+| `buildSidebarRows` (1 sessão) | 239 ms |
+| `describeDaemonState` (`isAlive` via `powershell.exe` respondeu normalmente) | 237 ms |
+| `describeAutostartState`, primeira chamada (módulo `ScheduledTasks` do PowerShell, frio) | **6.017 ms** |
+| `buildStatusPanelText` inteiro, chamada seguinte (módulo já quente) | 1.416 ms |
+
+**O travamento do item 8 não reproduziu na máquina do PO.** O que existe de verdade, medido, é uma
+consulta cara — de 1,4 a 6 s por ciclo, concentrada em `describeAutostartState` — não um deadlock.
+O próprio PO registrou que a primeira sonda dele também "travou", e a causa ali era dele mesmo:
+`await app.whenReady()` no topo de um módulo ESM, que nunca resolve porque o Electron só emite
+`ready` depois do módulo terminar de avaliar (deadlock conhecido, não relacionado a
+`powershell.exe`). **Ele não afirma que essa foi a causa do que ESTE agente observou** — só que é
+o que ele mesmo mediu.
+
+**Conclusão, respeitando D-025 (ausência de dado não vira afirmação):** o travamento que este
+agente observou foi real (a sessão nunca produziu screenshot nem saiu), mas **a causa continua
+desconhecida** — a hipótese "interação da sandbox de agente com processos aninhados" registrada na
+primeira versão deste item era inferência a partir de eliminação, não uma causa confirmada, e a
+medição do PO mostra que o mecanismo suspeito (`ProcessControl.isAlive`/`powershell.exe`) responde
+normalmente sob condições equivalentes (mesmo daemon vivo, mesmo pid). Fica como hipótese não
+confirmada, não como causa. **O que a correção do item 10 (o laço de atualização mais barato)
+resolve de qualquer forma:** independentemente da causa do travamento específico, o custo real que
+o PO mediu (até 6 s por ciclo, de uma consulta que nem precisa rodar toda hora) já justificava a
+mudança por si só — ver o item 10 (correção de desenho) neste mesmo registro. A lógica de
 `state/status-panel.ts`/`sidebar/sidebar-data.ts` está provada correta por teste (unidade e
-integração, com dublês e com um `tmpdir` real) independentemente disso; a prova final contra o
-`~/.claude`/`~/.seeya` reais do mantenedor, na máquina dele (fora desta sandbox), é o que fecha
-esse aceite de verdade — e é exatamente o "aceite manual do mantenedor" que a tarefa já pedia.
+integração, com dublês e com um `tmpdir` real) independentemente deste achado.
+
+### 9) Defeito de revisão: IPC de aba já encerrada derrubava o processo principal
+
+Achado pelo PO na revisão: `PtyManager.write`/`resize`/`closeTab` lançavam `UnknownTabError`
+quando a aba já não tinha pty (o `onExit` já tinha apagado a entrada do mapa) — e nada em
+`electron/main.ts` capturava essa exceção, porque os três chegam por `ipcMain.on`, não
+`ipcMain.handle`. Três cenários reais bastavam para provocar: a pessoa digita `exit` no shell e
+depois (a) tecla algo na aba, (b) redimensiona a janela — `resizeTab` chama **todas** as abas
+abertas, encerradas inclusive, então uma única ação do usuário podia lançar uma vez por aba já
+encerrada — ou (c) clica no × de uma aba já encerrada. Uma exceção não tratada num handler de
+`ipcMain.on` vira `uncaughtException` no processo principal, que no Electron abre o diálogo "A
+JavaScript error occurred in the main process".
+
+**Corrigido no modelo** (`pty/pty-manager.ts`), não com `try/catch` em `electron/main.ts`: a mesma
+razão que `tabs/tab-model.ts#updateTab` já documentava para o próprio modelo — um evento tardio
+para uma aba que já saiu é esperado, não um bug do chamador — agora vale para `PtyManager`
+também. `write`/`resize`/`closeTab` **nunca lançam**: devolvem `boolean` (`true` quando havia um
+pty vivo para a ação, `false` quando não), tolerância uniforme para os dois casos (id nunca criado
+e id já encerrado), porque o renderer não tem como distinguir um do outro mesmo se quisesse. A
+classe `UnknownTabError` foi removida — não sobrou nenhum call site que precisasse dela. Teste
+novo cobrindo os três métodos contra um id sem pty vivo, e um caso dedicado ao cenário (b)
+(redimensionar depois de uma aba ter saído: as vivas redimensionam, a encerrada é ignorada em
+silêncio).
+
+### 10) Defeito de desenho: o laço de atualização fazia I/O redundante e caro a cada ciclo
+
+A partir da medição do PO no item 8: a cada ciclo (antes, 5s), `sidebar/sidebar-data.ts` fazia
+UMA descoberta (`SessionProvider.list()`) e `state/status-panel.ts` fazia **outra**, mais o
+`isAlive` do daemon (~237ms) e `describeAutostartState` (1,4 a 6 s, medido). Corrigido:
+
+- `sidebar/sidebar-data.ts#buildSidebarRows` e `state/status-panel.ts#buildStatusPanelText` não
+  fazem mais I/O próprio — ambos recebem a descoberta (`DiscoveryResult`) já feita pelo chamador.
+  `electron/main.ts` faz **uma** chamada de `sessionProvider.list()` por ciclo, compartilhada
+  pelos dois.
+- O intervalo do laço subiu de 5 s para 10 s (`electron/main.ts#REFRESH_INTERVAL_MS`) — o estado
+  do daemon (`describeDaemonState`) continua entrando a cada ciclo, porque o custo medido
+  (~0,24 s) é aceitável.
+- A linha de autostart ganhou um cache dedicado, `state/autostart-cache.ts#resolveAutostartReport`
+  — módulo puro, testado com um `fetchReport` falso — que só reconsulta
+  `describeAutostartState` quando o tempo decorrido desde a última consulta (pelo `Clock`
+  injetado, **nunca** por contador de ciclos — um ciclo que demorou 6 s não pode ser contado como
+  "1 tick de 10 s" sem mentir sobre quanto tempo passou de verdade) atinge o intervalo configurado
+  (`DEFAULT_AUTOSTART_REFRESH_INTERVAL_MS`, 60 s — seis ciclos de 10 s). Nos ciclos intermediários,
+  a última linha resolvida é reaproveitada sem nova chamada.
+
+`buildStatusPanelText` também passou a receber a linha de autostart já resolvida, em vez de chamar
+`autostart.status()` por conta própria — a mesma mudança de forma que `buildSidebarRows` recebeu
+para a descoberta.
 
 ### O que ficou inferido, não medido
 
