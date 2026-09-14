@@ -25,6 +25,13 @@
  * never sleeps or waits internally, it only records timestamps so the caller can verify an
  * interval actually elapsed.
  *
+ * State handoff between steps (V2-T1, Q-068): the FIRST invocation of any sequence above prints
+ * `[state] created <dir>` and `[state] export SPIKE_J_STATE_DIR=<dir>` — run that export in the
+ * SAME shell before the next step. Every later invocation reads `SPIKE_J_STATE_DIR` and fails
+ * loudly if it's unset or the directory is gone; this script never guesses a state location from
+ * `tmpdir()` on its own (see `resolveStateDir`'s own comment for why an earlier version of this
+ * fix still wasn't safe enough).
+ *
  * Real invocations of `claude`, one per step. Costs real money — see the per-call
  * `--max-budget-usd` ceiling below and docs/spikes/J-cache-na-captura.md's invocation count.
  *
@@ -45,15 +52,7 @@
  * this project avoids with real TypeScript.
  */
 import { spawnSync } from 'node:child_process';
-import {
-  mkdirSync,
-  mkdtempSync,
-  writeFileSync,
-  readFileSync,
-  readdirSync,
-  statSync,
-  existsSync,
-} from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -76,41 +75,56 @@ import { fileURLToPath } from 'node:url';
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RAW_DIR = path.join(REPO_ROOT, 'docs', 'spikes', 'j-cache-na-captura-raw');
 
-// V2-T1 (Q-068, CodeQL js/insecure-temporary-file, high): this used to be a FIXED name under
-// `tmpdir()` (`seeya-spike-j-state.json`) — predictable, so another local user/process could
-// pre-create or symlink that exact path before this script ever ran, redirecting the write.
-// `mkdtempSync` creates a directory with an unpredictable, atomically-chosen suffix, which an
-// attacker can't pre-create: nobody can guess the name in time to plant a symlink there. The
-// wrinkle this script has that a one-shot tool doesn't: the docstring above is explicit that each
-// step is a SEPARATE process invocation the operator runs by hand over minutes-to-hours (the
-// "measure the clock" arms need a real wait between them), so the state has to be findable again
-// on the NEXT invocation — a single mkdtemp per run would orphan a new directory every time and
-// never reconnect to the previous state. `resolveStateDir` below reuses the most-recently-modified
-// directory this script already created (matched only by prefix, and only ones that already hold
-// a `state.json` — never an arbitrary attacker-planted directory with a lucky-matching prefix but
-// no valid content) instead of ever constructing a fixed path itself.
+// V2-T1 (Q-068, CodeQL js/insecure-temporary-file, high). Round 1 of this fix used a FIXED name
+// under `tmpdir()` (`seeya-spike-j-state.json`) — predictable, so another local user/process
+// could pre-create or symlink that exact path before this script ever ran, redirecting the
+// write. Round 2 (review, same task) tried reusing the most-recently-modified directory under
+// `tmpdir()` matching a fixed PREFIX and already containing a `state.json` — still insecure:
+// nothing stops another local process from creating that exact same shape (a directory named
+// `<prefix><anything>` with a `state.json` inside, the latter a symlink pointing wherever it
+// likes) ahead of time, and this script would still write through it as soon as it looked
+// "recent enough". Scanning `tmpdir()` by name pattern is exactly the class of thing
+// `js/insecure-temporary-file` flags — a predictable SHAPE is no better than a predictable NAME.
+//
+// The actual fix: never search `tmpdir()` at all. `mkdtempSync` creates one directory with an
+// unpredictable, atomically-chosen suffix on the FIRST invocation only, and this script hands
+// that path back to the operator to carry forward explicitly (`SPIKE_J_STATE_DIR`) for every
+// later step — the same way a shell carries any other credential or handle. The wrinkle this
+// script has that a one-shot tool doesn't: the docstring above is explicit that each step is a
+// SEPARATE process invocation the operator runs by hand over minutes-to-hours (the "measure the
+// clock" arms need a real wait between them), so state has to survive across them — but survival
+// is now the OPERATOR's job (an explicit, visible env var they set), never this script's job to
+// rediscover by guessing.
 const STATE_DIR_PREFIX = 'seeya-spike-j-state-';
 const STATE_FILE_NAME = 'state.json';
+const STATE_DIR_ENV_VAR = 'SPIKE_J_STATE_DIR';
 
 /**
- * Finds this script's own most-recently-used state directory (by mtime) if one already has a
- * `state.json` in it, or creates a fresh, unpredictable one via `mkdtempSync` — never a fixed
- * path. Only pre-existing directories that already contain OUR state file are reused, so a
- * same-prefix directory some other process happened to create (without our content) is never
- * mistaken for a real one.
+ * On the first invocation (no `SPIKE_J_STATE_DIR` in the environment): creates one fresh,
+ * unpredictable directory via `mkdtempSync` and prints the `export` line the operator must run
+ * before the next step. On every later invocation: uses `SPIKE_J_STATE_DIR` as given — never
+ * falls back to creating or discovering one on its own, and fails loudly (not silently) if the
+ * directory doesn't exist, since silently creating a fresh one there would look identical to
+ * "state was lost" instead of announcing it.
  * @returns {string}
  */
 function resolveStateDir() {
-  const base = tmpdir();
-  const candidates = readdirSync(base, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name.startsWith(STATE_DIR_PREFIX))
-    .map((entry) => path.join(base, entry.name))
-    .filter((dir) => existsSync(path.join(dir, STATE_FILE_NAME)));
-  if (candidates.length > 0) {
-    candidates.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
-    return candidates[0];
+  const configured = process.env[STATE_DIR_ENV_VAR];
+  if (configured === undefined) {
+    const created = mkdtempSync(path.join(tmpdir(), STATE_DIR_PREFIX));
+    console.log(`[state] created ${created}`);
+    console.log(`[state] export ${STATE_DIR_ENV_VAR}=${created}   (needed for every later step)`);
+    return created;
   }
-  return mkdtempSync(path.join(base, STATE_DIR_PREFIX));
+  if (!existsSync(configured)) {
+    throw new Error(
+      `${STATE_DIR_ENV_VAR}=${configured} does not exist. This must be the exact directory a ` +
+        'previous run\'s "[state] created ..." line printed — it is never recreated ' +
+        'automatically, so a stale or mistyped value fails here instead of silently starting ' +
+        'over with empty state.',
+    );
+  }
+  return configured;
 }
 
 const STATE_FILE = path.join(resolveStateDir(), STATE_FILE_NAME);

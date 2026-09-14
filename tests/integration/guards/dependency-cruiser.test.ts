@@ -399,6 +399,27 @@ describe('guard: dependency-cruiser rejects a layer violation', () => {
   );
 
   it(
+    'rejects cli/ reaching into packages/engine/src by a raw relative path ' +
+      "(V2-T1's cli-only-imports-engine-public-subpaths: legitimate access is only through " +
+      '@seeya-ai/engine\'s package export map, see the "approves cli/ importing" controls above)',
+    () => {
+      const filePath = fixture('cli', 'violation-test-engine-relative.ts');
+      // packages/cli/src/_guard-dependency-cruiser/ -> packages/engine/src/core/index.ts: 3 ups
+      // reach packages/, then engine/src/core/index.js.
+      created.push(
+        writeTempFile(filePath, "import '../../../engine/src/core/index.js';\nexport {};\n"),
+      );
+
+      const result = runDependencyCruiser([filePath]);
+      expect(result.jsonValid, result.raw).toBe(true);
+      const rules = violationsOfFixture(result.violations, filePath).map((v) => v.rule);
+
+      expect(rules, result.raw).toContain('cli-only-imports-engine-public-subpaths');
+    },
+    TEST_TIMEOUT_MS,
+  );
+
+  it(
     'rejects a dependency cycle between two modules',
     () => {
       const filePathA = fixture('adapters/clock', 'cycle-test-a.ts');

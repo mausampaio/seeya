@@ -6616,20 +6616,24 @@ como antes), o `dist` espelha isso — `packages/cli/dist/index.js`, não
 `packages/cli/dist/cli/index.js`. É exatamente o motivo do `brokenPath` do autostart (a tarefa
 agendada do mantenedor aponta para o `dist/cli/index.js` antigo, de um layout de pacote único).
 
-### 5) Um teste novo para a regra 8 foi escrito e depois removido, para não violar "1.566, nenhum a mais"
+### 5) Um teste novo para a regra 8 foi escrito, removido, e recolocado por decisão do PO na revisão
 
 Escrevi um `it()` novo em `dependency-cruiser.test.ts` provando que a oitava regra rejeita um
 caminho relativo cru de `packages/cli/src` para `packages/engine/src`. Com ele, a suíte somava
 1.567 testes — um a mais que a base. Como o despacho repete duas vezes, com números exatos, que
 "os mesmos 1.566 testes passam... nenhum pulado a mais", tratei isso como invariante mais forte
-que "toda regra nova merece teste dedicado" e removi o `it()` novo. A regra continua provada —
-só não por um teste que sobrevive no repositório: verifiquei manualmente escrevendo um arquivo de
-violação temporário (`packages/cli/src/_tmp-violation.ts`, com um `import` relativo cru para
-`packages/engine/src/core/types.js`), rodando `npx depcruise` e confirmando que
-`cli-only-imports-engine-public-subpaths` aparece na lista de violações, e apaguei o arquivo
-antes de qualquer commit. Se o mantenedor preferir a regra coberta por teste automatizado em vez
-de por essa verificação manual registrada aqui, é decisão dele — o `it()` removido está descrito
-acima com precisão suficiente para ser reescrito em minutos.
+que "toda regra nova merece teste dedicado" e removi o `it()` novo, substituindo-o por uma
+verificação manual (arquivo de violação temporário, `npx depcruise`, apagado antes do commit).
+
+**Revisão do PO:** a leitura acima foi literal demais. O invariante "1.566, nenhum a mais" existe
+para não **perder** teste nem **pular** um a mais — nunca para impedir uma regra de guard nova de
+ganhar teste dedicado, que é exatamente o que os guards de `tests/integration/guards/` existem
+para exigir (AGENTS.md § Testes: "toda função nova tem teste"; a regra 8 é função nova do guard).
+O `it()` foi **recolocado**, com o texto exato descrito no parágrafo anterior — caminho relativo
+cru de `packages/cli/src` para `packages/engine/src`, esperando
+`cli-only-imports-engine-public-subpaths` na lista de violações. **A contagem correta da tarefa é
+1.567 testes passando, 3 pulados** (1.566 da base + 1 da regra 8), não 1.566 — corrigido também
+no relatório da V2-T1 (`docs/PLANO-DE-ENTREGA.md`) e em `docs/ESTADO-ATUAL.md`.
 
 ### 6) `git log --follow` provado num arquivo, não em todos
 
