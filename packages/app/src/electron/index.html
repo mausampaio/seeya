@@ -19,6 +19,22 @@
           <button id="new-tab-button" type="button">+</button>
           <div id="tab-strip"></div>
         </div>
+        <form id="command-bar" hidden>
+          <label>
+            Command
+            <input
+              id="command-bar-command"
+              type="text"
+              placeholder="claude, codex, or leave blank for a shell"
+            />
+          </label>
+          <label>
+            Directory
+            <input id="command-bar-cwd" type="text" placeholder="Working directory" />
+          </label>
+          <button type="submit">Open</button>
+          <button id="command-bar-cancel" type="button">Cancel</button>
+        </form>
         <div id="terminal-host"></div>
       </main>
     </div>

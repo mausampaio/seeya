@@ -20,7 +20,23 @@ import os from 'node:os';
 import path from 'node:path';
 import { systemClock } from '@seeya-ai/engine/adapters/clock/index.js';
 import { buildResumptionEnv } from '@seeya-ai/engine/adapters/resumption/env.js';
-import type { Clock } from '@seeya-ai/engine/core/ports.js';
+import { processControl as realProcessControl } from '@seeya-ai/engine/adapters/process/index.js';
+import {
+  resolveCommand,
+  realCommandResolutionFs,
+  type ResolveCommandResult,
+} from '@seeya-ai/engine/adapters/process/resolve-command.js';
+import { DiscoverySessionProvider } from '@seeya-ai/engine/adapters/discovery/index.js';
+import { StorageAdapter } from '@seeya-ai/engine/adapters/storage/index.js';
+import { buildAutostart } from '@seeya-ai/engine/adapters/autostart/index.js';
+import type {
+  Autostart,
+  Clock,
+  ProcessControl,
+  SessionProvider,
+  Storage,
+} from '@seeya-ai/engine/core/ports.js';
+import type { Config } from '@seeya-ai/engine/core/types.js';
 import { NodePtyAdapter } from '../pty/node-pty-adapter.js';
 import { PtyManager, type PtyManagerCallbacks } from '../pty/pty-manager.js';
 import { defaultShellCommand, type ShellCommand } from '../pty/default-shell.js';
@@ -51,20 +67,67 @@ export interface AppContext {
   readonly tabEnv: NodeJS.ProcessEnv;
   readonly defaultShell: ShellCommand;
   buildPtyManager(callbacks: PtyManagerCallbacks): PtyManager;
+  /** The same `SessionProvider` `seeya sessions` uses (`cli/composition.ts#buildSessionProvider`,
+   * same wiring) — the sidebar's "same list as `seeya sessions`" (docs/PLANO-DE-ENTREGA.md V2-T2). */
+  readonly sessionProvider: SessionProvider;
+  /** For the status panel's daemon section (`@seeya-ai/engine/scheduler/daemon-state.js`) — same
+   * two ports `cli/status-command.ts` needs for the identical purpose. */
+  readonly storage: Storage;
+  readonly processControl: ProcessControl;
+  readonly autostart: Autostart;
+  readonly config: Config;
+  /**
+   * Resolves a harness command name (`claude`, `codex`) the same way the real OS's shell would —
+   * `@seeya-ai/engine/adapters/process/resolve-command.js`, with the real `PATH`/`PATHEXT`/
+   * filesystem this function itself already closed over (V2-T2 item 4). Never called for the
+   * empty-string "system shell" case (`pty/default-shell.ts` handles that one directly — it never
+   * needs a `PATH` walk, see that file's own docstring).
+   */
+  resolveHarnessCommand(command: string, args: readonly string[]): Promise<ResolveCommandResult>;
 }
 
 /**
  * Builds everything `electron/main.ts` needs, reading the real `process.env`/`process.platform`
  * exactly once (mirrors `packages/cli/src/composition.ts#buildCliContext`'s own "read once" shape).
+ *
+ * **Not async, unlike `buildCliContext`.** `cli/composition.ts#buildCliContext` awaits
+ * `storage.readConfig()` before building `SessionProvider` (it needs `relevanceHours` first) —
+ * this function can't do the same and stay synchronous, so `config` here is read the same way but
+ * the whole function returns a `Promise`, awaited once by `electron/main.ts` at startup.
  */
-export function buildAppContext(homeDir: string = os.homedir()): AppContext {
+export async function buildAppContext(homeDir: string = os.homedir()): Promise<AppContext> {
   const home = resolveAppHome(homeDir);
+  const clock = systemClock;
+  const storage = new StorageAdapter(home.seeyaHome);
+  const config = await storage.readConfig();
+  const sessionProvider = new DiscoverySessionProvider({
+    claudeHome: home.claudeHome,
+    seeyaHome: home.seeyaHome,
+    processControl: realProcessControl,
+    clock,
+    relevanceHours: config.relevanceHours,
+  });
+  const platform = process.platform;
+  const pathEnv = process.env.PATH;
+  const pathExtEnv = process.env.PATHEXT;
   return {
-    clock: systemClock,
+    clock,
     home,
     homeDir,
     tabEnv: buildResumptionEnv(process.env),
-    defaultShell: defaultShellCommand(process.platform, process.env),
+    defaultShell: defaultShellCommand(platform, process.env),
     buildPtyManager: (callbacks) => new PtyManager(new NodePtyAdapter(), callbacks),
+    sessionProvider,
+    storage,
+    processControl: realProcessControl,
+    autostart: buildAutostart(homeDir),
+    config,
+    resolveHarnessCommand: (command, args) =>
+      resolveCommand(command, args, {
+        platform,
+        pathEnv,
+        pathExtEnv,
+        fs: realCommandResolutionFs,
+      }),
   };
 }

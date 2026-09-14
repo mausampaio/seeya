@@ -16,6 +16,8 @@ import type {
   WriteTabRequest,
   TabDataEvent,
   TabExitEvent,
+  SessionsUpdateEvent,
+  StatusUpdateEvent,
 } from '../ipc/channels.js';
 
 export interface SeeyaApi {
@@ -26,8 +28,8 @@ export interface SeeyaApi {
   closeTab(request: CloseTabRequest): void;
   onTabData(listener: (event: TabDataEvent) => void): void;
   onTabExit(listener: (event: TabExitEvent) => void): void;
-  listSessions(): Promise<string>;
-  readStatus(): Promise<string>;
+  onSessionsUpdate(listener: (event: SessionsUpdateEvent) => void): void;
+  onStatusUpdate(listener: (event: StatusUpdateEvent) => void): void;
 }
 
 const api: SeeyaApi = {
@@ -46,8 +48,12 @@ const api: SeeyaApi = {
   onTabExit: (listener) => {
     ipcRenderer.on(CHANNELS.tabExit, (_event, data: TabExitEvent) => listener(data));
   },
-  listSessions: () => ipcRenderer.invoke(CHANNELS.listSessions),
-  readStatus: () => ipcRenderer.invoke(CHANNELS.readStatus),
+  onSessionsUpdate: (listener) => {
+    ipcRenderer.on(CHANNELS.sessionsUpdate, (_event, data: SessionsUpdateEvent) => listener(data));
+  },
+  onStatusUpdate: (listener) => {
+    ipcRenderer.on(CHANNELS.statusUpdate, (_event, data: StatusUpdateEvent) => listener(data));
+  },
 };
 
 contextBridge.exposeInMainWorld('seeya', api);

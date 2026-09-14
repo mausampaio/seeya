@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { formatStatusReport, type StatusView } from '../../../packages/cli/src/format-status.js';
+import {
+  formatStatusReport,
+  type StatusView,
+} from '../../../packages/engine/src/application/format-status.js';
 
 function view(overrides: Partial<StatusView> = {}): StatusView {
   return {

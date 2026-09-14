@@ -14,13 +14,15 @@
  *
  * Once `Storage` grows a way to read today's handoffs (S2-T3/S1-T5), this needs a real
  * `previousCaptureToday` per session — see Q-015 for why that isn't invented here instead.
+ *
+ * **Moved here from `packages/cli/src/eligibility-view.ts` in V2-T2** — the interface's status
+ * panel needs the exact "N of M discovered" count `seeya status` shows, not a second computation
+ * of eligibility that could drift from it. `cli/status-command.ts` now imports this from
+ * `@seeya-ai/engine/application/eligibility-view.js`, same name, same behavior — see Q-071.
  */
-import { evaluateEligibility } from '@seeya-ai/engine/core/eligibility.js';
-import {
-  normalizedIgnoreSet,
-  withComparableCwd,
-} from '@seeya-ai/engine/application/eligibility-assembly.js';
-import type { DiscoveredSession, Config } from '@seeya-ai/engine/core/types.js';
+import { evaluateEligibility } from '../core/eligibility.js';
+import { normalizedIgnoreSet, withComparableCwd } from './eligibility-assembly.js';
+import type { DiscoveredSession, Config } from '../core/types.js';
 
 export function countEligibleSessions(
   sessions: readonly DiscoveredSession[],

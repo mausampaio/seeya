@@ -20,8 +20,8 @@ import type {
   Storage,
 } from '@seeya-ai/engine/core/ports.js';
 import type { Config } from '@seeya-ai/engine/core/types.js';
-import { countEligibleSessions } from './eligibility-view.js';
-import { formatStatusReport } from './format-status.js';
+import { countEligibleSessions } from '@seeya-ai/engine/application/eligibility-view.js';
+import { formatStatusReport } from '@seeya-ai/engine/application/format-status.js';
 import { describeDaemonState } from '@seeya-ai/engine/scheduler/daemon-state.js';
 import { describeAutostartState } from '@seeya-ai/engine/application/autostart-state.js';
 

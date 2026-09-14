@@ -1,9 +1,10 @@
 /**
  * The Electron main process entry (D-042: the interface embeds the terminal; D-041: no logic of
  * its own — every decision below delegates to a pure module or to `composition/index.ts`). Wires
- * IPC (`ipc/channels.ts`) to `pty/pty-manager.ts` and the renderer's `BrowserWindow`. Excluded
- * from `packages/app/src`'s coverage floor (`vitest.config.ts`'s `APP_ELECTRON_SOURCE`) — it
- * cannot run without a display; everything it calls is unit-tested on its own.
+ * IPC (`ipc/channels.ts`) to `pty/pty-manager.ts`, `state/refresh-loop.ts` and the renderer's
+ * `BrowserWindow`. Excluded from `packages/app/src`'s coverage floor (`vitest.config.ts`'s
+ * `APP_ELECTRON_SOURCE`) — it cannot run without a display; everything it calls is unit-tested on
+ * its own.
  */
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,12 +18,32 @@ import type {
   WriteTabRequest,
   TabDataEvent,
   TabExitEvent,
+  SessionsUpdateEvent,
+  StatusUpdateEvent,
 } from '../ipc/channels.js';
 import type { Clock } from '@seeya-ai/engine/core/ports.js';
-import { buildAppContext } from '../composition/index.js';
+import { buildAppContext, type AppContext } from '../composition/index.js';
 import { MESSAGES } from '../text/messages.js';
+import {
+  addTab,
+  createTab,
+  emptyTabs,
+  markExited,
+  updateTab,
+  withPid,
+  type TabCollection,
+} from '../tabs/tab-model.js';
+import { buildSidebarRows } from '../sidebar/sidebar-data.js';
+import { buildStatusPanelText } from '../state/status-panel.js';
+import { runRefreshLoop } from '../state/refresh-loop.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+
+/** How often the sidebar/status panel refresh (docs/PLANO-DE-ENTREGA.md V2-T2: "atualizada em
+ * intervalo pelo relógio injetado"). Independent of the daemon's own 30s poll
+ * (`scheduler/loop.ts#POLL_INTERVAL_MS`) — this is a read-only UI refresh, not a scheduling
+ * decision, so a shorter interval costs nothing beyond a `SessionProvider.list()` call. */
+const REFRESH_INTERVAL_MS = 5_000;
 
 /**
  * `screenshotPath`/`quitAfterMs` back a single verification hook (undocumented, internal, unset
@@ -90,15 +111,17 @@ function createWindow(clock: Clock): BrowserWindow {
     });
   }
   // SEEYA_APP_AUTO_OPEN_SHELL_TAB: same "instrumentação só do spike" class as SEEYA_APP_OFFSCREEN
-  // above — clicks the real "+" button (the same DOM element and click handler a person would
-  // use), a few seconds after load, so an agent with no keyboard/mouse of its own can prove a
+  // above — clicks the real "+" button and submits the real command bar with both fields left
+  // blank (the same elements and handlers a person would use, for the "leave blank for a shell"
+  // case), a few seconds after load, so an agent with no keyboard/mouse of its own can prove a
   // shell tab really opens a pty (docs/PLANO-DE-ENTREGA.md V2-T2 aceite: process tree, window
   // count). Never set by `npm run app` or the README.
   if (process.env.SEEYA_APP_AUTO_OPEN_SHELL_TAB === '1') {
     window.webContents.once('did-finish-load', () => {
       void clock.sleep(300).then(() => {
         void window.webContents.executeJavaScript(
-          "document.getElementById('new-tab-button').click()",
+          "document.getElementById('new-tab-button').click(); " +
+            "document.getElementById('command-bar').requestSubmit();",
         );
       });
     });
@@ -107,40 +130,58 @@ function createWindow(clock: Clock): BrowserWindow {
 }
 
 /**
- * Wires every IPC channel to `PtyManager` — the only logic here is "which tab does this event
- * belong to", never anything about a pty or a process itself (that's `pty/pty-manager.ts`'s job).
+ * Wires every IPC channel to `PtyManager` and starts the sidebar/status refresh loop. The only
+ * logic here is "which tab does this event belong to" and "which window does this update go to" —
+ * never anything about a pty, a process, or how to compute a session row (that's `pty/`, `state/`
+ * and `sidebar/`'s job).
  */
-function wireIpc(window: BrowserWindow, context: ReturnType<typeof buildAppContext>): void {
+function wireIpc(window: BrowserWindow, context: AppContext): void {
+  // Mutated only by the two places below that change a tab's lifecycle (created, exited) — never
+  // read by anything outside this function, so a plain closed-over variable is enough; no reason
+  // for the heavier ceremony `pty/pty-manager.ts`'s own class gets (that one is exported and
+  // tested on its own).
+  let tabs: TabCollection = emptyTabs();
+
   const ptyManager = context.buildPtyManager({
     onData: (id, data) => {
       const event: TabDataEvent = { id, data };
       window.webContents.send(CHANNELS.tabData, event);
     },
     onExit: (id, exitCode) => {
+      tabs = updateTab(tabs, id, (tab) => markExited(tab, exitCode));
       const event: TabExitEvent = { id, exitCode };
       window.webContents.send(CHANNELS.tabExit, event);
     },
   });
 
-  ipcMain.handle(CHANNELS.createTab, (_event, request: CreateTabRequest): CreateTabResponse => {
-    // Empty command means "the default system shell" (docs/PLANO-DE-ENTREGA.md V2-T2 step (b):
-    // "'+' abrindo uma aba com o shell do sistema"). A named harness (`claude`/`codex`, step (d))
-    // resolves through the engine's `adapters/process/resolve-command.ts` instead — wired once
-    // that module exists (V2-T2 step (c)).
-    const resolved =
-      request.command === ''
-        ? context.defaultShell
-        : { command: request.command, args: request.args };
-    const pid = ptyManager.create(request.id, {
-      command: resolved.command,
-      args: resolved.args,
-      cwd: request.cwd === '' ? context.homeDir : request.cwd,
-      env: context.tabEnv,
-      cols: request.cols,
-      rows: request.rows,
-    });
-    return { id: request.id, pid };
-  });
+  ipcMain.handle(
+    CHANNELS.createTab,
+    async (_event, request: CreateTabRequest): Promise<CreateTabResponse> => {
+      // Empty command means "the default system shell" (docs/PLANO-DE-ENTREGA.md V2-T2 step (b)):
+      // pty/default-shell.ts needs no PATH walk. A named harness (claude/codex, or anything else
+      // typed) resolves through the engine's adapters/process/resolve-command.ts instead, exactly
+      // the way a real shell would find it (V2-T2 item 4/step (c)).
+      const resolved =
+        request.command === ''
+          ? context.defaultShell
+          : await resolveHarnessOrThrow(context, request.command, request.args);
+      const cwd = request.cwd === '' ? context.homeDir : request.cwd;
+      tabs = addTab(
+        tabs,
+        createTab({ id: request.id, command: request.command, args: request.args, cwd }),
+      );
+      const pid = ptyManager.create(request.id, {
+        command: resolved.command,
+        args: resolved.args,
+        cwd,
+        env: context.tabEnv,
+        cols: request.cols,
+        rows: request.rows,
+      });
+      tabs = updateTab(tabs, request.id, (tab) => withPid(tab, pid));
+      return { id: request.id, pid };
+    },
+  );
 
   ipcMain.on(CHANNELS.writeTab, (_event, request: WriteTabRequest) => {
     ptyManager.write(request.id, request.data);
@@ -156,14 +197,56 @@ function wireIpc(window: BrowserWindow, context: ReturnType<typeof buildAppConte
   ipcMain.on(CHANNELS.closeTab, (_event, request: CloseTabRequest) => {
     ptyManager.closeTab(request.id);
   });
+
+  void runRefreshLoop({
+    clock: context.clock,
+    intervalMs: REFRESH_INTERVAL_MS,
+    shouldStop: () => window.isDestroyed(),
+    onTick: async () => {
+      const rows = await buildSidebarRows(
+        context.sessionProvider,
+        context.config,
+        context.clock,
+        tabs,
+      );
+      const sessionsEvent: SessionsUpdateEvent = { rows };
+      window.webContents.send(CHANNELS.sessionsUpdate, sessionsEvent);
+
+      const text = await buildStatusPanelText(context);
+      const statusEvent: StatusUpdateEvent = { text };
+      window.webContents.send(CHANNELS.statusUpdate, statusEvent);
+    },
+  });
 }
 
-void app.whenReady().then(() => {
+/** Resolves a named harness command against the real `PATH`, or throws a message naming exactly
+ * where it looked (AGENTS.md's error-message rule) — `ipcMain.handle` turns a thrown error into a
+ * rejected promise on the renderer side, which `renderer.ts#openTab` shows in the tab itself. */
+async function resolveHarnessOrThrow(
+  context: AppContext,
+  command: string,
+  args: readonly string[],
+): Promise<{ readonly command: string; readonly args: readonly string[] }> {
+  const result = await context.resolveHarnessCommand(command, args);
+  if (result.kind === 'resolved') {
+    return result.resolved;
+  }
+  throw new Error(
+    `could not find "${command}" — searched: ${result.unresolved.searched.join(', ') || '(PATH is empty)'}`,
+  );
+}
+
+void app.whenReady().then(async () => {
   // Built once per process (mirrors `packages/cli/src/composition.ts`'s own "read once" shape).
   // `wireIpc` registers every `ipcMain.handle`/`ipcMain.on` — process-global in Electron, not
   // per-window (`ipcMain.handle` throws "Attempted to register a second handler" on a repeat
   // registration) — so it runs exactly ONCE here, never again from `activate` below.
-  const context = buildAppContext();
+  //
+  // SEEYA_APP_HOME_OVERRIDE: same undocumented, internal, verification-only class as
+  // SEEYA_APP_OFFSCREEN/SEEYA_APP_SCREENSHOT_PATH above — `buildAppContext` already accepts a home
+  // directory as a parameter for exactly this (every test in tests/integration/app/composition.test.ts
+  // uses it against a tmpdir fixture, never the real home). Never set by `npm run app`.
+  const context = await buildAppContext(process.env.SEEYA_APP_HOME_OVERRIDE);
   const window = createWindow(context.clock);
   wireIpc(window, context);
 

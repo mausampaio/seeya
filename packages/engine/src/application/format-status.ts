@@ -1,11 +1,18 @@
 /**
  * Plain-text rendering for `seeya status` (D-028): the configured end-of-day time, the
  * discovered/eligible session counts, and — since S4-T13 — today's effective schedule and the
- * daemon's state, both pre-rendered by `./daemon-state.ts#describeDaemonState` and passed in as
- * `daemonAndScheduleReport`. That text is reused verbatim from the same function `seeya daemon
- * --status` calls (docs/PLANO-DE-ENTREGA.md S4-T13, cuidado (a)) rather than re-derived here —
- * this module's own job stays "assemble the pieces of `seeya status`'s report", not "decide what
- * the daemon is doing".
+ * daemon's state, both pre-rendered by `scheduler/daemon-state.ts#describeDaemonState` and passed
+ * in as `daemonAndScheduleReport`. That text is reused verbatim from the same function `seeya
+ * daemon --status` calls (docs/PLANO-DE-ENTREGA.md S4-T13, cuidado (a)) rather than re-derived
+ * here — this module's own job stays "assemble the pieces of `seeya status`'s report", not
+ * "decide what the daemon is doing".
+ *
+ * **Moved here from `packages/cli/src/format-status.ts` in V2-T2.** Unlike `format-sessions.ts`
+ * (stayed in `cli/` — the interface renders its own sidebar DOM, not CLI text), the interface's
+ * status panel wants the literal SAME text `seeya status` prints (docs/PLANO-DE-ENTREGA.md V2-T2:
+ * "o painel de estado bate com `seeya status`" — the aceite compares them, so reusing this
+ * function verbatim is what makes that comparison meaningless to fail). `cli/status-command.ts`
+ * now imports this from `@seeya-ai/engine/application/format-status.js`, same name, same output.
  */
 export interface StatusView {
   readonly endOfDayTime: string | null;

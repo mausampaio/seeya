@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { countEligibleSessions } from '../../../packages/cli/src/eligibility-view.js';
+import { countEligibleSessions } from '../../../packages/engine/src/application/eligibility-view.js';
 import type { Config } from '@seeya-ai/engine/core/types.js';
 import { createSessionWithPid } from '../core/_fixtures.js';
 

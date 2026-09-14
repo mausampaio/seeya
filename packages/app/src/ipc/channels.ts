@@ -5,6 +5,7 @@
  * channel string is a classic Electron footgun (main and renderer silently never talking to each
  * other); this module is the one place the string exists.
  */
+import type { SidebarRow } from '../sidebar/sidebar-data.js';
 
 export const CHANNELS = {
   /** Renderer → main: open a new tab. */
@@ -19,10 +20,13 @@ export const CHANNELS = {
   tabData: 'seeya:tab-data',
   /** Main → renderer: one tab's process ended. */
   tabExit: 'seeya:tab-exit',
-  /** Renderer → main (invoke): the current session listing (same content as `seeya sessions`). */
-  listSessions: 'seeya:list-sessions',
-  /** Renderer → main (invoke): the current status text (same content as `seeya status`). */
-  readStatus: 'seeya:read-status',
+  /** Main → renderer, pushed on an interval by `state/refresh-loop.ts` (docs/PLANO-DE-ENTREGA.md
+   * V2-T2: "atualizada em intervalo pelo relógio injetado"): the sidebar's rows, same content as
+   * `seeya sessions` (`sidebar/sidebar-data.ts#buildSidebarRows`). */
+  sessionsUpdate: 'seeya:sessions-update',
+  /** Main → renderer, pushed on the same interval: the status panel's text, same content as
+   * `seeya status` (`state/status-panel.ts#buildStatusPanelText`). */
+  statusUpdate: 'seeya:status-update',
 } as const;
 
 export interface CreateTabRequest {
@@ -63,4 +67,12 @@ export interface TabDataEvent {
 export interface TabExitEvent {
   readonly id: string;
   readonly exitCode: number;
+}
+
+export interface SessionsUpdateEvent {
+  readonly rows: readonly SidebarRow[];
+}
+
+export interface StatusUpdateEvent {
+  readonly text: string;
 }
