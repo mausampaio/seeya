@@ -146,6 +146,33 @@ trabalho de verdade.
 `claude` funcionando; comparar a lateral com `seeya sessions` e o painel de estado com `seeya
 status` ao vivo; medir memória com 1 e 3 abas.
 
+## V2-T3 — terminal usável no dia a dia (entregue em worktree, 14/09, pendente revisão do PO)
+
+**Não mesclada ainda** — três commits numa worktree isolada, um por item, aguardando revisão do
+PO antes de subir para `main` (nenhum push feito pelo agente). Os três itens do despacho: fonte
+configurável com Nerd Font embutida (`terminalFontFamily`/`terminalFontSize`, D-035), aba
+encerrada removível pelo ×, e a checagem/correção do bit de execução do `spawn-helper` do
+node-pty (mais `X_OK` em `adapters/process/resolve-command.ts`, que antes só conferia
+existência).
+
+**Medido pelo agente:** `npm run verificar` completo verde a cada um dos três commits; `npm run
+verificar:linux` verde no estado final — 161 arquivos de teste, 1.654 testes passando, 5 pulados,
+dentro do contêiner `node:22-bookworm` (Docker respondeu em segundos). Captura de tela real prova
+os glifos Nerd renderizados (não como caixas) numa aba. **Achado que muda o entendimento do item
+3:** `spawn-helper` só existe no macOS (é um alvo `OS=="mac"` no `binding.gyp` do próprio
+node-pty) — o Linux nunca o compila nem precisa dele, o que bate com a aba de shell já funcionando
+lá desde a V2-T2. Os prebuilds de macOS que o `npm ci` do contêiner Linux extrai mesmo sem
+usá-los saíram com modo `644` (sem bit de execução) — evidência a favor da hipótese do
+mantenedor sobre o Mac, não confirmação (só o `ls -l` dele lá confirma).
+
+Detalhes completos, decisões e o que ficou inferido (não medido) em `docs/QUESTOES.md` Q-072;
+relatório do agente na entrada V2-T3 de `docs/PLANO-DE-ENTREGA.md`.
+
+**O que o mantenedor precisa fazer:** revisar e mesclar; depois, no Mac, `ls -l
+node_modules/node-pty/prebuilds/darwin-*/spawn-helper` antes de `npm run app` (que agora corrige
+sozinho se faltar o bit) e conferir se uma aba de shell abre; na máquina Linux do dia a dia,
+conferir se o prompt do `oh-my-posh` agora renderiza os glifos Nerd corretamente.
+
 ## Próximo passo
 
 S4-T11, S4-T12 e S4-T13 mescladas em 12/09; a fila do Sprint 4 está vazia. **Decidido em

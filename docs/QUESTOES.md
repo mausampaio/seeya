@@ -6952,3 +6952,163 @@ para a descoberta.
   cria um HWND visível do jeito que `EnumWindows` enumeraria, então a contagem antes/depois fica
   sem sentido nesta sandbox especificamente — é outra medição que cabe ao mantenedor, numa área de
   trabalho de verdade.
+
+## Q-072 — V2-T3 (terminal usável no dia a dia): a versão/licença da fonte embutida, o modo do
+## helper no contêiner (e por que ele não existe ali), e as decisões dos três itens
+
+**Tarefa:** V2-T3
+**Bloqueia:** não — os três itens foram entregues com um commit cada, portão local completo verde
+(`npm run verificar`) e `npm run verificar:linux` verde no mesmo estado final. Registro no mesmo
+padrão de Q-070/Q-071.
+
+### 1) Item 1 — a fonte: versão exata, licença, e por que a pilha padrão funciona mesmo sem
+### depender do que já está instalado
+
+Baixada do release oficial do projeto Nerd Fonts (`ryanoasis/nerd-fonts`), **tag `v3.5.1`**, o
+zip `FiraCode.zip`. Só o peso **Regular** entrou —
+`packages/app/assets/fonts/FiraCodeNerdFontMono-Regular.ttf`, **2.757.772 bytes (~2,6 MiB)**, mais
+que a estimativa de "~1–2 MB" do despacho (a estimativa era otimista; um Nerd Font Mono patcheado
+com o conjunto completo de glifos de ícone é maior que isso). Licença **conferida antes de
+commitar**: `packages/app/assets/fonts/OFL.txt` é a cópia exata da SIL Open Font License 1.1 que
+vem dentro do próprio zip, cabeçalho `Copyright (c) 2014, The Fira Code Project Authors`.
+
+**A pilha padrão** (`config-schema.ts#TERMINAL_FONT_FAMILY_DEFAULT`):
+`'FiraCode Nerd Font Mono', 'FiraCode Nerd Font', 'Fira Code', monospace`. A primeira entrada é
+o nome EXATO que o `@font-face` do `index.css` registra — e é isso, não a ordem da lista, que faz
+dela uma garantia: uma declaração `@font-face` da própria página sempre vence uma fonte do sistema
+com o mesmo nome, então a primeira entrada resolve para o arquivo embutido **quer a pessoa tenha
+ou não uma fonte de sistema com esse nome exato**. As entradas seguintes (`'FiraCode Nerd Font'`,
+`'Fira Code'`) e o `monospace` final existem para transparência de quem lê o valor (ex.: alguém
+que rode `seeya config get terminalFontFamily` e queira trocar por outra coisa), não porque o
+navegador precisasse delas para escolher a fonte certa.
+
+**Onde a decisão pura mora:** `packages/app/src/state/terminal-font.ts#resolveTerminalFontOptions`
+— só extrai `terminalFontFamily`/`terminalFontSize` do `Config` (já resolvido com defaults pelo
+motor) na forma que `new Terminal({...})` espera. `electron/main.ts` chama essa função uma vez, no
+handshake IPC `getTerminalFontConfig` (`ipcRenderer.invoke`, o mesmo padrão de `createTab`);
+`electron/renderer.ts#main` busca o valor antes de conectar qualquer coisa que possa abrir uma
+aba, então `openTab` nunca precisa de um valor de reserva.
+
+**Prova (lida por mim):** captura de tela real, contra `SEEYA_APP_HOME_OVERRIDE` descartável, com
+`SEEYA_APP_OFFSCREEN=1`/`SEEYA_APP_SCREENSHOT_PATH`/`SEEYA_APP_AUTO_OPEN_SHELL_TAB=1` — a mesma
+instrumentação só de verificação que a V2-T2 já tinha, estendida por uma linha (`main.ts`'s
+`NERD_GLYPH_PROOF_LINE`, três code points ``/``/`` enviados pelo MESMO canal
+`CHANNELS.tabData` que uma saída real de pty usaria) para escrever os glifos numa aba real. A
+captura mostrou os três glifos renderizados como ícones de verdade (um triângulo Powerline, um
+ícone de pasta, um ícone de branch) — não como caixas. Não afirmo nada sobre a fonte no Linux real
+do mantenedor além do que a Q-071 já tinha registrado (o achado de uso que originou esta tarefa).
+
+### 2) Item 2 — aba encerrada removível: o que `removeTab` cobre, e uma lacuna deixada de propósito
+
+`tabs/tab-model.ts#removeTab` é puro — remove uma entrada de `TabCollection`, no-op silencioso
+para um id inexistente (mesmo espírito de `updateTab`), com teste. **Quem decide QUANDO chamar** é
+o `renderer.ts`: o botão × lê `isRunning(open.tab)` — se falso (processo já saiu), remove o botão
+e o painel do terminal (`removeTabUi`, que também chama `terminal.dispose()`); se verdadeiro,
+continua só pedindo o fim do processo, como já era. Isso exigiu manter o `tab.status` do
+`OpenTab` do renderer sincronizado com o evento real de saída (`onTabExit` agora aplica
+`markExited` na cópia local também, espelhando o que `main.ts` já fazia na própria
+`TabCollection`) — sem isso, o botão nunca saberia que a aba já tinha saído.
+
+**Deliberadamente não tocado:** a `TabCollection` que `main.ts` mantém no processo principal
+**não** é notificada quando o renderer remove uma aba — ela segue guardando a entrada (como já
+fazia desde a V2-T2, que nunca removia nada). Isso é uma lacuna conhecida, não um bug desta
+tarefa: o despacho listava só `tabs/tab-model.ts#removeTab` e "o renderer remove botão e painel",
+sem pedir um canal IPC novo de remoção, e nenhum novo `spawn` some — `findTabByPid` só é usado
+para casar aba↔sessão descoberta (D-025), e uma sessão cujo processo já morreu não aparece mais na
+descoberta de qualquer forma, então o pior caso é uma entrada morta acumulando na memória do
+processo principal ao longo de uma sessão longa de uso, não uma correspondência errada. Registro
+aqui em vez de decidir sozinho ampliar o escopo (AGENTS.md: "se a solução tiver efeito além da sua
+tarefa, abra a questão e siga com a solução mínima").
+
+**Achado incidental, não corrigido (fora de escopo desta tarefa):** durante a verificação visual
+deste item, a barra de comando (`#command-bar`) apareceu sempre visível nas capturas de tela,
+mesmo depois de submetida — `index.css` declara `#command-bar { display: flex; ... }`, uma regra
+de ID mais específica que a folha de estilo padrão do navegador para `[hidden] { display: none }`,
+então o atributo `hidden` que `renderer.ts` já seta corretamente nunca ganha efeito visual. Isso é
+da V2-T2, não desta tarefa, e não afeta nenhuma prova pedida aqui (a barra continua funcionalmente
+escondida do ponto de vista de foco/submissão, só visualmente não some) — registrado para quando
+alguém for mexer em `index.css` de novo.
+
+**Verificado (não é a prova pedida pelo despacho, que só citava item 1 explicitamente — feito por
+cautela própria, revertido antes do commit):** rodei a interface real duas vezes contra um
+`SEEYA_APP_HOME_OVERRIDE` descartável, escrevendo `exit\r` de verdade no pty de uma aba de shell
+(via `window.seeya.writeTab`, a mesma API de produção) para fazer o processo sair de verdade, e
+comparei a captura antes/depois de clicar × de novo: antes, a aba mostrava "shell exited (code 0)"
+com × ainda visível; depois do clique, a faixa de abas e o painel do terminal ficaram vazios. O
+código que orquestrava esse teste (mais delay/clique via `executeJavaScript`) nunca foi commitado
+— era só instrumentação temporária deste agente, e o `main.ts` commitado é idêntico ao do commit
+do item 1 mais só o handler do IPC de fonte (item 1) — `git diff` entre os dois commits confirma.
+
+### 3) Item 3 — `spawn-helper`: por que ele não existe no Linux, a medição real no contêiner, e o
+### que isso diz (e não diz) sobre o macOS
+
+**Renomeação, como pedido:** `CommandResolutionFs.fileExists` virou `isExecutable`, e
+`realCommandResolutionFs` passou de `access(path)` para `access(path, constants.X_OK)`. No
+Windows, `X_OK` não distingue nada (documentado no próprio Node) — o comportamento ali é idêntico
+ao de antes, e um teste de integração novo prova as duas coisas: em POSIX, um arquivo sem bit de
+execução deixa de ser "encontrado" (o defeito que existia); no Windows, um arquivo sem conceito de
+bit de execução no modelo da plataforma continua resolvendo, sem regressão.
+
+**A medição pedida, dentro do contêiner `node:22-bookworm` do `verificar:linux`, node-pty 1.1.0:**
+`spawn-helper` **é um alvo que só existe para `OS=="mac"` no `binding.gyp` do próprio node-pty**
+(`src/unix/spawn-helper.cc`, dentro de um bloco `['OS=="mac"', {...}]`). O build Linux usa
+`forkpty`/`-lutil` direto em `pty.cc` e nunca declara nem precisa desse alvo — confirmado
+compilando do fonte dentro do contêiner (`node-gyp rebuild`, que já funciona sem toolchain extra,
+como a Q-071 item 6 tinha medido): o `make` produz só `pty.node`, nenhum `spawn-helper`. Por isso
+`locateSpawnHelper()` (em `build.mjs`) devolve `null` no Linux — **esse é o resultado esperado e
+saudável, não um defeito**. `unixTerminal.js` ainda calcula e passa um caminho de `spawn-helper`
+para a chamada nativa em QUALQUER POSIX, mas o addon compilado no Linux nunca abre esse caminho
+(não tem código para isso), o que bate com a aba de shell funcionando normalmente no Linux desde a
+V2-T2.
+
+**O que o mesmo contêiner mostrou sobre o macOS — evidência, não confirmação:** o `npm ci` daquele
+contêiner Linux extrai os PREBUILDS de macOS do próprio pacote npm mesmo sem usá-los
+(`prebuilds/darwin-x64/spawn-helper`, `prebuilds/darwin-arm64/spawn-helper`) — e os dois saíram
+com modo **`644` (`-rw-r--r--`), sem nenhum bit de execução**. Como a extração de um pacote npm
+preserva o modo empacotado no tarball **independente do sistema operacional que está extraindo**,
+os MESMOS bytes, com o MESMO modo `644`, são o que um `npm ci` real num Mac também extrairia — o
+que torna a hipótese do mantenedor mais plausível, mas **não a confirma**: eu não tenho como medir
+o Mac dele a partir daqui. A lógica de localizar+corrigir foi testada de verdade contra esse
+arquivo real e não-executável dentro do contêiner (achou, confirmou modo `644`, aplicou `chmod`
+para `755`) — a função funciona; o que fica em aberto é só se ESTA é de fato a causa do
+`posix_spawnp failed` que ele viu.
+
+**`ensureSpawnHelperExecutable`** (em `build.mjs`, ao lado de `ensureElectronBinary`, chamada de
+`launchElectron`, então só roda em `npm run app`/`--dev`, nunca no bundle de produção puro):
+no-op imediato em `win32`; em `darwin`/`linux`, localiza pelo mesmo algoritmo de busca que
+`node_modules/node-pty/lib/utils.js#loadNativeModule` usa (via `require.resolve`, nunca um
+caminho chutado), confere o modo, e só aplica `chmod` quando falta qualquer bit de execução —
+sem efeito quando já está certo, e sem erro quando não encontra nada (o caso normal do Linux).
+
+### 4) Medido vs. inferido — resumo
+
+**Medido por este agente:**
+- Fonte: versão v3.5.1, licença OFL 1.1 conferida, peso Regular, 2,76 MB.
+- Renderização dos glifos Nerd numa aba real (captura de tela, offscreen, Windows).
+- Remoção de aba encerrada funcionando (captura antes/depois, verificação própria fora do commit).
+- `spawn-helper` é exclusivo de macOS no código-fonte do node-pty (`binding.gyp`); Linux não o
+  compila nem precisa dele.
+- Modo `644` dos prebuilds darwin extraídos por `npm ci` dentro do contêiner Linux.
+- A lógica de localizar+corrigir funciona contra um arquivo real não-executável (mesmo contêiner).
+- `X_OK` distingue corretamente em POSIX; no Windows o comportamento não muda (teste dedicado).
+- Portão local completo verde (`npm run verificar`) e `npm run verificar:linux` verde, no estado
+  final dos três commits — 161 arquivos de teste, 1654 testes passando, 5 pulados, dentro do
+  contêiner.
+
+**Inferido, não medido por este agente:**
+- Que o `chmod` do item 3 é de fato o que resolve o `posix_spawnp failed` no Mac do mantenedor —
+  só ele pode medir isso (`ls -l` antes/depois, e uma aba abrindo).
+- Se o prompt com `oh-my-posh` fica legível na segunda máquina do mantenedor (Linux) com a fonte
+  embutida — pendência que já estava registrada desde a V2-T2/Q-071 e que só ele pode confirmar
+  numa tela de verdade.
+
+### 5) Pendências para o mantenedor
+
+1. No Mac: `ls -l node_modules/node-pty/prebuilds/darwin-*/spawn-helper` antes de abrir a
+   interface, depois `npm run app` (que agora corrige sozinho se faltar o bit) e conferir se uma
+   aba de shell abre.
+2. Na máquina Linux do dia a dia: conferir se o prompt do `oh-my-posh` agora renderiza os glifos
+   corretamente com a fonte embutida.
+3. O achado incidental do item 2 (`#command-bar` sempre visível por causa da especificidade de
+   CSS) — cosmético, não bloqueia nada desta tarefa, mas fica registrado para quando alguém tocar
+   `index.css` de novo.

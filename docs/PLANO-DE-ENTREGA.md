@@ -4421,7 +4421,7 @@ texto, mas não são a fila.
       shell, e `chmod +x` no helper. **Pendência do mantenedor**, registrada na V2-T3 como
       correção condicional. Com Windows e a segunda máquina passando, a tarefa está **aceita**.
 
-- [ ] **V2-T3 — Terminal usável no dia a dia: fonte configurável com Nerd Font embutida, aba
+- [~] **V2-T3 — Terminal usável no dia a dia: fonte configurável com Nerd Font embutida, aba
       encerrada removível, helper executável no macOS/Linux (D-035, D-042).** Especificada pelo
       PO em 2026-09-14 a partir do uso real do mantenedor no mesmo dia; **aprovada e despachada
       pelo mantenedor em 2026-09-14.** Curta de propósito: três correções de uso que
@@ -4472,6 +4472,53 @@ texto, mas não são a fila.
       (medir: modo do helper depois do `npm ci` lá); portão e `verificar:linux` verdes; CI nos
       três sistemas. **Aceite manual do mantenedor:** o prompt com `oh-my-posh` legível na
       segunda máquina; e no Mac, o diagnóstico do helper e uma aba de shell abrindo.
+
+      **Entregue pelo agente em 2026-09-14, três commits, um por item, worktree isolada.** Portão
+      local completo verde a cada commit (`npm run verificar`, rodado em pedaços, código de saída
+      lido em cada um) e `npm run verificar:linux` verde no estado final dos três commits juntos —
+      161 arquivos de teste, 1.654 testes passando, 5 pulados, dentro do contêiner
+      `node:22-bookworm` (Docker respondeu em segundos, bem dentro da janela de cinco minutos).
+
+      1. **Fonte.** FiraCode Nerd Font Mono, peso Regular, baixada do release oficial
+         `ryanoasis/nerd-fonts` **v3.5.1** (`FiraCode.zip`), licença SIL OFL 1.1 conferida antes de
+         commitar (`packages/app/assets/fonts/OFL.txt`, cópia exata do arquivo do zip) —
+         2.757.772 bytes, acima da estimativa de "~1–2 MB" do despacho. As duas chaves
+         (`terminalFontFamily`/`terminalFontSize`) entraram no esquema de config, no
+         `seeya config get/set`, e no glossário do `AGENTS.md` antes do código. A decisão de qual
+         fonte/tamanho aplicar mora em `packages/app/src/state/terminal-font.ts` (módulo puro,
+         testado), buscada pelo renderer via IPC antes de qualquer aba poder abrir — `electron/`
+         só aplica em `new Terminal({...})`. **Prova lida pelo agente:** captura de tela real
+         (offscreen, `SEEYA_APP_HOME_OVERRIDE` descartável) com os três glifos Nerd
+         (`  `, enviados pelo mesmo canal `tabData` que uma saída real de pty
+         usaria) renderizados como ícones de verdade, não caixas.
+
+      2. **Aba encerrada removível.** `tabs/tab-model.ts#removeTab` (puro, testado); o × só remove
+         quando `isRunning(tab)` é falso, senão continua só encerrando o processo como antes. O
+         renderer precisou passar a espelhar `markExited` na sua própria cópia da aba (antes só
+         `main.ts` fazia isso) para o botão saber qual dos dois casos aplicar. Verificação própria
+         do agente (fora da prova formalmente pedida, que citava só o item 1): captura antes/
+         depois com um `exit\r` real escrito no pty confirmou a remoção completa (botão e painel).
+         **Lacuna registrada, não corrigida:** a `TabCollection` que `main.ts` mantém no processo
+         principal não é notificada da remoção — segue guardando a entrada, como já fazia desde a
+         V2-T2. Sem efeito prático conhecido (a correspondência aba↔sessão já depende só de PID
+         vivo), mas registrado em vez de ampliar sozinho o escopo (Q-072).
+
+      3. **`spawn-helper`.** `adapters/process/resolve-command.ts`:
+         `CommandResolutionFs.fileExists` virou `isExecutable`, com `access(path, X_OK)` —
+         testado que distingue em POSIX e que o Windows (onde `X_OK` não diferencia nada, doc do
+         próprio Node) não regrediu. **Medição real no contêiner `verificar:linux`:** o
+         `spawn-helper` é um alvo exclusivo de `OS=="mac"` no `binding.gyp` do próprio node-pty —
+         o build Linux usa `forkpty` direto e nunca produz nem precisa desse arquivo (confirmado
+         compilando do fonte dentro do contêiner). `ensureSpawnHelperExecutable` (em `build.mjs`,
+         ao lado de `ensureElectronBinary`) reflete isso: no-op correto quando não encontra nada
+         no Linux, e a lógica de localizar+corrigir foi testada de verdade contra um arquivo real
+         não-executável — os prebuilds de macOS que o próprio `npm ci` do contêiner Linux extrai
+         (mesmo sem usá-los) saíram com modo `644`, sem bit de execução, o que torna a hipótese do
+         mantenedor mais plausível **sem confirmá-la** — só o `ls -l` dele no Mac de verdade
+         confirma.
+
+      Detalhes, decisões de ferramental e o que ficou inferido (não medido) em
+      `docs/QUESTOES.md` Q-072.
 
 - [ ] **V2-T4 — A interface retoma o dia: `start-day` em abas e pergunta antes do fallback
       (D-042, D-043, D-039).** Especificada pelo PO em 2026-09-14; **aguarda
