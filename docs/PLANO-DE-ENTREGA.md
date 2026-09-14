@@ -4405,8 +4405,11 @@ texto, mas não são a fila.
       pediu; o gesto de remover a aba encerrada entra na V2-T3), e o `codex` não mostrou tela de
       confiança no diretório padrão (comportamento do harness, não do seeya).
 
-      **Aceite na segunda máquina do mantenedor (2026-09-14): passou** — shell e `claude` abertos
-      em abas e funcionando (`codex` não testado: não está instalado lá). Um achado de uso: o
+      **Aceite na segunda máquina do mantenedor, o Linux do dia a dia (2026-09-14): passou** —
+      shell e `claude` abertos em abas e funcionando (`codex` não testado: não está instalado
+      lá). É a medição que a D-042 pedia: a pilha se sustenta no Linux. Ao fechar a interface, o
+      terminal mostrou `VAAPI version is too old (min 1.17.0, installed 1.14)` — aviso do
+      Chromium sobre a biblioteca de vídeo por hardware da distro, inofensivo para o seeya. Um achado de uso: o
       terminal da máquina usa `oh-my-posh` com uma fonte Nerd (FiraCode), e a aba abriu com a
       fonte padrão do `xterm.js`, então o prompt renderizou quebrado — vira a V2-T3 (fonte
       configurável, com uma Nerd Font embutida como padrão). **No macOS (MacBook 2012, Sonoma):**
