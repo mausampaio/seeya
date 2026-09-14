@@ -139,7 +139,9 @@ npm run app
 ```
 
 Builds the engine, bundles the three Electron targets (`packages/app/scripts/build.mjs`, esbuild),
-and launches the real Electron binary. A window opens with the discovered-session list on the
+and launches the real Electron binary. **The first run downloads that binary (~160 MB)**: the
+`electron` package no longer does it at `npm ci` time, so the script runs its installer once when
+`node_modules/electron/path.txt` is missing. A window opens with the discovered-session list on the
 side, a status panel matching `seeya status`, and a "+" button that opens a command bar (command
 and working directory — never a native `prompt()`) for a tab backed by an embedded terminal
 (`@xterm/xterm` + `node-pty`). Distribution as an installer is future work (D-042); today this only
