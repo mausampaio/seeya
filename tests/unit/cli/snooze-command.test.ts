@@ -14,11 +14,11 @@ import {
   runSkipTodayCommand,
   runSnoozeCommand,
   parseSnoozeIncrement,
-} from '../../../src/cli/snooze-command.js';
+} from '../../../packages/cli/src/snooze-command.js';
 import { InMemoryScheduleStorage } from './_fakes.js';
 import { FakeClock } from '../application/_fakes.js';
-import type { Config, DayState } from '../../../src/core/types.js';
-import { EMPTY_DAEMON_HEALTH } from '../../../src/core/daemon-health.js';
+import type { Config, DayState } from '@seeya-ai/engine/core/types.js';
+import { EMPTY_DAEMON_HEALTH } from '@seeya-ai/engine/core/daemon-health.js';
 
 function config(overrides: Partial<Config> = {}): Config {
   return {

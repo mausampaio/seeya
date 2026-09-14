@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseWorktreeListPorcelain } from '../../../../src/adapters/git/worktree-list.js';
+import { parseWorktreeListPorcelain } from '@seeya-ai/engine/adapters/git/worktree-list.js';
 
 describe('parseWorktreeListPorcelain', () => {
   it('empty output is an empty list', () => {

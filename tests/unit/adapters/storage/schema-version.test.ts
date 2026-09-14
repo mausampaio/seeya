@@ -3,7 +3,7 @@ import {
   resolveSchemaVersion,
   UnsupportedSchemaVersionError,
   type SchemaMigration,
-} from '../../../../src/adapters/storage/schema-version.js';
+} from '@seeya-ai/engine/adapters/storage/schema-version.js';
 
 describe('resolveSchemaVersion', () => {
   it('returns the document unchanged when it is already at the expected version', () => {

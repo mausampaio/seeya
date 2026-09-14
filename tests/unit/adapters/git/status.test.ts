@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseStatusPorcelain } from '../../../../src/adapters/git/status.js';
+import { parseStatusPorcelain } from '@seeya-ai/engine/adapters/git/status.js';
 
 describe('parseStatusPorcelain', () => {
   it('empty output means no modified files', () => {

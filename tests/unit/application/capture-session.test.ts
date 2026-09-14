@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { captureSession } from '../../../src/application/capture-session.js';
+import { captureSession } from '@seeya-ai/engine/application/capture-session.js';
 import { createSessionWithPid, createSessionWithoutPid } from '../core/_fixtures.js';
 import {
   DEFAULT_TEST_CONFIG,
@@ -13,8 +13,8 @@ import {
   failingGenerator,
   succeedingGenerator,
 } from './_fakes.js';
-import type { EndDayDeps } from '../../../src/application/types.js';
-import type { Config, Day, Handoff } from '../../../src/core/types.js';
+import type { EndDayDeps } from '@seeya-ai/engine/application/types.js';
+import type { Config, Day, Handoff } from '@seeya-ai/engine/core/types.js';
 
 /** Records the ORDER `saveHandoff`/`readHandoff` are called in, into a shared array — proves
  * D-002's "handoff gravado e verificado em disco → só então terminar o processo" by execution,

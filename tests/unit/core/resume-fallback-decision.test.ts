@@ -4,7 +4,7 @@
  * the three answers AND the empty default.
  */
 import { describe, expect, it } from 'vitest';
-import { parseFallbackAnswer } from '../../../src/core/resume-fallback-decision.js';
+import { parseFallbackAnswer } from '@seeya-ai/engine/core/resume-fallback-decision.js';
 
 describe('parseFallbackAnswer — the three answers', () => {
   it.each(['y', 'Y', 'yes', 'YES', '  y  '])('opens on %j', (answer) => {

@@ -5,7 +5,7 @@
  */
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { MacosAutostart } from '../../../../src/adapters/autostart/macos.js';
+import { MacosAutostart } from '@seeya-ai/engine/adapters/autostart/macos.js';
 import { RecordingCommandRunner } from './_command-runner-fakes.js';
 
 const HOME_DIR = '/Users/<usuario>';

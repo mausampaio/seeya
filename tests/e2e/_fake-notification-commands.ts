@@ -1,6 +1,6 @@
 /**
  * Fakes every native notification command `adapters/notification/` might spawn, so e2e — which
- * runs the REAL compiled `dist/cli/index.js` (`_harness.ts#runSeeya`) — never shows a real OS
+ * runs the REAL compiled `packages/cli/dist/index.js` (`_harness.ts#runSeeya`) — never shows a real OS
  * notification on whatever machine runs the suite (docs/PLANO-DE-ENTREGA.md S4-T1: "não notifique
  * de verdade durante o teste. Ninguém quer o portão cuspindo notificação na tela de quem roda
  * `npm test`"). Every e2e `end-day` run reaches `cli/composition.ts`'s real `notifier`

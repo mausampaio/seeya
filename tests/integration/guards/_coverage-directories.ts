@@ -28,35 +28,70 @@ export type CoverageExpectation =
     };
 
 export interface DeclaredCoverageDirectory {
-  /** Path relative to `src/`, forward-slashed (e.g. `'adapters/process'`). */
+  /**
+   * Path relative to the PROJECT ROOT, forward-slashed (e.g.
+   * `'packages/engine/src/adapters/process'`) — root-relative, not `src/`-relative, since V2-T1
+   * (D-043) split production code across two package roots (`packages/engine/src/*`,
+   * `packages/cli/src`) with no shared `src/` ancestor any more. This is also exactly the string
+   * vitest.config.ts's `PRODUCTION_DIRECTORY_THRESHOLDS` keys use (minus the trailing `/**`), so
+   * `globFor` below is a plain string concatenation, not a rewrite.
+   */
   readonly path: string;
   readonly expectation: CoverageExpectation;
 }
 
 /**
- * Every directory directly under `src/` that holds at least one production `.ts` file, as of
- * S1-T12. `core/` keeps the stricter 95% (docs/TESTES.md); every other covered directory is 80%.
+ * Every directory that holds at least one production `.ts` file directly under one of the two
+ * package src roots, as of V2-T1. `core/` keeps the stricter 95% (docs/TESTES.md); every other
+ * covered directory is 80%.
  *
- * `cli/` is `covered` at 80% since S1-T6, not `excluded` — the directory grew past its single
- * wiring file the moment `sessions`/`status` needed a composition root, view-model assembly and
- * text formatting of their own. Only `index.ts` itself stays out of `coverage.include` in
- * vitest.config.ts (thin `commander` wiring, exercised for real only by the compiled e2e journey,
- * docs/TESTES.md nº1) — every other file under `cli/` is real branching logic and carries the
- * same floor every other adapter directory does.
+ * `packages/cli/src` is `covered` at 80% since S1-T6 (`cli` in the pre-monorepo layout), not
+ * `excluded` — the directory grew past its single wiring file the moment `sessions`/`status`
+ * needed a composition root, view-model assembly and text formatting of their own. It is declared
+ * as ONE entry covering the whole package (unlike engine's per-layer entries below) because,
+ * unlike `packages/engine/src`, it has no further subdirectory of its own — `index.ts` and every
+ * other cli file sit directly in `packages/cli/src`. Only `index.ts` itself stays out of
+ * `coverage.include` in vitest.config.ts (thin `commander` wiring, exercised for real only by the
+ * compiled e2e journey, docs/TESTES.md nº1) — every other file is real branching logic and
+ * carries the same floor every other adapter directory does.
  */
 export const DECLARED_COVERAGE_DIRECTORIES: readonly DeclaredCoverageDirectory[] = [
-  { path: 'core', expectation: { kind: 'covered', threshold: 95 } },
-  { path: 'application', expectation: { kind: 'covered', threshold: 80 } },
-  { path: 'scheduler', expectation: { kind: 'covered', threshold: 80 } },
-  { path: 'adapters/autostart', expectation: { kind: 'covered', threshold: 80 } },
-  { path: 'adapters/clock', expectation: { kind: 'covered', threshold: 80 } },
-  { path: 'adapters/discovery', expectation: { kind: 'covered', threshold: 80 } },
-  { path: 'adapters/generation', expectation: { kind: 'covered', threshold: 80 } },
-  { path: 'adapters/git', expectation: { kind: 'covered', threshold: 80 } },
-  { path: 'adapters/notification', expectation: { kind: 'covered', threshold: 80 } },
-  { path: 'adapters/process', expectation: { kind: 'covered', threshold: 80 } },
-  { path: 'adapters/resumption', expectation: { kind: 'covered', threshold: 80 } },
-  { path: 'adapters/storage', expectation: { kind: 'covered', threshold: 80 } },
-  { path: 'adapters/transcript', expectation: { kind: 'covered', threshold: 80 } },
-  { path: 'cli', expectation: { kind: 'covered', threshold: 80 } },
+  { path: 'packages/engine/src/core', expectation: { kind: 'covered', threshold: 95 } },
+  { path: 'packages/engine/src/application', expectation: { kind: 'covered', threshold: 80 } },
+  { path: 'packages/engine/src/scheduler', expectation: { kind: 'covered', threshold: 80 } },
+  {
+    path: 'packages/engine/src/adapters/autostart',
+    expectation: { kind: 'covered', threshold: 80 },
+  },
+  { path: 'packages/engine/src/adapters/clock', expectation: { kind: 'covered', threshold: 80 } },
+  {
+    path: 'packages/engine/src/adapters/discovery',
+    expectation: { kind: 'covered', threshold: 80 },
+  },
+  {
+    path: 'packages/engine/src/adapters/generation',
+    expectation: { kind: 'covered', threshold: 80 },
+  },
+  { path: 'packages/engine/src/adapters/git', expectation: { kind: 'covered', threshold: 80 } },
+  {
+    path: 'packages/engine/src/adapters/notification',
+    expectation: { kind: 'covered', threshold: 80 },
+  },
+  {
+    path: 'packages/engine/src/adapters/process',
+    expectation: { kind: 'covered', threshold: 80 },
+  },
+  {
+    path: 'packages/engine/src/adapters/resumption',
+    expectation: { kind: 'covered', threshold: 80 },
+  },
+  {
+    path: 'packages/engine/src/adapters/storage',
+    expectation: { kind: 'covered', threshold: 80 },
+  },
+  {
+    path: 'packages/engine/src/adapters/transcript',
+    expectation: { kind: 'covered', threshold: 80 },
+  },
+  { path: 'packages/cli/src', expectation: { kind: 'covered', threshold: 80 } },
 ];

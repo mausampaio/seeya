@@ -1,7 +1,7 @@
 /**
  * E2E nº2, nº3 and nº4 (docs/TESTES.md § E2E) plus S2-T5's own `--session` acceptance point,
  * which isn't one of the eight numbered journeys but is required by
- * docs/PLANO-DE-ENTREGA.md S2-T5 all the same. Runs the COMPILED `dist/cli/index.js` (via
+ * docs/PLANO-DE-ENTREGA.md S2-T5 all the same. Runs the COMPILED `packages/cli/dist/index.js` (via
  * `_harness.ts#runSeeya`) with `HOME`/`USERPROFILE` pointed at a `tmpdir` and a REAL fake `claude`
  * on PATH (`_harness.ts`'s `createFakeClaudeFixture` reuse, S2-T5) — never `src/` directly.
  *

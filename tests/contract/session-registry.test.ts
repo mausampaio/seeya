@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { sessionRecordSchema } from '../../src/adapters/discovery/schemas.js';
+import { sessionRecordSchema } from '@seeya-ai/engine/adapters/discovery/schemas.js';
 import { getClaudeCodeVersion, realClaudeRoot } from './_support.js';
 
 const version = getClaudeCodeVersion();

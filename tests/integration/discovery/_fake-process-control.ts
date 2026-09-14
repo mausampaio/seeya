@@ -1,4 +1,4 @@
-import type { ProcessControl } from '../../../src/core/ports.js';
+import type { ProcessControl } from '@seeya-ai/engine/core/ports.js';
 
 /**
  * Named double for `ProcessControl` (docs/TESTES.md § Testes: "duplo de I/O é classe/objeto

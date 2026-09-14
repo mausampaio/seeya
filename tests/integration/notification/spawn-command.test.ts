@@ -8,7 +8,7 @@
  * rather than any real notification command.
  */
 import { describe, expect, it } from 'vitest';
-import { spawnCommand } from '../../../src/adapters/notification/backend.js';
+import { spawnCommand } from '@seeya-ai/engine/adapters/notification/backend.js';
 
 describe('spawnCommand', () => {
   it('resolves with stdout and exit code 0 for a real, successful process', async () => {

@@ -1,6 +1,6 @@
 /**
  * E2E nº1 (docs/TESTES.md § E2E): "`seeya sessions` lista corretamente vivas, ociosas e
- * encerradas." Runs the COMPILED `dist/cli/index.js` (via `_harness.ts#runSeeya`) with
+ * encerradas." Runs the COMPILED `packages/cli/dist/index.js` (via `_harness.ts#runSeeya`) with
  * `HOME`/`USERPROFILE` pointed at a `tmpdir` and a fake `claude` on PATH — never `src/` directly,
  * so a build-only defect (like the `tsconfig.build.json` gap AGENTS.md warns about) would actually
  * fail this test.
@@ -12,8 +12,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { captureObservedProcStart } from '../../src/adapters/process/proc-start.js';
-import { processExists } from '../../src/adapters/process/existence.js';
+import { captureObservedProcStart } from '@seeya-ai/engine/adapters/process/proc-start.js';
+import { processExists } from '@seeya-ai/engine/adapters/process/existence.js';
 import {
   createE2eHome,
   removeE2eHome,

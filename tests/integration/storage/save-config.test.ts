@@ -7,8 +7,8 @@ import { describe, expect, it } from 'vitest';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { StorageAdapter } from '../../../src/adapters/storage/index.js';
-import { DEFAULT_CONFIG } from '../../../src/adapters/storage/config-schema.js';
+import { StorageAdapter } from '@seeya-ai/engine/adapters/storage/index.js';
+import { DEFAULT_CONFIG } from '@seeya-ai/engine/adapters/storage/config-schema.js';
 
 async function makeTmpDir(): Promise<string> {
   return mkdtemp(path.join(tmpdir(), 'seeya-storage-save-config-'));

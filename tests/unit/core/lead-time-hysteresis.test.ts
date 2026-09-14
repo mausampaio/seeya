@@ -4,7 +4,7 @@
  * 100% de comportamento").
  */
 import { describe, expect, it } from 'vitest';
-import { shouldSuppressLeadTimeWarning } from '../../../src/core/lead-time-hysteresis.js';
+import { shouldSuppressLeadTimeWarning } from '@seeya-ai/engine/core/lead-time-hysteresis.js';
 
 const NOW = new Date('2026-09-05T19:20:00.000Z');
 

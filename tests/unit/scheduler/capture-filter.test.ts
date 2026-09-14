@@ -2,11 +2,11 @@
  * `scheduler/capture-filter.ts` (S4-T3). Pure — no I/O.
  */
 import { describe, expect, it } from 'vitest';
-import { buildRetryFilter, nonModelSessionIds } from '../../../src/scheduler/capture-filter.js';
-import { emptyDayState } from '../../../src/core/schedule.js';
-import { MAX_CAPTURE_ATTEMPTS_PER_SESSION_PER_DAY } from '../../../src/core/capture-retry.js';
+import { buildRetryFilter, nonModelSessionIds } from '@seeya-ai/engine/scheduler/capture-filter.js';
+import { emptyDayState } from '@seeya-ai/engine/core/schedule.js';
+import { MAX_CAPTURE_ATTEMPTS_PER_SESSION_PER_DAY } from '@seeya-ai/engine/core/capture-retry.js';
 import { createSessionWithPid } from '../core/_fixtures.js';
-import type { EndDayResult } from '../../../src/application/types.js';
+import type { EndDayResult } from '@seeya-ai/engine/application/types.js';
 
 const DAY = '2026-09-05';
 

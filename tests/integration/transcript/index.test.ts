@@ -3,8 +3,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import { TranscriptFileReader } from '../../../src/adapters/transcript/index.js';
-import type { SessionWithoutPid } from '../../../src/core/types.js';
+import { TranscriptFileReader } from '@seeya-ai/engine/adapters/transcript/index.js';
+import type { SessionWithoutPid } from '@seeya-ai/engine/core/types.js';
 
 /**
  * Integration tests for `TranscriptFileReader` (the `TranscriptReader` port implementation,

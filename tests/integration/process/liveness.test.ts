@@ -7,9 +7,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { processControl } from '../../../src/adapters/process/index.js';
-import { captureObservedProcStart } from '../../../src/adapters/process/proc-start.js';
-import { processExists } from '../../../src/adapters/process/existence.js';
+import { processControl } from '@seeya-ai/engine/adapters/process/index.js';
+import { captureObservedProcStart } from '@seeya-ai/engine/adapters/process/proc-start.js';
+import { processExists } from '@seeya-ai/engine/adapters/process/existence.js';
 
 const CHILD_SCRIPT = fileURLToPath(
   new URL('../../fixtures/process/graceful-child.mjs', import.meta.url),

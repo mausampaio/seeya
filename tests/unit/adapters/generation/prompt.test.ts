@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   buildLeanPrompt,
   DEEP_GENERATION_PROMPT,
-} from '../../../../src/adapters/generation/prompt.js';
-import type { SessionFacts, SessionWithoutPid } from '../../../../src/core/types.js';
+} from '@seeya-ai/engine/adapters/generation/prompt.js';
+import type { SessionFacts, SessionWithoutPid } from '@seeya-ai/engine/core/types.js';
 
 function session(overrides: Partial<SessionWithoutPid> = {}): SessionWithoutPid {
   return {

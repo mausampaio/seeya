@@ -8,11 +8,11 @@
  * lock" case.
  */
 import { describe, expect, it } from 'vitest';
-import { runDaemonStatus } from '../../../src/cli/daemon-command.js';
-import { runStatusCommand } from '../../../src/cli/status-command.js';
-import type { ProcessControl } from '../../../src/core/ports.js';
-import { NOTIFY_AFTER_CONSECUTIVE_CYCLE_FAILURES } from '../../../src/core/daemon-health.js';
-import { emptyDayState } from '../../../src/core/schedule.js';
+import { runDaemonStatus } from '../../../packages/cli/src/daemon-command.js';
+import { runStatusCommand } from '../../../packages/cli/src/status-command.js';
+import type { ProcessControl } from '@seeya-ai/engine/core/ports.js';
+import { NOTIFY_AFTER_CONSECUTIVE_CYCLE_FAILURES } from '@seeya-ai/engine/core/daemon-health.js';
+import { emptyDayState } from '@seeya-ai/engine/core/schedule.js';
 import { createConfig } from '../core/_fixtures.js';
 import { InMemoryDaemonStorage } from '../scheduler/_fakes.js';
 import { FakeClock, FakeSessionProvider } from '../application/_fakes.js';

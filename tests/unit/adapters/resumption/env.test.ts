@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildResumptionEnv } from '../../../../src/adapters/resumption/env.js';
+import { buildResumptionEnv } from '@seeya-ai/engine/adapters/resumption/env.js';
 
 /**
  * Pure-function unit test for D-017, resumption's own spawn point (S3-T2). Mirrors

@@ -8,8 +8,8 @@ import { describe, expect, it } from 'vitest';
 import {
   findPendingBriefing,
   MAX_BRIEFING_SCAN_DAYS,
-} from '../../../src/application/find-pending-briefing.js';
-import { subtractLocalDays, localDayString } from '../../../src/core/day.js';
+} from '@seeya-ai/engine/application/find-pending-briefing.js';
+import { subtractLocalDays, localDayString } from '@seeya-ai/engine/core/day.js';
 import { createHandoff } from '../core/_fixtures.js';
 import { DEFAULT_TEST_CONFIG, FakeClock, FakeStorage } from './_fakes.js';
 

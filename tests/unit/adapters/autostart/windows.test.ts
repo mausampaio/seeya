@@ -4,7 +4,7 @@
  * spawned by this file (AGENTS.md § "Testes").
  */
 import { describe, expect, it } from 'vitest';
-import { WindowsAutostart } from '../../../../src/adapters/autostart/windows.js';
+import { WindowsAutostart } from '@seeya-ai/engine/adapters/autostart/windows.js';
 import { RecordingCommandRunner } from './_command-runner-fakes.js';
 
 const BINARY_PATH = 'C:\\code\\seeya\\dist\\cli\\index.js';

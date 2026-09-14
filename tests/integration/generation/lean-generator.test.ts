@@ -9,10 +9,10 @@
  * the sending end.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { LeanHandoffGenerator } from '../../../src/adapters/generation/lean-generator.js';
-import { GenerationError } from '../../../src/adapters/generation/errors.js';
-import { buildLeanPrompt } from '../../../src/adapters/generation/prompt.js';
-import type { SessionFacts, SessionWithoutPid } from '../../../src/core/types.js';
+import { LeanHandoffGenerator } from '@seeya-ai/engine/adapters/generation/lean-generator.js';
+import { GenerationError } from '@seeya-ai/engine/adapters/generation/errors.js';
+import { buildLeanPrompt } from '@seeya-ai/engine/adapters/generation/prompt.js';
+import type { SessionFacts, SessionWithoutPid } from '@seeya-ai/engine/core/types.js';
 import {
   createFakeClaudeFixture,
   readCapturedClaudeCall,

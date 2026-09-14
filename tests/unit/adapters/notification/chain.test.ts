@@ -5,7 +5,7 @@
  * the three CI systems.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { ChainNotifier } from '../../../../src/adapters/notification/chain.js';
+import { ChainNotifier } from '@seeya-ai/engine/adapters/notification/chain.js';
 import {
   AlwaysAvailableBackend,
   FailingSendBackend,

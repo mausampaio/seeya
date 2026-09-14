@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mapWithConcurrencyLimit } from '../../../src/application/concurrency.js';
+import { mapWithConcurrencyLimit } from '@seeya-ai/engine/application/concurrency.js';
 
 describe('mapWithConcurrencyLimit', () => {
   it('returns results in the same order as the input, regardless of settle order', async () => {

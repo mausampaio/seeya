@@ -4,7 +4,7 @@
  * (docs/TESTES.md: "duplo de I/O é classe/objeto nomeado implementando a porta").
  */
 import { describe, expect, it } from 'vitest';
-import { resumeSessions, type StartDayDeps } from '../../../src/application/start-day.js';
+import { resumeSessions, type StartDayDeps } from '@seeya-ai/engine/application/start-day.js';
 import { createHandoff } from '../core/_fixtures.js';
 import {
   DEFAULT_TEST_CONFIG,
@@ -16,7 +16,7 @@ import {
   fallbackNeedingThenFailingResumer,
   throwingResumer,
 } from './_fakes.js';
-import type { ResumeFallbackReason } from '../../../src/core/types.js';
+import type { ResumeFallbackReason } from '@seeya-ai/engine/core/types.js';
 
 const DAY = '2026-08-16';
 

@@ -1,7 +1,10 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { assistantEntrySchema, userEntrySchema } from '../../src/adapters/transcript/schemas.js';
+import {
+  assistantEntrySchema,
+  userEntrySchema,
+} from '@seeya-ai/engine/adapters/transcript/schemas.js';
 import { getClaudeCodeVersion, realClaudeRoot } from './_support.js';
 
 const version = getClaudeCodeVersion();

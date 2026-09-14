@@ -9,9 +9,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { StorageAdapter } from '../../../src/adapters/storage/index.js';
-import { DEFAULT_CONFIG } from '../../../src/adapters/storage/config-schema.js';
-import { runSkipTodayCommand, runSnoozeCommand } from '../../../src/cli/snooze-command.js';
+import { StorageAdapter } from '@seeya-ai/engine/adapters/storage/index.js';
+import { DEFAULT_CONFIG } from '@seeya-ai/engine/adapters/storage/config-schema.js';
+import { runSkipTodayCommand, runSnoozeCommand } from '../../../packages/cli/src/snooze-command.js';
 import { FakeClock } from '../discovery/_fake-clock.js';
 import {
   createDiscoveryFixture,

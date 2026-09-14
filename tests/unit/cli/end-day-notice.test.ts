@@ -4,13 +4,13 @@
  * one this file most needs to prove, since docs/PLANO-DE-ENTREGA.md names it explicitly for S4-T1.
  */
 import { describe, expect, it } from 'vitest';
-import { buildEndDayNotice } from '../../../src/cli/end-day-notice.js';
+import { buildEndDayNotice } from '../../../packages/cli/src/end-day-notice.js';
 import type {
   CapturedSession,
   EndDayResult,
   TerminationNotice,
-} from '../../../src/application/types.js';
-import type { Handoff } from '../../../src/core/types.js';
+} from '@seeya-ai/engine/application/types.js';
+import type { Handoff } from '@seeya-ai/engine/core/types.js';
 
 function createHandoff(overrides: Partial<Handoff> = {}): Handoff {
   return {

@@ -12,7 +12,7 @@ import path from 'node:path';
 import {
   readForkRegistryEntries,
   forkRegistryPath,
-} from '../../../src/adapters/discovery/fork-registry.js';
+} from '@seeya-ai/engine/adapters/discovery/fork-registry.js';
 import {
   createDiscoveryFixture,
   removeDiscoveryFixture,

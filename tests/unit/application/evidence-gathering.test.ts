@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { gatherEvidence } from '../../../src/application/evidence-gathering.js';
+import { gatherEvidence } from '@seeya-ai/engine/application/evidence-gathering.js';
 import { createSessionWithPid, createSessionWithoutPid } from '../core/_fixtures.js';
 import { FakeGitReader, FakeTranscriptReader, StaticGitReader } from './_fakes.js';
 import type {
@@ -7,7 +7,7 @@ import type {
   GitReadResult,
   GitReader,
   TranscriptReadResult,
-} from '../../../src/core/ports.js';
+} from '@seeya-ai/engine/core/ports.js';
 
 const REPO_FACTS: GitReadResult = {
   hasGit: true,

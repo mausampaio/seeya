@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseCommitLog } from '../../../../src/adapters/git/commits.js';
+import { parseCommitLog } from '@seeya-ai/engine/adapters/git/commits.js';
 
 const FIELD_SEP = '\x1f';
 const RECORD_SEP = '\x1e';

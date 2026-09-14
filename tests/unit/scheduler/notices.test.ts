@@ -8,9 +8,9 @@ import {
   buildEarlyWarningsNotice,
   buildLeadTimeNotice,
   buildMissedEndOfDayNotice,
-} from '../../../src/scheduler/notices.js';
-import type { EarlyWarning } from '../../../src/core/early-warnings.js';
-import type { EndDayResult } from '../../../src/application/types.js';
+} from '@seeya-ai/engine/scheduler/notices.js';
+import type { EarlyWarning } from '@seeya-ai/engine/core/early-warnings.js';
+import type { EndDayResult } from '@seeya-ai/engine/application/types.js';
 
 function emptyEndDayResult(overrides: Partial<EndDayResult> = {}): EndDayResult {
   return {

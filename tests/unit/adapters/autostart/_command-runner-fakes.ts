@@ -6,7 +6,7 @@
  * ever spawning a real `powershell.exe`/`systemctl`/`launchctl` (AGENTS.md § "Testes": "nenhum
  * teste toca... o systemd").
  */
-import type { CommandRunner, SpawnResult } from '../../../../src/adapters/notification/backend.js';
+import type { CommandRunner, SpawnResult } from '@seeya-ai/engine/adapters/notification/backend.js';
 
 export interface RecordedCommandCall {
   readonly command: string;

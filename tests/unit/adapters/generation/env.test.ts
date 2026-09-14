@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildGenerationEnv } from '../../../../src/adapters/generation/env.js';
+import { buildGenerationEnv } from '@seeya-ai/engine/adapters/generation/env.js';
 
 /**
  * Pure-function unit test for D-017 (docs/TESTES.md § Unidade: "Sanitização de ambiente"). No

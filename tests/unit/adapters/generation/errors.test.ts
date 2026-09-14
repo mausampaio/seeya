@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GenerationError } from '../../../../src/adapters/generation/errors.js';
+import { GenerationError } from '@seeya-ai/engine/adapters/generation/errors.js';
 
 /**
  * AGENTS.md § "Mensagens de erro": the message names the offending value and the expected shape,

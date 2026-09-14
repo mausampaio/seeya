@@ -2,8 +2,8 @@
  * Named `Notifier`/`Storage` doubles for `cli/` tests (docs/TESTES.md: "duplo de I/O é
  * classe/objeto nomeado implementando a porta, não stub inline").
  */
-import type { Notice, Notifier } from '../../../src/core/ports.js';
-import type { Config, DayState } from '../../../src/core/types.js';
+import type { Notice, Notifier } from '@seeya-ai/engine/core/ports.js';
+import type { Config, DayState } from '@seeya-ai/engine/core/types.js';
 import { FakeStorage } from '../application/_fakes.js';
 
 /** Records every `Notice` it was asked to show, in order — never throws. */

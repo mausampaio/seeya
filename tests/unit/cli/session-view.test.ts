@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildSessionRows } from '../../../src/cli/session-view.js';
-import type { Config } from '../../../src/core/types.js';
+import { buildSessionRows } from '../../../packages/cli/src/session-view.js';
+import type { Config } from '@seeya-ai/engine/core/types.js';
 import { createSessionWithPid, createSessionWithoutPid } from '../core/_fixtures.js';
 
 const NOW = new Date('2026-08-29T12:00:00.000Z');

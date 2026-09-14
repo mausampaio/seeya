@@ -3,7 +3,7 @@
  * `ProcessControl`.
  */
 import { describe, expect, it } from 'vitest';
-import { acquireDaemonLock, checkDaemonLock } from '../../../src/scheduler/lock.js';
+import { acquireDaemonLock, checkDaemonLock } from '@seeya-ai/engine/scheduler/lock.js';
 import { InMemoryDaemonStorage, ControllableProcessControl } from './_fakes.js';
 import { DEFAULT_TEST_CONFIG } from '../application/_fakes.js';
 

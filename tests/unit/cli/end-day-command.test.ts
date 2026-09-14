@@ -7,11 +7,11 @@
  * only governs `src/`, so a test-to-test import across faixas is not a layer violation.
  */
 import { describe, expect, it } from 'vitest';
-import { runEndDayCommand } from '../../../src/cli/end-day-command.js';
+import { runEndDayCommand } from '../../../packages/cli/src/end-day-command.js';
 import { createSessionWithPid } from '../core/_fixtures.js';
-import type { EndDayDeps } from '../../../src/application/types.js';
-import type { Config } from '../../../src/core/types.js';
-import type { DiscoveryResult, SessionProvider } from '../../../src/core/ports.js';
+import type { EndDayDeps } from '@seeya-ai/engine/application/types.js';
+import type { Config } from '@seeya-ai/engine/core/types.js';
+import type { DiscoveryResult, SessionProvider } from '@seeya-ai/engine/core/ports.js';
 import {
   DEFAULT_TEST_CONFIG,
   FakeClock,

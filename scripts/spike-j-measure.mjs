@@ -45,7 +45,15 @@
  * this project avoids with real TypeScript.
  */
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  writeFileSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  existsSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -67,7 +75,45 @@ import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RAW_DIR = path.join(REPO_ROOT, 'docs', 'spikes', 'j-cache-na-captura-raw');
-const STATE_FILE = path.join(tmpdir(), 'seeya-spike-j-state.json');
+
+// V2-T1 (Q-068, CodeQL js/insecure-temporary-file, high): this used to be a FIXED name under
+// `tmpdir()` (`seeya-spike-j-state.json`) — predictable, so another local user/process could
+// pre-create or symlink that exact path before this script ever ran, redirecting the write.
+// `mkdtempSync` creates a directory with an unpredictable, atomically-chosen suffix, which an
+// attacker can't pre-create: nobody can guess the name in time to plant a symlink there. The
+// wrinkle this script has that a one-shot tool doesn't: the docstring above is explicit that each
+// step is a SEPARATE process invocation the operator runs by hand over minutes-to-hours (the
+// "measure the clock" arms need a real wait between them), so the state has to be findable again
+// on the NEXT invocation — a single mkdtemp per run would orphan a new directory every time and
+// never reconnect to the previous state. `resolveStateDir` below reuses the most-recently-modified
+// directory this script already created (matched only by prefix, and only ones that already hold
+// a `state.json` — never an arbitrary attacker-planted directory with a lucky-matching prefix but
+// no valid content) instead of ever constructing a fixed path itself.
+const STATE_DIR_PREFIX = 'seeya-spike-j-state-';
+const STATE_FILE_NAME = 'state.json';
+
+/**
+ * Finds this script's own most-recently-used state directory (by mtime) if one already has a
+ * `state.json` in it, or creates a fresh, unpredictable one via `mkdtempSync` — never a fixed
+ * path. Only pre-existing directories that already contain OUR state file are reused, so a
+ * same-prefix directory some other process happened to create (without our content) is never
+ * mistaken for a real one.
+ * @returns {string}
+ */
+function resolveStateDir() {
+  const base = tmpdir();
+  const candidates = readdirSync(base, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name.startsWith(STATE_DIR_PREFIX))
+    .map((entry) => path.join(base, entry.name))
+    .filter((dir) => existsSync(path.join(dir, STATE_FILE_NAME)));
+  if (candidates.length > 0) {
+    candidates.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
+    return candidates[0];
+  }
+  return mkdtempSync(path.join(base, STATE_DIR_PREFIX));
+}
+
+const STATE_FILE = path.join(resolveStateDir(), STATE_FILE_NAME);
 
 // D-017's exact list, duplicated here rather than imported: this is a plain .mjs tool script with
 // no build step, and src/adapters/generation/env.ts is TypeScript. Kept manually in sync — if

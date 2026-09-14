@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planForkCleanup, type ForkAge } from '../../../src/core/fork-cleanup.js';
+import { planForkCleanup, type ForkAge } from '@seeya-ai/engine/core/fork-cleanup.js';
 
 const NOW = new Date('2026-08-29T12:00:00.000Z');
 const DAY_MS = 24 * 60 * 60 * 1000;

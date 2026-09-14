@@ -10,9 +10,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { DeepHandoffGenerator } from '../../../src/adapters/generation/deep-generator.js';
+import { DeepHandoffGenerator } from '@seeya-ai/engine/adapters/generation/deep-generator.js';
 import { FakeClock } from '../discovery/_fake-clock.js';
-import type { SessionWithoutPid } from '../../../src/core/types.js';
+import type { SessionWithoutPid } from '@seeya-ai/engine/core/types.js';
 import {
   createFakeClaudeFixture,
   readCapturedClaudeCall,

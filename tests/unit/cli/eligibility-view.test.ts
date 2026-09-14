@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { countEligibleSessions } from '../../../src/cli/eligibility-view.js';
-import type { Config } from '../../../src/core/types.js';
+import { countEligibleSessions } from '../../../packages/cli/src/eligibility-view.js';
+import type { Config } from '@seeya-ai/engine/core/types.js';
 import { createSessionWithPid } from '../core/_fixtures.js';
 
 const NOW = new Date('2026-08-29T12:00:00.000Z');

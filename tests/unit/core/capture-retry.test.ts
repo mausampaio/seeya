@@ -7,8 +7,8 @@ import {
   MAX_CAPTURE_ATTEMPTS_PER_SESSION_PER_DAY,
   recordCaptureAttempts,
   sessionsExhaustedToday,
-} from '../../../src/core/capture-retry.js';
-import { emptyDayState } from '../../../src/core/schedule.js';
+} from '@seeya-ai/engine/core/capture-retry.js';
+import { emptyDayState } from '@seeya-ai/engine/core/schedule.js';
 
 const DAY = '2026-09-05';
 

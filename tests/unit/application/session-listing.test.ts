@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSessionListings } from '../../../src/application/session-listing.js';
+import { buildSessionListings } from '@seeya-ai/engine/application/session-listing.js';
 import { createSessionWithoutPid } from '../core/_fixtures.js';
 import { FakeTranscriptReader } from './_fakes.js';
 

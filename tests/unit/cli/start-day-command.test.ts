@@ -13,7 +13,7 @@ import {
   runStartDayCommand,
   type StartDayCommandContext,
   type StartDayIo,
-} from '../../../src/cli/start-day-command.js';
+} from '../../../packages/cli/src/start-day-command.js';
 import { createHandoff } from '../core/_fixtures.js';
 import {
   DEFAULT_TEST_CONFIG,
@@ -23,7 +23,7 @@ import {
   fallbackNeedingResumer,
   throwingResumer,
 } from '../application/_fakes.js';
-import type { ResumeFallbackReason } from '../../../src/core/types.js';
+import type { ResumeFallbackReason } from '@seeya-ai/engine/core/types.js';
 
 const PROMPT_TOO_LARGE_REASON: ResumeFallbackReason = {
   kind: 'promptTooLarge',

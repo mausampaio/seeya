@@ -3,8 +3,8 @@ import {
   buildSessionWithPid,
   computeLastActivity,
   deriveNameFromCwd,
-} from '../../../../src/adapters/discovery/session-mapping.js';
-import type { SessionRecord } from '../../../../src/adapters/discovery/schemas.js';
+} from '@seeya-ai/engine/adapters/discovery/session-mapping.js';
+import type { SessionRecord } from '@seeya-ai/engine/adapters/discovery/schemas.js';
 
 const baseRecord: SessionRecord = {
   pid: 4242,

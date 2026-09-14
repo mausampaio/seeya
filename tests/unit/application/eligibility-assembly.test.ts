@@ -3,9 +3,9 @@ import {
   evaluateCheapEligibility,
   evaluateFullEligibility,
   projectPolicyFor,
-} from '../../../src/application/eligibility-assembly.js';
+} from '@seeya-ai/engine/application/eligibility-assembly.js';
 import { createSessionWithPid } from '../core/_fixtures.js';
-import type { HandoffFacts } from '../../../src/core/types.js';
+import type { HandoffFacts } from '@seeya-ai/engine/core/types.js';
 import { DEFAULT_TEST_CONFIG, FakeStorage } from './_fakes.js';
 
 const NOW = new Date('2026-08-16T21:00:00.000Z');

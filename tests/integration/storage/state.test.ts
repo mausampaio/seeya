@@ -6,9 +6,9 @@ import { describe, expect, it } from 'vitest';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { StorageAdapter } from '../../../src/adapters/storage/index.js';
-import { emptyDayState } from '../../../src/core/schedule.js';
-import { EMPTY_DAEMON_HEALTH } from '../../../src/core/daemon-health.js';
+import { StorageAdapter } from '@seeya-ai/engine/adapters/storage/index.js';
+import { emptyDayState } from '@seeya-ai/engine/core/schedule.js';
+import { EMPTY_DAEMON_HEALTH } from '@seeya-ai/engine/core/daemon-health.js';
 
 async function makeTmpDir(): Promise<string> {
   return mkdtemp(path.join(tmpdir(), 'seeya-storage-state-'));

@@ -17,8 +17,8 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { processControl } from '../../../src/adapters/process/index.js';
-import { terminateAbruptly } from '../../../src/adapters/process/termination.js';
+import { processControl } from '@seeya-ai/engine/adapters/process/index.js';
+import { terminateAbruptly } from '@seeya-ai/engine/adapters/process/termination.js';
 import { spawnInNewConsole } from './_windows-console.js';
 
 const CHILD_SCRIPT = fileURLToPath(

@@ -5,7 +5,7 @@
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { readFile, rm, writeFile } from 'node:fs/promises';
-import { listUninspectableSessionKeys } from '../../../src/adapters/discovery/index.js';
+import { listUninspectableSessionKeys } from '@seeya-ai/engine/adapters/discovery/index.js';
 import {
   createDiscoveryFixture,
   removeDiscoveryFixture,

@@ -10,10 +10,10 @@
  * this file (`daemonPorts()`'s own docstring below).
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { DiscoverySessionProvider } from '../../../src/adapters/discovery/index.js';
-import { StorageAdapter } from '../../../src/adapters/storage/index.js';
-import { runStatusCommand } from '../../../src/cli/status-command.js';
-import type { Config } from '../../../src/core/types.js';
+import { DiscoverySessionProvider } from '@seeya-ai/engine/adapters/discovery/index.js';
+import { StorageAdapter } from '@seeya-ai/engine/adapters/storage/index.js';
+import { runStatusCommand } from '../../../packages/cli/src/status-command.js';
+import type { Config } from '@seeya-ai/engine/core/types.js';
 import { FakeClock } from '../discovery/_fake-clock.js';
 import { FakeProcessControl } from '../discovery/_fake-process-control.js';
 import { FakeAutostart } from '../../unit/cli/_autostart-fakes.js';

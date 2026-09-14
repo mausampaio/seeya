@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { mergeDiscoveryResults } from '../../../../src/adapters/discovery/merge.js';
+import { mergeDiscoveryResults } from '@seeya-ai/engine/adapters/discovery/merge.js';
 import type {
   RegistryDiscoveryResult,
   RejectedSessionRecord,
-} from '../../../../src/adapters/discovery/registry.js';
+} from '@seeya-ai/engine/adapters/discovery/registry.js';
 import type {
   RejectedTranscriptRecord,
   TranscriptScanResult,
-} from '../../../../src/adapters/discovery/transcript-scan.js';
-import type { SessionWithPid, SessionWithoutPid } from '../../../../src/core/types.js';
+} from '@seeya-ai/engine/adapters/discovery/transcript-scan.js';
+import type { SessionWithPid, SessionWithoutPid } from '@seeya-ai/engine/core/types.js';
 
 const SESSION_A = '11111111-1111-4111-8111-111111111111';
 const SESSION_B = '22222222-2222-4222-8222-222222222222';

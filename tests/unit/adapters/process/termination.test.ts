@@ -11,7 +11,7 @@
  * session), so there is no port to inject a double through in the first place.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { terminateAbruptly } from '../../../../src/adapters/process/termination.js';
+import { terminateAbruptly } from '@seeya-ai/engine/adapters/process/termination.js';
 
 describe('terminateAbruptly', () => {
   afterEach(() => {

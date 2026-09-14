@@ -3,8 +3,8 @@ import {
   briefingStillPending,
   handoffStillPending,
   unresumedHandoffs,
-} from '../../../src/core/pending-briefing.js';
-import type { Briefing } from '../../../src/core/ports.js';
+} from '@seeya-ai/engine/core/pending-briefing.js';
+import type { Briefing } from '@seeya-ai/engine/core/ports.js';
 import { createHandoff } from './_fixtures.js';
 
 describe('handoffStillPending — source: "model" (D-025: only a real verdict resolves)', () => {

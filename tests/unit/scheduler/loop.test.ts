@@ -4,7 +4,7 @@
  * either.
  */
 import { describe, expect, it } from 'vitest';
-import { runDaemon } from '../../../src/scheduler/loop.js';
+import { runDaemon } from '@seeya-ai/engine/scheduler/loop.js';
 import { createConfig } from '../core/_fixtures.js';
 import {
   FakeForkCleanup,
@@ -14,8 +14,8 @@ import {
   succeedingGenerator,
 } from '../application/_fakes.js';
 import { ControllableProcessControl, InMemoryDaemonStorage, RecordingNotifier } from './_fakes.js';
-import type { DaemonDeps } from '../../../src/scheduler/types.js';
-import { NOTIFY_AFTER_CONSECUTIVE_CYCLE_FAILURES } from '../../../src/core/daemon-health.js';
+import type { DaemonDeps } from '@seeya-ai/engine/scheduler/types.js';
+import { NOTIFY_AFTER_CONSECUTIVE_CYCLE_FAILURES } from '@seeya-ai/engine/core/daemon-health.js';
 
 const NOW = new Date(2026, 8, 5, 8, 0, 0); // long before any lead time — every poll is a no-op
 

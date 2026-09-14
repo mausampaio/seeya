@@ -21,8 +21,8 @@ import { fileURLToPath } from 'node:url';
 import {
   DAEMON_CHILD_ENV_VAR,
   spawnDetachedDaemon,
-} from '../../../src/adapters/process/daemon-launch.js';
-import { processExists } from '../../../src/adapters/process/existence.js';
+} from '@seeya-ai/engine/adapters/process/daemon-launch.js';
+import { processExists } from '@seeya-ai/engine/adapters/process/existence.js';
 
 const FIXTURE_PATH = fileURLToPath(
   new URL('../../fixtures/process/graceful-child.mjs', import.meta.url),

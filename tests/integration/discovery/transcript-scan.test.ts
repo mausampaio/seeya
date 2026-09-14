@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { discoverSessionsFromTranscriptScan } from '../../../src/adapters/discovery/index.js';
+import { discoverSessionsFromTranscriptScan } from '@seeya-ai/engine/adapters/discovery/index.js';
 import {
   createDiscoveryFixture,
   removeDiscoveryFixture,

@@ -6,7 +6,7 @@
  * outside this module).
  */
 import { describe, expect, it } from 'vitest';
-import { systemClock } from '../../../../src/adapters/clock/index.js';
+import { systemClock } from '@seeya-ai/engine/adapters/clock/index.js';
 
 describe('systemClock.now', () => {
   it('returns a real Date instance close to the actual current time', () => {

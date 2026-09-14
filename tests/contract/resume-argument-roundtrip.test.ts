@@ -1,6 +1,6 @@
 /**
  * Contract test for `claude --resume <id> "<prompt>"` — `buildResumeArgs`'s exact production shape
- * (`src/adapters/resumption/args.ts`), never `-p` (S5-T9, docs/QUESTOES.md Q-069, D-004).
+ * (`packages/engine/src/adapters/resumption/args.ts`), never `-p` (S5-T9, docs/QUESTOES.md Q-069, D-004).
  *
  * **Why this exists.** On 2026-09-13 `start-day` reported a 4,135-character handoff as "too long
  * to pass safely" against the old 4096-character ceiling — 39 characters over, for a plan the
@@ -42,8 +42,8 @@ import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { buildResumeArgs } from '../../src/adapters/resumption/args.js';
-import { buildResumptionEnv } from '../../src/adapters/resumption/env.js';
+import { buildResumeArgs } from '@seeya-ai/engine/adapters/resumption/args.js';
+import { buildResumptionEnv } from '@seeya-ai/engine/adapters/resumption/env.js';
 import { getClaudeCodeVersion } from './_support.js';
 
 const version = getClaudeCodeVersion();

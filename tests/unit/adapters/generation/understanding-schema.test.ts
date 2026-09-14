@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   generatedUnderstandingContentSchema,
   UNDERSTANDING_JSON_SCHEMA,
-} from '../../../../src/adapters/generation/understanding-schema.js';
+} from '@seeya-ai/engine/adapters/generation/understanding-schema.js';
 
 describe('generatedUnderstandingContentSchema', () => {
   const valid = {

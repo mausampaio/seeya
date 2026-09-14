@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { GENERATION_SYSTEM_PROMPT } from '../../../../src/adapters/generation/system-prompt.js';
-import { buildLeanArgs } from '../../../../src/adapters/generation/args.js';
+import { GENERATION_SYSTEM_PROMPT } from '@seeya-ai/engine/adapters/generation/system-prompt.js';
+import { buildLeanArgs } from '@seeya-ai/engine/adapters/generation/args.js';
 
 // S4-T0e: this only proves the two instructions exist in the exported prompt text and are the
 // ones actually sent to `claude` (via `args.ts`). It does NOT prove the model obeys them — that

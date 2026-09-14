@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { configDefaults, defineConfig } from 'vitest/config';
 
 /**
@@ -29,8 +30,8 @@ import { configDefaults, defineConfig } from 'vitest/config';
  * lines.
  */
 const WINDOWS_ONLY_SOURCE = [
-  'src/adapters/process/console-signal.ts',
-  'src/adapters/process/termination-windows.ts',
+  'packages/engine/src/adapters/process/console-signal.ts',
+  'packages/engine/src/adapters/process/termination-windows.ts',
 ];
 
 /**
@@ -43,7 +44,7 @@ const WINDOWS_ONLY_SOURCE = [
  * `WINDOWS_ONLY_SOURCE`, opposite direction, same fix: exclude it from the denominator of the
  * platform that structurally cannot run it, never from the platform that can.
  */
-const POSIX_ONLY_SOURCE = ['src/adapters/process/termination-posix.ts'];
+const POSIX_ONLY_SOURCE = ['packages/engine/src/adapters/process/termination-posix.ts'];
 
 /**
  * These five integration files launch a REAL `powershell.exe` (`adapters/process/proc-start.ts`'s
@@ -176,30 +177,111 @@ const SERIALIZED_RESOURCE_HEAVY_FILES = [
  * different, stricter policy nobody asked for.
  */
 const PRODUCTION_DIRECTORY_THRESHOLDS = {
-  'src/core/**': { statements: 95, branches: 95, functions: 95, lines: 95 },
-  'src/application/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
-  'src/scheduler/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
-  // cli/index.ts alone stays out of coverage.exclude below (thin commander wiring, exercised for
-  // real only by the compiled e2e journey, docs/TESTES.md nº1) — but S1-T6 gave cli/ several
-  // other files with real branching (composition.ts, session-view.ts, format-sessions.ts,
-  // eligibility-view.ts, format-status.ts, the two *-command.ts orchestrators), so the directory
-  // now carries the same 80% floor every other adapter does instead of staying uncovered by
-  // default. See tests/integration/guards/_coverage-directories.ts.
-  'src/cli/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
-  'src/adapters/autostart/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
-  'src/adapters/clock/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
-  'src/adapters/discovery/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
-  'src/adapters/generation/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
-  'src/adapters/git/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
-  'src/adapters/notification/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
-  'src/adapters/process/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
-  'src/adapters/resumption/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
-  'src/adapters/storage/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
-  'src/adapters/transcript/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
+  'packages/engine/src/core/**': { statements: 95, branches: 95, functions: 95, lines: 95 },
+  'packages/engine/src/application/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
+  'packages/engine/src/scheduler/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
+  // packages/cli/src/index.ts alone stays out of coverage.exclude below (thin commander wiring,
+  // exercised for real only by the compiled e2e journey, docs/TESTES.md nº1) — but S1-T6 gave
+  // cli/ several other files with real branching (composition.ts, session-view.ts,
+  // format-sessions.ts, eligibility-view.ts, format-status.ts, the two *-command.ts
+  // orchestrators), so the whole package carries the same 80% floor every other adapter does
+  // instead of staying uncovered by default. One glob for the whole package (V2-T1, D-043): it
+  // has no internal layer subdirectory the way packages/engine/src does — see
+  // tests/integration/guards/_coverage-directories.ts.
+  'packages/cli/src/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
+  'packages/engine/src/adapters/autostart/**': {
+    statements: 80,
+    branches: 80,
+    functions: 80,
+    lines: 80,
+  },
+  'packages/engine/src/adapters/clock/**': {
+    statements: 80,
+    branches: 80,
+    functions: 80,
+    lines: 80,
+  },
+  'packages/engine/src/adapters/discovery/**': {
+    statements: 80,
+    branches: 80,
+    functions: 80,
+    lines: 80,
+  },
+  'packages/engine/src/adapters/generation/**': {
+    statements: 80,
+    branches: 80,
+    functions: 80,
+    lines: 80,
+  },
+  'packages/engine/src/adapters/git/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
+  'packages/engine/src/adapters/notification/**': {
+    statements: 80,
+    branches: 80,
+    functions: 80,
+    lines: 80,
+  },
+  'packages/engine/src/adapters/process/**': {
+    statements: 80,
+    branches: 80,
+    functions: 80,
+    lines: 80,
+  },
+  'packages/engine/src/adapters/resumption/**': {
+    statements: 80,
+    branches: 80,
+    functions: 80,
+    lines: 80,
+  },
+  'packages/engine/src/adapters/storage/**': {
+    statements: 80,
+    branches: 80,
+    functions: 80,
+    lines: 80,
+  },
+  'packages/engine/src/adapters/transcript/**': {
+    statements: 80,
+    branches: 80,
+    functions: 80,
+    lines: 80,
+  },
 };
 
+/**
+ * V2-T1 (D-043): every test resolves `@seeya-ai/engine/*` straight to packages/engine/src — never
+ * to its built `dist/` — so the suite never depends on a prior build, exactly like it never
+ * depended on one before the monorepo split. Mirrors the root tsconfig.json's own "paths"
+ * override (same reasoning, same comment there).
+ *
+ * Needed in THREE places, measured one at a time rather than assumed: the root `resolve.alias`
+ * (used by root-scoped files like `tests/_powershell-warmup-global-setup.ts`, which run under the
+ * root config, not any one project's), and again inside EACH `projects[]` entry that can import
+ * `@seeya-ai/engine` (each project gets its own Vite instance that does NOT inherit the root's
+ * `resolve` — confirmed by adding it only at the root first: project test files still failed to
+ * resolve `@seeya-ai/engine/...`, while re-adding it per-project fixed those same files).
+ * `server.deps.inline` is what makes the alias apply at all: `@seeya-ai/engine` is a real npm
+ * workspace package (a node_modules symlink), so without this Vitest's own dependency
+ * optimization treats every import of it as "external" and hands it straight to Node's native
+ * resolver — which never sees the alias and resolves through the package's real `exports` map
+ * into `packages/engine/dist` instead. Measured directly: without `deps.inline`, every test still
+ * passed (`dist/` existed from an earlier build) but resolved a DIFFERENT module than the alias
+ * intended, and v8 coverage attributed every hit to files under `dist/`, which `coverage.include`
+ * (below, scoped to packages/engine/src) can never match — every directory under
+ * packages/engine/src read 0% while packages/cli/src (reached only by plain relative imports,
+ * never this alias) read its real number.
+ */
+const ENGINE_ALIAS = {
+  resolve: {
+    alias: {
+      '@seeya-ai/engine': path.resolve(import.meta.dirname, 'packages/engine/src'),
+    },
+  },
+};
+const ENGINE_ALIAS_DEPS_INLINE = { server: { deps: { inline: ['@seeya-ai/engine'] } } };
+
 export default defineConfig({
+  ...ENGINE_ALIAS,
   test: {
+    ...ENGINE_ALIAS_DEPS_INLINE,
     passWithNoTests: true,
     // Q-025: at the ROOT, so every project gets it — not just `integration`, where it started.
     // `powershell.exe` is reachable from `src/adapters/process/` in general, so a future test in
@@ -210,21 +292,23 @@ export default defineConfig({
     globalSetup: ['tests/_powershell-warmup-global-setup.ts'],
     coverage: {
       provider: 'v8',
-      include: ['src/**/*.ts'],
+      include: ['packages/engine/src/**/*.ts', 'packages/cli/src/**/*.ts'],
       exclude:
         process.platform === 'win32'
-          ? ['src/cli/index.ts', ...POSIX_ONLY_SOURCE]
-          : ['src/cli/index.ts', ...WINDOWS_ONLY_SOURCE],
+          ? ['packages/cli/src/index.ts', ...POSIX_ONLY_SOURCE]
+          : ['packages/cli/src/index.ts', ...WINDOWS_ONLY_SOURCE],
       thresholds: PRODUCTION_DIRECTORY_THRESHOLDS,
     },
     projects: [
       {
+        ...ENGINE_ALIAS,
         test: {
           name: 'unit',
           include: ['tests/unit/**/*.test.ts'],
         },
       },
       {
+        ...ENGINE_ALIAS,
         test: {
           name: 'integration',
           include: ['tests/integration/**/*.test.ts'],
@@ -257,6 +341,7 @@ export default defineConfig({
         },
       },
       {
+        ...ENGINE_ALIAS,
         test: {
           // S4-T10: the five files in `PROCESS_HEAVY_INTEGRATION_FILES` (see that const's own
           // docstring for the measurement) — extended S4-T11 with two more groups that share the
@@ -305,12 +390,14 @@ export default defineConfig({
         },
       },
       {
+        ...ENGINE_ALIAS,
         test: {
           name: 'e2e',
           include: ['tests/e2e/**/*.test.ts'],
         },
       },
       {
+        ...ENGINE_ALIAS,
         test: {
           name: 'contract',
           include: ['tests/contract/**/*.test.ts'],

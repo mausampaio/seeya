@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   resolveSessionReference,
   type SessionReference,
-} from '../../../src/cli/session-reference.js';
+} from '../../../packages/cli/src/session-reference.js';
 
 type Candidate = SessionReference;
 

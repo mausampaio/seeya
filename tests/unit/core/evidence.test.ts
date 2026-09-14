@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildEvidenceSignature, sameEvidence } from '../../../src/core/evidence.js';
-import type { HandoffFacts } from '../../../src/core/types.js';
+import { buildEvidenceSignature, sameEvidence } from '@seeya-ai/engine/core/evidence.js';
+import type { HandoffFacts } from '@seeya-ai/engine/core/types.js';
 
 const NO_EVIDENCE_FACTS: HandoffFacts = {
   lastActivity: null,

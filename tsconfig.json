@@ -6,10 +6,6 @@
   // this program never emits and must never require a prior build, mirroring how tests resolve
   // `@seeya-ai/engine` to source (see "paths" below), not to `packages/engine/dist`.
   //
-  // V2-T1 step (b): "tests" is still deliberately left OUT of "include" below until step (c)
-  // migrates its imports off the old `../../../src/...` paths — lint-staged's pre-commit hook
-  // runs this exact command unscoped (lint-staged.config.js), so a tests/ directory still on the
-  // pre-move paths would fail every commit before the migration is done, not just the last one.
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
@@ -22,5 +18,11 @@
       "@seeya-ai/engine/*": ["./packages/engine/src/*"]
     }
   },
-  "include": ["packages/engine/src", "packages/cli/src"]
+  "include": [
+    "packages/engine/src",
+    "packages/cli/src",
+    "tests",
+    "vitest.config.ts",
+    "eslint.config.js"
+  ]
 }

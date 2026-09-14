@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { evaluateEligibility, type EligibilityCriteria } from '../../../src/core/eligibility.js';
+import {
+  evaluateEligibility,
+  type EligibilityCriteria,
+} from '@seeya-ai/engine/core/eligibility.js';
 import { createSessionWithPid } from './_fixtures.js';
 
 const NOW = new Date('2026-08-16T20:00:00.000Z');

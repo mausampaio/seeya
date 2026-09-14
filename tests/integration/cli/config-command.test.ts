@@ -6,12 +6,12 @@
  * before the first `seeya config set` ever runs.
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { StorageAdapter } from '../../../src/adapters/storage/index.js';
+import { StorageAdapter } from '@seeya-ai/engine/adapters/storage/index.js';
 import {
   runConfigGetCommand,
   runConfigPolicyCommand,
   runConfigSetCommand,
-} from '../../../src/cli/config-command.js';
+} from '../../../packages/cli/src/config-command.js';
 import {
   createDiscoveryFixture,
   removeDiscoveryFixture,

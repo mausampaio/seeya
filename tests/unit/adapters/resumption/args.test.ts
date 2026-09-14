@@ -6,7 +6,7 @@ import {
   describeResumeAttempt,
   FALLBACK_KICKOFF_PROMPT,
   RESUME_PROMPT_ARG_LIMIT_CHARS,
-} from '../../../../src/adapters/resumption/args.js';
+} from '@seeya-ai/engine/adapters/resumption/args.js';
 
 describe('buildResumeArgs — S3-T2, D-015 as corrected', () => {
   it('puts --resume, the session id, and the prompt as the last positional argument', () => {

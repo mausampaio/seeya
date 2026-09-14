@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildAutostart } from '../../../../src/adapters/autostart/index.js';
-import { WindowsAutostart } from '../../../../src/adapters/autostart/windows.js';
-import { LinuxAutostart } from '../../../../src/adapters/autostart/linux.js';
-import { MacosAutostart } from '../../../../src/adapters/autostart/macos.js';
+import { buildAutostart } from '@seeya-ai/engine/adapters/autostart/index.js';
+import { WindowsAutostart } from '@seeya-ai/engine/adapters/autostart/windows.js';
+import { LinuxAutostart } from '@seeya-ai/engine/adapters/autostart/linux.js';
+import { MacosAutostart } from '@seeya-ai/engine/adapters/autostart/macos.js';
 
 describe('buildAutostart', () => {
   it('picks WindowsAutostart on win32', () => {

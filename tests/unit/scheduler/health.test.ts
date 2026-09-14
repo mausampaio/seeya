@@ -5,8 +5,8 @@
  * test can't easily isolate: a non-`Error` throw, and the "nothing to write" fast path.
  */
 import { describe, expect, it } from 'vitest';
-import { recordPollFailure, recordPollSuccess } from '../../../src/scheduler/health.js';
-import { NOTIFY_AFTER_CONSECUTIVE_CYCLE_FAILURES } from '../../../src/core/daemon-health.js';
+import { recordPollFailure, recordPollSuccess } from '@seeya-ai/engine/scheduler/health.js';
+import { NOTIFY_AFTER_CONSECUTIVE_CYCLE_FAILURES } from '@seeya-ai/engine/core/daemon-health.js';
 import { createConfig } from '../core/_fixtures.js';
 import {
   FakeForkCleanup,
@@ -15,7 +15,7 @@ import {
   succeedingGenerator,
 } from '../application/_fakes.js';
 import { ControllableProcessControl, InMemoryDaemonStorage, RecordingNotifier } from './_fakes.js';
-import type { DaemonDeps } from '../../../src/scheduler/types.js';
+import type { DaemonDeps } from '@seeya-ai/engine/scheduler/types.js';
 
 const NOW = new Date('2026-09-05T10:00:00.000Z');
 

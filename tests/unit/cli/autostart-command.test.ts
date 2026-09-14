@@ -9,13 +9,13 @@ import {
   runAutostartDisableCommand,
   runAutostartEnableCommand,
   runAutostartStatusCommand,
-} from '../../../src/cli/autostart-command.js';
+} from '../../../packages/cli/src/autostart-command.js';
 import type {
   Autostart,
   AutostartDisableResult,
   AutostartEnableResult,
   AutostartStatus,
-} from '../../../src/core/ports.js';
+} from '@seeya-ai/engine/core/ports.js';
 
 class ScriptedAutostart implements Autostart {
   constructor(

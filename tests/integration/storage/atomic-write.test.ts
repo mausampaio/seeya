@@ -22,7 +22,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { writeFileAtomic } from '../../../src/adapters/storage/atomic-write.js';
+import { writeFileAtomic } from '@seeya-ai/engine/adapters/storage/atomic-write.js';
 
 const FIXTURE = fileURLToPath(
   new URL('../../fixtures/storage/slow-atomic-write.mjs', import.meta.url),

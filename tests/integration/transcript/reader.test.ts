@@ -1,7 +1,7 @@
 import { statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { parseTranscriptFile } from '../../../src/adapters/transcript/reader.js';
+import { parseTranscriptFile } from '@seeya-ai/engine/adapters/transcript/reader.js';
 
 /**
  * Integration tests for the streaming transcript parser (S1-T4), against the committed synthetic

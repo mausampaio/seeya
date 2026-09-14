@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildResumePrompt, buildResumePrompts } from '../../../src/core/resume-prompt.js';
-import type { Briefing } from '../../../src/core/ports.js';
+import { buildResumePrompt, buildResumePrompts } from '@seeya-ai/engine/core/resume-prompt.js';
+import type { Briefing } from '@seeya-ai/engine/core/ports.js';
 import { createHandoff } from './_fixtures.js';
 
 describe('buildResumePrompt — source: "model" (D-003/D-004: the plan is the prompt)', () => {

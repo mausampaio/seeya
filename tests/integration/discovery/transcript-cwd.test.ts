@@ -7,7 +7,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import { readCwdFromTranscript } from '../../../src/adapters/discovery/transcript-cwd.js';
+import { readCwdFromTranscript } from '@seeya-ai/engine/adapters/discovery/transcript-cwd.js';
 import {
   createDiscoveryFixture,
   removeDiscoveryFixture,

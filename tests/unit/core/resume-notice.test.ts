@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { formatResumeNotice } from '../../../src/core/resume-notice.js';
-import type { ResumeOutcome } from '../../../src/core/types.js';
+import { formatResumeNotice } from '@seeya-ai/engine/core/resume-notice.js';
+import type { ResumeOutcome } from '@seeya-ai/engine/core/types.js';
 
 describe('formatResumeNotice — D-004 "avisar o usuário que houve fallback"', () => {
   it('returns null when the resume attached cleanly — nothing to warn about', () => {

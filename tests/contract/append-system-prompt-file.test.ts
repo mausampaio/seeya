@@ -61,7 +61,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { buildGenerationEnv } from '../../src/adapters/generation/env.js';
+import { buildGenerationEnv } from '@seeya-ai/engine/adapters/generation/env.js';
 import { getClaudeCodeVersion } from './_support.js';
 
 const version = getClaudeCodeVersion();

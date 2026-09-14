@@ -4,8 +4,8 @@
  * budget are proven against the actual capture flow, not a stand-in for it.
  */
 import { describe, expect, it } from 'vitest';
-import { pollOnce } from '../../../src/scheduler/poll.js';
-import { applySnooze, emptyDayState } from '../../../src/core/schedule.js';
+import { pollOnce } from '@seeya-ai/engine/scheduler/poll.js';
+import { applySnooze, emptyDayState } from '@seeya-ai/engine/core/schedule.js';
 import { createConfig, createSessionWithPid } from '../core/_fixtures.js';
 import {
   FakeForkCleanup,
@@ -16,10 +16,10 @@ import {
   succeedingGenerator,
 } from '../application/_fakes.js';
 import { ControllableProcessControl, InMemoryDaemonStorage, RecordingNotifier } from './_fakes.js';
-import type { DaemonDeps } from '../../../src/scheduler/types.js';
-import type { Config, DiscoveredSession } from '../../../src/core/types.js';
-import type { EarlyWarning } from '../../../src/core/early-warnings.js';
-import type { HandoffGenerator, ProcessControl } from '../../../src/core/ports.js';
+import type { DaemonDeps } from '@seeya-ai/engine/scheduler/types.js';
+import type { Config, DiscoveredSession } from '@seeya-ai/engine/core/types.js';
+import type { EarlyWarning } from '@seeya-ai/engine/core/early-warnings.js';
+import type { HandoffGenerator, ProcessControl } from '@seeya-ai/engine/core/ports.js';
 
 interface FixedClock {
   now(): Date;

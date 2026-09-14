@@ -12,8 +12,8 @@ const NODE_IN_CORE_MESSAGE =
   'port declared in core/ports.ts.';
 
 const CLOCK_MESSAGE = (name) =>
-  `${name} can only be used in src/adapters/clock/. Anywhere else, use the Clock port ` +
-  '(core/ports.ts) to get the current instant or schedule something.';
+  `${name} can only be used in packages/engine/src/adapters/clock/. Anywhere else, use the ` +
+  'Clock port (core/ports.ts) to get the current instant or schedule something.';
 
 const SPAWN_MESSAGE =
   'spawn from node:child_process can only be imported in adapters/process/spawn.ts (the ' +
@@ -26,15 +26,16 @@ export default tseslint.config(
   {
     // .dependency-cruiser.cjs is CommonJS on purpose (see the file itself) and isn't part of
     // the project's TypeScript program — it's out of the type-aware ESLint's scope.
-    // coverage/** is '**/coverage/**' (not just the root one) because the fixtures in
-    // tests/fixtures/guards/ generate their own when they run.
+    // '**/dist/**'/'**/coverage/**' (not just the root ones, V2-T1): every workspace package now
+    // has its own dist/, and the fixtures in tests/fixtures/guards/ generate their own coverage/
+    // when they run.
     // tests/fixtures/**/*.mjs: plain Node scripts spawned as real child processes by
     // integration tests (e.g. tests/fixtures/process/), never imported nor compiled — they
     // aren't part of the TypeScript program (tsconfig.json's "include" doesn't reach them) and
     // `allowDefaultProject` only covers the two root-level .js config files, not a whole
     // directory of them.
     ignores: [
-      'dist/**',
+      '**/dist/**',
       '**/coverage/**',
       'node_modules/**',
       '.dependency-cruiser.cjs',
@@ -64,7 +65,8 @@ export default tseslint.config(
   },
   {
     // node:* is forbidden only in the core — in any other directory it's normal and necessary.
-    files: ['src/core/**/*.ts'],
+    // Engine-only (V2-T1): packages/cli has no core/ layer of its own.
+    files: ['packages/engine/src/core/**/*.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -87,8 +89,8 @@ export default tseslint.config(
     // transform data already in hand (allowed anywhere) — that's why no-restricted-globals
     // (which doesn't distinguish arity) doesn't work for Date, and we turn to
     // no-restricted-syntax with selectors that actually look at the arguments.
-    files: ['src/**/*.ts'],
-    ignores: ['src/adapters/clock/**/*.ts'],
+    files: ['packages/*/src/**/*.ts'],
+    ignores: ['packages/engine/src/adapters/clock/**/*.ts'],
     rules: {
       'no-restricted-globals': [
         'error',
@@ -112,23 +114,23 @@ export default tseslint.config(
     // D-038 (S4-T9, closing Q-059 item 3): `spawn` from node:child_process is banned outside the
     // wrapper and its three declared exceptions — the same inversion-of-onus technique as the
     // clock guard above, this time for "every process the seeya launches is invisible by
-    // default". src/core/ is excluded from this list on purpose, not left off by accident: it
-    // already can't import ANY node:* module at all (the core-only block above), so a
-    // spawn-specific rule there would be redundant — and, worse, since this block's `files`
-    // matches src/**/*.ts (a superset of src/core/**/*.ts), NOT excluding core here would make
-    // ESLint's flat-config merge (last matching config wins per rule name) silently REPLACE the
-    // core block's broader `no-restricted-imports` setting for every file under src/core/,
-    // undoing "core/ can't import node:* at all" and narrowing it down to just this one function.
-    // Measured while writing this rule, not theoretical: without the `src/core/**/*.ts` exclusion
-    // below, `tests/integration/guards/eslint-restrictions.test.ts`'s existing
-    // "rejects node:* imported in src/core/" test goes red.
-    files: ['src/**/*.ts'],
+    // default". packages/engine/src/core/ is excluded from this list on purpose, not left off by
+    // accident: it already can't import ANY node:* module at all (the core-only block above), so
+    // a spawn-specific rule there would be redundant — and, worse, since this block's `files`
+    // matches packages/*/src/**/*.ts (a superset of packages/engine/src/core/**/*.ts), NOT
+    // excluding core here would make ESLint's flat-config merge (last matching config wins per
+    // rule name) silently REPLACE the core block's broader `no-restricted-imports` setting for
+    // every file under packages/engine/src/core/, undoing "core/ can't import node:* at all" and
+    // narrowing it down to just this one function. Measured while writing this rule, not
+    // theoretical: without that exclusion, `tests/integration/guards/eslint-restrictions.test.ts`'s
+    // existing "rejects node:* imported in src/core/" test goes red.
+    files: ['packages/*/src/**/*.ts'],
     ignores: [
-      'src/core/**/*.ts',
-      'src/adapters/process/spawn.ts',
-      'src/adapters/process/daemon-launch.ts',
-      'src/adapters/process/termination-posix.ts',
-      'src/adapters/resumption/spawn-interactive.ts',
+      'packages/engine/src/core/**/*.ts',
+      'packages/engine/src/adapters/process/spawn.ts',
+      'packages/engine/src/adapters/process/daemon-launch.ts',
+      'packages/engine/src/adapters/process/termination-posix.ts',
+      'packages/engine/src/adapters/resumption/spawn-interactive.ts',
     ],
     rules: {
       'no-restricted-imports': [

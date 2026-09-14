@@ -1,5 +1,5 @@
 /**
- * `src/cli/composition.ts` — the project's only composition root (D-020) — exercised for real:
+ * `packages/cli/src/composition.ts` — the project's only composition root (D-020) — exercised for real:
  * a real `StorageAdapter` reading `config.json` from a `tmpdir`, and a real `DiscoverySessionProvider`
  * wired to the real `adapters/process` `ProcessControl` (not `FakeProcessControl`). Unlike
  * `sessions-command.test.ts`/`status-command.test.ts`, which build their own fakes to isolate the
@@ -17,9 +17,9 @@ import {
   buildSnoozeContext,
   buildStartDayContext,
   resolveCliHome,
-} from '../../../src/cli/composition.js';
-import { captureObservedProcStart } from '../../../src/adapters/process/proc-start.js';
-import { processExists } from '../../../src/adapters/process/existence.js';
+} from '../../../packages/cli/src/composition.js';
+import { captureObservedProcStart } from '@seeya-ai/engine/adapters/process/proc-start.js';
+import { processExists } from '@seeya-ai/engine/adapters/process/existence.js';
 import {
   createDiscoveryFixture,
   removeDiscoveryFixture,

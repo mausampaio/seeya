@@ -9,9 +9,9 @@ import {
   formatStartDaySummary,
   renderFallbackQuestion,
   renderPickerQuestion,
-} from '../../../src/cli/format-start-day.js';
-import type { ResumeSessionsResult } from '../../../src/application/start-day.js';
-import type { ResumeFallbackReason } from '../../../src/core/types.js';
+} from '../../../packages/cli/src/format-start-day.js';
+import type { ResumeSessionsResult } from '@seeya-ai/engine/application/start-day.js';
+import type { ResumeFallbackReason } from '@seeya-ai/engine/core/types.js';
 import { createHandoff } from '../core/_fixtures.js';
 
 const PROMPT_TOO_LARGE_REASON: ResumeFallbackReason = {

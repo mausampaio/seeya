@@ -16,6 +16,29 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const PROJECT_ROOT = path.resolve(HERE, '..', '..', '..');
 
 /**
+ * V2-T1 (D-043): the guards used to write every fixture under one shared `src/` tree. Now there
+ * are two package roots — `packages/engine/src/{core,application,adapters,scheduler}` and
+ * `packages/cli/src` (cli's own files sit directly in that root, with no further `cli/`
+ * subdirectory the way the other four layers each get their own subdirectory of `src/`). Every
+ * guard helper below that used to hardcode `'src'` picks the right one of these two instead.
+ */
+export const ENGINE_SRC_ROOT = path.join('packages', 'engine', 'src');
+export const CLI_SRC_ROOT = path.join('packages', 'cli', 'src');
+
+/** The layer name that routes to `CLI_SRC_ROOT` instead of `ENGINE_SRC_ROOT` — see `guardFixturePath`
+ * and `srcRootForLayer` below. */
+const CLI_LAYER_NAME = 'cli';
+
+/**
+ * Which package root a fixture/import for `layerDir` belongs to (V2-T1). `layerDir` is always
+ * either `'cli'` itself or a core/application/adapters/scheduler (sub)directory — never a nested
+ * `'cli/...'`, since cli's package has no internal layer subdirectories of its own.
+ */
+export function srcRootForLayer(layerDir: string): string {
+  return layerDir === CLI_LAYER_NAME ? CLI_SRC_ROOT : ENGINE_SRC_ROOT;
+}
+
+/**
  * Budget (ms) for the CHILD PROCESS itself, passed straight to `spawnSync`'s own `timeout`
  * option so eslint/dependency-cruiser/vitest are killed on THEIR clock, not on vitest's
  * (S2-T7, docs/PLANO-DE-ENTREGA.md). Before this task there was no such option at all — `run()`
@@ -311,7 +334,10 @@ export function listProductionTsFiles(directory: string): string[] {
  * their own `_guard-*`), so our own listing doesn't inherit that race.
  */
 export function runDependencyCruiserOnFullTree(): DependencyCruiserResult {
-  const entries = listProductionTsFiles(path.join(PROJECT_ROOT, 'src'));
+  const entries = [
+    ...listProductionTsFiles(path.join(PROJECT_ROOT, ENGINE_SRC_ROOT)),
+    ...listProductionTsFiles(path.join(PROJECT_ROOT, CLI_SRC_ROOT)),
+  ];
   return runDependencyCruiser(entries);
 }
 
@@ -455,12 +481,20 @@ export function guardSubdirectory(guardName: string): string {
 
 /**
  * Path (relative to the project root) of a fixture file for the `guardName` guard, inside the
- * `layerDir` layer (relative to src/, e.g. `'adapters/clock'`). E.g.:
+ * `layerDir` layer (relative to its package's own src root — see `srcRootForLayer`, e.g.
+ * `'adapters/clock'` for engine or `'cli'` itself for cli). E.g.:
  * `guardFixturePath('eslint', 'core', 'control.ts')` →
- * `'src/core/_guard-eslint/control.ts'`.
+ * `'packages/engine/src/core/_guard-eslint/control.ts'`, and
+ * `guardFixturePath('eslint', 'cli', 'control.ts')` → `'packages/cli/src/_guard-eslint/control.ts'`.
  */
 export function guardFixturePath(guardName: string, layerDir: string, fileName: string): string {
-  return path.join('src', layerDir, guardSubdirectory(guardName), fileName);
+  const root = srcRootForLayer(layerDir);
+  // cli's package root has no internal layer subdirectory of its own (V2-T1): its production
+  // files sit directly in `packages/cli/src`, unlike the other four layers, each a subdirectory
+  // of the shared `packages/engine/src`. Joining `''` as a path segment is harmless (path.join
+  // drops empty segments), but writing it out explicitly here says why 'cli' doesn't get one.
+  const layerSegment = layerDir === 'cli' ? '' : layerDir;
+  return path.join(root, layerSegment, guardSubdirectory(guardName), fileName);
 }
 
 /**
@@ -472,7 +506,8 @@ export function guardFixturePath(guardName: string, layerDir: string, fileName: 
  * test file's fixture.
  */
 export function cleanUpGuardResidue(guardName: string): void {
-  deleteSubdirectoriesNamed(path.join(PROJECT_ROOT, 'src'), guardSubdirectory(guardName));
+  deleteSubdirectoriesNamed(path.join(PROJECT_ROOT, ENGINE_SRC_ROOT), guardSubdirectory(guardName));
+  deleteSubdirectoriesNamed(path.join(PROJECT_ROOT, CLI_SRC_ROOT), guardSubdirectory(guardName));
 }
 
 /**

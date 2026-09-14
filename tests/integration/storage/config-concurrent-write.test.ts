@@ -18,8 +18,8 @@
  * rather than a `Clock`-injected backoff (docs/QUESTOES.md Q-058).
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { StorageAdapter } from '../../../src/adapters/storage/index.js';
-import { DEFAULT_CONFIG } from '../../../src/adapters/storage/config-schema.js';
+import { StorageAdapter } from '@seeya-ai/engine/adapters/storage/index.js';
+import { DEFAULT_CONFIG } from '@seeya-ai/engine/adapters/storage/config-schema.js';
 import {
   createDiscoveryFixture,
   removeDiscoveryFixture,

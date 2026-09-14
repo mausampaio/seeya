@@ -16,10 +16,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { checkDaemonLock, acquireDaemonLock } from '../../../src/scheduler/lock.js';
-import { processControl } from '../../../src/adapters/process/index.js';
-import { captureObservedProcStart } from '../../../src/adapters/process/proc-start.js';
-import { processExists } from '../../../src/adapters/process/existence.js';
+import { checkDaemonLock, acquireDaemonLock } from '@seeya-ai/engine/scheduler/lock.js';
+import { processControl } from '@seeya-ai/engine/adapters/process/index.js';
+import { captureObservedProcStart } from '@seeya-ai/engine/adapters/process/proc-start.js';
+import { processExists } from '@seeya-ai/engine/adapters/process/existence.js';
 import { InMemoryDaemonStorage } from '../../unit/scheduler/_fakes.js';
 import { DEFAULT_TEST_CONFIG } from '../../unit/application/_fakes.js';
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeAutostartState } from '../../../src/cli/autostart-state.js';
+import { describeAutostartState } from '../../../packages/cli/src/autostart-state.js';
 import { FakeAutostart } from './_autostart-fakes.js';
 
 describe('describeAutostartState', () => {

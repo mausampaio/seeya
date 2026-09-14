@@ -35,8 +35,8 @@
  * assertion below checks for instead of the old `/EPERM/` pattern.
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { StorageAdapter } from '../../../src/adapters/storage/index.js';
-import { emptyDayState } from '../../../src/core/schedule.js';
+import { StorageAdapter } from '@seeya-ai/engine/adapters/storage/index.js';
+import { emptyDayState } from '@seeya-ai/engine/core/schedule.js';
 import {
   createDiscoveryFixture,
   removeDiscoveryFixture,

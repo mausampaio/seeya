@@ -4,6 +4,7 @@ import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import {
   SYNTHETIC_TEST_LAYER_NAME,
   PROJECT_ROOT,
+  ENGINE_SRC_ROOT,
   TEST_TIMEOUT_MS,
   deleteTempFile,
   guardFixturePath,
@@ -17,7 +18,8 @@ import {
 
 const GUARD_NAME = 'dependency-cruiser';
 
-/** Shortcut for a fixture path in this file, always isolated in src/<layer>/_guard-dependency-cruiser/. */
+/** Shortcut for a fixture path in this file, always isolated in its package's own
+ * <layer>/_guard-dependency-cruiser/ (see `guardFixturePath`/`srcRootForLayer` in `_support.ts`). */
 function fixture(layerDir: string, fileName: string): string {
   return guardFixturePath(GUARD_NAME, layerDir, fileName);
 }
@@ -134,7 +136,11 @@ describe('guard: dependency-cruiser rejects a layer violation', () => {
     'rejects adapters/ importing cli/',
     () => {
       const filePath = fixture('adapters/clock', 'violation-test-cli.ts');
-      created.push(writeTempFile(filePath, "import '../../../cli/index.js';\nexport {};\n"));
+      // V2-T1: 5 "../" reach packages/ from packages/engine/src/adapters/clock/_guard-.../ (was
+      // 3 "../" reaching the old shared src/) — see this file's own module docstring update.
+      created.push(
+        writeTempFile(filePath, "import '../../../../../cli/src/index.js';\nexport {};\n"),
+      );
 
       const result = runDependencyCruiser([filePath]);
       expect(result.jsonValid, result.raw).toBe(true);
@@ -179,7 +185,8 @@ describe('guard: dependency-cruiser rejects a layer violation', () => {
     'rejects application/ importing cli/',
     () => {
       const filePath = fixture('application', 'violation-test-cli.ts');
-      created.push(writeTempFile(filePath, "import '../../cli/index.js';\nexport {};\n"));
+      // V2-T1: 4 "../" reach packages/ from packages/engine/src/application/_guard-.../.
+      created.push(writeTempFile(filePath, "import '../../../../cli/src/index.js';\nexport {};\n"));
 
       const result = runDependencyCruiser([filePath]);
       expect(result.jsonValid, result.raw).toBe(true);
@@ -254,7 +261,8 @@ describe('guard: dependency-cruiser rejects a layer violation', () => {
     'rejects scheduler/ importing cli/ (D-020: cli/ is what injects the scheduler, never the other way)',
     () => {
       const filePath = fixture('scheduler', 'violation-test-cli.ts');
-      created.push(writeTempFile(filePath, "import '../../cli/index.js';\nexport {};\n"));
+      // V2-T1: 4 "../" reach packages/ from packages/engine/src/scheduler/_guard-.../.
+      created.push(writeTempFile(filePath, "import '../../../../cli/src/index.js';\nexport {};\n"));
 
       const result = runDependencyCruiser([filePath]);
       expect(result.jsonValid, result.raw).toBe(true);
@@ -299,7 +307,13 @@ describe('guard: dependency-cruiser rejects a layer violation', () => {
     'approves cli/ importing adapters/ (control: cli/ is the only composition root, D-020)',
     () => {
       const filePath = fixture('cli', 'control-test-adapters.ts');
-      created.push(writeTempFile(filePath, "import '../../adapters/git/index.js';\nexport {};\n"));
+      // V2-T1: cli reaches engine ONLY through @seeya-ai/engine's package export map, never a
+      // relative path into packages/engine/src (the new cli-only-imports-engine-public-subpaths
+      // rule forbids that) — resolving this specifier requires packages/engine/dist to already
+      // exist (built), same as npm run verificar's own ordering (build before dependencias).
+      created.push(
+        writeTempFile(filePath, "import '@seeya-ai/engine/adapters/git/index.js';\nexport {};\n"),
+      );
 
       const result = runDependencyCruiser([filePath]);
       expect(result.jsonValid, result.raw).toBe(true);
@@ -314,7 +328,9 @@ describe('guard: dependency-cruiser rejects a layer violation', () => {
     'approves cli/ importing core/ (control)',
     () => {
       const filePath = fixture('cli', 'control-test-core.ts');
-      created.push(writeTempFile(filePath, "import '../../core/index.js';\nexport {};\n"));
+      created.push(
+        writeTempFile(filePath, "import '@seeya-ai/engine/core/index.js';\nexport {};\n"),
+      );
 
       const result = runDependencyCruiser([filePath]);
       expect(result.jsonValid, result.raw).toBe(true);
@@ -329,7 +345,9 @@ describe('guard: dependency-cruiser rejects a layer violation', () => {
     'approves cli/ importing application/ (control)',
     () => {
       const filePath = fixture('cli', 'control-test-application.ts');
-      created.push(writeTempFile(filePath, "import '../../application/index.js';\nexport {};\n"));
+      created.push(
+        writeTempFile(filePath, "import '@seeya-ai/engine/application/index.js';\nexport {};\n"),
+      );
 
       const result = runDependencyCruiser([filePath]);
       expect(result.jsonValid, result.raw).toBe(true);
@@ -344,7 +362,9 @@ describe('guard: dependency-cruiser rejects a layer violation', () => {
     'approves cli/ importing scheduler/ (control: cli/ builds and injects the scheduler)',
     () => {
       const filePath = fixture('cli', 'control-test-scheduler.ts');
-      created.push(writeTempFile(filePath, "import '../../scheduler/index.js';\nexport {};\n"));
+      created.push(
+        writeTempFile(filePath, "import '@seeya-ai/engine/scheduler/index.js';\nexport {};\n"),
+      );
 
       const result = runDependencyCruiser([filePath]);
       expect(result.jsonValid, result.raw).toBe(true);
@@ -356,8 +376,9 @@ describe('guard: dependency-cruiser rejects a layer violation', () => {
   );
 
   it(
-    'does not reject src/application-legacy/ by mistake (segment anchoring, S0-T6): ' +
-      '^src/application without an anchor would match this prefix and block a layer that does not even exist',
+    'does not reject packages/engine/src/application-legacy/ by mistake (segment anchoring, S0-T6): ' +
+      '^packages/engine/src/application without an anchor would match this prefix and block a ' +
+      'layer that does not even exist',
     () => {
       const filePath = fixture(SYNTHETIC_TEST_LAYER_NAME, 'anchoring-test.ts');
       writeTempFile(filePath, "import '../../adapters/git/index.js';\nexport {};\n");
@@ -368,7 +389,7 @@ describe('guard: dependency-cruiser rejects a layer violation', () => {
 
         expect(violations, result.raw).toEqual([]);
       } finally {
-        rmSync(path.join(PROJECT_ROOT, 'src', SYNTHETIC_TEST_LAYER_NAME), {
+        rmSync(path.join(PROJECT_ROOT, ENGINE_SRC_ROOT, SYNTHETIC_TEST_LAYER_NAME), {
           recursive: true,
           force: true,
         });

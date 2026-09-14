@@ -3,7 +3,7 @@ import type {
   Handoff,
   SessionWithPid,
   SessionWithoutPid,
-} from '../../../src/core/types.js';
+} from '@seeya-ai/engine/core/types.js';
 
 /**
  * Factories for `DiscoveredSession` for the `core/` tests (S1-T1). Synthetic values — UUIDs with

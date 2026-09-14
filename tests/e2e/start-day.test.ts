@@ -1,6 +1,6 @@
 /**
  * E2E nº5 (docs/TESTES.md § E2E): "seeya start-day --all invoca claude --resume com os argumentos
- * certos." Runs the COMPILED `dist/cli/index.js` (via `_harness.ts#runSeeya`) with
+ * certos." Runs the COMPILED `packages/cli/dist/index.js` (via `_harness.ts#runSeeya`) with
  * `HOME`/`USERPROFILE` pointed at a `tmpdir` and a REAL fake `claude` on PATH — never `src/`
  * directly.
  *
@@ -15,7 +15,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { localDayString } from '../../src/core/day.js';
+import { localDayString } from '@seeya-ai/engine/core/day.js';
 import {
   createE2eHome,
   readLastClaudeCall,

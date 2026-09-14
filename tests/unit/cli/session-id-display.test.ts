@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeDisplaySessionIds } from '../../../src/cli/session-id-display.js';
+import { computeDisplaySessionIds } from '../../../packages/cli/src/session-id-display.js';
 
 describe('computeDisplaySessionIds', () => {
   it("assigns the first 8 characters (the UUID's first group) when there is no collision", () => {

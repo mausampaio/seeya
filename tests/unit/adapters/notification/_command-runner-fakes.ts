@@ -6,7 +6,7 @@
  * without ever starting a real `powershell.exe`/`notify-send`/`osascript` — none of which `npm
  * test` may show on the screen of whoever runs it.
  */
-import type { CommandRunner, SpawnResult } from '../../../../src/adapters/notification/backend.js';
+import type { CommandRunner, SpawnResult } from '@seeya-ai/engine/adapters/notification/backend.js';
 
 export interface RecordedCommandCall {
   readonly command: string;

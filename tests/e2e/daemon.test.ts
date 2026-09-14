@@ -20,7 +20,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createE2eHome, removeE2eHome, runSeeya, type E2eHome } from './_harness.js';
-import { processExists } from '../../src/adapters/process/existence.js';
+import { processExists } from '@seeya-ai/engine/adapters/process/existence.js';
 
 let home: E2eHome | undefined;
 let lastDaemonPid: number | undefined;
@@ -161,7 +161,7 @@ describe('e2e: seeya daemon — instância única, --status e --stop', () => {
 
 // **Items 6 and 7 of docs/TESTES.md § E2E remain without a test, unchanged by this task.**
 // Item 6 (lead-time warning then close, with an injected clock) needs a clock-injection point in
-// `dist/cli/index.js` that doesn't exist — `cli/index.ts` always builds the real `systemClock`,
+// `packages/cli/dist/index.js` that doesn't exist — `cli/index.ts` always builds the real `systemClock`,
 // and the daemon's own loop only ever fires on real 30s-grained windows, which would make this
 // journey "poucos e caros" into "caro demais" (minutes of real wall-clock waiting per run). Item 7
 // (`seeya snooze`/`seeya skip-today` against a running daemon) was deliberately left ungrouped

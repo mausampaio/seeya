@@ -301,7 +301,9 @@ describe('guard: eslint rejects spawn imported straight from node:child_process 
   it(
     'approves the real adapters/process/spawn.ts wrapper importing spawn directly (control for the exemption)',
     () => {
-      const result = runEslint([path.join(PROJECT_ROOT, 'src/adapters/process/spawn.ts')]);
+      const result = runEslint([
+        path.join(PROJECT_ROOT, 'packages/engine/src/adapters/process/spawn.ts'),
+      ]);
 
       expect(result.exitCode, result.output).toBe(0);
     },
@@ -313,9 +315,9 @@ describe('guard: eslint rejects spawn imported straight from node:child_process 
     () => {
       const result = runEslint(
         [
-          'src/adapters/process/daemon-launch.ts',
-          'src/adapters/process/termination-posix.ts',
-          'src/adapters/resumption/spawn-interactive.ts',
+          'packages/engine/src/adapters/process/daemon-launch.ts',
+          'packages/engine/src/adapters/process/termination-posix.ts',
+          'packages/engine/src/adapters/resumption/spawn-interactive.ts',
         ].map((relativePath) => path.join(PROJECT_ROOT, relativePath)),
       );
 

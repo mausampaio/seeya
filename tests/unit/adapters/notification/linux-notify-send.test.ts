@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildNotifySendArgs,
   LinuxNotifySendBackend,
-} from '../../../../src/adapters/notification/linux-notify-send.js';
+} from '@seeya-ai/engine/adapters/notification/linux-notify-send.js';
 import { RecordingCommandRunner } from './_command-runner-fakes.js';
 
 const NOTICE = { title: 'seeya end-day: 2026-08-16', body: '1 session captured.' };

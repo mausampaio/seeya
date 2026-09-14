@@ -6,7 +6,7 @@
  * bug that only showed on one Windows runner).
  */
 import { describe, expect, it } from 'vitest';
-import { normalizeCwdForComparison } from '../../../src/core/cwd-normalization.js';
+import { normalizeCwdForComparison } from '@seeya-ai/engine/core/cwd-normalization.js';
 
 describe('normalizeCwdForComparison', () => {
   it('unifies backslash and forward-slash separators, on both platform hints', () => {

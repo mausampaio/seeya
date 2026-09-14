@@ -7,7 +7,7 @@ import {
   classifyAutostartStatus,
   decideAutostartEnable,
   type AutostartRawQuery,
-} from '../../../src/core/autostart.js';
+} from '@seeya-ai/engine/core/autostart.js';
 
 const NOT_REGISTERED: AutostartRawQuery = { registered: false };
 const REGISTERED = (registeredPath: string): AutostartRawQuery => ({

@@ -3,7 +3,7 @@ import {
   classifyState,
   pidRepresentsSameProcess,
   type ClassificationParams,
-} from '../../../src/core/classification.js';
+} from '@seeya-ai/engine/core/classification.js';
 import { createSessionWithPid, createSessionWithoutPid } from './_fixtures.js';
 
 const NOW = new Date('2026-08-16T20:45:00.000Z');

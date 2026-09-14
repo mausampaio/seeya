@@ -139,13 +139,15 @@ export async function writeTranscript(
 }
 
 /**
- * `dist/cli/index.js` — the artifact `npm run build` produces (`tsconfig.build.json`). Resolved
- * relative to this file rather than `process.cwd()` so the harness works the same regardless of
- * which directory vitest is invoked from. `package.json`'s `pretest:e2e` script runs `npm run
- * build` before this project executes, so this path is always fresh — see that script's comment
- * for why a stale or missing `dist/` would otherwise pass silently against old code.
+ * `packages/cli/dist/index.js` — the artifact `npm run build` produces (`tsc -b`,
+ * `tsconfig.build.json`; V2-T1 moved it out of the old shared `dist/cli/index.js`, matching
+ * `packages/cli/package.json`'s own `bin.seeya`). Resolved relative to this file rather than
+ * `process.cwd()` so the harness works the same regardless of which directory vitest is invoked
+ * from. `package.json`'s `pretest:e2e` script runs `npm run build` before this project executes,
+ * so this path is always fresh — see that script's comment for why a stale or missing `dist/`
+ * would otherwise pass silently against old code.
  */
-const DIST_CLI_PATH = fileURLToPath(new URL('../../dist/cli/index.js', import.meta.url));
+const DIST_CLI_PATH = fileURLToPath(new URL('../../packages/cli/dist/index.js', import.meta.url));
 
 export interface SeeyaResult {
   readonly stdout: string;

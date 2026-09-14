@@ -1,4 +1,4 @@
-import type { Clock } from '../../../src/core/ports.js';
+import type { Clock } from '@seeya-ai/engine/core/ports.js';
 
 /**
  * Named double for `Clock` (docs/TESTES.md § Testes: "duplo de I/O é classe/objeto nomeado

@@ -11,7 +11,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { discoverSessionsFromRegistry } from '../../../src/adapters/discovery/index.js';
+import { discoverSessionsFromRegistry } from '@seeya-ai/engine/adapters/discovery/index.js';
 import { FakeProcessControl } from './_fake-process-control.js';
 import {
   createDiscoveryFixture,

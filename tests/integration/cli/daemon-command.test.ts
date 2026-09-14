@@ -18,15 +18,15 @@ import {
   runDaemonStatus,
   runDaemonStop,
   type DaemonControlDeps,
-} from '../../../src/cli/daemon-command.js';
-import { checkDaemonLock } from '../../../src/scheduler/index.js';
-import { processExists } from '../../../src/adapters/process/existence.js';
-import { processControl } from '../../../src/adapters/process/index.js';
-import { captureObservedProcStart } from '../../../src/adapters/process/proc-start.js';
+} from '../../../packages/cli/src/daemon-command.js';
+import { checkDaemonLock } from '@seeya-ai/engine/scheduler/index.js';
+import { processExists } from '@seeya-ai/engine/adapters/process/existence.js';
+import { processControl } from '@seeya-ai/engine/adapters/process/index.js';
+import { captureObservedProcStart } from '@seeya-ai/engine/adapters/process/proc-start.js';
 import { DEFAULT_TEST_CONFIG, FakeStorage } from '../../unit/application/_fakes.js';
 import { InMemoryDaemonStorage } from '../../unit/scheduler/_fakes.js';
-import type { DaemonLockInfo } from '../../../src/core/daemon-lock.js';
-import type { ProcessControl } from '../../../src/core/ports.js';
+import type { DaemonLockInfo } from '@seeya-ai/engine/core/daemon-lock.js';
+import type { ProcessControl } from '@seeya-ai/engine/core/ports.js';
 
 const FIXTURE_PATH = fileURLToPath(
   new URL('../../fixtures/process/graceful-child.mjs', import.meta.url),

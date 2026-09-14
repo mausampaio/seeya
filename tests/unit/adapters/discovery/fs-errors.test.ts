@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isEnoent, nodeErrorCode } from '../../../../src/adapters/discovery/fs-errors.js';
+import { isEnoent, nodeErrorCode } from '@seeya-ai/engine/adapters/discovery/fs-errors.js';
 
 describe('nodeErrorCode', () => {
   it('reads .code off a Node-shaped error', () => {

@@ -9,7 +9,7 @@ import {
   lastPromptEntrySchema,
   KNOWN_ENTRY_TYPES,
   KNOWN_ENTRY_TYPE_SET,
-} from '../../../../src/adapters/transcript/schemas.js';
+} from '@seeya-ai/engine/adapters/transcript/schemas.js';
 
 /**
  * Unit tests for the transcript schemas (S0-T5). Synthetic fixtures shaped after what's observed

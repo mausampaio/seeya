@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { processExists } from '../../../../src/adapters/process/existence.js';
+import { processExists } from '@seeya-ai/engine/adapters/process/existence.js';
 
 /**
  * `processExists`'s `assertValidPid` guard (S1-T12, found while auditing `adapters/process`'s

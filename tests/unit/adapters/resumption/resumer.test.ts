@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveClaudeBinary } from '../../../../src/adapters/resumption/resumer.js';
+import { resolveClaudeBinary } from '@seeya-ai/engine/adapters/resumption/resumer.js';
 
 /** Pure-function unit test for the one branch `tests/integration/resumption/resumer.test.ts`
  * deliberately never exercises: actually spawning the literal string `'claude'` in a test would

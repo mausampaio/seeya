@@ -8,8 +8,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { discoverEarlyWarnings } from '../../../src/adapters/discovery/index.js';
-import { StorageAdapter } from '../../../src/adapters/storage/index.js';
+import { discoverEarlyWarnings } from '@seeya-ai/engine/adapters/discovery/index.js';
+import { StorageAdapter } from '@seeya-ai/engine/adapters/storage/index.js';
 import { createSessionWithPid } from '../../unit/core/_fixtures.js';
 import {
   createDiscoveryFixture,

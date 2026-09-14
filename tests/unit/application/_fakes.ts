@@ -1,4 +1,4 @@
-import type { FallbackConfirmer } from '../../../src/application/start-day.js';
+import type { FallbackConfirmer } from '@seeya-ai/engine/application/start-day.js';
 import type {
   Briefing,
   Clock,
@@ -17,7 +17,7 @@ import type {
   TranscriptListingInfo,
   TranscriptReader,
   TranscriptReadResult,
-} from '../../../src/core/ports.js';
+} from '@seeya-ai/engine/core/ports.js';
 import type {
   Config,
   DayState,
@@ -29,8 +29,8 @@ import type {
   ResumeFallbackReason,
   ResumeOutcome,
   SessionFacts,
-} from '../../../src/core/types.js';
-import type { DaemonLockInfo } from '../../../src/core/daemon-lock.js';
+} from '@seeya-ai/engine/core/types.js';
+import type { DaemonLockInfo } from '@seeya-ai/engine/core/daemon-lock.js';
 
 /**
  * Named doubles for `application/endDay`'s ports (docs/TESTES.md § Testes: "duplo de I/O é

@@ -4,7 +4,7 @@ import {
   interpretExistenceCheckError,
   resolveIsAlive,
   type ProcStartCapture,
-} from '../../../../src/adapters/process/liveness.js';
+} from '@seeya-ai/engine/adapters/process/liveness.js';
 
 describe('errorCode', () => {
   it('reads .code off an error-shaped object', () => {

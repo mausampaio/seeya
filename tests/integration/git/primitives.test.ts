@@ -9,9 +9,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { readBranch } from '../../../src/adapters/git/branch.js';
-import { readModifiedFiles } from '../../../src/adapters/git/status.js';
-import { readCommitsToday } from '../../../src/adapters/git/commits.js';
+import { readBranch } from '@seeya-ai/engine/adapters/git/branch.js';
+import { readModifiedFiles } from '@seeya-ai/engine/adapters/git/status.js';
+import { readCommitsToday } from '@seeya-ai/engine/adapters/git/commits.js';
 import { createGitFixture, removeGitFixture, type GitFixture } from './_fixtures.js';
 
 const NOW = new Date(2026, 7, 29, 12, 0, 0);

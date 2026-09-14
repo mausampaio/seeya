@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   captureObservedProcStart,
   parseLinuxProcStat,
-} from '../../../../src/adapters/process/proc-start.js';
-import type { CommandRunner } from '../../../../src/adapters/process/spawn-stdout.js';
+} from '@seeya-ai/engine/adapters/process/proc-start.js';
+import type { CommandRunner } from '@seeya-ai/engine/adapters/process/spawn-stdout.js';
 
 describe('parseLinuxProcStat', () => {
   it('parses a normal /proc/<pid>/stat line (comm has no special characters)', () => {

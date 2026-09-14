@@ -2,9 +2,9 @@ import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { ClaudeSessionResumer } from '../../../src/adapters/resumption/resumer.js';
-import { RESUME_PROMPT_ARG_LIMIT_CHARS } from '../../../src/adapters/resumption/args.js';
-import type { ResumeOutcome } from '../../../src/core/types.js';
+import { ClaudeSessionResumer } from '@seeya-ai/engine/adapters/resumption/resumer.js';
+import { RESUME_PROMPT_ARG_LIMIT_CHARS } from '@seeya-ai/engine/adapters/resumption/args.js';
+import type { ResumeOutcome } from '@seeya-ai/engine/core/types.js';
 import {
   createFakeInteractiveClaudeFixture,
   readCapturedInteractiveClaudeCalls,

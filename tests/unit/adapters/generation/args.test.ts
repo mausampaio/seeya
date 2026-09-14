@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { buildDeepArgs, buildLeanArgs } from '../../../../src/adapters/generation/args.js';
-import { GENERATION_SYSTEM_PROMPT } from '../../../../src/adapters/generation/system-prompt.js';
-import { UNDERSTANDING_JSON_SCHEMA } from '../../../../src/adapters/generation/understanding-schema.js';
+import { buildDeepArgs, buildLeanArgs } from '@seeya-ai/engine/adapters/generation/args.js';
+import { GENERATION_SYSTEM_PROMPT } from '@seeya-ai/engine/adapters/generation/system-prompt.js';
+import { UNDERSTANDING_JSON_SCHEMA } from '@seeya-ai/engine/adapters/generation/understanding-schema.js';
 
 const COMMON_OPTIONS = { model: 'sonnet', budgetPerSessionUsd: 0.25 };
 

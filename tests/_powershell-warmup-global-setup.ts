@@ -36,7 +36,7 @@
  * one compiles a shim, costing seconds rather than milliseconds, and its only consumer is a
  * fixture that is structurally integration-only.
  */
-import { runForStdout } from '../src/adapters/process/spawn-stdout.js';
+import { runForStdout } from '@seeya-ai/engine/adapters/process/spawn-stdout.js';
 
 export async function setup(): Promise<void> {
   if (process.platform !== 'win32') {

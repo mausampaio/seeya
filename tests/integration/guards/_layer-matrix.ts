@@ -13,16 +13,20 @@
  */
 
 export interface Layer {
-  /** Layer name, matching the directory name under src/. */
+  /** Layer name, matching the directory name under src/ (or, for `cli`, the whole of
+   * packages/cli/src — see the field docs below and `srcRootForLayer` in `_support.ts`). */
   readonly name: string;
   /**
-   * Directory (relative to src/) where it's safe to write a fixture file for this layer.
-   * `adapters/` has no `index.ts` at its root (each concrete adapter has its own) — that's why
-   * it points at a concrete adapter (`adapters/clock/`), like the rest of the suite already
-   * does.
+   * Directory (relative to the layer's own package src root, `srcRootForLayer`) where it's safe
+   * to write a fixture file for this layer. `adapters/` has no `index.ts` at its root (each
+   * concrete adapter has its own) — that's why it points at a concrete adapter
+   * (`adapters/clock/`), like the rest of the suite already does. `cli`'s is `''` (V2-T1,
+   * D-043): packages/cli/src IS the layer, with no further subdirectory the way the other four
+   * layers each get one under the shared packages/engine/src.
    */
   readonly fixtureDir: string;
-  /** Directory (relative to src/) whose `index.ts` is this layer's canonical import target. */
+  /** Directory (relative to the layer's own package src root) whose `index.ts` is this layer's
+   * canonical import target. `''` for `cli`, same reason as `fixtureDir`. */
   readonly targetDir: string;
 }
 
@@ -35,7 +39,7 @@ export const LAYERS: readonly Layer[] = [
   { name: 'adapters', fixtureDir: 'adapters/clock', targetDir: 'adapters/clock' },
   { name: 'application', fixtureDir: 'application', targetDir: 'application' },
   { name: 'scheduler', fixtureDir: 'scheduler', targetDir: 'scheduler' },
-  { name: 'cli', fixtureDir: 'cli', targetDir: 'cli' },
+  { name: 'cli', fixtureDir: '', targetDir: '' },
 ];
 
 /**

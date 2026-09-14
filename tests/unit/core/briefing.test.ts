@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { generateBriefingMarkdown } from '../../../src/core/briefing.js';
-import type { RejectedDiscoveryRecord } from '../../../src/core/ports.js';
-import type { ResolvedEndDayScope, SessionListing } from '../../../src/core/types.js';
+import { generateBriefingMarkdown } from '@seeya-ai/engine/core/briefing.js';
+import type { RejectedDiscoveryRecord } from '@seeya-ai/engine/core/ports.js';
+import type { ResolvedEndDayScope, SessionListing } from '@seeya-ai/engine/core/types.js';
 import { createHandoff } from './_fixtures.js';
 
 const GENERATED_AT = new Date('2026-08-16T21:05:00.000Z');

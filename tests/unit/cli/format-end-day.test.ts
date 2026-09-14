@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { formatEndDayReport } from '../../../src/cli/format-end-day.js';
+import { formatEndDayReport } from '../../../packages/cli/src/format-end-day.js';
 import type {
   CapturedSession,
   EndDayResult,
   IneligibleSession,
-} from '../../../src/application/types.js';
-import type { Config, Handoff } from '../../../src/core/types.js';
+} from '@seeya-ai/engine/application/types.js';
+import type { Config, Handoff } from '@seeya-ai/engine/core/types.js';
 
 /** Minimal, complete `Handoff` — same spirit as `core/briefing.test.ts`'s own `createHandoff`
  * (this file doesn't import that one: each test file keeps its own tiny fixture, the project's

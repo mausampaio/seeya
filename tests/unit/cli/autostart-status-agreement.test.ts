@@ -6,9 +6,9 @@
  * `daemon-status-agreement.test.ts` already established for the daemon section (S4-T13).
  */
 import { describe, expect, it } from 'vitest';
-import { runAutostartStatusCommand } from '../../../src/cli/autostart-command.js';
-import { runStatusCommand } from '../../../src/cli/status-command.js';
-import type { AutostartStatus, ProcessControl } from '../../../src/core/ports.js';
+import { runAutostartStatusCommand } from '../../../packages/cli/src/autostart-command.js';
+import { runStatusCommand } from '../../../packages/cli/src/status-command.js';
+import type { AutostartStatus, ProcessControl } from '@seeya-ai/engine/core/ports.js';
 import { createConfig } from '../core/_fixtures.js';
 import { InMemoryDaemonStorage } from '../scheduler/_fakes.js';
 import { FakeClock, FakeSessionProvider } from '../application/_fakes.js';

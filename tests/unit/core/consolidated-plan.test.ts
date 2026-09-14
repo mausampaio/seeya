@@ -3,8 +3,8 @@ import {
   renderConsolidatedPlan,
   renderItemList,
   renderRelativeAge,
-} from '../../../src/core/consolidated-plan.js';
-import type { Briefing } from '../../../src/core/ports.js';
+} from '@seeya-ai/engine/core/consolidated-plan.js';
+import type { Briefing } from '@seeya-ai/engine/core/ports.js';
 import { createHandoff } from './_fixtures.js';
 
 // `daysAgo: 1` ("yesterday") throughout this describe block on purpose: it's the ordinary case

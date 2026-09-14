@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isCaptureCandidate } from '../../../src/core/capture-scope.js';
+import { isCaptureCandidate } from '@seeya-ai/engine/core/capture-scope.js';
 import { createSessionWithPid, createSessionWithoutPid } from './_fixtures.js';
 
 /**

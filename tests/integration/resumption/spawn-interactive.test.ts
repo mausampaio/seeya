@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { runInteractive } from '../../../src/adapters/resumption/spawn-interactive.js';
+import { runInteractive } from '@seeya-ai/engine/adapters/resumption/spawn-interactive.js';
 import {
   createFakeInteractiveClaudeFixture,
   readCapturedInteractiveClaudeCalls,

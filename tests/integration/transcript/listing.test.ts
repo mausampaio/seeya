@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { parseTranscriptListingInfo } from '../../../src/adapters/transcript/listing.js';
+import { parseTranscriptListingInfo } from '@seeya-ai/engine/adapters/transcript/listing.js';
 
 /**
  * Integration tests for D-031's listing extraction, against the committed synthetic fixtures

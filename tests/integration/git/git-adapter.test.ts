@@ -15,8 +15,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { GitAdapter } from '../../../src/adapters/git/index.js';
-import { runGit } from '../../../src/adapters/git/run-git.js';
+import { GitAdapter } from '@seeya-ai/engine/adapters/git/index.js';
+import { runGit } from '@seeya-ai/engine/adapters/git/run-git.js';
 import { FakeClock } from '../discovery/_fake-clock.js';
 import {
   addWorktree,

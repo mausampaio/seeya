@@ -5,7 +5,7 @@
  */
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { LinuxAutostart } from '../../../../src/adapters/autostart/linux.js';
+import { LinuxAutostart } from '@seeya-ai/engine/adapters/autostart/linux.js';
 import { RecordingCommandRunner } from './_command-runner-fakes.js';
 
 const HOME_DIR = '/home/<usuario>';

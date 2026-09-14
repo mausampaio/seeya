@@ -6,7 +6,7 @@
  * commit just after local midnight must not leak into "yesterday" either.
  */
 import { describe, expect, it } from 'vitest';
-import { isWithinLocalDay, localDayBounds } from '../../../../src/adapters/git/local-day.js';
+import { isWithinLocalDay, localDayBounds } from '@seeya-ai/engine/adapters/git/local-day.js';
 
 describe('localDayBounds', () => {
   it('start of today is local midnight, and start of tomorrow is 24h later', () => {

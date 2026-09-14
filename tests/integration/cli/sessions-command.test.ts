@@ -8,9 +8,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { DiscoverySessionProvider } from '../../../src/adapters/discovery/index.js';
-import { runSessionsCommand } from '../../../src/cli/sessions-command.js';
-import type { Config } from '../../../src/core/types.js';
+import { DiscoverySessionProvider } from '@seeya-ai/engine/adapters/discovery/index.js';
+import { runSessionsCommand } from '../../../packages/cli/src/sessions-command.js';
+import type { Config } from '@seeya-ai/engine/core/types.js';
 import { FakeClock } from '../discovery/_fake-clock.js';
 import { FakeProcessControl } from '../discovery/_fake-process-control.js';
 import {

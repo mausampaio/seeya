@@ -11,7 +11,7 @@ import {
   buildToastXml,
   escapeForPowerShellSingleQuotedString,
   WindowsToastBackend,
-} from '../../../../src/adapters/notification/windows-toast.js';
+} from '@seeya-ai/engine/adapters/notification/windows-toast.js';
 import { RecordingCommandRunner } from './_command-runner-fakes.js';
 
 const NOTICE = { title: 'seeya end-day: 2026-08-16', body: '1 session captured.' };

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { StderrBackend } from '../../../../src/adapters/notification/stderr-backend.js';
+import { StderrBackend } from '@seeya-ai/engine/adapters/notification/stderr-backend.js';
 import { StderrCapture } from './_stderr-capture.js';
 
 describe('StderrBackend', () => {

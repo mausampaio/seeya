@@ -23,9 +23,9 @@ import {
   emptyDayState,
   minutesRemaining,
   resolveEndOfDayInstant,
-} from '../../../src/core/schedule.js';
+} from '@seeya-ai/engine/core/schedule.js';
 import { createConfig } from './_fixtures.js';
-import { EMPTY_DAEMON_HEALTH } from '../../../src/core/daemon-health.js';
+import { EMPTY_DAEMON_HEALTH } from '@seeya-ai/engine/core/daemon-health.js';
 
 describe('resolveEndOfDayInstant — ordinary day', () => {
   it('resolves "HH:MM" against the reference day, in local time', () => {

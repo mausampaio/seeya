@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import {
   detectEarlyWarnings,
   EMPTY_EARLY_WARNING_STATE,
-} from '../../../src/core/early-warnings.js';
+} from '@seeya-ai/engine/core/early-warnings.js';
 import { createSessionWithPid, createSessionWithoutPid } from './_fixtures.js';
 
 describe('detectEarlyWarnings — missing-transcript trigger (D-018)', () => {

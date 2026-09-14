@@ -4,7 +4,7 @@ import {
   buildQueryScript,
   buildRegisterScript,
   buildUnregisterScript,
-} from '../../../../src/adapters/autostart/windows-scripts.js';
+} from '@seeya-ai/engine/adapters/autostart/windows-scripts.js';
 
 describe('buildQueryScript', () => {
   it('queries the fixed task name and prints found/registeredPath as compact JSON', () => {

@@ -6,11 +6,11 @@ import {
   MAX_LAST_PROMPTS,
   MAX_ASSISTANT_MESSAGES,
   MAX_ASSISTANT_MESSAGE_CHARS,
-} from '../../../../src/adapters/transcript/facts.js';
+} from '@seeya-ai/engine/adapters/transcript/facts.js';
 import {
   userEntryTextSchema,
   assistantEntryWithContentSchema,
-} from '../../../../src/adapters/transcript/schemas.js';
+} from '@seeya-ai/engine/adapters/transcript/schemas.js';
 
 /**
  * Unit tests for the pure fact-extraction functions (S1-T4, docs/TESTES.md § Unidade: "a lógica

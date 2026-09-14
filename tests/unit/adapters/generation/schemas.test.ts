@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { claudePrintOutputSchema } from '../../../../src/adapters/generation/schemas.js';
+import { claudePrintOutputSchema } from '@seeya-ai/engine/adapters/generation/schemas.js';
 
 /**
  * Unit tests for the `claude -p --output-format json` output schema (S0-T5). Synthetic fixture

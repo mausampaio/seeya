@@ -2,7 +2,7 @@
  * `core/daemon-lock.ts` (S4-T3, D-005's single-instance requirement). Pure decision — no I/O.
  */
 import { describe, expect, it } from 'vitest';
-import { decideLockAcquisition } from '../../../src/core/daemon-lock.js';
+import { decideLockAcquisition } from '@seeya-ai/engine/core/daemon-lock.js';
 
 describe('decideLockAcquisition', () => {
   it('acquires when nothing has been written yet (null)', () => {

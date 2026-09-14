@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { localDayString, subtractLocalDays } from '../../../src/core/day.js';
+import { localDayString, subtractLocalDays } from '@seeya-ai/engine/core/day.js';
 
 describe('localDayString', () => {
   it('formats year, month and day, zero-padded', () => {

@@ -3,7 +3,7 @@ import {
   findHandoffBySessionReference,
   parseInteractiveSelection,
   resolveSelectionMode,
-} from '../../../src/cli/start-day-selection.js';
+} from '../../../packages/cli/src/start-day-selection.js';
 import { createHandoff } from '../core/_fixtures.js';
 
 describe('resolveSelectionMode', () => {

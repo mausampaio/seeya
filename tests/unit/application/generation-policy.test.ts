@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   generateUnderstanding,
   selectCaptureMode,
-} from '../../../src/application/generation-policy.js';
+} from '@seeya-ai/engine/application/generation-policy.js';
 import { createSessionWithPid } from '../core/_fixtures.js';
 import { failingGenerator, succeedingGenerator } from './_fakes.js';
 

@@ -11,13 +11,13 @@ import {
   runDaemonStatus,
   runDaemonStop,
   type DaemonControlDeps,
-} from '../../../src/cli/daemon-command.js';
-import type { DaemonDeps } from '../../../src/scheduler/index.js';
-import { NOTIFY_AFTER_CONSECUTIVE_CYCLE_FAILURES } from '../../../src/core/daemon-health.js';
-import type { DaemonLockInfo } from '../../../src/core/daemon-lock.js';
-import type { ProcessControl, Storage } from '../../../src/core/ports.js';
-import type { DayState } from '../../../src/core/types.js';
-import { emptyDayState } from '../../../src/core/schedule.js';
+} from '../../../packages/cli/src/daemon-command.js';
+import type { DaemonDeps } from '@seeya-ai/engine/scheduler/index.js';
+import { NOTIFY_AFTER_CONSECUTIVE_CYCLE_FAILURES } from '@seeya-ai/engine/core/daemon-health.js';
+import type { DaemonLockInfo } from '@seeya-ai/engine/core/daemon-lock.js';
+import type { ProcessControl, Storage } from '@seeya-ai/engine/core/ports.js';
+import type { DayState } from '@seeya-ai/engine/core/types.js';
+import { emptyDayState } from '@seeya-ai/engine/core/schedule.js';
 import { createConfig } from '../core/_fixtures.js';
 import { InMemoryDaemonStorage } from '../scheduler/_fakes.js';
 import {

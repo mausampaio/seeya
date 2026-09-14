@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateAgentsJsonOutput } from '../../src/adapters/discovery/schemas.js';
+import { validateAgentsJsonOutput } from '@seeya-ai/engine/adapters/discovery/schemas.js';
 import { runClaude, getClaudeCodeVersion } from './_support.js';
 
 const version = getClaudeCodeVersion();

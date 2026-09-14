@@ -4,8 +4,8 @@
  * real process, on purpose: this is exactly the fallback-selection LOGIC docs/TESTES.md's unit
  * tier asks for, independent of which OS actually runs the test (the S2-T1 lesson).
  */
-import type { Notice } from '../../../../src/core/ports.js';
-import type { NotificationBackend } from '../../../../src/adapters/notification/backend.js';
+import type { Notice } from '@seeya-ai/engine/core/ports.js';
+import type { NotificationBackend } from '@seeya-ai/engine/adapters/notification/backend.js';
 
 export class AlwaysAvailableBackend implements NotificationBackend {
   readonly sent: Notice[] = [];

@@ -13,7 +13,7 @@ import {
   schemaVersionNotEditableMessage,
   serializeConfigDocument,
   unknownConfigKeyMessage,
-} from '../../../../src/adapters/storage/config-schema.js';
+} from '@seeya-ai/engine/adapters/storage/config-schema.js';
 
 describe('parseConfigDocument', () => {
   it('returns every default when the document has no fields at all', () => {

@@ -6,10 +6,10 @@
  * never calls them), the same extension pattern `StorageWithRejectedHandoffs`/`FailingSaveStorage`
  * already use in that file for a different subset of methods.
  */
-import type { Notifier, ProcessControl } from '../../../src/core/ports.js';
-import type { DaemonLockInfo } from '../../../src/core/daemon-lock.js';
-import type { Config, DayState, Handoff } from '../../../src/core/types.js';
-import type { Notice } from '../../../src/core/ports.js';
+import type { Notifier, ProcessControl } from '@seeya-ai/engine/core/ports.js';
+import type { DaemonLockInfo } from '@seeya-ai/engine/core/daemon-lock.js';
+import type { Config, DayState, Handoff } from '@seeya-ai/engine/core/types.js';
+import type { Notice } from '@seeya-ai/engine/core/ports.js';
 import { FakeStorage } from '../application/_fakes.js';
 
 /** Real in-memory `estado.json`/`daemon.lock` — what every `scheduler/` test needs that

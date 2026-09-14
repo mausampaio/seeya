@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { endDay } from '../../../src/application/end-day.js';
+import { endDay } from '@seeya-ai/engine/application/end-day.js';
 import { createSessionWithPid, createSessionWithoutPid } from '../core/_fixtures.js';
-import type { RejectedDiscoveryRecord } from '../../../src/core/ports.js';
-import type { Config, Day, Handoff } from '../../../src/core/types.js';
+import type { RejectedDiscoveryRecord } from '@seeya-ai/engine/core/ports.js';
+import type { Config, Day, Handoff } from '@seeya-ai/engine/core/types.js';
 import {
   DEFAULT_TEST_CONFIG,
   FailingForkCleanup,
@@ -17,7 +17,7 @@ import {
   failingGenerator,
   succeedingGenerator,
 } from './_fakes.js';
-import type { EndDayDeps } from '../../../src/application/types.js';
+import type { EndDayDeps } from '@seeya-ai/engine/application/types.js';
 
 const NOW = new Date('2026-08-16T21:00:00.000Z');
 

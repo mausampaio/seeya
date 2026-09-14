@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   removeFallbackContextFile,
   writeFallbackContextFile,
-} from '../../../src/adapters/resumption/context-file.js';
+} from '@seeya-ai/engine/adapters/resumption/context-file.js';
 
 /**
  * Real filesystem, real tmpdir root standing in for `~/.seeya` — same discipline

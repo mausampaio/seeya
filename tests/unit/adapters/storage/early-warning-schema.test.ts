@@ -3,7 +3,7 @@ import {
   EARLY_WARNING_SCHEMA_VERSION,
   parseEarlyWarningDocument,
   serializeEarlyWarningState,
-} from '../../../../src/adapters/storage/early-warning-schema.js';
+} from '@seeya-ai/engine/adapters/storage/early-warning-schema.js';
 
 describe('parseEarlyWarningDocument', () => {
   it('returns both sets empty when the document has no fields at all', () => {

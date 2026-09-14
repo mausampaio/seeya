@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildDefaultBackends, notifier } from '../../../../src/adapters/notification/index.js';
-import { WindowsToastBackend } from '../../../../src/adapters/notification/windows-toast.js';
-import { MacOsascriptBackend } from '../../../../src/adapters/notification/macos-osascript.js';
-import { LinuxNotifySendBackend } from '../../../../src/adapters/notification/linux-notify-send.js';
+import { buildDefaultBackends, notifier } from '@seeya-ai/engine/adapters/notification/index.js';
+import { WindowsToastBackend } from '@seeya-ai/engine/adapters/notification/windows-toast.js';
+import { MacOsascriptBackend } from '@seeya-ai/engine/adapters/notification/macos-osascript.js';
+import { LinuxNotifySendBackend } from '@seeya-ai/engine/adapters/notification/linux-notify-send.js';
 
 describe('buildDefaultBackends', () => {
   it('picks WindowsToastBackend on win32', () => {

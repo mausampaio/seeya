@@ -7,7 +7,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { DiscoverySessionProvider } from '../../../src/adapters/discovery/index.js';
+import { DiscoverySessionProvider } from '@seeya-ai/engine/adapters/discovery/index.js';
 import { FakeProcessControl } from './_fake-process-control.js';
 import { FakeClock } from './_fake-clock.js';
 import {

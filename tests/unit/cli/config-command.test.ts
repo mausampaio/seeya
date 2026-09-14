@@ -12,10 +12,10 @@ import {
   runConfigGetCommand,
   runConfigPolicyCommand,
   runConfigSetCommand,
-} from '../../../src/cli/config-command.js';
-import { normalizeCwdForComparison } from '../../../src/core/cwd-normalization.js';
+} from '../../../packages/cli/src/config-command.js';
+import { normalizeCwdForComparison } from '@seeya-ai/engine/core/cwd-normalization.js';
 import { InMemoryScheduleStorage } from './_fakes.js';
-import type { Config } from '../../../src/core/types.js';
+import type { Config } from '@seeya-ai/engine/core/types.js';
 
 function config(overrides: Partial<Config> = {}): Config {
   return {

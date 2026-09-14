@@ -1,7 +1,13 @@
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import rawViteConfig from '../../../vitest.config.js';
-import { isRecord, listProductionTsFiles, PROJECT_ROOT } from './_support.js';
+import {
+  isRecord,
+  listProductionTsFiles,
+  PROJECT_ROOT,
+  ENGINE_SRC_ROOT,
+  CLI_SRC_ROOT,
+} from './_support.js';
 import {
   DECLARED_COVERAGE_DIRECTORIES,
   type DeclaredCoverageDirectory,
@@ -54,32 +60,50 @@ describe('guard: no production directory silently carries zero coverage floor', 
 });
 
 /**
- * `src/`'s real directories that directly hold at least one production `.ts` file, as paths
- * relative to `src/` (e.g. `'adapters/process'`). Built from `listProductionTsFiles` (S1-T0,
- * reused here per S1-T12 rather than a second recursive walker) so this inherits the same
- * TOCTOU-safe scan and `_guard-*` exclusion the dependency-cruiser guards already rely on —
- * a guard fixture writing into `src/adapters/clock/_guard-eslint/` mid-run must never be read as
- * a new production directory here.
+ * The two package src roots' real leaf directories that directly hold at least one production
+ * `.ts` file, as project-root-relative paths (e.g. `'packages/engine/src/adapters/process'`) —
+ * V2-T1's replacement for the old single `src/`-relative scan. Built from `listProductionTsFiles`
+ * (S1-T0, reused here per S1-T12 rather than a second recursive walker) so this inherits the same
+ * TOCTOU-safe scan and `_guard-*` exclusion the dependency-cruiser guards already rely on — a
+ * guard fixture writing into `packages/engine/src/adapters/clock/_guard-eslint/` mid-run must
+ * never be read as a new production directory here.
+ *
+ * The two roots are scanned differently on purpose: `packages/engine/src` still requires every
+ * production file to live one layer directory deep (core/, adapters/<x>/, application/,
+ * scheduler/ — same as the pre-monorepo `src/` did), so a stray top-level file still throws.
+ * `packages/cli/src` has no such subdirectory at all (cli's files sit directly in its own package
+ * root) — it either holds at least one production file, in which case it's ONE covered unit
+ * (`'packages/cli/src'` itself, matching `_coverage-directories.ts`'s single entry for it and
+ * vitest.config.ts's one glob key for the whole package), or it holds none.
  */
 function realLeafSourceDirectories(): string[] {
-  const files = listProductionTsFiles(path.join(PROJECT_ROOT, 'src'));
+  const directories = new Set<string>(engineLeafDirectories());
+  if (listProductionTsFiles(path.join(PROJECT_ROOT, CLI_SRC_ROOT)).length > 0) {
+    directories.add(CLI_SRC_ROOT.split(path.sep).join('/'));
+  }
+  return [...directories].sort();
+}
+
+function engineLeafDirectories(): string[] {
+  const rootPrefix = `${ENGINE_SRC_ROOT.split(path.sep).join('/')}/`;
+  const files = listProductionTsFiles(path.join(PROJECT_ROOT, ENGINE_SRC_ROOT));
   const directories = new Set<string>();
   for (const file of files) {
     // `file` is always project-root-relative with `/` (see listProductionTsFiles). Slice past
-    // "src/" so entries read the same as _coverage-directories.ts's `path` field.
-    const withoutSrcPrefix = file.slice('src/'.length);
-    const lastSlash = withoutSrcPrefix.lastIndexOf('/');
+    // the engine src root so the remainder reads the same as it did pre-monorepo.
+    const withoutRootPrefix = file.slice(rootPrefix.length);
+    const lastSlash = withoutRootPrefix.lastIndexOf('/');
     if (lastSlash === -1) {
       throw new Error(
-        `found a .ts file directly in src/ with no owning directory: "${file}". Every ` +
-          'production file is expected to live inside a layer directory (core/, adapters/<x>/, ' +
-          'application/, scheduler/, cli/) — either this is a real new top-level file that needs ' +
-          'its own decision, or the scan above picked up something it should not have.',
+        `found a .ts file directly in ${ENGINE_SRC_ROOT} with no owning directory: "${file}". ` +
+          'Every production file is expected to live inside a layer directory (core/, ' +
+          'adapters/<x>/, application/, scheduler/) — either this is a real new top-level file ' +
+          'that needs its own decision, or the scan above picked up something it should not have.',
       );
     }
-    directories.add(withoutSrcPrefix.slice(0, lastSlash));
+    directories.add(`${rootPrefix}${withoutRootPrefix.slice(0, lastSlash)}`);
   }
-  return [...directories].sort();
+  return [...directories];
 }
 
 function coveredEntries(): (DeclaredCoverageDirectory & {
@@ -95,7 +119,9 @@ function coveredEntries(): (DeclaredCoverageDirectory & {
 }
 
 function globFor(directoryPath: string): string {
-  return `src/${directoryPath}/**`;
+  // V2-T1: directoryPath is already project-root-relative (see DeclaredCoverageDirectory's own
+  // docs) and equal to vitest.config.ts's real glob key, minus the trailing "/**".
+  return `${directoryPath}/**`;
 }
 
 /**
