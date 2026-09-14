@@ -323,10 +323,14 @@ sistema é complexidade sem fim, e validar com um mecanismo que não é o do pro
 O spike M valida PTY e TUI dos harnesses dentro do `xterm.js` **no Linux (o dia a dia do
 mantenedor) e no Windows**.
 
-1. renomear para `seeya` (S5-T0, D-040) e organizar o monorepo com os escopos;
-2. `seeya project create`, `list`, `show` e `open`, com o template mínimo (`AGENTS.md`,
-   `INDEX.md`, estado atual, `decisions/`) e a associação de repositórios;
-3. **interface básica**: projetos na lateral, abas de sessão, `pause`/`end-day` por projeto;
+1. renomear para `seeya` (S5-T0, D-040) e organizar o monorepo com os escopos — feito (V2-T1);
+2. **interface básica** (mantenedor, 2026-09-14: antes dos projetos, porque organizar sessão
+   viva não depende do modelo de projeto): a lateral nasce com as **sessões descobertas** da
+   v1, abas de terminal embutido e o painel de estado (V2-T2, esqueleto); depois `start-day`
+   abrindo abas, `pause`/`end-day` e notificações com ações (V2-T3);
+3. `seeya project create`, `list`, `show` e `open`, com o template mínimo (`AGENTS.md`,
+   `INDEX.md`, estado atual, `decisions/`) e a associação de repositórios — e a lateral passa a
+   agrupar as sessões por projeto;
 4. `checkpoint` e `pause`, com a camada de afirmações verificáveis do detector;
 5. `end-day` global, com `priority` e `status`;
 6. sincronização em níveis e continuidade entre dispositivos;

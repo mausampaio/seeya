@@ -4130,8 +4130,9 @@ texto, mas não são a fila.
       perguntar (nenhuma altera comportamento, API entre camadas ou texto voltado à pessoa).
 
 - [ ] **V2-T2 — A interface, esqueleto: `@seeya-ai/app` com abas de terminal e a lista de sessões
-      (D-042, D-043).** Especificada pelo PO em 2026-09-14; **aguarda aprovação do mantenedor
-      antes de qualquer despacho.** Primeira tarefa de código da interface. Ela é deliberadamente
+      (D-042, D-043).** Especificada pelo PO em 2026-09-14; **aprovada pelo mantenedor no mesmo
+      dia, com as sessões descobertas na lateral** (projetos depois). Primeira tarefa de código da
+      interface. Ela é deliberadamente
       um esqueleto: prova a pilha (Electron + `xterm.js` + `node-pty`) como código de produto,
       dentro do monorepo e dos guards, e entrega a primeira utilidade real — abrir o harness numa
       aba e ver as sessões vivas da máquina numa lista — sem ainda nenhuma ação que custe dinheiro
