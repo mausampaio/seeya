@@ -152,16 +152,14 @@ quebrava com `MODULE_NOT_FOUND`. Corrigido antes da mesclagem.
 `./dist/index.js` (raiz do dist do pacote, sem o antigo prefixo `cli/`) — ou seja, o artefato
 passa a ser `packages/cli/dist/index.js`, não mais `dist/cli/index.js`.
 
-**Consequência para o mantenedor, pendente em 13/09:** a tarefa agendada do autostart aponta
-para o caminho antigo (`C:\code\seeya\dist\cli\index.js`), que deixa de existir depois desta
-mesclagem e de um `npm run build` na `main`. `seeya autostart status` vai passar a mostrar
-`brokenPath` nesse momento — é o comportamento desenhado pela S5-T1 para exatamente este caso, não
-um defeito. **`seeya autostart enable` reaponta a tarefa** para o caminho novo; era, em 13/09, o
-único passo manual pendente depois da mesclagem, e depois disso convém conferir que o daemon
-volta a subir sozinho no próximo logon. Medido nesta tarefa, com o link apontando para a worktree
-(não a `main`, que não foi tocada): `seeya --version`, `seeya status` e `seeya autostart status`
-respondem certo pelo link novo — o `status` mostrou o caminho antigo porque, em 13/09, a tarefa
-real da máquina ainda não tinha mudado.
+**Autostart reapontado em 14/09.** A tarefa agendada apontava para o caminho antigo
+(`C:\code\seeya\dist\cli\index.js`); o mantenedor rodou `seeya autostart enable`, que
+respondeu pelo caminho "já existia, atualizou" da S5-T1 e reescreveu para
+`C:\code\seeya\packages\cli\dist\index.js` (`autostart status` confirma). O `brokenPath`
+não chegou a aparecer: a pasta `dist/` antiga continuou no disco como resto de build (ignorada
+pelo git), então o caminho velho nunca deixou de existir. Ainda não confirmado: o daemon subir
+sozinho pelo caminho novo no próximo logon — o daemon em execução em 14/09 é o que subiu em
+13/09 pelo código antigo, até ser reiniciado.
 
 `npm link` desta tarefa roda em `packages/cli`, não na raiz — o `seeya` do PATH deste notebook
 aponta para a worktree enquanto ela existir; religar depois da mesclagem aponta de volta para

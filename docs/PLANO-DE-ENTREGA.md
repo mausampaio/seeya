@@ -3952,10 +3952,10 @@ texto, mas não são a fila.
       spike G contra uma sessão embutida. Processos e sessões de teste (incluindo os transcripts
       que criaram em `~/.claude/projects/` e `~/.codex/sessions/`) foram removidos ao final.
 
-- [~] **V2-T1 — O monorepo: `@seeya-ai/engine` e `@seeya-ai/cli` (D-043).** Especificada pelo PO em
+- [x] **V2-T1 — O monorepo: `@seeya-ai/engine` e `@seeya-ai/cli` (D-043).** Especificada pelo PO em
       2026-09-13; aprovada pelo mantenedor e despachada no mesmo dia; **mesclada na `main` em
-      2026-09-13** (fast-forward, sete commits) depois da revisão do PO. Fica em `[~]` até o
-      mantenedor rodar `seeya autostart enable` e o CI dos três sistemas confirmar. É a primeira
+      2026-09-13** (fast-forward, sete commits) depois da revisão do PO; **aceita em 2026-09-14**
+      depois do CI verde nos três sistemas e do `seeya autostart enable` do mantenedor. É a primeira
       tarefa de código da v2 e uma reestruturação que toca tudo: por isso o aceite é "nada mudou",
       medido.
 
@@ -4028,10 +4028,15 @@ texto, mas não são a fila.
       (1.567 passando, 3 pulados); CI verde nos três sistemas e CodeQL verde no mesmo push; o
       alerta `js/insecure-temporary-file` consta como **fixed** e não há alerta aberto (Q-068
       fechada). `seeya` religado em `packages/cli`, `seeya --version` respondendo pelo link novo.
-      Pendente do mantenedor: `seeya autostart enable` (a tarefa agendada ainda aponta para
-      `dist/cli/index.js`, que continua existindo como resto de build antigo, por isso `status`
-      ainda diz `enabled` e não `brokenPath`) e reiniciar o daemon, que está rodando o código
-      antigo.
+      **Aceite do mantenedor (2026-09-14):** `seeya autostart enable` respondeu "already
+      enabled, pointing at `C:\code\seeya\dist\cli\index.js`. Updated it to the binary
+      currently in use: `C:\code\seeya\packages\cli\dist\index.js`" — o caminho
+      "já existia, atualizou" da S5-T1, no primeiro caso real; `autostart status` confirma o
+      caminho novo. O `brokenPath` não chegou a aparecer porque a pasta `dist/` antiga continuou
+      no disco como resto de build (ignorada pelo git), então o caminho velho nunca deixou de
+      existir — o estado observado foi `enabled` com caminho velho, depois `enabled` com o novo.
+      O daemon que estava rodando (subido em 13/09 pelo código antigo) segue até ser reiniciado;
+      isso é operação, não aceite.
 
       **Relatório do agente (2026-09-13), numa worktree isolada, nada mesclado.** Sete commits
       ao todo — quatro do movimento em si, um achado de ferramental no meio do caminho, e dois de
