@@ -15,6 +15,7 @@ import type {
   CreateTabResponse,
   ResizeTabRequest,
   CloseTabRequest,
+  RemoveTabRequest,
   WriteTabRequest,
   TabDataEvent,
   TabExitEvent,
@@ -30,6 +31,7 @@ import {
   createTab,
   emptyTabs,
   markExited,
+  removeTab,
   updateTab,
   withPid,
   type TabCollection,
@@ -246,6 +248,17 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // removed) — closeTab only asks the process to end, it never removes the tab itself.
   ipcMain.on(CHANNELS.closeTab, (_event, request: CloseTabRequest) => {
     ptyManager.closeTab(request.id);
+  });
+
+  // V2-T3 review: the renderer only ever sends this for a tab whose process has already exited
+  // (`renderer.ts#removeTabUi`, the same distinction `closeTab` above never needed) — keeps this
+  // `TabCollection` from still holding a stale entry, which is what let a NEW session with a
+  // reused pid falsely match a removed tab in the sidebar (`CHANNELS.removeTab`'s own docstring).
+  // `ptyManager` needs no matching call: `PtyManager` was never asked to track this tab in the
+  // first place once its own `onExit` already deleted the entry (`pty-manager.ts`'s own
+  // docstring on `handleFor`).
+  ipcMain.on(CHANNELS.removeTab, (_event, request: RemoveTabRequest) => {
+    tabs = removeTab(tabs, request.id);
   });
 
   void runRefreshLoop({

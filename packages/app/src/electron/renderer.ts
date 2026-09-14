@@ -104,6 +104,10 @@ function addTabButton(id: string, label: string): void {
  * (`addTabButton`'s own `wrapper`, and the terminal pane); if the removed tab was the one showing,
  * falls back to whatever tab remains, if any (`tabs/tab-model.ts#removeTab`'s own docstring: the
  * pure model doesn't know about "which tab is showing" — that's a renderer/DOM concern).
+ *
+ * **V2-T3 review: also tells the main process** (`window.seeya.removeTab`) so its own
+ * `TabCollection` drops the entry too — otherwise it keeps matching a NEW session against this
+ * tab's old pid if the OS reuses it (`CHANNELS.removeTab`'s own docstring has the concrete risk).
  */
 function removeTabUi(id: string, wrapper: HTMLElement, open: OpenTab): void {
   const wasShown = !open.container.hidden;
@@ -111,6 +115,7 @@ function removeTabUi(id: string, wrapper: HTMLElement, open: OpenTab): void {
   open.container.remove();
   wrapper.remove();
   openTabs.delete(id);
+  window.seeya.removeTab({ id });
   const remaining = wasShown ? openTabs.keys().next().value : undefined;
   if (remaining !== undefined) {
     showTab(remaining);

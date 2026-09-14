@@ -13,6 +13,7 @@ import type {
   CreateTabResponse,
   ResizeTabRequest,
   CloseTabRequest,
+  RemoveTabRequest,
   WriteTabRequest,
   TabDataEvent,
   TabExitEvent,
@@ -27,6 +28,9 @@ export interface SeeyaApi {
   writeTab(request: WriteTabRequest): void;
   resizeTab(request: ResizeTabRequest): void;
   closeTab(request: CloseTabRequest): void;
+  /** V2-T3 review: `electron/renderer.ts#removeTabUi` calls this AFTER its own DOM cleanup, for a
+   * tab whose process has already exited — see `CHANNELS.removeTab`'s own docstring for why. */
+  removeTab(request: RemoveTabRequest): void;
   /** V2-T3: fetched once, at renderer startup, before any tab's `new Terminal({...})` is
    * constructed (`electron/renderer.ts`'s own `main`). */
   getTerminalFontConfig(): Promise<TerminalFontConfigResponse>;
@@ -46,6 +50,7 @@ const api: SeeyaApi = {
   writeTab: (request) => ipcRenderer.send(CHANNELS.writeTab, request),
   resizeTab: (request) => ipcRenderer.send(CHANNELS.resizeTab, request),
   closeTab: (request) => ipcRenderer.send(CHANNELS.closeTab, request),
+  removeTab: (request) => ipcRenderer.send(CHANNELS.removeTab, request),
   getTerminalFontConfig: () => ipcRenderer.invoke(CHANNELS.getTerminalFontConfig),
   onTabData: (listener) => {
     ipcRenderer.on(CHANNELS.tabData, (_event, data: TabDataEvent) => listener(data));

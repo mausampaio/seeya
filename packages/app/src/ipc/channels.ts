@@ -21,6 +21,13 @@ export const CHANNELS = {
   resizeTab: 'seeya:resize-tab',
   /** Renderer → main: close one tab (ends its process). */
   closeTab: 'seeya:close-tab',
+  /** Renderer → main: forget a tab whose process has already exited (V2-T3 review) — the renderer
+   * already removed its own button/pane by the time this fires; this is what keeps `main.ts`'s
+   * own `TabCollection` from still holding an entry for it (otherwise `findTabByPid`'s aba↔sessão
+   * correspondence — D-025 — could match a NEW session against a stale entry's pid, the concrete
+   * risk being OS pid reuse). Never sent for a tab whose process is still running — that case
+   * still goes through `closeTab` above, unchanged. */
+  removeTab: 'seeya:remove-tab',
   /** Main → renderer: output chunk for one tab. */
   tabData: 'seeya:tab-data',
   /** Main → renderer: one tab's process ended. */
@@ -61,6 +68,10 @@ export interface ResizeTabRequest {
 }
 
 export interface CloseTabRequest {
+  readonly id: string;
+}
+
+export interface RemoveTabRequest {
   readonly id: string;
 }
 
