@@ -1,6 +1,6 @@
 # Estado atual
 
-_Atualizado em 2026-09-14, depois da mesclagem da V2-T2 na `main`. Se o
+_Atualizado em 2026-09-14, depois da mesclagem da V2-T3 na `main`. Se o
 `git log`, a CI ou o `~/.seeya` contarem algo diferente do que está aqui, **este arquivo está
 atrasado**: confie na evidência e atualize o arquivo. Isso já aconteceu: a primeira versão dele,
 escrita à mão no mesmo dia, tinha quatro afirmações falsas, e quem achou foi uma sessão limpa
@@ -146,11 +146,11 @@ trabalho de verdade.
 `claude` funcionando; comparar a lateral com `seeya sessions` e o painel de estado com `seeya
 status` ao vivo; medir memória com 1 e 3 abas.
 
-## V2-T3 — terminal usável no dia a dia (entregue em worktree, 14/09, pendente revisão do PO)
+## V2-T3 — terminal usável no dia a dia (mesclada na `main` em 14/09)
 
-**Não mesclada ainda** — três commits numa worktree isolada, um por item, mais dois commits de
-revisão do PO, aguardando revisão do mantenedor antes de subir para `main` (nenhum push feito pelo
-agente). Os três itens do despacho: fonte configurável com Nerd Font embutida
+**Mesclada na `main` em 14/09** (fast-forward: três commits, um por item, mais dois de correção
+da revisão do PO e dois de documentação; portão e `verificar:linux` verdes na worktree). Os três
+itens do despacho: fonte configurável com Nerd Font embutida
 (`terminalFontFamily`/`terminalFontSize`, D-035), aba encerrada removível pelo ×, e a
 checagem/correção do bit de execução do `spawn-helper` do node-pty (mais `X_OK` em
 `adapters/process/resolve-command.ts`, que antes só conferia existência). **Revisão do PO:** dois

@@ -4423,8 +4423,9 @@ texto, mas não são a fila.
 
 - [~] **V2-T3 — Terminal usável no dia a dia: fonte configurável com Nerd Font embutida, aba
       encerrada removível, helper executável no macOS/Linux (D-035, D-042).** Especificada pelo
-      PO em 2026-09-14 a partir do uso real do mantenedor no mesmo dia; **aprovada e despachada
-      pelo mantenedor em 2026-09-14.** Curta de propósito: três correções de uso que
+      PO em 2026-09-14 a partir do uso real do mantenedor no mesmo dia; aprovada e despachada
+      pelo mantenedor em 2026-09-14; **mesclada na `main` em 2026-09-14** depois de uma rodada de
+      revisão do PO. Curta de propósito: três correções de uso que
       valem antes do `start-day` em abas (V2-T4), porque sem elas a aba não serve para o dia a
       dia de quem já tem o terminal configurado.
 
