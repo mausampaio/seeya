@@ -13,15 +13,15 @@
  * `docs/PLANO-DE-ENTREGA.md` V2-T2 gives: "o mesmo problema vai aparecer quando o `start-day` abrir
  * abas (V2-T3), então não pertence à interface."
  *
- * **No I/O of its own.** `CommandResolutionFs.fileExists` is the one port this module depends on
+ * **No I/O of its own.** `CommandResolutionFs.isExecutable` is the one port this module depends on
  * — tests inject a fake, in-memory filesystem (`docs/TESTES.md`: "duplo de I/O é classe/objeto
  * nomeado implementando a porta") instead of touching a real disk, and `platform`/`pathEnv`/
  * `pathExtEnv` are parameters, never `process.platform`/`process.env` read directly (AGENTS.md's
  * own "cuidado": no bare `process.platform === 'win32'` outside an adapter with both branches next
  * to each other — this IS that adapter). The real caller (`packages/app/src/composition/index.ts`)
- * reads the real values once and passes them in, plus a real `fileExists` backed by `node:fs`.
+ * reads the real values once and passes them in, plus a real `isExecutable` backed by `node:fs`.
  */
-import { access } from 'node:fs/promises';
+import { access, constants } from 'node:fs/promises';
 
 /** A command resolved to something safe to hand to `node-pty`'s `spawn` directly. */
 export interface ResolvedCommand {
@@ -44,22 +44,33 @@ export type ResolveCommandResult =
   | { readonly kind: 'notFound'; readonly unresolved: UnresolvedCommand };
 
 /** The one I/O this module needs — implemented for real against `node:fs` (`realCommandResolutionFs`
- * below) by the caller, and by an in-memory fake in tests. */
+ * below) by the caller, and by an in-memory fake in tests. **Named for what it checks, not just
+ * whether the path exists** (V2-T3): a `PATH` entry that exists but isn't executable is not a
+ * command a shell would ever pick either, and treating it as "found" is exactly the mismatch that
+ * let the macOS `spawn-helper` finding go unnoticed by this module — it only ever checked
+ * existence. */
 export interface CommandResolutionFs {
-  fileExists(path: string): Promise<boolean>;
+  isExecutable(path: string): Promise<boolean>;
 }
 
 /**
  * The real, `node:fs`-backed `CommandResolutionFs` — the only piece of this module that touches a
- * real disk. `access` (not `stat`) because the question is exactly "can this be found and
- * executed", never anything about the entry's other metadata; any error (permission, ENOENT, a
- * directory answering to the name) means "not this one", not "resolution failed" — a strict
- * PATH walk skips a candidate it can't use, it doesn't abort the search over it.
+ * real disk. `access(path, constants.X_OK)` (not `stat`, and not bare `access(path)`) because the
+ * question is exactly "can this be found AND executed" — a candidate that exists but has no
+ * execute bit (V2-T3: the same class of defect as `packages/app/scripts/build.mjs`'s own
+ * `ensureSpawnHelperExecutable`, one PATH entry away) is not one a real shell would ever launch
+ * either. **On Windows, `X_OK` does not distinguish** — Node's own docs: most files there have no
+ * separate execute permission, so `access(path, X_OK)` behaves the same as `access(path)` there,
+ * which is exactly the existing Windows behavior this change must not disturb (`resolveWindows`
+ * below never had an executable-bit concept to begin with — the `PATHEXT` walk IS the "is this
+ * runnable" question on that platform). Any error (permission, ENOENT, a directory answering to
+ * the name) means "not this one", not "resolution failed" — a strict PATH walk skips a candidate
+ * it can't use, it doesn't abort the search over it.
  */
 export const realCommandResolutionFs: CommandResolutionFs = {
-  async fileExists(path: string): Promise<boolean> {
+  async isExecutable(path: string): Promise<boolean> {
     try {
-      await access(path);
+      await access(path, constants.X_OK);
       return true;
     } catch {
       return false;
@@ -113,7 +124,7 @@ async function resolvePosix(
   for (const directory of splitPath(options.pathEnv, POSIX_PATH_SEPARATOR)) {
     const candidate = joinPath(directory, command, options.platform);
     searched.push(candidate);
-    if (await options.fs.fileExists(candidate)) {
+    if (await options.fs.isExecutable(candidate)) {
       return { kind: 'resolved', resolved: { command: candidate, args } };
     }
   }
@@ -147,7 +158,7 @@ async function resolveWindows(
     for (const extension of candidateExtensions) {
       const candidate = joinPath(directory, `${command}${extension}`, options.platform);
       searched.push(candidate);
-      if (await options.fs.fileExists(candidate)) {
+      if (await options.fs.isExecutable(candidate)) {
         return { kind: 'resolved', resolved: resolveWindowsMatch(candidate, args, extension) };
       }
     }

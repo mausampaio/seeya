@@ -10,7 +10,7 @@ import {
 class FakeFs implements CommandResolutionFs {
   constructor(private readonly existingPaths: ReadonlySet<string>) {}
 
-  fileExists(path: string): Promise<boolean> {
+  isExecutable(path: string): Promise<boolean> {
     return Promise.resolve(this.existingPaths.has(path));
   }
 }
