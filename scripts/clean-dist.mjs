@@ -26,15 +26,25 @@
 // V2-T1 (D-043): one `dist/` per workspace package now, not one at the repo root — each package
 // builds and ships its own. `force: true` (a missing directory already satisfies "make sure
 // dist/ doesn't exist") is what keeps this a no-op for packages/app, reserved but not created yet.
+//
+// Also removes each package's `tsconfig.build.tsbuildinfo` (`tsc -b`'s incremental-build cache,
+// introduced by this same task): measured directly that skipping this reintroduces the exact
+// class of bug this whole script exists to prevent. `tsc -b` decides whether a project is
+// up to date from source mtimes recorded in that file — NOT from whether `dist/` still physically
+// exists — so deleting only `dist/` left a build that had already run once produce a completely
+// EMPTY `dist/` on the next `npm run build`: `tsc -b` saw an unchanged, still-valid buildinfo and
+// silently skipped re-emitting anything, exiting 0. `npm link`'s `seeya` then failed with
+// `MODULE_NOT_FOUND` even though `npm run verificar` had just reported success.
 import { rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const packageDistDirs = ['packages/engine', 'packages/cli'].map((pkg) =>
+const packagePathsToClean = ['packages/engine', 'packages/cli'].flatMap((pkg) => [
   path.join(repoRoot, pkg, 'dist'),
-);
+  path.join(repoRoot, pkg, 'tsconfig.build.tsbuildinfo'),
+]);
 
-for (const distDir of packageDistDirs) {
-  rmSync(distDir, { recursive: true, force: true });
+for (const target of packagePathsToClean) {
+  rmSync(target, { recursive: true, force: true });
 }
