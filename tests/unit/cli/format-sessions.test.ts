@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { formatSessionsReport } from '../../../packages/cli/src/format-sessions.js';
-import type { SessionRow } from '../../../packages/cli/src/session-view.js';
+import type { SessionRow } from '../../../packages/engine/src/application/session-view.js';
 import type { RejectedDiscoveryRecord } from '@seeya-ai/engine/core/ports.js';
 
 function row(overrides: Partial<SessionRow> = {}): SessionRow {

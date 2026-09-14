@@ -18,6 +18,9 @@
  * for exactly the ids that collide, and all the way to the full id if even that isn't enough —
  * the same "handle it, don't hope around it" spirit as D-025, applied to a probability instead of
  * a missing fact.
+ *
+ * **Moved here from `packages/cli/src/session-id-display.ts` in V2-T2**, alongside
+ * `session-view.ts` (its only caller) — see that file's own docstring for why.
  */
 const UUID_GROUP_BOUNDARIES = [8, 13, 18, 23, 36] as const;
 

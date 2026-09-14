@@ -25,7 +25,7 @@ import {
   describeDaemonState,
   describeError,
   type DaemonStateDeps,
-} from './daemon-state.js';
+} from '@seeya-ai/engine/scheduler/daemon-state.js';
 
 /**
  * Pre-flight only — `scheduler/lock.ts#checkDaemonLock` never writes. Refusing here BEFORE
@@ -90,7 +90,8 @@ export async function runDaemonWorker(
 // ---------------------------------------------------------------------------------------------
 // S4-T5: `seeya daemon --stop`/`--status` — the natural consumer of S4-T3b's lock `procStart`
 // tie-break and `DayState.daemonHealth`. Both commands share one read of "is the recorded lock's
-// pid actually alive" (`checkLiveLock`, `./daemon-state.js`), so `--status` and `--stop` can never
+// pid actually alive" (`checkLiveLock`, `@seeya-ai/engine/scheduler/daemon-state.js` since V2-T2),
+// so `--status` and `--stop` can never
 // disagree about which of the four states (D-024) they're looking at.
 //
 // **S4-T13 moved `checkLiveLock`/`describeLiveness`/`describeScheduleDecision`/`describeHealth`/

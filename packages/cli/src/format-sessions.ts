@@ -4,7 +4,7 @@
  * orchestration or the discovery adapters).
  */
 import type { RejectedDiscoveryRecord } from '@seeya-ai/engine/core/ports.js';
-import type { SessionRow } from './session-view.js';
+import type { SessionRow } from '@seeya-ai/engine/application/session-view.js';
 
 /**
  * `lastActivity: null` is absence of data (D-025), never rendered as a real instant. "unknown",

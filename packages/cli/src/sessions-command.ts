@@ -5,7 +5,7 @@
  */
 import type { Clock, SessionProvider } from '@seeya-ai/engine/core/ports.js';
 import type { Config } from '@seeya-ai/engine/core/types.js';
-import { buildSessionRows } from './session-view.js';
+import { buildSessionRows } from '@seeya-ai/engine/application/session-view.js';
 import { formatSessionsReport } from './format-sessions.js';
 
 export interface SessionsCommandContext {

@@ -1,12 +1,21 @@
 /**
  * Pure view-model assembly for `seeya sessions` (docs/ESPECIFICACAO.md § "seeya sessions"). No
- * I/O: `sessions`/`config`/`now` all arrive already resolved by the caller (`sessions-command.ts`)
- * — this module only decides what to show and how to sort it.
+ * I/O: `sessions`/`config`/`now` all arrive already resolved by the caller (`sessions-command.ts`
+ * in `cli/`, and `packages/app/src`'s own sidebar) — this module only decides what to show and how
+ * to sort it.
+ *
+ * **Moved here from `packages/cli/src/session-view.ts` in V2-T2** (D-043: the interface's sidebar
+ * shows "the same list as `seeya sessions`" — docs/PLANO-DE-ENTREGA.md V2-T2 item 3 — and needs the
+ * exact same row assembly, not a second copy that could drift, AGENTS.md "nada de duplicação").
+ * `cli/session-view.ts` no longer exists; `cli/sessions-command.ts` now imports this from
+ * `@seeya-ai/engine/application/session-view.js`, same names, same behavior — see Q-071.
+ * `cli/format-sessions.ts` stays in `cli/`: it's the CLI's own plain-text rendering of this row
+ * shape, not something the interface reuses (the interface renders its own sidebar DOM instead).
  */
-import { classifyState } from '@seeya-ai/engine/core/classification.js';
-import type { DiscoveredSession, SessionState, Config } from '@seeya-ai/engine/core/types.js';
+import { classifyState } from '../core/classification.js';
+import type { DiscoveredSession, SessionState, Config } from '../core/types.js';
 import { computeDisplaySessionIds } from './session-id-display.js';
-import { projectPolicyFor } from '@seeya-ai/engine/application/eligibility-assembly.js';
+import { projectPolicyFor } from './eligibility-assembly.js';
 
 export interface SessionRow {
   readonly name: string;

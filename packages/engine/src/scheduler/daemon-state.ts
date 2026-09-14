@@ -9,18 +9,30 @@
  * Read-only throughout: nothing here ever writes `daemon.lock` or `estado.json`. `checkLiveLock`
  * only READS the lock and asks `ProcessControl.isAlive`; clearing a stale lock is `runDaemonStop`'s
  * job alone (docs/PLANO-DE-ENTREGA.md S4-T13, cuidado (b)).
+ *
+ * **Moved here from `packages/cli/src/daemon-state.ts` in V2-T2 (the interface needs the same
+ * daemon+schedule text `seeya status` renders, and `application/` cannot import `cli/`).** Lands
+ * in `scheduler/`, not `application/`, because of `buildDaemonUnhealthyNotice` below: it lives in
+ * `scheduler/notices.ts`, and the layer matrix (docs/ARQUITETURA.md) forbids `application/` from
+ * importing `scheduler/` — the two choices were "this module moves to `scheduler/`" or "the notice
+ * function moves down to `core/`", and moving this module keeps `buildDaemonUnhealthyNotice`
+ * exactly where every other daemon notice already lives, instead of splitting daemon-notice
+ * building across two layers for one caller's sake. `scheduler/ → application/` stays allowed
+ * either way (the matrix's own arrow), so nothing downstream of `scheduler/poll.ts` changes.
+ * `cli/daemon-command.ts` and `cli/status-command.ts` now import this from
+ * `@seeya-ai/engine/scheduler/daemon-state.js`, same names, same behavior — see Q-071.
  */
-import type { Clock, ProcessControl, Storage } from '@seeya-ai/engine/core/ports.js';
-import type { DaemonLockInfo } from '@seeya-ai/engine/core/daemon-lock.js';
-import type { DaemonHealth, DayState } from '@seeya-ai/engine/core/types.js';
-import { localDayString } from '@seeya-ai/engine/core/day.js';
+import type { Clock, ProcessControl, Storage } from '../core/ports.js';
+import type { DaemonLockInfo } from '../core/daemon-lock.js';
+import type { DaemonHealth, DayState } from '../core/types.js';
+import { localDayString } from '../core/day.js';
 import {
   decideSchedule,
   emptyDayState,
   resetIfNewDay,
   type ScheduleDecision,
-} from '@seeya-ai/engine/core/schedule.js';
-import { buildDaemonUnhealthyNotice } from '@seeya-ai/engine/scheduler/index.js';
+} from '../core/schedule.js';
+import { buildDaemonUnhealthyNotice } from './notices.js';
 
 export interface DaemonStateDeps {
   readonly storage: Storage;

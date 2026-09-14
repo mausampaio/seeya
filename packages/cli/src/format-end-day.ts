@@ -11,7 +11,7 @@ import {
   formatSessionListingLine,
 } from '@seeya-ai/engine/core/briefing.js';
 import { renderItemList } from '@seeya-ai/engine/core/consolidated-plan.js';
-import { resolveCanTerminate } from './session-view.js';
+import { resolveCanTerminate } from '@seeya-ai/engine/application/session-view.js';
 
 function pluralize(count: number, singular: string, plural: string): string {
   return `${count} ${count === 1 ? singular : plural}`;

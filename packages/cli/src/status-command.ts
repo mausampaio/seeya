@@ -22,8 +22,8 @@ import type {
 import type { Config } from '@seeya-ai/engine/core/types.js';
 import { countEligibleSessions } from './eligibility-view.js';
 import { formatStatusReport } from './format-status.js';
-import { describeDaemonState } from './daemon-state.js';
-import { describeAutostartState } from './autostart-state.js';
+import { describeDaemonState } from '@seeya-ai/engine/scheduler/daemon-state.js';
+import { describeAutostartState } from '@seeya-ai/engine/application/autostart-state.js';
 
 export interface StatusCommandContext {
   readonly sessionProvider: SessionProvider;

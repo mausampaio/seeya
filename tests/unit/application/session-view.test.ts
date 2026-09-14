@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSessionRows } from '../../../packages/cli/src/session-view.js';
+import { buildSessionRows } from '../../../packages/engine/src/application/session-view.js';
 import type { Config } from '@seeya-ai/engine/core/types.js';
 import { createSessionWithPid, createSessionWithoutPid } from '../core/_fixtures.js';
 

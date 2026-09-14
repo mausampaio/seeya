@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { describeAutostartState } from '../../../packages/cli/src/autostart-state.js';
-import { FakeAutostart } from './_autostart-fakes.js';
+import { describeAutostartState } from '../../../packages/engine/src/application/autostart-state.js';
+// Shared with tests/unit/cli/{autostart-status-agreement,daemon-status-agreement,status-command}
+// .test.ts (V2-T2: describeAutostartState moved here, but its fake double stays put — no reason
+// to duplicate it for the one relocated test).
+import { FakeAutostart } from '../cli/_autostart-fakes.js';
 
 describe('describeAutostartState', () => {
   it('disabled', async () => {

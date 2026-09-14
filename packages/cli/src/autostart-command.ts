@@ -4,7 +4,7 @@
  * status` also calls (cuidado (c): the two can never disagree).
  */
 import type { Autostart } from '@seeya-ai/engine/core/ports.js';
-import { describeAutostartState } from './autostart-state.js';
+import { describeAutostartState } from '@seeya-ai/engine/application/autostart-state.js';
 
 export async function runAutostartEnableCommand(
   autostart: Autostart,
