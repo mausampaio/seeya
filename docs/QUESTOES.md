@@ -5948,6 +5948,13 @@ processo-alvo pode falhar conforme o estado da sessão do runner. **Se voltar:**
 fazer o auxiliar devolver o erro legível (sem `CLIXML`) e o código 5 nomeado, para a próxima
 ocorrência dizer o motivo em vez de só o sintoma.
 
+**Ocorrência (2026-09-14, PO):** classe (a) de novo, num push só de documentação
+(`0400f2c`): `tests/integration/git/git-adapter.test.ts` ("leaves the main worktree, the linked
+worktree and the shared .git identical before/after") estourou 5.000 ms no `windows-latest`, com
+`EBUSY: resource busy or locked, rmdir '<temp do runner>\seeya-git-…'`.
+Reexecução só do job, sem mudança de código: verde. O push seguinte (`9931339`), mesmo código,
+verde de primeira.
+
 ---
 
 ## Q-065 — S4-T12: onde a normalização de `projectPolicy` mora, a escolha de resolver (não recusar) caminho relativo, e por que `buildDaemonContext` perdeu seu único `readConfig` de startup
