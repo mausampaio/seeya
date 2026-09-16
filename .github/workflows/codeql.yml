@@ -26,7 +26,15 @@ name: CodeQL
 on:
   push:
     branches: [main]
+    # Pushes that only touch docs/ or AGENTS.md skip this workflow: nothing the gate runs
+    # reads either (measured 2026-09-16 -- the only code touching docs/ is
+    # scripts/spike-j-measure.mjs, which never runs in CI, and .prettierignore already
+    # excludes both). Filtering by changed paths, not by commit type: the path list is a
+    # fact about the push, a `docs:` prefix is a claim by whoever wrote it. README.md,
+    # INDEX.md and CLAUDE.md still trigger CI -- prettier checks them.
+    paths-ignore: ['docs/**', 'AGENTS.md']
   pull_request:
+    paths-ignore: ['docs/**', 'AGENTS.md']
 
 jobs:
   analyze:
