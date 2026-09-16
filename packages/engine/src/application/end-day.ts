@@ -15,11 +15,15 @@
  * `mapWithConcurrencyLimit` below; `dryRun` is threaded down to `captureSession` and to this
  * function's own briefing/fork-cleanup steps, each of which stops right before its own write
  * (`capture-session.ts#persistAndMaybeTerminate`, `previewDailyBriefing` below, and the fork-cleanup
- * skip) — everything upstream of a write (discovery, eligibility, evidence gathering, generation)
- * runs for real either way, so a dry-run preview can never describe a different code path than the
- * one a real run actually takes.
+ * skip) — everything upstream of a write (discovery, eligibility, evidence gathering) runs for
+ * real either way, so a dry-run preview can never describe a different code path than the one a
+ * real run actually takes. **Generation is the one exception, and only when `skipGeneration` is
+ * ALSO set** (V2-T5a review fix, `EndDayOptions.skipGeneration`'s own docstring) — `seeya
+ * end-day --dry-run`'s own contract (S2-T5) still calls the real lean generator during a dry run;
+ * only `packages/app/src`'s own preview (which must not spend a real, billed model call before
+ * the person has confirmed anything) sets `skipGeneration` alongside `dryRun`.
  *
- * **`skipTermination` (D-036, `EndDayOptions`) is a third, independent switch: writes happen
+ * **`skipTermination` (D-036, `EndDayOptions`) is a fourth, independent switch: writes happen
  * normally, only the termination step is forced off** — unlike `dryRun`, which skips every write.
  * `seeya end-day` never sets it; only `scheduler/poll.ts`'s overdue-but-same-day case does.
  */
