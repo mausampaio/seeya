@@ -29,16 +29,19 @@ import type {
   ResumeProgressUpdateEvent,
   ResumeTabOpenedEvent,
   EndDayPreviewResponse,
+  EndDayRunResponse,
 } from '../ipc/channels.js';
 import type { Clock } from '@seeya-ai/engine/core/ports.js';
 import { findPendingBriefing } from '@seeya-ai/engine/application/find-pending-briefing.js';
 import { resumeSessions } from '@seeya-ai/engine/application/start-day.js';
 import { endDay } from '@seeya-ai/engine/application/end-day.js';
 import { formatEndDayReport } from '@seeya-ai/engine/application/format-end-day.js';
+import { buildEndDayNotice } from '@seeya-ai/engine/application/end-day-notice.js';
 import type { Handoff } from '@seeya-ai/engine/core/types.js';
 import { buildAppContext, toEndDayDeps, type AppContext } from '../composition/index.js';
 import { MESSAGES } from '../text/messages.js';
 import { buildEndDayCostCeiling } from '../state/end-day-preview.js';
+import { projectEndDayProgressEvent } from '../state/end-day-progress.js';
 import {
   addTab,
   createTab,
@@ -253,6 +256,12 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // fast-failure race for the specific tabs it opened — ExitListenerRegistry's own docstring.
   const exitListenerRegistry = new ExitListenerRegistry();
   let nextResumeTabId = 0;
+  // V2-T5a item 4: "a execução ... uma por vez" — the renderer already disables "Run end-day now"
+  // while `running`, but this is the same defense-in-depth `ipcMain.handle(CHANNELS.resumeSelected`
+  // above relies on the renderer alone for (no second guard there) — end-day gets one anyway
+  // because a REAL run terminates opted-in sessions (D-002), a consequence worth refusing a stray
+  // concurrent call over rather than trusting the renderer alone.
+  let endDayRunInProgress = false;
 
   const ptyManager = context.buildPtyManager({
     onData: (id, data) => {
@@ -446,6 +455,44 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
       reportText: formatEndDayReport(result, context.config),
       costCeiling: buildEndDayCostCeiling(result.sessionsInScope, context.config),
     };
+  });
+
+  // V2-T5a item 4: "Run end-day now" — the real run (dryRun: false), notified through the SAME
+  // Notifier/buildEndDayNotice seeya end-day uses (composition/index.ts#buildAppContext wires the
+  // real adapter, D-020). The status panel picks up whatever this run wrote/terminated on its own
+  // next tick (runRefreshLoop below, at most REFRESH_INTERVAL_MS away — no separate push needed);
+  // the "Today" panel is refreshed explicitly by the renderer right after this resolves
+  // (renderer.ts#handleEndDayRunClicked), the same "refresh after a write" shape
+  // handleResumeSelected already has for the resume flow.
+  ipcMain.handle(CHANNELS.endDayRun, async (): Promise<EndDayRunResponse> => {
+    if (endDayRunInProgress) {
+      throw new Error('an end-day run is already in progress');
+    }
+    endDayRunInProgress = true;
+    try {
+      const result = await endDay(toEndDayDeps(context), {
+        dryRun: false,
+        scope: { kind: 'fullDay' },
+        onCaptureProgress: (event) => {
+          const projected = projectEndDayProgressEvent(event);
+          if (projected !== null) {
+            window.webContents.send(CHANNELS.endDayProgress, projected);
+          }
+        },
+      });
+      const notice = buildEndDayNotice(result);
+      if (notice !== null) {
+        try {
+          await context.notifier.notify(notice);
+        } catch {
+          // Same discipline as cli/end-day-command.ts#notifyEndDayResult: a broken notifier must
+          // never derail the day's own ending.
+        }
+      }
+      return { reportText: formatEndDayReport(result, context.config) };
+    } finally {
+      endDayRunInProgress = false;
+    }
   });
 
   void runRefreshLoop({

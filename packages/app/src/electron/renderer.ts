@@ -254,6 +254,16 @@ function wireIncomingEvents(): void {
     }
   });
   window.seeya.onResumeTabOpened((event) => openResumeTabUi(event));
+  // V2-T5a item 4: "capturing N of M: <name>" while "Run end-day now" is in flight — a no-op if
+  // the dialog has already moved past `running` (e.g. a straggler event after `runFinished`),
+  // same guard `reduceEndDayPanel`'s own `progress` case already enforces.
+  window.seeya.onEndDayProgress(({ index, total, name }) => {
+    endDayState = reduceEndDayPanel(endDayState, {
+      kind: 'progress',
+      progressText: MESSAGES.endDayCaptureProgress(index, total, name),
+    });
+    renderEndDayDialog();
+  });
 }
 
 function fallbackDialog(): HTMLDialogElement {
@@ -408,13 +418,39 @@ function handleEndDayCancelOrClose(): void {
   renderEndDayDialog();
 }
 
-/** Wired once, at startup. The "Run end-day now" button's own click handler is wired by V2-T5a
- * item 4 (the real execution) — visible here already (item 1: "Dois botões"), inert until then. */
+/**
+ * "Run end-day now" clicked (V2-T5a item 4): runs the real `endDay`, one at a time — this
+ * function only proceeds from `preview` (the button is hidden in every other state, and the
+ * reducer itself refuses `runClicked` from anywhere else, so a stray second call is a no-op even
+ * if it somehow fired). Refreshes the "Today" panel once the run resolves — the freshly-written
+ * handoffs/briefing are what tomorrow's `start-day` will find; the status panel picks up the same
+ * write on its own next ambient refresh tick (`main.ts`'s own `runRefreshLoop`, at most
+ * `REFRESH_INTERVAL_MS` away), no separate push needed here.
+ */
+async function handleEndDayRunClicked(): Promise<void> {
+  if (endDayState.kind !== 'preview') {
+    return;
+  }
+  endDayState = reduceEndDayPanel(endDayState, { kind: 'runClicked' });
+  renderEndDayDialog();
+  const response = await window.seeya.endDayRun();
+  endDayState = reduceEndDayPanel(endDayState, {
+    kind: 'runFinished',
+    reportText: response.reportText,
+  });
+  renderEndDayDialog();
+  await refreshTodayPanel();
+}
+
+/** Wired once, at startup. */
 function wireEndDayDialog(): void {
   const openButton = document.getElementById('end-day-button') as HTMLButtonElement;
   openButton.textContent = MESSAGES.endDayButton;
   openButton.addEventListener('click', () => {
     void handleEndDayOpenClicked();
+  });
+  document.getElementById('end-day-dialog-run')?.addEventListener('click', () => {
+    void handleEndDayRunClicked();
   });
   document.getElementById('end-day-dialog-cancel')?.addEventListener('click', () => {
     handleEndDayCancelOrClose();
