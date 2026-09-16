@@ -7,6 +7,7 @@
  */
 import type { SidebarRow } from '../sidebar/sidebar-data.js';
 import type { TerminalFontOptions } from '../state/terminal-font.js';
+import type { TodayPanelData } from '../state/today-panel.js';
 
 export const CHANNELS = {
   /** Renderer → main: open a new tab. */
@@ -46,6 +47,24 @@ export const CHANNELS = {
   /** Renderer → main: the person's answer to one `confirmFallbackRequest`, by `requestId` —
    * `resume/pending-fallback-requests.ts#PendingFallbackRequests.resolve`'s own input. */
   confirmFallbackAnswer: 'seeya:confirm-fallback-answer',
+  /** Renderer → main: the "Today" panel's own data (V2-T4 item 1, `state/today-panel.ts`) —
+   * fetched once at startup and again after `resumeSelected` finishes, same "no polling of its
+   * own" shape `getTerminalFontConfig` already has. */
+  getTodayPanel: 'seeya:get-today-panel',
+  /** Renderer → main: "Resume selected" — the sessions the person checked, for the day the panel
+   * is showing. */
+  resumeSelected: 'seeya:resume-selected',
+  /** Main → renderer, pushed once per session while `resumeSelected` is running: "resuming N of
+   * M: <name>" (`application/start-day.ts#ResumeProgressEvent`, projected to just what the
+   * renderer needs to say). */
+  resumeProgress: 'seeya:resume-progress',
+  /** Main → renderer: a tab the RESUMER opened (not the command bar) — `electron/main.ts`'s own
+   * `TabResumeOpener` sends this right after spawning the pty, so the renderer can create the same
+   * `@xterm/xterm` instance/tab-strip button `createTab`'s own round trip creates, labeled with the
+   * handoff's name instead of the raw `claude` command (V2-T4: "a aba ... rotulada com o nome da
+   * sessão"). Unlike `createTab`, the renderer never calls back to spawn anything here — the pty
+   * already exists by the time this event arrives. */
+  resumeTabOpened: 'seeya:resume-tab-opened',
 } as const;
 
 export interface CreateTabRequest {
@@ -119,4 +138,40 @@ export interface FallbackConfirmRequestEvent {
 export interface FallbackConfirmAnswerRequest {
   readonly requestId: string;
   readonly decision: 'open' | 'skip';
+}
+
+/** `CHANNELS.getTodayPanel`'s response — the exact shape `state/today-panel.ts#buildTodayPanelData`
+ * produces. */
+export type TodayPanelResponse = TodayPanelData;
+
+/** `CHANNELS.resumeSelected`'s payload. `day` is `core/types.ts`'s `Day` (a plain string,
+ * `YYYY-MM-DD`) — not imported from the engine here, same "this file only ever imports app-internal
+ * state modules" shape every other type above already keeps (`SidebarRow`/`TerminalFontOptions`/
+ * `TodayPanelData`). */
+export interface ResumeSelectedRequest {
+  readonly day: string;
+  readonly sessionIds: readonly string[];
+}
+
+/** `CHANNELS.resumeSelected`'s response — minimal on purpose for V2-T4 item 1 (just enough for the
+ * panel to say what happened); item 4 grows this into the full per-session breakdown
+ * (`state/resume-summary.ts`). */
+export interface ResumeSelectedResponse {
+  readonly resumedCount: number;
+  readonly skippedCount: number;
+  readonly invalidCount: number;
+  readonly stoppedEarly: boolean;
+}
+
+export interface ResumeProgressUpdateEvent {
+  readonly index: number;
+  readonly total: number;
+  readonly name: string;
+}
+
+export interface ResumeTabOpenedEvent {
+  readonly id: string;
+  readonly label: string;
+  readonly cwd: string;
+  readonly pid: number;
 }

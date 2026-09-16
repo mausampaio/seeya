@@ -23,8 +23,16 @@ import type {
   StatusUpdateEvent,
   TerminalFontConfigResponse,
   FallbackConfirmAnswerRequest,
+  TodayPanelResponse,
+  ResumeSelectedRequest,
+  ResumeSelectedResponse,
+  ResumeProgressUpdateEvent,
+  ResumeTabOpenedEvent,
 } from '../ipc/channels.js';
 import type { Clock } from '@seeya-ai/engine/core/ports.js';
+import { findPendingBriefing } from '@seeya-ai/engine/application/find-pending-briefing.js';
+import { resumeSessions } from '@seeya-ai/engine/application/start-day.js';
+import type { Handoff } from '@seeya-ai/engine/core/types.js';
 import { buildAppContext, type AppContext } from '../composition/index.js';
 import { MESSAGES } from '../text/messages.js';
 import {
@@ -47,7 +55,22 @@ import {
   DEFAULT_AUTOSTART_REFRESH_INTERVAL_MS,
   type AutostartCacheEntry,
 } from '../state/autostart-cache.js';
+import { buildTodayPanelData } from '../state/today-panel.js';
 import { PendingFallbackRequests } from '../resume/pending-fallback-requests.js';
+import { buildFallbackConfirmer } from '../resume/fallback-confirmer.js';
+import { ExitListenerRegistry } from '../resume/exit-listener-registry.js';
+import {
+  TabSessionResumer,
+  type OpenedResumeTab,
+  type TabResumeOpener,
+} from '../resume/tab-session-resumer.js';
+
+/** `TabSessionResumer`'s `claudeCommand` in production — the same default the CLI's own
+ * `ClaudeSessionResumer#resolveClaudeBinary` falls back to when nothing overrides it
+ * (`adapters/resumption/resumer.ts`'s own `DEFAULT_CLAUDE_BINARY`, not exported — this is the app's
+ * own copy of that one literal, resolved for real here via `context.resolveHarnessCommand`, unlike
+ * the CLI which hands the bare string straight to `node:child_process.spawn`). */
+const CLAUDE_COMMAND = 'claude';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -191,6 +214,10 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // V2-T4 item 3: at most one truly pending in production (`resumeSessions`'s own sequential
   // loop), but keyed independently by requestId anyway — `PendingFallbackRequests`'s own docstring.
   const pendingFallbackRequests = new PendingFallbackRequests();
+  // V2-T4 item 2: lets the SAME onExit callback below also notify TabSessionResumer's
+  // fast-failure race for the specific tabs it opened — ExitListenerRegistry's own docstring.
+  const exitListenerRegistry = new ExitListenerRegistry();
+  let nextResumeTabId = 0;
 
   const ptyManager = context.buildPtyManager({
     onData: (id, data) => {
@@ -201,8 +228,49 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
       tabs = updateTab(tabs, id, (tab) => markExited(tab, exitCode));
       const event: TabExitEvent = { id, exitCode };
       window.webContents.send(CHANNELS.tabExit, event);
+      exitListenerRegistry.fire(id, exitCode);
     },
   });
+
+  /**
+   * The real `TabResumeOpener` (V2-T4 item 2) — glue over this function's own `ptyManager`/`tabs`,
+   * the same two things `CHANNELS.createTab`'s handler below already uses, so a resumed session's
+   * tab is indistinguishable from a command-bar one once open (same `PtyManager`, same
+   * `TabCollection`, same pid the sidebar matches by). The one real difference: the RENDERER never
+   * initiates this — `resumeTabOpened` tells it to create the `@xterm/xterm` instance for an `id`
+   * whose pty this process already spawned, instead of the renderer asking main to spawn one.
+   */
+  async function openResumeTab(options: {
+    readonly command: string;
+    readonly args: readonly string[];
+    readonly cwd: string;
+    readonly label: string;
+  }): Promise<OpenedResumeTab> {
+    const resolved = await resolveHarnessOrThrow(context, options.command, options.args);
+    nextResumeTabId += 1;
+    const id = `resume-${nextResumeTabId}`;
+    tabs = addTab(tabs, createTab({ id, command: options.label, args: [], cwd: options.cwd }));
+    const pid = ptyManager.create(id, {
+      command: resolved.command,
+      args: resolved.args,
+      cwd: options.cwd,
+      env: context.tabEnv,
+      // Reasonable initial size — same as any tab: the renderer's own FitAddon corrects it once
+      // the tab is actually shown, the same way an ordinary command-bar tab's first size is only
+      // ever a starting point (`renderer.ts#openTab`'s own `terminal.cols`/`rows`).
+      cols: 80,
+      rows: 24,
+    });
+    tabs = updateTab(tabs, id, (tab) => withPid(tab, pid));
+    const event: ResumeTabOpenedEvent = { id, label: options.label, cwd: options.cwd, pid };
+    window.webContents.send(CHANNELS.resumeTabOpened, event);
+    return { id, pid };
+  }
+
+  const tabResumeOpener: TabResumeOpener = {
+    openTab: openResumeTab,
+    onceExit: (id, listener) => exitListenerRegistry.register(id, listener),
+  };
 
   // V2-T3: fetched once by `renderer.ts#main`, before any `new Terminal({...})` is constructed —
   // the two-way handshake (`invoke`, not `send`) matches `createTab` below, the only other channel
@@ -272,6 +340,66 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   ipcMain.on(CHANNELS.confirmFallbackAnswer, (_event, answer: FallbackConfirmAnswerRequest) => {
     pendingFallbackRequests.resolve(answer.requestId, answer.decision);
   });
+
+  // V2-T4 item 1: the "Today" panel's own data — findPendingBriefing is the exact same lookup
+  // `seeya start-day` does (application/find-pending-briefing.js), scanned over
+  // config.maxBriefingScanDays like the CLI's own StartDayCommandContext.
+  ipcMain.handle(CHANNELS.getTodayPanel, async (): Promise<TodayPanelResponse> => {
+    const lookup = await findPendingBriefing(
+      context.storage,
+      context.clock,
+      context.config.maxBriefingScanDays,
+    );
+    return buildTodayPanelData(lookup);
+  });
+
+  // V2-T4 items 1/2/3: "Resume selected" — the same resumeSessions the CLI's start-day-command.ts
+  // calls, with a TabSessionResumer instead of ClaudeSessionResumer and a dialog-backed
+  // FallbackConfirmer instead of readline (D-039: this NEVER runs on its own, only from this one
+  // handler, itself only ever called by the person's own click — renderer.ts's "Resume selected"
+  // button).
+  ipcMain.handle(
+    CHANNELS.resumeSelected,
+    async (_event, request: ResumeSelectedRequest): Promise<ResumeSelectedResponse> => {
+      const briefing = await context.storage.readBriefing(request.day);
+      const wanted = new Set(request.sessionIds);
+      const handoffs: readonly Handoff[] =
+        briefing?.handoffs.filter((handoff) => wanted.has(handoff.sessionId)) ?? [];
+
+      const resolveLabel = (sessionId: string): string =>
+        handoffs.find((handoff) => handoff.sessionId === sessionId)?.name ?? sessionId;
+      const sessionResumer = new TabSessionResumer({
+        seeyaHome: context.home.seeyaHome,
+        claudeCommand: CLAUDE_COMMAND,
+        opener: tabResumeOpener,
+        clock: context.clock,
+        resolveLabel,
+      });
+      const confirmFallback = buildFallbackConfirmer(pendingFallbackRequests, (confirmRequest) =>
+        window.webContents.send(CHANNELS.confirmFallbackRequest, confirmRequest),
+      );
+
+      const result = await resumeSessions(
+        { storage: context.storage, sessionResumer, confirmFallback },
+        { day: request.day, handoffs },
+        (progressEvent) => {
+          const event: ResumeProgressUpdateEvent = {
+            index: progressEvent.index,
+            total: progressEvent.total,
+            name: progressEvent.handoff.name,
+          };
+          window.webContents.send(CHANNELS.resumeProgress, event);
+        },
+      );
+
+      return {
+        resumedCount: result.resumed.length,
+        skippedCount: result.skipped.length,
+        invalidCount: result.invalidFallbackAnswers.length,
+        stoppedEarly: result.stoppedEarly !== false,
+      };
+    },
+  );
 
   void runRefreshLoop({
     clock: context.clock,

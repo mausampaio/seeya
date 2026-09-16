@@ -15,7 +15,12 @@ import { createTab, isRunning, markExited, withPid, type Tab } from '../tabs/tab
 import { MESSAGES } from '../text/messages.js';
 import type { SeeyaApi } from './preload.js';
 import type { SidebarRow } from '../sidebar/sidebar-data.js';
-import type { FallbackConfirmRequestEvent, TerminalFontConfigResponse } from '../ipc/channels.js';
+import type {
+  FallbackConfirmRequestEvent,
+  ResumeTabOpenedEvent,
+  TerminalFontConfigResponse,
+} from '../ipc/channels.js';
+import type { TodayPanelData, TodaySessionRow } from '../state/today-panel.js';
 
 declare global {
   interface Window {
@@ -131,13 +136,13 @@ function markTabButtonExited(id: string, exitCode: number): void {
   }
 }
 
-/** Opens one tab: creates the model entry, an `@xterm/xterm` instance, and asks the main process
- * to spawn the pty behind it — in that order, so the terminal exists before any data can arrive
- * for it (`main.ts`'s own `onData` starts sending as soon as `createTab` resolves). */
-async function openTab(command: string, args: readonly string[], cwd: string): Promise<void> {
-  const id = newTabId();
-  let tab = createTab({ id, command, args, cwd });
-
+/**
+ * Creates the `@xterm/xterm` instance, its DOM pane and tab-strip button for `tab`, and wires
+ * keystrokes to `writeTab` — the part `openTab` (below, spawns via `createTab`) and
+ * `openResumeTabUi` (V2-T4 item 2, the pty already exists by the time its event arrives) both need
+ * identically; only how the pty gets spawned differs between the two callers.
+ */
+function mountTerminalTab(tab: Tab, label: string): Terminal {
   const container = document.createElement('div');
   container.className = 'terminal-pane';
   terminalHost().appendChild(container);
@@ -158,12 +163,22 @@ async function openTab(command: string, args: readonly string[], cwd: string): P
   fitAddon.fit();
 
   terminal.onData((data) => {
-    window.seeya.writeTab({ id, data });
+    window.seeya.writeTab({ id: tab.id, data });
   });
 
-  openTabs.set(id, { tab, terminal, fitAddon, container });
-  addTabButton(id, command === '' ? 'shell' : command);
-  showTab(id);
+  openTabs.set(tab.id, { tab, terminal, fitAddon, container });
+  addTabButton(tab.id, label);
+  showTab(tab.id);
+  return terminal;
+}
+
+/** Opens one command-bar tab: mounts the terminal UI first, then asks the main process to spawn
+ * the pty behind it — in that order, so the terminal exists before any data can arrive for it
+ * (`main.ts`'s own `onData` starts sending as soon as `createTab` resolves). */
+async function openTab(command: string, args: readonly string[], cwd: string): Promise<void> {
+  const id = newTabId();
+  let tab = createTab({ id, command, args, cwd });
+  const terminal = mountTerminalTab(tab, command === '' ? 'shell' : command);
 
   try {
     const response = await window.seeya.createTab({
@@ -188,6 +203,20 @@ async function openTab(command: string, args: readonly string[], cwd: string): P
   }
 }
 
+/**
+ * V2-T4 item 2: creates the tab UI for a session `electron/main.ts`'s own `TabResumeOpener`
+ * already spawned — never calls `window.seeya.createTab` (unlike `openTab` above), because the pty
+ * exists by the time `CHANNELS.resumeTabOpened` arrives. Labeled with the handoff's `name`, not a
+ * raw command (V2-T4: "a aba ... rotulada com o nome da sessão").
+ */
+function openResumeTabUi(event: ResumeTabOpenedEvent): void {
+  const tab = withPid(
+    createTab({ id: event.id, command: 'claude', args: [], cwd: event.cwd }),
+    event.pid,
+  );
+  mountTerminalTab(tab, event.label);
+}
+
 function wireIncomingEvents(): void {
   window.seeya.onTabData(({ id, data }) => {
     openTabs.get(id)?.terminal.write(data);
@@ -210,6 +239,13 @@ function wireIncomingEvents(): void {
     panel.textContent = text;
   });
   window.seeya.onConfirmFallbackRequest((event) => showFallbackDialog(event));
+  window.seeya.onResumeProgress(({ index, total, name }) => {
+    const progress = document.getElementById('today-progress');
+    if (progress !== null) {
+      progress.textContent = MESSAGES.todayResumeProgress(index, total, name);
+    }
+  });
+  window.seeya.onResumeTabOpened((event) => openResumeTabUi(event));
 }
 
 function fallbackDialog(): HTMLDialogElement {
@@ -258,6 +294,110 @@ function wireFallbackDialog(): void {
   dialog.addEventListener('cancel', () => {
     answerFallbackDialog(dialog.dataset.requestId ?? '', 'skip');
   });
+}
+
+function todayPanel(): HTMLElement {
+  return document.getElementById('today-panel') as HTMLElement;
+}
+
+/** One session row in the "Today" panel (V2-T4 item 1) — a checkbox for a still-unresumed
+ * session, or a plain note for one already marked resumed today (D-024/D-025: the two are never
+ * rendered the same way, same discipline `core/consolidated-plan.ts#renderSessionPlanLine`
+ * already applies to the CLI's own plan text). */
+function renderTodaySessionRow(row: TodaySessionRow): HTMLLIElement {
+  const item = document.createElement('li');
+  if (row.alreadyResumed) {
+    item.textContent = `${row.name} (${row.cwd}) — ${MESSAGES.todayAlreadyResumed}`;
+    return item;
+  }
+  const label = document.createElement('label');
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.className = 'today-session-checkbox';
+  checkbox.value = row.sessionId;
+  label.appendChild(checkbox);
+  label.append(` ${row.name} (${row.cwd}) — ${row.firstPlanLine ?? MESSAGES.todayNoPlanRecorded}`);
+  item.appendChild(label);
+  return item;
+}
+
+/**
+ * Renders the whole "Today" panel from scratch — called once at startup (`main` below) and again
+ * after "Resume selected" finishes (`handleResumeSelected`), so a session just resumed stops
+ * showing a checkbox without a page reload. Simpler than patching the existing DOM in place for a
+ * list this small, and it's what keeps the resume button's own click handler always closed over
+ * the CURRENT `data.day` rather than a stale one from an earlier render.
+ */
+function renderTodayPanel(data: TodayPanelData): void {
+  const panel = todayPanel();
+  panel.textContent = '';
+  if (data.kind === 'noBriefing') {
+    const message = document.createElement('p');
+    message.textContent = data.message;
+    panel.appendChild(message);
+    return;
+  }
+
+  const title = document.createElement('p');
+  title.textContent = MESSAGES.todayPlanTitle(data.day, data.daysAgo);
+  panel.appendChild(title);
+
+  const list = document.createElement('ul');
+  for (const row of data.rows) {
+    list.appendChild(renderTodaySessionRow(row));
+  }
+  panel.appendChild(list);
+
+  const resumeButton = document.createElement('button');
+  resumeButton.type = 'button';
+  resumeButton.textContent = MESSAGES.todayResumeSelected;
+  resumeButton.addEventListener('click', () => void handleResumeSelected(data.day));
+  panel.appendChild(resumeButton);
+
+  const progress = document.createElement('p');
+  progress.id = 'today-progress';
+  panel.appendChild(progress);
+
+  const result = document.createElement('p');
+  result.id = 'today-result';
+  panel.appendChild(result);
+}
+
+async function refreshTodayPanel(): Promise<void> {
+  renderTodayPanel(await window.seeya.getTodayPanel());
+}
+
+/** "Resume selected" (V2-T4 items 1/2/3/4): reads the checked boxes straight from the DOM (the
+ * panel's own render is the single source of truth for what's currently offered — no separate
+ * selection state to keep in sync with it), calls the main process, then refreshes the panel so
+ * newly-resumed sessions stop offering a checkbox. */
+async function handleResumeSelected(day: string): Promise<void> {
+  const checked = todayPanel().querySelectorAll<HTMLInputElement>(
+    '.today-session-checkbox:checked',
+  );
+  const sessionIds = [...checked].map((checkbox) => checkbox.value);
+  const resultLine = document.getElementById('today-result');
+  if (sessionIds.length === 0) {
+    if (resultLine !== null) {
+      resultLine.textContent = MESSAGES.todayNothingSelected;
+    }
+    return;
+  }
+  const response = await window.seeya.resumeSelected({ day, sessionIds });
+  const progressLine = document.getElementById('today-progress');
+  if (progressLine !== null) {
+    progressLine.textContent = '';
+  }
+  if (resultLine !== null) {
+    const parts = [
+      `Resumed ${response.resumedCount}`,
+      `skipped ${response.skippedCount}`,
+      ...(response.invalidCount > 0 ? [`${response.invalidCount} invalid answer(s)`] : []),
+      ...(response.stoppedEarly ? ['stopped early'] : []),
+    ];
+    resultLine.textContent = parts.join(', ');
+  }
+  await refreshTodayPanel();
 }
 
 /** Renders the sidebar's session list — same rows `seeya sessions` would print
@@ -337,6 +477,7 @@ async function main(): Promise<void> {
   wireWindowResize();
   wireCommandBar();
   wireFallbackDialog();
+  await refreshTodayPanel();
 }
 
 void main();

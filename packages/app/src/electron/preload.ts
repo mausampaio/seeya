@@ -22,6 +22,11 @@ import type {
   TerminalFontConfigResponse,
   FallbackConfirmRequestEvent,
   FallbackConfirmAnswerRequest,
+  TodayPanelResponse,
+  ResumeSelectedRequest,
+  ResumeSelectedResponse,
+  ResumeProgressUpdateEvent,
+  ResumeTabOpenedEvent,
 } from '../ipc/channels.js';
 
 export interface SeeyaApi {
@@ -44,6 +49,15 @@ export interface SeeyaApi {
    * answers via `answerFallbackConfirm` below. */
   onConfirmFallbackRequest(listener: (event: FallbackConfirmRequestEvent) => void): void;
   answerFallbackConfirm(request: FallbackConfirmAnswerRequest): void;
+  /** V2-T4 item 1: the "Today" panel's own data. */
+  getTodayPanel(): Promise<TodayPanelResponse>;
+  /** V2-T4 items 1/2/3: "Resume selected". */
+  resumeSelected(request: ResumeSelectedRequest): Promise<ResumeSelectedResponse>;
+  onResumeProgress(listener: (event: ResumeProgressUpdateEvent) => void): void;
+  /** V2-T4 item 2: a tab the resumer opened — `electron/renderer.ts` creates the same
+   * `@xterm/xterm` instance/tab-strip button `openTab` creates for a command-bar tab, without
+   * calling back to spawn anything (the pty already exists). */
+  onResumeTabOpened(listener: (event: ResumeTabOpenedEvent) => void): void;
 }
 
 const api: SeeyaApi = {
@@ -76,6 +90,18 @@ const api: SeeyaApi = {
     );
   },
   answerFallbackConfirm: (request) => ipcRenderer.send(CHANNELS.confirmFallbackAnswer, request),
+  getTodayPanel: () => ipcRenderer.invoke(CHANNELS.getTodayPanel),
+  resumeSelected: (request) => ipcRenderer.invoke(CHANNELS.resumeSelected, request),
+  onResumeProgress: (listener) => {
+    ipcRenderer.on(CHANNELS.resumeProgress, (_event, data: ResumeProgressUpdateEvent) =>
+      listener(data),
+    );
+  },
+  onResumeTabOpened: (listener) => {
+    ipcRenderer.on(CHANNELS.resumeTabOpened, (_event, data: ResumeTabOpenedEvent) =>
+      listener(data),
+    );
+  },
 };
 
 contextBridge.exposeInMainWorld('seeya', api);
