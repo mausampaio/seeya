@@ -17,7 +17,7 @@ import {
   failingGenerator,
   succeedingGenerator,
 } from './_fakes.js';
-import type { EndDayDeps } from '@seeya-ai/engine/application/types.js';
+import type { CaptureProgressEvent, EndDayDeps } from '@seeya-ai/engine/application/types.js';
 
 const NOW = new Date('2026-08-16T21:00:00.000Z');
 
@@ -901,5 +901,95 @@ describe('endDay — concurrency limit', () => {
     });
     await endDay(deps);
     expect(storage.maxInFlight).toBeLessThanOrEqual(2);
+  });
+});
+
+describe('endDay — onCaptureProgress (V2-T5a item 3)', () => {
+  it(
+    'emits captureStarted/captureFinished per session, 1-based index/total, and names a ' +
+      'failure — never changing captured/failedCaptures themselves',
+    async () => {
+      const good = createSessionWithPid({
+        sessionId: '11111111-1111-4111-8111-111111111111',
+        name: 'good-project',
+        cwd: 'c:\\code\\bom',
+        lastActivity: NOW,
+      });
+      const bad = createSessionWithPid({
+        sessionId: '22222222-2222-4222-8222-222222222222',
+        name: 'bad-project',
+        cwd: 'c:\\code\\ruim',
+        lastActivity: NOW,
+      });
+      const deps = buildDeps({
+        sessionProvider: new FakeSessionProvider({ sessions: [good, bad], rejected: [] }),
+        storage: new SingleSessionFailureStorage(DEFAULT_TEST_CONFIG, bad.sessionId),
+      });
+      const events: CaptureProgressEvent[] = [];
+
+      const result = await endDay(deps, { onCaptureProgress: (event) => events.push(event) });
+
+      // The hook is purely an observer — the SAME outcome the pre-existing (no-hook) tests above
+      // already assert, unaffected by anyone listening.
+      expect(result.captured).toHaveLength(1);
+      expect(result.failedCaptures).toHaveLength(1);
+
+      expect(events).toHaveLength(4); // 2 sessions × (started + finished)
+      const byId = (id: string): CaptureProgressEvent[] =>
+        events.filter((event) => event.session.sessionId === id);
+      expect(byId(good.sessionId).map((event) => event.kind)).toEqual([
+        'captureStarted',
+        'captureFinished',
+      ]);
+      const goodFinished = byId(good.sessionId)[1];
+      expect(goodFinished?.kind === 'captureFinished' && goodFinished.outcome).toEqual({
+        kind: 'captured',
+      });
+      const badFinished = byId(bad.sessionId)[1];
+      const badOutcome = badFinished?.kind === 'captureFinished' ? badFinished.outcome : null;
+      expect(badOutcome?.kind).toBe('failed');
+      expect(badOutcome?.kind === 'failed' && badOutcome.reason).toMatch(/storage is on fire/);
+      // 1-based, over sessionsInScope.length (2 here) — every event agrees on total, and the two
+      // sessions never share the same index (docs/PLANO-DE-ENTREGA.md V2-T5a item 3: "índice,
+      // total").
+      for (const event of events) {
+        expect(event.total).toBe(2);
+      }
+      expect(new Set(events.map((event) => event.index))).toEqual(new Set([1, 2]));
+    },
+  );
+
+  it('an ineligible session reports captureFinished with its ineligibility reasons', async () => {
+    const session = createSessionWithPid({ cwd: 'c:\\code\\rascunhos', lastActivity: NOW });
+    const config = { ...DEFAULT_TEST_CONFIG, ignore: ['c:\\code\\rascunhos'] };
+    const deps = buildDeps({
+      sessionProvider: new FakeSessionProvider({ sessions: [session], rejected: [] }),
+      storage: new FakeStorage(config),
+    });
+    const events: CaptureProgressEvent[] = [];
+
+    await endDay(deps, { onCaptureProgress: (event) => events.push(event) });
+
+    const finished = events[1];
+    expect(finished?.kind === 'captureFinished' && finished.outcome).toEqual({
+      kind: 'ineligible',
+      reasons: ['ignoredCwd'],
+    });
+  });
+
+  it('leaving onCaptureProgress unset (every existing caller) changes nothing about the result', async () => {
+    const session = createSessionWithPid({ lastActivity: NOW });
+    const deps = buildDeps({
+      sessionProvider: new FakeSessionProvider({ sessions: [session], rejected: [] }),
+    });
+
+    const withoutHook = await endDay(deps);
+    const withHook = await endDay(deps, { onCaptureProgress: () => {} });
+
+    expect(withoutHook.captured).toHaveLength(1);
+    expect(withHook.captured).toHaveLength(1);
+    expect(withoutHook.captured[0]?.handoff.sessionId).toBe(
+      withHook.captured[0]?.handoff.sessionId,
+    );
   });
 });

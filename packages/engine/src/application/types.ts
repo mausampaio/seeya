@@ -93,7 +93,62 @@ export interface EndDayOptions {
    * only the daemon's own overdue path ever sets this `true`.
    */
   readonly skipTermination?: boolean;
+  /**
+   * V2-T5a: an optional observer over the per-session capture loop `end-day.ts` already runs
+   * under `config.captureConcurrency` — never changes the order, the concurrency, or the result
+   * those calls produce (see `end-day.ts`'s own `runSession`/`emitCaptureStarted`/
+   * `emitCaptureFinished`, the only three places that call this). `seeya end-day`
+   * (`cli/composition.ts#buildEndDayContext`) and the daemon (`scheduler/poll.ts#buildEndDayDeps`)
+   * never pass it — only `packages/app/src`'s own "End day..." button does (its own
+   * `state/end-day-progress.ts` projects each event into "capturing N of M" for the panel), so it
+   * has to be optional for every existing call site to keep compiling unchanged, same reasoning
+   * `dryRun`/`sessionFilter`/`scope` above already give.
+   */
+  readonly onCaptureProgress?: (event: CaptureProgressEvent) => void;
 }
+
+/**
+ * V2-T5a: one session, narrowed from `DiscoveredSession` to just what a progress display needs
+ * (D-024: `CaptureProgressEvent` can't accidentally leak evidence-gathering fields like
+ * `hasTranscript` this event was never meant to carry).
+ */
+export interface CaptureProgressSession {
+  readonly sessionId: string;
+  readonly cwd: string;
+  readonly name: string;
+}
+
+/**
+ * `captureFinished`'s own outcome — mirrors `end-day.ts`'s internal `SessionOutcome` union
+ * (`captured`/`ineligible`/`failed`) exactly, since `onCaptureProgress` is emitted from the very
+ * same three-way branch that already builds `EndDayResult`'s own buckets: this event can never
+ * claim a fourth state `endDay` itself has no concept of (D-024).
+ */
+export type CaptureProgressOutcome =
+  | { readonly kind: 'captured' }
+  | { readonly kind: 'ineligible'; readonly reasons: readonly IneligibilityReason[] }
+  | { readonly kind: 'failed'; readonly reason: string };
+
+/**
+ * V2-T5a's own progress event: `captureStarted` right before one session enters the capture
+ * pipeline, `captureFinished` right after, with `index`/`total` 1-based over
+ * `EndDayOptions.sessionFilter`'s own `sessionsInScope` (mirrors `application/start-day.ts
+ * #ResumeProgressEvent`'s own 1-based numbering, same "N of M" reading).
+ */
+export type CaptureProgressEvent =
+  | {
+      readonly kind: 'captureStarted';
+      readonly session: CaptureProgressSession;
+      readonly index: number;
+      readonly total: number;
+    }
+  | {
+      readonly kind: 'captureFinished';
+      readonly session: CaptureProgressSession;
+      readonly index: number;
+      readonly total: number;
+      readonly outcome: CaptureProgressOutcome;
+    };
 
 /** One session `evaluateEligibility` (`core/eligibility.ts`) excluded, and why — the "aceitos e
  * rejeitados" half of D-022's contract applied to eligibility instead of parsing. */

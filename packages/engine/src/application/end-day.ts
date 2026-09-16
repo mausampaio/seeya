@@ -40,6 +40,8 @@ import { mapWithConcurrencyLimit } from './concurrency.js';
 import { evaluateCheapEligibility } from './eligibility-assembly.js';
 import type {
   CaptureFailure,
+  CaptureProgressOutcome,
+  CaptureProgressSession,
   CapturedSession,
   EndDayDeps,
   EndDayOptions,
@@ -68,8 +70,12 @@ type SessionOutcome =
  * unexpected failure here becomes this session's own `SessionOutcome` instead of rejecting the
  * `Promise.all` `mapWithConcurrencyLimit` runs underneath (docs/PLANO-DE-ENTREGA.md S2-T3:
  * "isolamento de falha por sessão").
+ *
+ * Split out of `runSession` below in V2-T5a so that function stays a thin progress-event wrapper
+ * around this one, instead of `onCaptureProgress`'s two emission points pushing the whole thing
+ * past AGENTS.md's ~20-line budget.
  */
-async function runSession(
+async function captureSessionOutcome(
   deps: EndDayDeps,
   session: DiscoveredSession,
   config: Config,
@@ -104,6 +110,76 @@ async function runSession(
     const reason = error instanceof Error ? error.message : String(error);
     return { kind: 'failed', session, reason };
   }
+}
+
+function toProgressSession(session: DiscoveredSession): CaptureProgressSession {
+  return { sessionId: session.sessionId, cwd: session.cwd, name: session.name };
+}
+
+/** `SessionOutcome`'s own `session`/`captured`/`notice` fields never belong on the PUBLIC
+ * `CaptureProgressOutcome` (V2-T5a's own `types.ts` docstring) — this is the one place that
+ * narrows one into the other. */
+function toProgressOutcome(outcome: SessionOutcome): CaptureProgressOutcome {
+  if (outcome.kind === 'ineligible') {
+    return { kind: 'ineligible', reasons: outcome.reasons };
+  }
+  if (outcome.kind === 'failed') {
+    return { kind: 'failed', reason: outcome.reason };
+  }
+  return { kind: 'captured' };
+}
+
+/** V2-T5a's own progress context: 1-based `index`/`total` over `sessionsInScope`
+ * (`endDay`'s own call site below), plus the optional hook itself — bundled into one object so
+ * `runSession` stays under AGENTS.md's ~5-parameter comfort zone instead of growing two more
+ * positional ones. */
+interface ProgressContext {
+  readonly index: number;
+  readonly total: number;
+  readonly onCaptureProgress: EndDayOptions['onCaptureProgress'];
+}
+
+/**
+ * V2-T5a item 3: wraps `captureSessionOutcome` with `onCaptureProgress`'s two emission points —
+ * never changes the order, the concurrency, or the outcome `captureSessionOutcome` itself decides,
+ * only observes it. A `progress.onCaptureProgress` left `undefined` (every existing caller: `seeya
+ * end-day`, the daemon) costs one `?.()` no-op per session, same "optional hook, zero cost when
+ * absent" shape `application/start-day.ts#resumeSessions`'s own `onProgress` already has.
+ */
+async function runSession(
+  deps: EndDayDeps,
+  session: DiscoveredSession,
+  config: Config,
+  now: Date,
+  day: Day,
+  dryRun: boolean,
+  skipTermination: boolean,
+  progress: ProgressContext,
+): Promise<SessionOutcome> {
+  const progressSession = toProgressSession(session);
+  progress.onCaptureProgress?.({
+    kind: 'captureStarted',
+    session: progressSession,
+    index: progress.index,
+    total: progress.total,
+  });
+  const outcome = await captureSessionOutcome(
+    deps,
+    session,
+    config,
+    now,
+    day,
+    dryRun,
+    skipTermination,
+  );
+  progress.onCaptureProgress?.({
+    kind: 'captureFinished',
+    session: progressSession,
+    index: progress.index,
+    total: progress.total,
+    outcome: toProgressOutcome(outcome),
+  });
+  return outcome;
 }
 
 function toIneligibleSession(
@@ -278,9 +354,14 @@ export async function endDay(deps: EndDayDeps, options: EndDayOptions = {}): Pro
   );
 
   const skipTermination = options.skipTermination ?? false;
+  const { onCaptureProgress } = options;
   const [outcomes, listedSessions] = await Promise.all([
-    mapWithConcurrencyLimit(sessionsInScope, config.captureConcurrency, (session) =>
-      runSession(deps, session, config, now, day, dryRun, skipTermination),
+    mapWithConcurrencyLimit(sessionsInScope, config.captureConcurrency, (session, index) =>
+      runSession(deps, session, config, now, day, dryRun, skipTermination, {
+        index: index + 1,
+        total: sessionsInScope.length,
+        onCaptureProgress,
+      }),
     ),
     buildSessionListings(deps.transcriptReader, outOfScopeSessions),
   ]);
