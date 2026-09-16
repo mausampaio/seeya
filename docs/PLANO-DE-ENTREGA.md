@@ -4704,6 +4704,85 @@ texto, mas não são a fila.
       Linux dele. Detalhes, decisões de ferramental e o que ficou inferido (não medido) em
       `docs/QUESTOES.md` Q-073.
 
+- [ ] **V2-T5a — `end-day` pela interface: a prévia é a confirmação, progresso por sessão,
+      resultado e notificação (D-039, D-042, D-043).** Especificada pelo PO em 2026-09-16;
+      **aguarda aprovação do mantenedor antes de qualquer despacho.** Fecha o ciclo diário
+      inteiro dentro da janela: encerrar à noite (esta tarefa), retomar de manhã (V2-T4). Na CLI
+      o `seeya end-day` roda sem perguntar e bloqueia em silêncio até acabar; a interface não
+      pode fazer nenhuma das duas coisas — é um botão que custa dinheiro (uma chamada de modelo
+      por sessão) e leva minutos.
+
+      **O que entra:**
+
+      1. **Botão "End day…"** na região de estado. Clicar **não encerra nada**: roda
+         `endDay(deps, { dryRun: true, scope: { kind: 'fullDay' } })` — a mesma prévia do
+         `seeya end-day --dry-run` — e mostra o resultado como **prévia de confirmação**: quantas
+         sessões estão no escopo, quais seriam capturadas (nome, `cwd`), quais **seriam
+         encerradas** pela política (`canTerminate`, D-002) e quais ficam de fora com o motivo
+         (D-024: cada motivo com o vocabulário da CLI). A prévia mostra também o teto de custo,
+         honesto e sem estimativa: "até N × `budgetPerSessionUsd`" com o `captureModel` da
+         config — é o teto que a própria captura impõe, não uma previsão (D-025). Dois botões:
+         **Run end-day now** e **Cancel**. Fechar a prévia sem escolher é cancelar.
+
+      2. **O texto da prévia e do resultado é o mesmo da CLI, por construção**: `formatEndDayReport`
+         (`packages/cli/src/format-end-day.ts`) e `buildEndDayNotice` (`end-day-notice.ts`) são
+         formatação pura sobre `EndDayResult` e **saem da CLI para `application/`** (`git mv`
+         com os testes, a CLI importando de lá), como `format-status.ts` saiu na V2-T2. A
+         interface mostra o texto literal num painel; o que ela acrescenta em DOM (o teto de
+         custo, os botões, o progresso) não existe na CLI e fica na interface.
+
+      3. **Progresso por sessão.** `endDay` hoje não avisa nada enquanto roda (as capturas correm
+         com `captureConcurrency` e o chamador só vê o resultado final). Entra um gancho
+         **opcional** em `EndDayOptions`: `onCaptureProgress?: (event) => void`, com eventos
+         `captureStarted` / `captureFinished` (sessão, índice, total, e no `finished` se foi
+         capturada ou falhou e por quê), emitido pelo laço de captura já existente — sem mudar
+         a ordem, a concorrência nem o resultado. **CLI e daemon não passam o gancho e não mudam.**
+         Teste em `tests/unit/application/end-day.test.ts`: a sequência de eventos para N
+         sessões com falha isolada, e a ausência do gancho não altera nada (os testes atuais
+         continuam iguais). A interface mostra "capturing 2 of 5: <nome>" e o painel de estado
+         continua atualizando por trás.
+
+      4. **Execução e resultado.** "Run end-day now" roda `endDay(deps, { dryRun: false, scope:
+         fullDay })` **uma vez por vez**: o botão fica desabilitado enquanto roda, e um segundo
+         clique não enfileira. Ao terminar: o relatório (o mesmo texto da CLI, item 2) no painel,
+         **e a notificação** pelo mesmo `Notifier` e o mesmo `buildEndDayNotice` que a CLI usa
+         (a interface compõe o adapter real de notificação, `adapters/notification/index.js`,
+         como `cli/composition.ts#buildEndDayContext` compõe). Depois, o painel "Hoje" (V2-T4) e
+         o painel de estado são atualizados — o briefing recém-escrito é o que o `start-day` de
+         amanhã vai achar.
+
+      5. **A composição da interface ganha o `EndDayDeps`**: `transcriptReader`, `gitReader`,
+         `leanGenerator`/`deepGenerator` (que lançam `claude -p` por `spawnHidden`, D-038 — dentro
+         do processo principal do Electron, sem janela, como o daemon já faz), `forkCleanup` —
+         espelhando `buildEndDayContext` da CLI, **fiação apenas**, nenhuma lógica duplicada.
+
+      **O que não entra** (V2-T5b): escopo de uma sessão só (`--session`) pela interface; a faixa
+      de horário com Snooze e Skip today; subir/parar o daemon; notificação do SO com botão
+      (D-034 — decisão a tomar lá). **Uma corrida que não se resolve aqui e fica registrada:** se
+      o daemon disparar o `end-day` agendado enquanto o botão está rodando, os dois escrevem
+      handoffs — é a mesma corrida que `seeya end-day` manual já tem com o daemon hoje; a tarefa
+      registra na Q-074 e não tenta resolver (o lock de instância é do daemon, não do `end-day`).
+
+      **Cuidados:** a interface não encerra nada sem o clique de confirmação (D-039, D-002);
+      nenhuma dependência nova; toda lógica fora de `electron/` com teste (o modelo da prévia, a
+      máquina de estados "ocioso → prévia → rodando → resultado", a projeção do progresso); texto
+      em `text/messages.ts`; as guardas valem; **um commit por item**, portão em primeiro plano
+      (em pedaços, `--maxWorkers 2` na cobertura), códigos de saída lidos, e **quem manda algo
+      para segundo plano lê o próprio resultado pelo relógio** — nenhuma notificação chega ao
+      agente. Questão: Q-074.
+
+      *Aceite:* num `homeDir` descartável com sessões e transcripts montados pelo harness de e2e
+      e o `claude` falso de `tests/e2e/end-day.test.ts` (que responde à captura), mais o
+      notificador falso de `tests/e2e/_fake-notification-commands.ts`: "End day…" mostra a prévia
+      com N sessões e o teto de custo; "Run end-day now" grava os handoffs e o briefing em
+      `~/.seeya/days/<dia>/`, mostra o progresso e depois o relatório idêntico ao de
+      `seeya end-day` contra o mesmo home, e o notificador falso recebe o mesmo aviso que a CLI
+      mandaria — provado por captura de tela lida pelo agente (se a captura falhar nesta sandbox,
+      dizer) e pelo conteúdo do home. Testes de unidade dos módulos novos e do gancho de
+      progresso. Portão, `verificar:linux` e CI verdes. **Aceite manual do mantenedor:** um
+      `end-day` real pela interface no fim de um dia real, e o `start-day` pela interface na
+      manhã seguinte — fecha V2-T4 e V2-T5a de uma vez.
+
 ## Definição de pronto (vale para toda tarefa)
 
 1. Código implementa exatamente a spec; divergência virou questão, não improviso.
