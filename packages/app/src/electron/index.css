@@ -142,3 +142,35 @@ body {
 .terminal-pane[hidden] {
   display: none;
 }
+
+/* V2-T4 item 3: the fallback confirmation dialog (S5-T9's "warn BEFORE, and ask", as a real
+ * <dialog> instead of the CLI's readline question) — showModal() gives it the native backdrop and
+ * Escape-to-cancel behavior renderer.ts's own "cancel" listener turns into a "skip" answer. */
+#fallback-dialog {
+  max-width: 480px;
+  border: 1px solid #333;
+  border-radius: 6px;
+  background: #252525;
+  color: #e0e0e0;
+  padding: 16px;
+}
+
+#fallback-dialog::backdrop {
+  background: rgb(0 0 0 / 50%);
+}
+
+#fallback-dialog h3 {
+  margin: 0 0 8px;
+}
+
+#fallback-dialog p {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+#fallback-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}

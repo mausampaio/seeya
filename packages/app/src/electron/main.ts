@@ -22,6 +22,7 @@ import type {
   SessionsUpdateEvent,
   StatusUpdateEvent,
   TerminalFontConfigResponse,
+  FallbackConfirmAnswerRequest,
 } from '../ipc/channels.js';
 import type { Clock } from '@seeya-ai/engine/core/ports.js';
 import { buildAppContext, type AppContext } from '../composition/index.js';
@@ -46,6 +47,7 @@ import {
   DEFAULT_AUTOSTART_REFRESH_INTERVAL_MS,
   type AutostartCacheEntry,
 } from '../state/autostart-cache.js';
+import { PendingFallbackRequests } from '../resume/pending-fallback-requests.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -186,6 +188,9 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // Same "closed-over, only this function touches it" reasoning as `tabs` above —
   // `state/autostart-cache.ts`'s own docstring has the caching rule and the measurement behind it.
   let autostartCache: AutostartCacheEntry | null = null;
+  // V2-T4 item 3: at most one truly pending in production (`resumeSessions`'s own sequential
+  // loop), but keyed independently by requestId anyway — `PendingFallbackRequests`'s own docstring.
+  const pendingFallbackRequests = new PendingFallbackRequests();
 
   const ptyManager = context.buildPtyManager({
     onData: (id, data) => {
@@ -259,6 +264,13 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // docstring on `handleFor`).
   ipcMain.on(CHANNELS.removeTab, (_event, request: RemoveTabRequest) => {
     tabs = removeTab(tabs, request.id);
+  });
+
+  // V2-T4 item 3: the renderer's answer to one confirmFallbackRequest — resolving a stale or
+  // unknown requestId is a no-op (PendingFallbackRequests.resolve's own docstring), so a late
+  // answer after the window reloaded mid-question never throws here.
+  ipcMain.on(CHANNELS.confirmFallbackAnswer, (_event, answer: FallbackConfirmAnswerRequest) => {
+    pendingFallbackRequests.resolve(answer.requestId, answer.decision);
   });
 
   void runRefreshLoop({

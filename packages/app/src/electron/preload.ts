@@ -20,6 +20,8 @@ import type {
   SessionsUpdateEvent,
   StatusUpdateEvent,
   TerminalFontConfigResponse,
+  FallbackConfirmRequestEvent,
+  FallbackConfirmAnswerRequest,
 } from '../ipc/channels.js';
 
 export interface SeeyaApi {
@@ -38,6 +40,10 @@ export interface SeeyaApi {
   onTabExit(listener: (event: TabExitEvent) => void): void;
   onSessionsUpdate(listener: (event: SessionsUpdateEvent) => void): void;
   onStatusUpdate(listener: (event: StatusUpdateEvent) => void): void;
+  /** V2-T4 item 3: one fallback question at a time — `electron/renderer.ts` shows the dialog and
+   * answers via `answerFallbackConfirm` below. */
+  onConfirmFallbackRequest(listener: (event: FallbackConfirmRequestEvent) => void): void;
+  answerFallbackConfirm(request: FallbackConfirmAnswerRequest): void;
 }
 
 const api: SeeyaApi = {
@@ -64,6 +70,12 @@ const api: SeeyaApi = {
   onStatusUpdate: (listener) => {
     ipcRenderer.on(CHANNELS.statusUpdate, (_event, data: StatusUpdateEvent) => listener(data));
   },
+  onConfirmFallbackRequest: (listener) => {
+    ipcRenderer.on(CHANNELS.confirmFallbackRequest, (_event, data: FallbackConfirmRequestEvent) =>
+      listener(data),
+    );
+  },
+  answerFallbackConfirm: (request) => ipcRenderer.send(CHANNELS.confirmFallbackAnswer, request),
 };
 
 contextBridge.exposeInMainWorld('seeya', api);

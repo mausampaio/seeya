@@ -15,7 +15,7 @@ import { createTab, isRunning, markExited, withPid, type Tab } from '../tabs/tab
 import { MESSAGES } from '../text/messages.js';
 import type { SeeyaApi } from './preload.js';
 import type { SidebarRow } from '../sidebar/sidebar-data.js';
-import type { TerminalFontConfigResponse } from '../ipc/channels.js';
+import type { FallbackConfirmRequestEvent, TerminalFontConfigResponse } from '../ipc/channels.js';
 
 declare global {
   interface Window {
@@ -209,6 +209,55 @@ function wireIncomingEvents(): void {
     const panel = document.getElementById('status-panel') as HTMLElement;
     panel.textContent = text;
   });
+  window.seeya.onConfirmFallbackRequest((event) => showFallbackDialog(event));
+}
+
+function fallbackDialog(): HTMLDialogElement {
+  return document.getElementById('fallback-dialog') as HTMLDialogElement;
+}
+
+/** Sends the person's answer and closes the dialog — the ONLY way a pending fallback question
+ * ever gets answered, whether by a button click or by the dialog's own "cancel" event below. */
+function answerFallbackDialog(requestId: string, decision: 'open' | 'skip'): void {
+  window.seeya.answerFallbackConfirm({ requestId, decision });
+  fallbackDialog().close();
+}
+
+/** V2-T4 item 3: populates and opens the dialog for one `confirmFallbackRequest` — `requestId` is
+ * stashed on the element itself (`dataset`) so the button/cancel handlers wired once in
+ * `wireFallbackDialog` below can find it without a second piece of state to keep in sync. */
+function showFallbackDialog(event: FallbackConfirmRequestEvent): void {
+  (document.getElementById('fallback-dialog-title') as HTMLElement).textContent =
+    MESSAGES.fallbackDialogTitle(event.sessionName);
+  (document.getElementById('fallback-dialog-reason') as HTMLElement).textContent =
+    `${event.reasonText} (${event.cwd})`;
+  const dialog = fallbackDialog();
+  dialog.dataset.requestId = event.requestId;
+  dialog.showModal();
+}
+
+/** Wired once, at startup — the dialog element itself is reused for every fallback question, one
+ * at a time (`PendingFallbackRequests`'s own docstring on the production shape this assumes). */
+function wireFallbackDialog(): void {
+  const dialog = fallbackDialog();
+  (document.getElementById('fallback-dialog-body') as HTMLElement).textContent =
+    MESSAGES.fallbackDialogBody;
+  const openButton = document.getElementById('fallback-dialog-open') as HTMLButtonElement;
+  openButton.textContent = MESSAGES.fallbackDialogOpen;
+  openButton.addEventListener('click', () => {
+    answerFallbackDialog(dialog.dataset.requestId ?? '', 'open');
+  });
+  const skipButton = document.getElementById('fallback-dialog-skip') as HTMLButtonElement;
+  skipButton.textContent = MESSAGES.fallbackDialogSkip;
+  skipButton.addEventListener('click', () => {
+    answerFallbackDialog(dialog.dataset.requestId ?? '', 'skip');
+  });
+  // "cancel" fires on Escape (and any other native dismissal) — V2-T4's own cuidado, "fechar sem
+  // escolher = pular": closing the dialog without a button click must still answer "skip", never
+  // leave `resumeSessions` waiting forever on a question nobody answered.
+  dialog.addEventListener('cancel', () => {
+    answerFallbackDialog(dialog.dataset.requestId ?? '', 'skip');
+  });
 }
 
 /** Renders the sidebar's session list — same rows `seeya sessions` would print
@@ -287,6 +336,7 @@ async function main(): Promise<void> {
   wireIncomingEvents();
   wireWindowResize();
   wireCommandBar();
+  wireFallbackDialog();
 }
 
 void main();

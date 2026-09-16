@@ -39,6 +39,13 @@ export const CHANNELS = {
   /** Main → renderer, pushed on the same interval: the status panel's text, same content as
    * `seeya status` (`state/status-panel.ts#buildStatusPanelText`). */
   statusUpdate: 'seeya:status-update',
+  /** Main → renderer: the fallback question (V2-T4 item 3, S5-T9's "warn BEFORE, and ask") — sent
+   * once per session whose `attemptResume` reported `needsFallback`,
+   * `resume/fallback-confirmer.ts#buildFallbackConfirmer`'s own `send`. */
+  confirmFallbackRequest: 'seeya:confirm-fallback-request',
+  /** Renderer → main: the person's answer to one `confirmFallbackRequest`, by `requestId` —
+   * `resume/pending-fallback-requests.ts#PendingFallbackRequests.resolve`'s own input. */
+  confirmFallbackAnswer: 'seeya:confirm-fallback-answer',
 } as const;
 
 export interface CreateTabRequest {
@@ -95,3 +102,21 @@ export interface StatusUpdateEvent {
 
 /** `getTerminalFontConfig`'s response — the exact shape `state/terminal-font.ts` produces. */
 export type TerminalFontConfigResponse = TerminalFontOptions;
+
+/** `CHANNELS.confirmFallbackRequest`'s payload — the exact shape
+ * `resume/fallback-confirmer.ts#FallbackConfirmRequestPayload` produces (re-declared here rather
+ * than imported, same "ipc/channels.ts is pure, no engine-adjacent app module imports it back"
+ * shape every other event type in this file already has — `resume/` imports FROM `ipc/`, never
+ * the other way). */
+export interface FallbackConfirmRequestEvent {
+  readonly requestId: string;
+  readonly sessionName: string;
+  readonly cwd: string;
+  readonly reasonText: string;
+}
+
+/** `CHANNELS.confirmFallbackAnswer`'s payload. */
+export interface FallbackConfirmAnswerRequest {
+  readonly requestId: string;
+  readonly decision: 'open' | 'skip';
+}
