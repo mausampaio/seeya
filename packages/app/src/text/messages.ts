@@ -45,4 +45,16 @@ export const MESSAGES = {
     "session's full history.",
   fallbackDialogOpen: 'Open a fresh session',
   fallbackDialogSkip: 'Skip',
+
+  // V2-T4 item 4 — the resume summary, rendered in the "Today" panel once resumeSessions
+  // finishes. Same content as `cli/format-start-day.ts#formatStartDaySummary`'s four sections
+  // (Q-073: only the data — `state/resume-summary.ts` — is shared, not this literal text).
+  todaySummaryResumedHeading: 'Resumed',
+  todaySummarySkippedHeading: 'Skipped at your request',
+  todaySummaryInvalidHeading: 'Not resumed — invalid fallback answer',
+  todaySummaryRemainingHeading: 'Not resumed',
+  todaySummaryStoppedEarly: (name: string, message: string): string =>
+    `Stopped after "${name}" failed: ${message}`,
+  todaySummaryFallbackNote: (reasonText: string): string =>
+    `Opened a new session there instead — ${reasonText}.`,
 } as const;

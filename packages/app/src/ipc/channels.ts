@@ -153,14 +153,45 @@ export interface ResumeSelectedRequest {
   readonly sessionIds: readonly string[];
 }
 
-/** `CHANNELS.resumeSelected`'s response — minimal on purpose for V2-T4 item 1 (just enough for the
- * panel to say what happened); item 4 grows this into the full per-session breakdown
- * (`state/resume-summary.ts`). */
-export interface ResumeSelectedResponse {
-  readonly resumedCount: number;
-  readonly skippedCount: number;
-  readonly invalidCount: number;
-  readonly stoppedEarly: boolean;
+/** One session, named for display — the common shape every `ResumeSummaryResponse` list entry
+ * below builds on. */
+export interface ResumeSummarySession {
+  readonly sessionId: string;
+  readonly name: string;
+  readonly cwd: string;
+}
+
+/** `false` means `--resume` attached cleanly; otherwise the same wording
+ * `core/resume-notice.ts#describeFallbackReason` gives the CLI's own `formatResumeNotice` for why
+ * a fresh session opened instead — computed once, in `state/resume-summary.ts`, never re-derived
+ * from the raw `ResumeFallbackReason` in `electron/renderer.ts` (which has no logic of its own,
+ * D-041). */
+export interface ResumeSummaryOutcome extends ResumeSummarySession {
+  readonly fellBack: false | { readonly reasonText: string };
+}
+
+export interface ResumeSummarySkipped extends ResumeSummarySession {
+  /** The exact same wording `core/resume-notice.ts#describeFallbackReason` gives the CLI. */
+  readonly reasonText: string;
+}
+
+export interface ResumeSummaryInvalid extends ResumeSummarySession {
+  readonly reason: string;
+}
+
+/** `CHANNELS.resumeSelected`'s response (V2-T4 item 4) — the full per-session breakdown, same
+ * content as `cli/format-start-day.ts#formatStartDaySummary` (resumed, skipped, invalid fallback
+ * answers, not-yet-attempted, and where the loop stopped early), rendered by the panel as DOM
+ * sections instead of reusing the CLI's plain-text rendering (Q-073's own "only the data crosses
+ * the boundary" — V2-T2's criterion for the status panel). Built by
+ * `state/resume-summary.ts#buildResumeSummary`. */
+export interface ResumeSummaryResponse {
+  readonly resumed: readonly ResumeSummaryOutcome[];
+  readonly skipped: readonly ResumeSummarySkipped[];
+  readonly invalidFallbackAnswers: readonly ResumeSummaryInvalid[];
+  readonly remaining: readonly ResumeSummarySession[];
+  readonly stoppedEarly:
+    { readonly session: ResumeSummarySession; readonly message: string } | false;
 }
 
 export interface ResumeProgressUpdateEvent {

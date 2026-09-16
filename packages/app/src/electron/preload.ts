@@ -24,7 +24,7 @@ import type {
   FallbackConfirmAnswerRequest,
   TodayPanelResponse,
   ResumeSelectedRequest,
-  ResumeSelectedResponse,
+  ResumeSummaryResponse,
   ResumeProgressUpdateEvent,
   ResumeTabOpenedEvent,
 } from '../ipc/channels.js';
@@ -52,7 +52,7 @@ export interface SeeyaApi {
   /** V2-T4 item 1: the "Today" panel's own data. */
   getTodayPanel(): Promise<TodayPanelResponse>;
   /** V2-T4 items 1/2/3: "Resume selected". */
-  resumeSelected(request: ResumeSelectedRequest): Promise<ResumeSelectedResponse>;
+  resumeSelected(request: ResumeSelectedRequest): Promise<ResumeSummaryResponse>;
   onResumeProgress(listener: (event: ResumeProgressUpdateEvent) => void): void;
   /** V2-T4 item 2: a tab the resumer opened — `electron/renderer.ts` creates the same
    * `@xterm/xterm` instance/tab-strip button `openTab` creates for a command-bar tab, without

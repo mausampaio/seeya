@@ -17,6 +17,7 @@ import type { SeeyaApi } from './preload.js';
 import type { SidebarRow } from '../sidebar/sidebar-data.js';
 import type {
   FallbackConfirmRequestEvent,
+  ResumeSummaryResponse,
   ResumeTabOpenedEvent,
   TerminalFontConfigResponse,
 } from '../ipc/channels.js';
@@ -367,10 +368,98 @@ async function refreshTodayPanel(): Promise<void> {
   renderTodayPanel(await window.seeya.getTodayPanel());
 }
 
+/** One labeled `<ul>` of `name (cwd)` lines — the shared shape every section of the summary below
+ * uses (V2-T4 item 4), same repeated structure `cli/format-start-day.ts`'s own
+ * `formatResumedSection`/`formatSkippedSection`/etc. already have, just built as DOM instead of
+ * joined lines. `null` when `sessions` is empty, so an empty section never renders as a bare
+ * heading with nothing under it. */
+function renderSummarySection(
+  heading: string,
+  sessions: readonly {
+    readonly name: string;
+    readonly cwd: string;
+    readonly note?: string | undefined;
+  }[],
+): HTMLElement | null {
+  if (sessions.length === 0) {
+    return null;
+  }
+  const section = document.createElement('div');
+  const title = document.createElement('strong');
+  title.textContent = heading;
+  section.appendChild(title);
+  const list = document.createElement('ul');
+  for (const session of sessions) {
+    const item = document.createElement('li');
+    item.textContent =
+      session.note === undefined
+        ? `${session.name} (${session.cwd})`
+        : `${session.name} (${session.cwd}) — ${session.note}`;
+    list.appendChild(item);
+  }
+  section.appendChild(list);
+  return section;
+}
+
+/** Renders `response` into `#today-result` (V2-T4 item 4) — same four sections
+ * `cli/format-start-day.ts#formatStartDaySummary` shows (resumed, skipped, invalid fallback
+ * answers, not-yet-attempted/stopped-early), built from `ResumeSummaryResponse`
+ * (`state/resume-summary.ts`'s own output) rather than any text reused literally (Q-073). */
+function renderResumeSummary(response: ResumeSummaryResponse): void {
+  const resultLine = document.getElementById('today-result');
+  if (resultLine === null) {
+    return;
+  }
+  resultLine.textContent = '';
+  const sections = [
+    renderSummarySection(
+      MESSAGES.todaySummaryResumedHeading,
+      response.resumed.map((outcome) => ({
+        name: outcome.name,
+        cwd: outcome.cwd,
+        note:
+          outcome.fellBack === false
+            ? undefined
+            : MESSAGES.todaySummaryFallbackNote(outcome.fellBack.reasonText),
+      })),
+    ),
+    renderSummarySection(
+      MESSAGES.todaySummarySkippedHeading,
+      response.skipped.map((session) => ({
+        name: session.name,
+        cwd: session.cwd,
+        note: session.reasonText,
+      })),
+    ),
+    renderSummarySection(
+      MESSAGES.todaySummaryInvalidHeading,
+      response.invalidFallbackAnswers.map((session) => ({
+        name: session.name,
+        cwd: session.cwd,
+        note: session.reason,
+      })),
+    ),
+    renderSummarySection(MESSAGES.todaySummaryRemainingHeading, response.remaining),
+  ];
+  for (const section of sections) {
+    if (section !== null) {
+      resultLine.appendChild(section);
+    }
+  }
+  if (response.stoppedEarly !== false) {
+    const note = document.createElement('p');
+    note.textContent = MESSAGES.todaySummaryStoppedEarly(
+      response.stoppedEarly.session.name,
+      response.stoppedEarly.message,
+    );
+    resultLine.appendChild(note);
+  }
+}
+
 /** "Resume selected" (V2-T4 items 1/2/3/4): reads the checked boxes straight from the DOM (the
  * panel's own render is the single source of truth for what's currently offered — no separate
- * selection state to keep in sync with it), calls the main process, then refreshes the panel so
- * newly-resumed sessions stop offering a checkbox. */
+ * selection state to keep in sync with it), calls the main process, renders the structured
+ * summary, then refreshes the panel so newly-resumed sessions stop offering a checkbox. */
 async function handleResumeSelected(day: string): Promise<void> {
   const checked = todayPanel().querySelectorAll<HTMLInputElement>(
     '.today-session-checkbox:checked',
@@ -384,20 +473,11 @@ async function handleResumeSelected(day: string): Promise<void> {
     return;
   }
   const response = await window.seeya.resumeSelected({ day, sessionIds });
-  const progressLine = document.getElementById('today-progress');
-  if (progressLine !== null) {
-    progressLine.textContent = '';
-  }
-  if (resultLine !== null) {
-    const parts = [
-      `Resumed ${response.resumedCount}`,
-      `skipped ${response.skippedCount}`,
-      ...(response.invalidCount > 0 ? [`${response.invalidCount} invalid answer(s)`] : []),
-      ...(response.stoppedEarly ? ['stopped early'] : []),
-    ];
-    resultLine.textContent = parts.join(', ');
-  }
+  // Refresh FIRST: renderTodayPanel rebuilds #today-panel from scratch (including a fresh, empty
+  // #today-result), so the summary has to be painted AFTER it — painting it before would just get
+  // wiped out by the refresh immediately following.
   await refreshTodayPanel();
+  renderResumeSummary(response);
 }
 
 /** Renders the sidebar's session list — same rows `seeya sessions` would print

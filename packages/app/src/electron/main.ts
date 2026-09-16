@@ -25,7 +25,7 @@ import type {
   FallbackConfirmAnswerRequest,
   TodayPanelResponse,
   ResumeSelectedRequest,
-  ResumeSelectedResponse,
+  ResumeSummaryResponse,
   ResumeProgressUpdateEvent,
   ResumeTabOpenedEvent,
 } from '../ipc/channels.js';
@@ -56,6 +56,7 @@ import {
   type AutostartCacheEntry,
 } from '../state/autostart-cache.js';
 import { buildTodayPanelData } from '../state/today-panel.js';
+import { buildResumeSummary } from '../state/resume-summary.js';
 import { PendingFallbackRequests } from '../resume/pending-fallback-requests.js';
 import { buildFallbackConfirmer } from '../resume/fallback-confirmer.js';
 import { ExitListenerRegistry } from '../resume/exit-listener-registry.js';
@@ -360,7 +361,7 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // button).
   ipcMain.handle(
     CHANNELS.resumeSelected,
-    async (_event, request: ResumeSelectedRequest): Promise<ResumeSelectedResponse> => {
+    async (_event, request: ResumeSelectedRequest): Promise<ResumeSummaryResponse> => {
       const briefing = await context.storage.readBriefing(request.day);
       const wanted = new Set(request.sessionIds);
       const handoffs: readonly Handoff[] =
@@ -392,12 +393,7 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
         },
       );
 
-      return {
-        resumedCount: result.resumed.length,
-        skippedCount: result.skipped.length,
-        invalidCount: result.invalidFallbackAnswers.length,
-        stoppedEarly: result.stoppedEarly !== false,
-      };
+      return buildResumeSummary(result, resolveLabel);
     },
   );
 
