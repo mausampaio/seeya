@@ -4534,6 +4534,17 @@ texto, mas não são a fila.
       Detalhes, decisões de ferramental e o que ficou inferido (não medido) em
       `docs/QUESTOES.md` Q-072.
 
+      **Medido pelo PO depois da mesclagem (2026-09-14):** portão na `main` verde em pedaços
+      (1.658 passando, 4 pulados), `verificar:linux` na `main` verde (1.657 passando, 5 pulados),
+      CI verde nos três sistemas nos dois pushes da mesclagem. **Aceite do mantenedor no Windows
+      (2026-09-16):** `oh-my-posh` instalado no PowerShell e no cmd, prompt legível dentro da aba
+      do seeya. Um detalhe que confirma o desenho: a sessão que instalou o `oh-my-posh` escolheu
+      uma fonte diferente para o terminal do sistema, e a aba do seeya ficou certa mesmo assim —
+      porque a aba desenha com a Nerd Font embutida, não com a fonte do terminal da máquina.
+      **Pendente:** o Linux (o `oh-my-posh` legível lá) e o Mac (o diagnóstico do helper e uma
+      aba de shell abrindo); a tarefa fica em `[~]` até um dos dois, com o Mac registrado como
+      pendência do mantenedor de qualquer forma.
+
 - [ ] **V2-T4 — A interface retoma o dia: `start-day` em abas e pergunta antes do fallback
       (D-042, D-043, D-039).** Especificada pelo PO em 2026-09-14; **aguarda
       aprovação do mantenedor antes de qualquer despacho.** É a razão de existirem duas raízes de
