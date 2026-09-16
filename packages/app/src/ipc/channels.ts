@@ -7,6 +7,7 @@
  */
 import type { SidebarRow } from '../sidebar/sidebar-data.js';
 import type { TerminalFontOptions } from '../state/terminal-font.js';
+import type { TodayPanelData } from '../state/today-panel.js';
 
 export const CHANNELS = {
   /** Renderer → main: open a new tab. */
@@ -39,6 +40,31 @@ export const CHANNELS = {
   /** Main → renderer, pushed on the same interval: the status panel's text, same content as
    * `seeya status` (`state/status-panel.ts#buildStatusPanelText`). */
   statusUpdate: 'seeya:status-update',
+  /** Main → renderer: the fallback question (V2-T4 item 3, S5-T9's "warn BEFORE, and ask") — sent
+   * once per session whose `attemptResume` reported `needsFallback`,
+   * `resume/fallback-confirmer.ts#buildFallbackConfirmer`'s own `send`. */
+  confirmFallbackRequest: 'seeya:confirm-fallback-request',
+  /** Renderer → main: the person's answer to one `confirmFallbackRequest`, by `requestId` —
+   * `resume/pending-fallback-requests.ts#PendingFallbackRequests.resolve`'s own input. */
+  confirmFallbackAnswer: 'seeya:confirm-fallback-answer',
+  /** Renderer → main: the "Today" panel's own data (V2-T4 item 1, `state/today-panel.ts`) —
+   * fetched once at startup and again after `resumeSelected` finishes, same "no polling of its
+   * own" shape `getTerminalFontConfig` already has. */
+  getTodayPanel: 'seeya:get-today-panel',
+  /** Renderer → main: "Resume selected" — the sessions the person checked, for the day the panel
+   * is showing. */
+  resumeSelected: 'seeya:resume-selected',
+  /** Main → renderer, pushed once per session while `resumeSelected` is running: "resuming N of
+   * M: <name>" (`application/start-day.ts#ResumeProgressEvent`, projected to just what the
+   * renderer needs to say). */
+  resumeProgress: 'seeya:resume-progress',
+  /** Main → renderer: a tab the RESUMER opened (not the command bar) — `electron/main.ts`'s own
+   * `TabResumeOpener` sends this right after spawning the pty, so the renderer can create the same
+   * `@xterm/xterm` instance/tab-strip button `createTab`'s own round trip creates, labeled with the
+   * handoff's name instead of the raw `claude` command (V2-T4: "a aba ... rotulada com o nome da
+   * sessão"). Unlike `createTab`, the renderer never calls back to spawn anything here — the pty
+   * already exists by the time this event arrives. */
+  resumeTabOpened: 'seeya:resume-tab-opened',
 } as const;
 
 export interface CreateTabRequest {
@@ -95,3 +121,88 @@ export interface StatusUpdateEvent {
 
 /** `getTerminalFontConfig`'s response — the exact shape `state/terminal-font.ts` produces. */
 export type TerminalFontConfigResponse = TerminalFontOptions;
+
+/** `CHANNELS.confirmFallbackRequest`'s payload — the exact shape
+ * `resume/fallback-confirmer.ts#FallbackConfirmRequestPayload` produces (re-declared here rather
+ * than imported, same "ipc/channels.ts is pure, no engine-adjacent app module imports it back"
+ * shape every other event type in this file already has — `resume/` imports FROM `ipc/`, never
+ * the other way). */
+export interface FallbackConfirmRequestEvent {
+  readonly requestId: string;
+  readonly sessionName: string;
+  readonly cwd: string;
+  readonly reasonText: string;
+}
+
+/** `CHANNELS.confirmFallbackAnswer`'s payload. */
+export interface FallbackConfirmAnswerRequest {
+  readonly requestId: string;
+  readonly decision: 'open' | 'skip';
+}
+
+/** `CHANNELS.getTodayPanel`'s response — the exact shape `state/today-panel.ts#buildTodayPanelData`
+ * produces. */
+export type TodayPanelResponse = TodayPanelData;
+
+/** `CHANNELS.resumeSelected`'s payload. `day` is `core/types.ts`'s `Day` (a plain string,
+ * `YYYY-MM-DD`) — not imported from the engine here, same "this file only ever imports app-internal
+ * state modules" shape every other type above already keeps (`SidebarRow`/`TerminalFontOptions`/
+ * `TodayPanelData`). */
+export interface ResumeSelectedRequest {
+  readonly day: string;
+  readonly sessionIds: readonly string[];
+}
+
+/** One session, named for display — the common shape every `ResumeSummaryResponse` list entry
+ * below builds on. */
+export interface ResumeSummarySession {
+  readonly sessionId: string;
+  readonly name: string;
+  readonly cwd: string;
+}
+
+/** `false` means `--resume` attached cleanly; otherwise the same wording
+ * `core/resume-notice.ts#describeFallbackReason` gives the CLI's own `formatResumeNotice` for why
+ * a fresh session opened instead — computed once, in `state/resume-summary.ts`, never re-derived
+ * from the raw `ResumeFallbackReason` in `electron/renderer.ts` (which has no logic of its own,
+ * D-041). */
+export interface ResumeSummaryOutcome extends ResumeSummarySession {
+  readonly fellBack: false | { readonly reasonText: string };
+}
+
+export interface ResumeSummarySkipped extends ResumeSummarySession {
+  /** The exact same wording `core/resume-notice.ts#describeFallbackReason` gives the CLI. */
+  readonly reasonText: string;
+}
+
+export interface ResumeSummaryInvalid extends ResumeSummarySession {
+  readonly reason: string;
+}
+
+/** `CHANNELS.resumeSelected`'s response (V2-T4 item 4) — the full per-session breakdown, same
+ * content as `cli/format-start-day.ts#formatStartDaySummary` (resumed, skipped, invalid fallback
+ * answers, not-yet-attempted, and where the loop stopped early), rendered by the panel as DOM
+ * sections instead of reusing the CLI's plain-text rendering (Q-073's own "only the data crosses
+ * the boundary" — V2-T2's criterion for the status panel). Built by
+ * `state/resume-summary.ts#buildResumeSummary`. */
+export interface ResumeSummaryResponse {
+  readonly resumed: readonly ResumeSummaryOutcome[];
+  readonly skipped: readonly ResumeSummarySkipped[];
+  readonly invalidFallbackAnswers: readonly ResumeSummaryInvalid[];
+  readonly remaining: readonly ResumeSummarySession[];
+  readonly stoppedEarly:
+    { readonly session: ResumeSummarySession; readonly message: string } | false;
+}
+
+export interface ResumeProgressUpdateEvent {
+  readonly index: number;
+  readonly total: number;
+  readonly name: string;
+}
+
+export interface ResumeTabOpenedEvent {
+  readonly id: string;
+  readonly label: string;
+  readonly cwd: string;
+  readonly pid: number;
+}

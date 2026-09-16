@@ -22,8 +22,17 @@ import type {
   SessionsUpdateEvent,
   StatusUpdateEvent,
   TerminalFontConfigResponse,
+  FallbackConfirmAnswerRequest,
+  TodayPanelResponse,
+  ResumeSelectedRequest,
+  ResumeSummaryResponse,
+  ResumeProgressUpdateEvent,
+  ResumeTabOpenedEvent,
 } from '../ipc/channels.js';
 import type { Clock } from '@seeya-ai/engine/core/ports.js';
+import { findPendingBriefing } from '@seeya-ai/engine/application/find-pending-briefing.js';
+import { resumeSessions } from '@seeya-ai/engine/application/start-day.js';
+import type { Handoff } from '@seeya-ai/engine/core/types.js';
 import { buildAppContext, type AppContext } from '../composition/index.js';
 import { MESSAGES } from '../text/messages.js';
 import {
@@ -46,6 +55,23 @@ import {
   DEFAULT_AUTOSTART_REFRESH_INTERVAL_MS,
   type AutostartCacheEntry,
 } from '../state/autostart-cache.js';
+import { buildTodayPanelData } from '../state/today-panel.js';
+import { buildResumeSummary } from '../state/resume-summary.js';
+import { PendingFallbackRequests } from '../resume/pending-fallback-requests.js';
+import { buildFallbackConfirmer } from '../resume/fallback-confirmer.js';
+import { ExitListenerRegistry } from '../resume/exit-listener-registry.js';
+import {
+  TabSessionResumer,
+  type OpenedResumeTab,
+  type TabResumeOpener,
+} from '../resume/tab-session-resumer.js';
+
+/** `TabSessionResumer`'s `claudeCommand` in production — the same default the CLI's own
+ * `ClaudeSessionResumer#resolveClaudeBinary` falls back to when nothing overrides it
+ * (`adapters/resumption/resumer.ts`'s own `DEFAULT_CLAUDE_BINARY`, not exported — this is the app's
+ * own copy of that one literal, resolved for real here via `context.resolveHarnessCommand`, unlike
+ * the CLI which hands the bare string straight to `node:child_process.spawn`). */
+const CLAUDE_COMMAND = 'claude';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -168,6 +194,36 @@ function createWindow(clock: Clock): BrowserWindow {
         });
     });
   }
+  // SEEYA_APP_AUTO_RESUME_ALL: same "instrumentação só do spike" class as the two above — checks
+  // every checkbox the "Today" panel rendered (renderer.ts's own startup `refreshTodayPanel`
+  // already populated it by the time `did-finish-load` fires) and clicks "Resume selected", so an
+  // agent with no keyboard/mouse of its own can prove V2-T4's own aceite: a tab opens labeled with
+  // the handoff's name for a session whose plan fits, and the fallback dialog appears with the
+  // right text for one whose plan doesn't (`resume/tab-session-resumer.ts`'s own size check runs
+  // before any tab opens, so the dialog can show up well inside this file's screenshot window).
+  // Never set by `npm run app` or the README.
+  if (process.env.SEEYA_APP_AUTO_RESUME_ALL === '1') {
+    window.webContents.once('did-finish-load', () => {
+      void clock
+        .sleep(500)
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.querySelectorAll('.today-session-checkbox').forEach((cb) => { cb.checked = true; }); " +
+              "document.querySelector('#today-panel button')?.click();",
+          ),
+        )
+        .then(() => clock.sleep(300))
+        .then(() =>
+          // If a fallback question came up (a plan over the size ceiling), answer "Skip" — the
+          // default a closed dialog would already pick, exercised explicitly here so the summary
+          // section actually renders instead of leaving resumeSessions waiting forever on this
+          // one automated run. A no-op when no dialog is open (optional chaining).
+          window.webContents.executeJavaScript(
+            "document.getElementById('fallback-dialog-skip')?.click();",
+          ),
+        );
+    });
+  }
   return window;
 }
 
@@ -186,6 +242,13 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // Same "closed-over, only this function touches it" reasoning as `tabs` above —
   // `state/autostart-cache.ts`'s own docstring has the caching rule and the measurement behind it.
   let autostartCache: AutostartCacheEntry | null = null;
+  // V2-T4 item 3: at most one truly pending in production (`resumeSessions`'s own sequential
+  // loop), but keyed independently by requestId anyway — `PendingFallbackRequests`'s own docstring.
+  const pendingFallbackRequests = new PendingFallbackRequests();
+  // V2-T4 item 2: lets the SAME onExit callback below also notify TabSessionResumer's
+  // fast-failure race for the specific tabs it opened — ExitListenerRegistry's own docstring.
+  const exitListenerRegistry = new ExitListenerRegistry();
+  let nextResumeTabId = 0;
 
   const ptyManager = context.buildPtyManager({
     onData: (id, data) => {
@@ -196,8 +259,49 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
       tabs = updateTab(tabs, id, (tab) => markExited(tab, exitCode));
       const event: TabExitEvent = { id, exitCode };
       window.webContents.send(CHANNELS.tabExit, event);
+      exitListenerRegistry.fire(id, exitCode);
     },
   });
+
+  /**
+   * The real `TabResumeOpener` (V2-T4 item 2) — glue over this function's own `ptyManager`/`tabs`,
+   * the same two things `CHANNELS.createTab`'s handler below already uses, so a resumed session's
+   * tab is indistinguishable from a command-bar one once open (same `PtyManager`, same
+   * `TabCollection`, same pid the sidebar matches by). The one real difference: the RENDERER never
+   * initiates this — `resumeTabOpened` tells it to create the `@xterm/xterm` instance for an `id`
+   * whose pty this process already spawned, instead of the renderer asking main to spawn one.
+   */
+  async function openResumeTab(options: {
+    readonly command: string;
+    readonly args: readonly string[];
+    readonly cwd: string;
+    readonly label: string;
+  }): Promise<OpenedResumeTab> {
+    const resolved = await resolveHarnessOrThrow(context, options.command, options.args);
+    nextResumeTabId += 1;
+    const id = `resume-${nextResumeTabId}`;
+    tabs = addTab(tabs, createTab({ id, command: options.label, args: [], cwd: options.cwd }));
+    const pid = ptyManager.create(id, {
+      command: resolved.command,
+      args: resolved.args,
+      cwd: options.cwd,
+      env: context.tabEnv,
+      // Reasonable initial size — same as any tab: the renderer's own FitAddon corrects it once
+      // the tab is actually shown, the same way an ordinary command-bar tab's first size is only
+      // ever a starting point (`renderer.ts#openTab`'s own `terminal.cols`/`rows`).
+      cols: 80,
+      rows: 24,
+    });
+    tabs = updateTab(tabs, id, (tab) => withPid(tab, pid));
+    const event: ResumeTabOpenedEvent = { id, label: options.label, cwd: options.cwd, pid };
+    window.webContents.send(CHANNELS.resumeTabOpened, event);
+    return { id, pid };
+  }
+
+  const tabResumeOpener: TabResumeOpener = {
+    openTab: openResumeTab,
+    onceExit: (id, listener) => exitListenerRegistry.register(id, listener),
+  };
 
   // V2-T3: fetched once by `renderer.ts#main`, before any `new Terminal({...})` is constructed —
   // the two-way handshake (`invoke`, not `send`) matches `createTab` below, the only other channel
@@ -260,6 +364,68 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   ipcMain.on(CHANNELS.removeTab, (_event, request: RemoveTabRequest) => {
     tabs = removeTab(tabs, request.id);
   });
+
+  // V2-T4 item 3: the renderer's answer to one confirmFallbackRequest — resolving a stale or
+  // unknown requestId is a no-op (PendingFallbackRequests.resolve's own docstring), so a late
+  // answer after the window reloaded mid-question never throws here.
+  ipcMain.on(CHANNELS.confirmFallbackAnswer, (_event, answer: FallbackConfirmAnswerRequest) => {
+    pendingFallbackRequests.resolve(answer.requestId, answer.decision);
+  });
+
+  // V2-T4 item 1: the "Today" panel's own data — findPendingBriefing is the exact same lookup
+  // `seeya start-day` does (application/find-pending-briefing.js), scanned over
+  // config.maxBriefingScanDays like the CLI's own StartDayCommandContext.
+  ipcMain.handle(CHANNELS.getTodayPanel, async (): Promise<TodayPanelResponse> => {
+    const lookup = await findPendingBriefing(
+      context.storage,
+      context.clock,
+      context.config.maxBriefingScanDays,
+    );
+    return buildTodayPanelData(lookup);
+  });
+
+  // V2-T4 items 1/2/3: "Resume selected" — the same resumeSessions the CLI's start-day-command.ts
+  // calls, with a TabSessionResumer instead of ClaudeSessionResumer and a dialog-backed
+  // FallbackConfirmer instead of readline (D-039: this NEVER runs on its own, only from this one
+  // handler, itself only ever called by the person's own click — renderer.ts's "Resume selected"
+  // button).
+  ipcMain.handle(
+    CHANNELS.resumeSelected,
+    async (_event, request: ResumeSelectedRequest): Promise<ResumeSummaryResponse> => {
+      const briefing = await context.storage.readBriefing(request.day);
+      const wanted = new Set(request.sessionIds);
+      const handoffs: readonly Handoff[] =
+        briefing?.handoffs.filter((handoff) => wanted.has(handoff.sessionId)) ?? [];
+
+      const resolveLabel = (sessionId: string): string =>
+        handoffs.find((handoff) => handoff.sessionId === sessionId)?.name ?? sessionId;
+      const sessionResumer = new TabSessionResumer({
+        seeyaHome: context.home.seeyaHome,
+        claudeCommand: CLAUDE_COMMAND,
+        opener: tabResumeOpener,
+        clock: context.clock,
+        resolveLabel,
+      });
+      const confirmFallback = buildFallbackConfirmer(pendingFallbackRequests, (confirmRequest) =>
+        window.webContents.send(CHANNELS.confirmFallbackRequest, confirmRequest),
+      );
+
+      const result = await resumeSessions(
+        { storage: context.storage, sessionResumer, confirmFallback },
+        { day: request.day, handoffs },
+        (progressEvent) => {
+          const event: ResumeProgressUpdateEvent = {
+            index: progressEvent.index,
+            total: progressEvent.total,
+            name: progressEvent.handoff.name,
+          };
+          window.webContents.send(CHANNELS.resumeProgress, event);
+        },
+      );
+
+      return buildResumeSummary(result, resolveLabel);
+    },
+  );
 
   void runRefreshLoop({
     clock: context.clock,

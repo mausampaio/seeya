@@ -7126,3 +7126,92 @@ sem efeito quando já está certo, e sem erro quando não encontra nada (o caso 
    aba de shell abre.
 2. Na máquina Linux do dia a dia: conferir se o prompt do `oh-my-posh` agora renderiza os glifos
    corretamente com a fonte embutida.
+
+## Q-073 — V2-T4 (a interface retoma o dia): decisões de ferramental, o que saiu de `cli/` (nada,
+## desta vez) e o que ficou inferido
+
+**Tarefa:** V2-T4
+**Bloqueia:** não — a tarefa foi entregue com o portão completo verde (Windows e o contêiner
+Linux) e as três capturas de tela do aceite medidas pelo agente. Registro no mesmo padrão de
+Q-069/Q-070/Q-071/Q-072.
+
+### 1) `resolveLabel`: por que a rotulagem da aba não passa pela porta `SessionResumer`
+
+O despacho pede "a aba de uma retomada é rotulada com o nome da sessão do handoff, não com
+`claude`". `SessionResumer.attemptResume`/`runFallback` (`core/ports.ts`) só recebem
+`sessionId`/`cwd`/`prompt` — a mesma assinatura que a CLI's `ClaudeSessionResumer` já usa, e mudar
+essa porta tocaria as duas implementações por um campo que só a interface precisa. A saída:
+`TabSessionResumerOptions.resolveLabel: (sessionId: string) => string`, uma função que
+`electron/main.ts` constrói uma vez por clique em "Resume selected" (`handoffs.find(h =>
+h.sessionId === sessionId)?.name ?? sessionId`), passada como dependência — o resumer nunca
+recebe o handoff inteiro, só o suficiente para rotular. `state/resume-summary.ts` reaproveita a
+MESMA função para o mesmo propósito (nomear `resumed[]`, que `ResumeOutcome` também não carrega).
+
+### 2) Item 4: nenhuma lógica de formatação saiu de `cli/format-start-day.ts` para o motor
+
+Diferente da V2-T2 (que moveu `format-status.ts` inteiro para `application/` porque o aceite
+exigia comparação literal com `seeya status`), o aceite desta tarefa não pede que o resumo da
+interface bata caractere a caractere com o da CLI — só "mesmo conteúdo". A interface desenha
+resumido/pulado/inválido/restante como seções em DOM
+(`electron/renderer.ts#renderResumeSummary`), e só o **dado** cruza a fronteira: `ResumeSessionsResult`
+(tipo, já público) projetado por `state/resume-summary.ts#buildResumeSummary` no formato seguro de
+IPC, reaproveitando `core/resume-notice.ts#describeFallbackReason` para cada motivo (a mesma
+função que a CLI já usa) — a garantia contra o texto divergir não é "mesmo texto literal", é
+"mesma função que decide o que o texto diz". `cli/format-start-day.ts` não foi tocado.
+
+### 3) Nenhuma lógica de seleção saiu de `cli/` para o motor nesta tarefa
+
+O despacho previa a possibilidade ("só o que for lógica pura de seleção compartilhável sai da CLI
+para `application/`"). Não aconteceu: a única lógica nova da interface — extrair a primeira linha
+do plano (`state/today-panel.ts`, `tomorrowPlan[0] ?? pendingItems[0] ?? null`, D-025) — não tem
+equivalente em `cli/start-day-selection.ts` (o picker da CLI só lista nome+cwd, nunca uma linha do
+plano), então não havia nada para mover. Ficou em `packages/app/src/state/`, testada isoladamente.
+
+### 4) `SEEYA_APP_AUTO_RESUME_ALL`: a quinta variável de instrumentação de verificação
+
+Mesma categoria de `SEEYA_APP_OFFSCREEN`/`SEEYA_APP_SCREENSHOT_PATH`/`SEEYA_APP_QUIT_AFTER_MS`/
+`SEEYA_APP_AUTO_OPEN_SHELL_TAB`/`SEEYA_APP_HOME_OVERRIDE` já registradas na V2-T2/V2-T3
+(`AGENTS.md` já as documentava como uma categoria fechada, mas aberta a crescer — "nunca vão para
+disco, ninguém digita"). Marca toda `.today-session-checkbox`, clica o único `<button>` de
+`#today-panel` (o botão "Resume selected" — não tem `id` próprio porque é o único botão daquele
+contêiner), espera 300ms e clica `#fallback-dialog-skip` se o diálogo tiver aparecido (nenhum
+efeito quando não aparece, por `?.`). Documentada em `electron/main.ts` junto de onde é lida, e no
+próprio `AGENTS.md`.
+
+### 5) O `claude` usado no aceite: um fake escrito à mão para esta verificação, não o fixture do
+### harness de e2e
+
+`tests/e2e/_harness.ts`/`tests/integration/generation/_fixtures.ts#createFakeClaudeFixture` (o
+fixture real, `fake-claude.mjs`) foi desenhado para `child_process.spawn` direto — o caminho que
+`ClaudeSessionResumer`/o e2e nº5 exercitam. Uma aba da interface passa por
+`resolveHarnessCommand`/`node-pty`, que no Windows embrulha um `.cmd` em `cmd.exe /d /s /c` (a
+mesma lógica que já existe para `codex.cmd`) — um caminho diferente o suficiente que reaproveitar
+o fixture do harness exigiria adaptá-lo para o node-pty, fora do escopo desta verificação pontual.
+O fake usado aqui é um `.cmd` de duas linhas (grava o argv recebido num arquivo, imprime
+`RESUMED-OK`, sai com código 0) — não commitado, vive só no driver de verificação (fora do
+repositório) que este agente usou. **Não é o `fake-claude.mjs` real**, então não prova nada sobre
+o protocolo de resposta do `claude` de verdade (o teste de contrato
+`tests/contract/resume-argument-roundtrip.test.ts`, que já existe, é o que prova isso contra o
+binário instalado) — prova só que o argv/label/registro em disco desta tarefa estão certos.
+
+### O que ficou inferido, não medido
+
+- **O `--resume` de verdade continuando uma sessão dentro de uma aba.** O fake só prova que o
+  argv/rótulo/`resumed.json` estão certos; a sessão de fato retomando com histórico é a mesma
+  medição que a Q-069 já deixou pendente para o mantenedor (lá, no terminal da CLI; aqui, na aba).
+- **A lateral marcando por PID uma sessão retomada pela interface, com o `claude` real vivo.** A
+  verificação mediu o estado logo depois do fake process sair (`RESUMED-OK`), antes do próximo
+  ciclo do laço de atualização (10s) rodar de novo contra um processo ainda vivo — o mecanismo
+  (`session-match.ts`) já é o mesmo testado desde a V2-T2, sem mudança nesta tarefa, então a
+  inferência é baixo risco, mas não é a mesma coisa que ter visto.
+- **Linux e macOS.** O agente só tem Windows; `verificar:linux` cobre o contêiner, não uma área de
+  trabalho real nem o `node-pty`/Electron rodando de verdade lá.
+- **Memória/desempenho com várias abas de retomada abertas ao mesmo tempo.** Não medido nesta
+  tarefa (fora do que o aceite pedia).
+
+### Pendências para o mantenedor
+
+1. Revisar e mesclar.
+2. Um `seeya end-day` real seguido de um `seeya start-day` real **pela interface**, no dia
+   seguinte, no Windows e no Linux — a mesma classe de medição que V2-T2/V2-T3 já pediram para o
+   resto da interface, agora para a retomada.

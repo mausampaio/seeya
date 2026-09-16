@@ -161,6 +161,18 @@ the machine. **The interface reads config once at startup**: changing either key
 the next `npm run app`, not live — close and reopen the interface after `seeya config set
 terminalFontFamily`/`terminalFontSize`.
 
+**Resuming the day, in tabs (V2-T4).** The sidebar's "Today" section shows the same pending
+briefing `seeya start-day` would find — the day, which sessions still need resuming, and (for
+each one) its name, working directory and the first line of its plan. Check the ones you want and
+click **Resume selected**: each one opens in its own tab, labeled with the session's name, running
+`claude --resume` with yesterday's plan as the first message — the interface's own `SessionResumer`
+implementation, over a tab instead of the CLI's inherited terminal, but calling the exact same
+`resumeSessions` the CLI does. If a plan is too long to pass safely to an interactive session, a
+dialog asks before opening a fresh, history-losing one in its place — **Open a fresh session** or
+**Skip**, mirroring `seeya start-day`'s own "warn BEFORE, and ask" — and closing the dialog without
+choosing counts as Skip. The interface never starts this on its own; it only ever runs after that
+click.
+
 ### Before writing code
 
 Read [`AGENTS.md`](AGENTS.md). It's the project's work contract: layer boundaries, code style,

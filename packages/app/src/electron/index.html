@@ -9,6 +9,8 @@
   <body>
     <div id="app">
       <aside id="sidebar">
+        <h2>Today</h2>
+        <div id="today-panel"></div>
         <h2>Sessions</h2>
         <ul id="session-list"></ul>
         <h2>Status</h2>
@@ -38,6 +40,15 @@
         <div id="terminal-host"></div>
       </main>
     </div>
+    <dialog id="fallback-dialog">
+      <h3 id="fallback-dialog-title"></h3>
+      <p id="fallback-dialog-reason"></p>
+      <p id="fallback-dialog-body"></p>
+      <div id="fallback-dialog-actions">
+        <button id="fallback-dialog-open" type="button"></button>
+        <button id="fallback-dialog-skip" type="button"></button>
+      </div>
+    </dialog>
     <script type="module" src="renderer.js"></script>
   </body>
 </html>
