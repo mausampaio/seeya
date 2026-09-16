@@ -1,7 +1,6 @@
 # Estado atual
 
-_Atualizado em 2026-09-16, depois da entrega da V2-T5a numa worktree isolada (V2-T4 já estava
-mesclada na `main` quando esta atualização começou).
+_Atualizado em 2026-09-16, depois da mesclagem da V2-T5a na `main`.
 Se o `git log`, a CI ou o `~/.seeya` contarem algo diferente do que está aqui, **este arquivo está
 atrasado**: confie na evidência e atualize o arquivo. Isso já aconteceu: a primeira versão dele,
 escrita à mão no mesmo dia, tinha quatro afirmações falsas, e quem achou foi uma sessão limpa
@@ -233,10 +232,10 @@ de um `seeya start-day` real **pela interface**, no dia seguinte, no Windows e n
 a mesma medição que V2-T2/V2-T3 pediram para o resto da interface, agora para a retomada.
 Detalhes, decisões de ferramental e o que ficou inferido (não medido) em `docs/QUESTOES.md` Q-073.
 
-## V2-T5a — `end-day` pela interface (entregue numa worktree isolada em 16/09)
+## V2-T5a — `end-day` pela interface (mesclada na `main` em 16/09)
 
-**Entregue pelo agente em 16/09, cinco commits (um por item), mais três da revisão do PO no mesmo
-dia (ver abaixo).** Fecha o ciclo diário inteiro dentro da janela: a interface agora encerra o dia
+**Mesclada na `main` em 16/09** (fast-forward: cinco commits, um por item, mais os da revisão do
+PO — a prévia sem geração — e um ajuste de texto do PO). Fecha o ciclo diário inteiro dentro da janela: a interface agora encerra o dia
 (esta tarefa) e retoma na manhã seguinte (V2-T4, já mesclada). Um botão **End day…** na região de
 estado roda a mesma prévia (`endDay(deps, { dryRun: true, skipGeneration: true, scope: fullDay })`
 — `skipGeneration` é o acréscimo da revisão, ver abaixo) e mostra o resultado — o texto literal de

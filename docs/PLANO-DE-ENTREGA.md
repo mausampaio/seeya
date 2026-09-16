@@ -4706,7 +4706,9 @@ texto, mas não são a fila.
 
 - [~] **V2-T5a — `end-day` pela interface: a prévia é a confirmação, progresso por sessão,
       resultado e notificação (D-039, D-042, D-043).** Especificada pelo PO em 2026-09-16;
-      **aprovada e despachada pelo mantenedor no mesmo dia.** Fecha o ciclo diário
+      aprovada e despachada pelo mantenedor no mesmo dia; **mesclada na `main` em 2026-09-16**
+      depois de uma rodada de revisão (a prévia sem chamada ao modelo — premissa errada do
+      despacho, corrigida no motor com `skipGeneration`). Fecha o ciclo diário
       inteiro dentro da janela: encerrar à noite (esta tarefa), retomar de manhã (V2-T4). Na CLI
       o `seeya end-day` roda sem perguntar e bloqueia em silêncio até acabar; a interface não
       pode fazer nenhuma das duas coisas — é um botão que custa dinheiro (uma chamada de modelo
