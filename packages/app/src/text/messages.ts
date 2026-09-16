@@ -74,9 +74,10 @@ export const MESSAGES = {
     readonly captureModel: string;
     readonly totalCeilingUsd: number;
   }): string =>
-    `Cost ceiling: up to ${ceiling.sessionsInScope} × $${ceiling.budgetPerSessionUsd.toFixed(2)} ` +
-    `per session (model: ${ceiling.captureModel}) — at most $${ceiling.totalCeilingUsd.toFixed(2)} ` +
-    'total. This is a ceiling the capture itself enforces, never an estimate of what it will spend.',
+    'This preview cost nothing — it never called the model (skipGeneration). If you run it: up ' +
+    `to ${ceiling.sessionsInScope} × $${ceiling.budgetPerSessionUsd.toFixed(2)} per session ` +
+    `(model: ${ceiling.captureModel}) — at most $${ceiling.totalCeilingUsd.toFixed(2)} total. ` +
+    'This is a ceiling the capture itself enforces, never an estimate of what it will spend.',
   endDayRunNow: 'Run end-day now',
   endDayCancel: 'Cancel',
 

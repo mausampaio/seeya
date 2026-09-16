@@ -469,13 +469,20 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
 
   // V2-T5a item 1: "End day..." — the dry-run preview shown as the confirmation itself (D-039,
   // D-002: this NEVER writes a handoff or terminates a process — dryRun: true stops every write
-  // right before it happens, application/end-day.ts's own top comment). The report text is
-  // formatEndDayReport's own literal output, the SAME text `seeya end-day --dry-run` prints
-  // (V2-T5a item 2: moved to application/ for exactly this reuse); the cost ceiling has no CLI
-  // equivalent, so it's computed here instead.
+  // right before it happens, application/end-day.ts's own top comment). skipGeneration: true
+  // (review fix) means this NEVER calls a real generator either — unlike `seeya end-day --dry-run`
+  // itself (whose own contract, S2-T5, still calls the real lean generator during a dry run: a
+  // command the person already decided to run), a preview the person has NOT confirmed anything
+  // for yet must not spend a real, billed model call — see EndDayOptions.skipGeneration's own
+  // docstring for the full reasoning. The report text is still formatEndDayReport's own literal
+  // rendering (the SAME function `seeya end-day` uses, V2-T5a item 2), just fed a result whose
+  // sessions never had the model actually called — so its CONTENT differs from
+  // `seeya end-day --dry-run` for lean sessions specifically, honestly (D-025): no "understanding"
+  // this preview never produced. The cost ceiling has no CLI equivalent, so it's computed here.
   ipcMain.handle(CHANNELS.endDayPreview, async (): Promise<EndDayPreviewResponse> => {
     const result = await endDay(toEndDayDeps(context), {
       dryRun: true,
+      skipGeneration: true,
       scope: { kind: 'fullDay' },
     });
     return {

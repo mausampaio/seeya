@@ -6,6 +6,11 @@
  * (`result.sessionsInScope`) the preview's own report text (`formatEndDayReport`) already reads,
  * and `budgetPerSessionUsd`/`captureModel` straight from `Config` — never a second, independent
  * count of sessions that could drift from what the report text says.
+ *
+ * **Review fix: the ceiling below describes what RUNNING would cost, never what the preview
+ * itself cost.** `main.ts#endDayPreview`'s own `endDay` call passes `skipGeneration: true`
+ * (`EndDayOptions`), so fetching this figure never calls the model at all — `text/messages.ts
+ * #endDayCostCeiling` says so explicitly in the line this figure feeds.
  */
 import type { Config } from '@seeya-ai/engine/core/types.js';
 
