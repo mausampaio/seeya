@@ -194,6 +194,36 @@ function createWindow(clock: Clock): BrowserWindow {
         });
     });
   }
+  // SEEYA_APP_AUTO_RESUME_ALL: same "instrumentação só do spike" class as the two above — checks
+  // every checkbox the "Today" panel rendered (renderer.ts's own startup `refreshTodayPanel`
+  // already populated it by the time `did-finish-load` fires) and clicks "Resume selected", so an
+  // agent with no keyboard/mouse of its own can prove V2-T4's own aceite: a tab opens labeled with
+  // the handoff's name for a session whose plan fits, and the fallback dialog appears with the
+  // right text for one whose plan doesn't (`resume/tab-session-resumer.ts`'s own size check runs
+  // before any tab opens, so the dialog can show up well inside this file's screenshot window).
+  // Never set by `npm run app` or the README.
+  if (process.env.SEEYA_APP_AUTO_RESUME_ALL === '1') {
+    window.webContents.once('did-finish-load', () => {
+      void clock
+        .sleep(500)
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.querySelectorAll('.today-session-checkbox').forEach((cb) => { cb.checked = true; }); " +
+              "document.querySelector('#today-panel button')?.click();",
+          ),
+        )
+        .then(() => clock.sleep(300))
+        .then(() =>
+          // If a fallback question came up (a plan over the size ceiling), answer "Skip" — the
+          // default a closed dialog would already pick, exercised explicitly here so the summary
+          // section actually renders instead of leaving resumeSessions waiting forever on this
+          // one automated run. A no-op when no dialog is open (optional chaining).
+          window.webContents.executeJavaScript(
+            "document.getElementById('fallback-dialog-skip')?.click();",
+          ),
+        );
+    });
+  }
   return window;
 }
 
