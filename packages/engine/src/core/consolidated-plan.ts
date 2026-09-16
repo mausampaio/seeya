@@ -63,7 +63,7 @@ export function renderRelativeAge(daysAgo: number): string {
  * could parse at a glance. One item per line, indented under its own `label:` line, the same
  * shape `renderPickerQuestion` already uses for its own numbered list.
  *
- * **Exported for `cli/format-end-day.ts` to reuse as-is (S4-T0h).** `seeya end-day` hit the exact
+ * **Exported for `application/format-end-day.ts` to reuse as-is (S4-T0h).** `seeya end-day` hit the exact
  * same bug this function was written to fix — `pendingItems`/`tomorrowPlan` never printed at all
  * there, and the captured-session block had no per-line list to fall back on. A second copy of
  * this same six-line function in `cli/` would be the duplication AGENTS.md § "Estilo de código"

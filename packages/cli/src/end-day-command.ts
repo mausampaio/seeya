@@ -3,7 +3,8 @@
  * extended by docs/PLANO-DE-ENTREGA.md S3-T5). Resolves `--session` to at most one discovered
  * session BEFORE `application/endDay` ever runs (`cli/session-reference.ts`), then calls `endDay`
  * with an exact-`sessionId` filter and turns the result into the plain-text report
- * (`format-end-day.ts`). No I/O happens here directly beyond that one resolving discovery call —
+ * (`@seeya-ai/engine/application/format-end-day.js`, moved out of `cli/` in V2-T5a — see that
+ * module's own docstring). No I/O happens here directly beyond that one resolving discovery call —
  * everything else `endDay` already did (or, under `--dry-run`, stopped right before doing it).
  *
  * **Why resolve before calling `endDay`, instead of passing a looser predicate straight through
@@ -24,8 +25,8 @@ import {
   type PathPlatformHint,
 } from '@seeya-ai/engine/core/cwd-normalization.js';
 import { resolveSessionReference, type SessionReference } from './session-reference.js';
-import { formatEndDayReport } from './format-end-day.js';
-import { buildEndDayNotice } from './end-day-notice.js';
+import { formatEndDayReport } from '@seeya-ai/engine/application/format-end-day.js';
+import { buildEndDayNotice } from '@seeya-ai/engine/application/end-day-notice.js';
 
 export interface EndDayCommandOptions {
   readonly dryRun: boolean;

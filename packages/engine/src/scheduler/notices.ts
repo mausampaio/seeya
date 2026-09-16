@@ -1,10 +1,10 @@
 /**
  * Builds every `Notice` (`core/ports.ts`) the daemon shows outside the terminal. English (D-028):
  * notification text is public. Concentrated here, not scattered (AGENTS.md § "Texto voltado ao
- * usuário") — same convention `cli/end-day-notice.ts` already established for `seeya end-day`'s own
+ * usuário") — same convention `application/end-day-notice.ts` already established for `seeya end-day`'s own
  * result notice.
  *
- * **A small, deliberate duplication of `cli/end-day-notice.ts#buildEndDayNotice`, not a shared
+ * **A small, deliberate duplication of `application/end-day-notice.ts#buildEndDayNotice`, not a shared
  * import.** `scheduler/` cannot import `cli/` at all (docs/ARQUITETURA.md's layer matrix: `cli/` is
  * the composition root, never a dependency of anything below it) — moving that S4-T1 module into
  * `application/` so both sides could share it would relayer an already-approved file for a handful
@@ -59,7 +59,7 @@ function failedCaptureSummary(result: EndDayResult): string | null {
  * `scheduler/poll.ts` is what compares `delayMs` against it; this function only renders the
  * already-made decision, never the threshold itself) distinguishes an on-time close from one that
  * ran late enough that termination was skipped for every session this run, `canTerminate: true`
- * included. `null` is never returned here the way `cli/end-day-notice.ts#buildEndDayNotice` can for
+ * included. `null` is never returned here the way `application/end-day-notice.ts#buildEndDayNotice` can for
  * a dry run — the daemon never runs `--dry-run`.
  */
 export function buildDaemonEndOfDayNotice(
@@ -109,7 +109,7 @@ export function buildMissedEndOfDayNotice(missedDay: string): Notice {
 /**
  * S4-T7 Part 2: how many of a poll cycle's `EarlyWarning`s get their own line before the notice
  * just declares a count instead. Chosen, not measured — same spirit as
- * `cli/format-end-day.ts#UNDERSTANDING_EXCERPT_CHARS`: there's no "right" toast height, but a
+ * `application/format-end-day.ts#UNDERSTANDING_EXCERPT_CHARS`: there's no "right" toast height, but a
  * one-line-per-warning body has to stay short enough to read at a glance even on a burst day, and 5
  * items is long enough to be useful without turning into the wall of text this task exists to stop.
  */
@@ -138,7 +138,7 @@ function firstLine(message: string): string {
  * count and shows what fits** (docs/PLANO-DE-ENTREGA.md S4-T7: "sem estourar o que o toast mostra",
  * "nenhum achado desaparece do texto sem estar contado"). Reuses
  * `core/consolidated-plan.ts#renderItemList` for the per-line layout — the exact "declare the total,
- * one item per line, never a silent cut" shape `cli/format-end-day.ts`/`consolidated-plan.ts`
+ * one item per line, never a silent cut" shape `application/format-end-day.ts`/`consolidated-plan.ts`
  * already established for a captured session's own pending list, not reinvented here.
  *
  * @example

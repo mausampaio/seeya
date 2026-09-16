@@ -270,7 +270,7 @@ function sortedListedSessions(listedSessions: readonly SessionListing[]): Sessio
  * S4-T0c: `listing.info.kind === 'unreadable'` renders as an explicit, named problem — never the
  * same "(no title)" text an ordinary absent `ai-title` gets. Before this task the two collapsed
  * into the identical shape (D-025's mistake: "no title" and "couldn't check" are different claims,
- * and only the second is someone's problem to go fix). **Exported for `cli/format-end-day.ts` to
+ * and only the second is someone's problem to go fix). **Exported for `application/format-end-day.ts` to
  * reuse as-is** — its own terminal report renders the exact same per-session text, and a second
  * copy of this branching would be exactly the duplication AGENTS.md § "Estilo de código" rules out
  * (same reuse precedent as `renderGitBlock` above, cited on its own docstring).
@@ -291,7 +291,7 @@ export function formatSessionListingLine(listing: SessionListing): string {
 /**
  * D-022's "contável" applied to S4-T0c's read-failure distinction: how many `listedSessions`
  * entries failed to read their transcript, as opposed to ordinarily having no `ai-title`. Exported
- * for `cli/format-end-day.ts` to reuse, same reasoning as `formatSessionListingLine` above.
+ * for `application/format-end-day.ts` to reuse, same reasoning as `formatSessionListingLine` above.
  */
 export function countUnreadableListings(listedSessions: readonly SessionListing[]): number {
   return listedSessions.filter((listing) => listing.info.kind === 'unreadable').length;

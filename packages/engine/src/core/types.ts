@@ -919,7 +919,7 @@ export type EndDayScope =
  * its own discovery — the counts below don't exist yet at that point, and giving the input type a
  * placeholder (`0`? `undefined`?) to fill until then would make an unresolved scope carry data that
  * reads as real (D-025's mistake, applied to the scope's own shape instead of to a fact inside it).
- * Only `EndDayResult.scope` and what renders it (`core/briefing.ts`, `cli/format-end-day.ts`) ever
+ * Only `EndDayResult.scope` and what renders it (`core/briefing.ts`, `application/format-end-day.ts`) ever
  * see this type.
  */
 export type ResolvedEndDayScope =

@@ -4,9 +4,15 @@
  * docstring earmarked this exact step for S4-T1). English (D-028): notification text is public.
  * Concentrated here, not scattered (AGENTS.md § "Texto voltado ao usuário"), same convention
  * `format-end-day.ts` already uses for the terminal report.
+ *
+ * **Moved here from `packages/cli/src/end-day-notice.ts` in V2-T5a**, same reasoning as
+ * `format-end-day.ts`'s own docstring: the interface's "Run end-day now" (item 4) notifies through
+ * the SAME `Notifier`/`Notice` the CLI does, by construction — see Q-074.
+ * `packages/cli/src/end-day-command.ts` now imports this from
+ * `@seeya-ai/engine/application/end-day-notice.js`.
  */
-import type { EndDayResult } from '@seeya-ai/engine/application/types.js';
-import type { Notice } from '@seeya-ai/engine/core/ports.js';
+import type { EndDayResult } from './types.js';
+import type { Notice } from '../core/ports.js';
 
 function pluralize(count: number, singular: string, plural: string): string {
   return `${count} ${count === 1 ? singular : plural}`;

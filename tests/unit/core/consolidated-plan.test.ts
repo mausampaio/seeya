@@ -172,10 +172,10 @@ describe('renderConsolidatedPlan — resumedSessionIds (S3-T3)', () => {
   });
 });
 
-// S4-T0h: `cli/format-end-day.ts` reuses this function as-is for `seeya end-day`'s own
+// S4-T0h: `application/format-end-day.ts` reuses this function as-is for `seeya end-day`'s own
 // pending/plan lines. Tested directly here (not just indirectly through
 // `renderConsolidatedPlan` above) now that it's a public export another module depends on.
-describe('renderItemList (exported for cli/format-end-day.ts reuse, S4-T0h)', () => {
+describe('renderItemList (exported for application/format-end-day.ts reuse, S4-T0h)', () => {
   it('renders the label and one item per line, indented under it', () => {
     expect(renderItemList('pending', ['fix the flaky test'])).toBe(
       '    pending:\n      - fix the flaky test',

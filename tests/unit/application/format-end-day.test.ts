@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatEndDayReport } from '../../../packages/cli/src/format-end-day.js';
+import { formatEndDayReport } from '@seeya-ai/engine/application/format-end-day.js';
 import type {
   CapturedSession,
   EndDayResult,

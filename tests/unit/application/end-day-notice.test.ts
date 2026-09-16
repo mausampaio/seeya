@@ -4,7 +4,7 @@
  * one this file most needs to prove, since docs/PLANO-DE-ENTREGA.md names it explicitly for S4-T1.
  */
 import { describe, expect, it } from 'vitest';
-import { buildEndDayNotice } from '../../../packages/cli/src/end-day-notice.js';
+import { buildEndDayNotice } from '@seeya-ai/engine/application/end-day-notice.js';
 import type {
   CapturedSession,
   EndDayResult,

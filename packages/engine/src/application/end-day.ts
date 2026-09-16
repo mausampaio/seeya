@@ -211,7 +211,7 @@ function applyCaptureScope(
 
 /**
  * S4-T0d: turns the caller's raw `EndDayScope` input into the `ResolvedEndDayScope` everything
- * downstream (`EndDayResult.scope`, `core/briefing.ts`, `cli/format-end-day.ts`) renders — adding
+ * downstream (`EndDayResult.scope`, `core/briefing.ts`, `application/format-end-day.ts`) renders — adding
  * the discard counts `applyCaptureScope` just computed, for the one case (`singleSession`) where
  * they mean anything. A full day carries no counts to add: there was no filter to discard against,
  * and inventing a "0 discarded" note where nothing was discarded is exactly the noise D-025 warns

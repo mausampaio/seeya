@@ -2,16 +2,20 @@
  * Plain-text rendering for `seeya end-day` (D-028: CLI output is English; AGENTS.md § "Registro e
  * saída" — user-facing text stays concentrated here, not scattered through `end-day-command.ts` or
  * `application/end-day.ts`). Same convention `format-sessions.ts`/`format-status.ts` already use.
+ *
+ * **Moved here from `packages/cli/src/format-end-day.ts` in V2-T5a** (D-043: the interface's own
+ * "End day…" preview/result panel needs the exact same rendering `seeya end-day`/`--dry-run`
+ * already produce, by construction, not a second copy that could drift — the same "moved because
+ * the interface needs it too" reasoning `application/session-view.ts` and `format-status.ts`
+ * already document for V2-T2). `packages/cli/src/end-day-command.ts` now imports this from
+ * `@seeya-ai/engine/application/format-end-day.js`, same behavior, same text — see Q-074.
  */
-import type { CapturedSession, EndDayResult } from '@seeya-ai/engine/application/types.js';
-import type { Config, Handoff } from '@seeya-ai/engine/core/types.js';
-import type { RejectedDiscoveryRecord } from '@seeya-ai/engine/core/ports.js';
-import {
-  countUnreadableListings,
-  formatSessionListingLine,
-} from '@seeya-ai/engine/core/briefing.js';
-import { renderItemList } from '@seeya-ai/engine/core/consolidated-plan.js';
-import { resolveCanTerminate } from '@seeya-ai/engine/application/session-view.js';
+import type { CapturedSession, EndDayResult } from './types.js';
+import type { Config, Handoff } from '../core/types.js';
+import type { RejectedDiscoveryRecord } from '../core/ports.js';
+import { countUnreadableListings, formatSessionListingLine } from '../core/briefing.js';
+import { renderItemList } from '../core/consolidated-plan.js';
+import { resolveCanTerminate } from './session-view.js';
 
 function pluralize(count: number, singular: string, plural: string): string {
   return `${count} ${count === 1 ? singular : plural}`;
