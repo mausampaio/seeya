@@ -4545,7 +4545,7 @@ texto, mas não são a fila.
       aba de shell abrindo); a tarefa fica em `[~]` até um dos dois, com o Mac registrado como
       pendência do mantenedor de qualquer forma.
 
-- [ ] **V2-T4 — A interface retoma o dia: `start-day` em abas e pergunta antes do fallback
+- [~] **V2-T4 — A interface retoma o dia: `start-day` em abas e pergunta antes do fallback
       (D-042, D-043, D-039).** Especificada pelo PO em 2026-09-14; **aprovada e despachada pelo
       mantenedor em 2026-09-16.** É a razão de existirem duas raízes de
       composição: a mesma `resumeSessions` da CLI, com um `SessionResumer` diferente — o da CLI
@@ -4626,6 +4626,80 @@ texto, mas não são a fila.
       o resumer (falha rápida, sucesso, fallback) com pty e relógio falsos; portão e
       `verificar:linux` verdes; CI verde nos três sistemas. **Aceite manual do mantenedor:** um
       `start-day` real pela interface no dia seguinte a um `end-day` real, no Windows e no Linux.
+
+      **Entregue pelo agente em 2026-09-16, cinco commits (um por item mais um de instrumentação
+      de verificação), worktree isolada (`tarefa/V2-T4-interface-retoma-dia`).** Portão local
+      completo verde a cada commit (`npm run format:check`, `tsc -p tsconfig.json --noEmit`,
+      `npm run lint`, `npm run build`, `npm run dependencias`, `npm run cobertura --
+      --maxWorkers 2`, cada um com o código de saída lido) e `npm run verificar:linux` verde no
+      estado final do branch inteiro (contêiner `node:22-bookworm`, Docker respondendo sem
+      demora) — **168 arquivos de teste, 1.692 testes passando, 5 pulados**. No Windows, a mesma
+      suíte: 1.693 passando, 4 pulados (a mesma diferença de pulados entre SOs já registrada em
+      tarefas anteriores, não uma regressão desta).
+
+      1. **`TabSessionResumer`** (`packages/app/src/resume/tab-session-resumer.ts`,
+         `exit-listener-registry.ts`). Reaproveita `buildResumeArgs`/`buildFallbackArgs`/
+         `RESUME_PROMPT_ARG_LIMIT_CHARS`/`context-file.ts` do motor sem reescrever nada —
+         `attemptResume` nunca espera a sessão terminar, só até `FAST_FAILURE_GRACE_MS` (pelo
+         `Clock` injetado, nunca `AbortSignal.timeout` como a CLI usa, porque a spec deste item
+         pedia especificamente o relógio injetado para a corrida ser testável sem pty real).
+         `ExitListenerRegistry` é o que deixa o `onExit` único do `PtyManager` (registrado uma vez
+         em `electron/main.ts`) também notificar essa corrida para tabs específicas — sem ele não
+         haveria como o resumer saber quando SUA aba (entre várias abertas) terminou.
+      2. **Pergunta antes do fallback**: `PendingFallbackRequests` (correlaciona pedido↔resposta
+         por `requestId`, já que `ipcRenderer.send`/`on` não tem forma nativa de pedir-e-esperar
+         do processo principal para o renderer) + `buildFallbackConfirmer` (usa
+         `core/resume-notice.ts#describeFallbackReason` direto — nunca uma segunda frase para o
+         mesmo motivo) + um `<dialog>` real no `index.html` (`showModal`, "cancel" no Escape
+         responde Skip).
+      3. **Painel "Hoje"** (`state/today-panel.ts`): reaproveita `findPendingBriefing`/
+         `PendingBriefingLookup` do motor sem mudança; a extração de "primeira linha do plano"
+         (`tomorrowPlan[0] ?? pendingItems[0] ?? null`, D-025) é lógica nova só da interface — não
+         havia nada equivalente em `cli/` para mover, então nada saiu da CLI para o motor nesta
+         tarefa (diferente da V2-T2). "Resume selected" liga tudo: `electron/main.ts` monta um
+         `TabResumeOpener` real sobre o mesmo `PtyManager`/`TabCollection` que a barra de comando
+         já usa (uma aba do resumer é indistinguível de uma aba comum depois de aberta — mesma
+         correspondência por PID na lateral), e chama a mesma `resumeSessions` que a CLI chama.
+      4. **Progresso e resultado**: `resumeProgress` (main → renderer) mostra "Resuming N of M";
+         `state/resume-summary.ts#buildResumeSummary` projeta o `ResumeSessionsResult` do motor
+         para um formato seguro de IPC, reaproveitando `describeFallbackReason` para cada motivo —
+         a interface desenha isso como seções em DOM, então só o **dado** atravessa a fronteira
+         (Q-073), como a V2-T2 já tinha feito para o painel de estado; `format-start-day.ts`
+         continua só na CLI, sem mudança.
+
+      **Aceite medido pelo agente**, num `homeDir` descartável, com um driver de verificação
+      próprio (fora do repositório, não commitado) que sobe a interface real compilada, offscreen
+      (`SEEYA_APP_HOME_OVERRIDE`/`SEEYA_APP_OFFSCREEN`/`SEEYA_APP_QUIT_AFTER_MS`, mais
+      `SEEYA_APP_AUTO_RESUME_ALL`, novo nesta tarefa — marca as caixas do painel e clica "Resume
+      selected", respondendo Skip se o diálogo aparecer). **O `claude` usado foi um fake escrito
+      à mão para esta verificação** (um `.cmd` que grava o argv recebido e sai com código 0),
+      não o fixture `fake-claude.mjs` do harness de e2e — mais simples de montar para uma aba de
+      pty (que passa pelo `resolveHarnessCommand`/`cmd.exe /c`, caminho diferente do `spawn`
+      direto que o fixture do harness mede). Três capturas de tela reais, lidas pelo agente:
+
+      - **Plano curto:** "Resume selected" abriu uma aba rotulada `project-alpha` (não `claude`),
+        com `claude --resume 11111111-1111-4111-8111-111111111111 "Resuming session
+        \"project-alpha\" in ..."` visível na saída do pty, e
+        `~/.seeya/days/<hoje>/resumed.json` com `{"sessionIds":["1111...1111"]}`.
+      - **Plano de 20.262 caracteres** (acima do teto de 16.384): nenhuma aba abriu — o diálogo
+        apareceu com "Could not resume \"project-alpha\" as-is" / "yesterday's plan is too long
+        to pass safely to an interactive session (20262 characters, limit 16384)" e os dois
+        botões certos.
+      - **A mesma sessão, respondendo Skip:** o painel voltou a mostrar a caixa de seleção (não
+        retomada) e a seção "Skipped at your request" com o motivo — sem `resumed.json` nenhum
+        escrito (nada foi de fato resumido).
+
+      **O que ficou inferido, não medido:** o `--resume` real contra o `claude` de verdade dentro
+      de uma aba (o fake só prova o argv/rotulagem/registro; a sessão de fato continuando é o
+      mesmo tipo de medição que a Q-069 já deixou para o mantenedor, agora também para a aba); a
+      lateral marcando por PID uma sessão retomada pela interface enquanto ela ainda está viva
+      (o teste mediu o estado logo depois do `RESUMED-OK` do fake, antes do próximo ciclo do
+      laço de atualização rodar); Linux e macOS — o agente só tem Windows.
+
+      **O que fica pendente do mantenedor:** revisar e mesclar; depois, um `seeya end-day` real
+      seguido de um `seeya start-day` real **pela interface**, no dia seguinte, no Windows e no
+      Linux dele. Detalhes, decisões de ferramental e o que ficou inferido (não medido) em
+      `docs/QUESTOES.md` Q-073.
 
 ## Definição de pronto (vale para toda tarefa)
 

@@ -1,16 +1,19 @@
 # Estado atual
 
-_Atualizado em 2026-09-14, depois da mesclagem da V2-T3 na `main`. Se o
-`git log`, a CI ou o `~/.seeya` contarem algo diferente do que está aqui, **este arquivo está
+_Atualizado em 2026-09-16, depois do trabalho da V2-T4 numa worktree isolada (ainda não mesclada).
+Se o `git log`, a CI ou o `~/.seeya` contarem algo diferente do que está aqui, **este arquivo está
 atrasado**: confie na evidência e atualize o arquivo. Isso já aconteceu: a primeira versão dele,
 escrita à mão no mesmo dia, tinha quatro afirmações falsas, e quem achou foi uma sessão limpa
 (spike K)._
 
 ## Em uma frase
 
-O Sprint 5 mínimo está aceito, o monorepo (V2-T1) e o **esqueleto da interface (V2-T2,
-`@seeya-ai/app`) estão mesclados na `main`** com o portão completo verde (Windows e o contêiner
-Linux); falta o aceite manual do mantenedor: `npm run app` no Windows e, sobretudo, no Linux dele.
+O Sprint 5 mínimo, o monorepo (V2-T1), o esqueleto da interface (V2-T2) e o terminal usável no dia
+a dia (V2-T3) estão mesclados na `main`; **a V2-T4 (a interface retoma o dia: `start-day` em abas
+e pergunta antes do fallback) está pronta numa worktree isolada**, portão local e
+`verificar:linux` verdes, aceite medido pelo agente com captura de tela real contra um `homeDir`
+descartável — falta a revisão do PO, a mesclagem, e o aceite manual do mantenedor (um `start-day`
+real pela interface, no dia seguinte a um `end-day` real, no Windows e no Linux dele).
 
 ## Onde o código está
 
@@ -176,6 +179,52 @@ relatório do agente na entrada V2-T3 de `docs/PLANO-DE-ENTREGA.md`.
 node_modules/node-pty/prebuilds/darwin-*/spawn-helper` antes de `npm run app` (que agora corrige
 sozinho se faltar o bit) e conferir se uma aba de shell abre; na máquina Linux do dia a dia,
 conferir se o prompt do `oh-my-posh` agora renderiza os glifos Nerd corretamente.
+
+## V2-T4 — a interface retoma o dia (worktree isolada, 16/09, ainda não mesclada)
+
+Aprovada e despachada pelo mantenedor em 16/09. Quatro commits de código, um por item do despacho,
+mais um de instrumentação de verificação — cada um com o portão local (formatação, tipos, lint,
+build, `dependencias`, cobertura) verde antes de commitar:
+
+1. **Painel "Hoje"** (`packages/app/src/state/today-panel.ts`): o mesmo `findPendingBriefing` que
+   `seeya start-day` usa, mostrado como caixa de seleção por sessão (nome, `cwd`, primeira linha
+   do plano) — uma sessão já retomada hoje vira nota, não caixa (D-024/D-025). Sem briefing
+   pendente, o mesmo vocabulário da CLI.
+2. **`TabSessionResumer`** (`packages/app/src/resume/tab-session-resumer.ts`): `SessionResumer`
+   sobre uma aba em vez do terminal herdado — mesmos argumentos/teto/ambiente/descrições do
+   `ClaudeSessionResumer` da CLI, reaproveitados diretamente do motor. Nunca espera a sessão
+   terminar; a corrida entre a saída da aba e `FAST_FAILURE_GRACE_MS` (pelo `Clock` injetado) é
+   `raceExitAgainstGrace`, e `ExitListenerRegistry` é o que deixa o único `onExit` do `PtyManager`
+   também avisar essa corrida.
+3. **Pergunta antes do fallback**: diálogo nativo (`<dialog>`) com **Open a fresh session**/
+   **Skip**, motivo exato reaproveitado de `core/resume-notice.ts#describeFallbackReason` (mesmo
+   texto da CLI). Fechar sem escolher conta como Skip.
+4. **Progresso e resultado**: `resumeProgress` mostra "Resuming N of M: nome"; ao final, o resumo
+   com o mesmo conteúdo de `cli/format-start-day.ts` (resumidas/puladas/resposta inválida/não
+   tentadas/parou cedo), desenhado como seções em DOM — só o modelo de dados
+   (`state/resume-summary.ts`) é compartilhado, a formatação em texto fica na CLI (Q-073).
+
+**Medido pelo agente, num `homeDir` descartável, com um `claude` falso escrito à mão para esta
+verificação (não o fixture do harness de e2e) e a interface real compilada, offscreen
+(`SEEYA_APP_HOME_OVERRIDE`/`SEEYA_APP_OFFSCREEN`/`SEEYA_APP_AUTO_RESUME_ALL`, este último novo
+nesta tarefa):** um handoff com plano curto — "Resume selected" abre uma aba rotulada
+`project-alpha`, rodando `claude --resume <id> "<prompt>"` de verdade (visível na captura de
+tela), e `resumed.json` do dia registra o id. Um handoff com plano de 20.262 caracteres (acima do
+teto de 16.384) nunca chega a abrir aba — o diálogo aparece com o texto exato ("yesterday's plan
+is too long to pass safely to an interactive session (20262 characters, limit 16384)"); respondido
+com Skip, a seção "Skipped at your request" aparece com o motivo, e nenhum `resumed.json` é
+escrito. As três capturas de tela foram lidas pelo próprio agente.
+
+**Portão:** `npm run verificar` completo verde (formatação, `tsc -p tsconfig.json --noEmit`, lint,
+`npm run build`, `dependencias`, cobertura — 1.693 testes passando, 4 pulados) e `npm run
+verificar:linux` também verde dentro do contêiner `node:22-bookworm`. Testes de unidade dedicados
+para o resumer (falha rápida com código ≠0, sucesso, falha rápida com código 0 conta como sucesso,
+fallback nunca espera a saída) com pty e relógio falsos, sem Electron.
+
+**O que fica pendente do mantenedor:** revisar e mesclar; depois, um `seeya end-day` real seguido
+de um `seeya start-day` real **pela interface**, no dia seguinte, no Windows e no Linux dele —
+a mesma medição que V2-T2/V2-T3 pediram para o resto da interface, agora para a retomada.
+Detalhes, decisões de ferramental e o que ficou inferido (não medido) em `docs/QUESTOES.md` Q-073.
 
 ## Próximo passo
 
