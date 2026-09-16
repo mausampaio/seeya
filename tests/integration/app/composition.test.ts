@@ -9,7 +9,11 @@
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { writeFile } from 'node:fs/promises';
-import { buildAppContext, resolveAppHome } from '../../../packages/app/src/composition/index.js';
+import {
+  buildAppContext,
+  resolveAppHome,
+  toEndDayDeps,
+} from '../../../packages/app/src/composition/index.js';
 import {
   createDiscoveryFixture,
   removeDiscoveryFixture,
@@ -108,5 +112,40 @@ describe('buildAppContext', () => {
     const result = await context.resolveHarnessCommand(realCommand, []);
 
     expect(result.kind).toBe('resolved');
+  });
+
+  it(
+    'V2-T5a item 5: wires transcriptReader/gitReader/leanGenerator/deepGenerator/forkCleanup/' +
+      'notifier — every port endDay needs beyond what this context already had',
+    async () => {
+      fixture = await createDiscoveryFixture();
+      const context = await buildAppContext(fixture.root);
+
+      expect(typeof context.transcriptReader.readFacts).toBe('function');
+      expect(typeof context.gitReader.readEvidenceAcrossRepos).toBe('function');
+      expect(typeof context.leanGenerator.generate).toBe('function');
+      expect(typeof context.deepGenerator.generate).toBe('function');
+      expect(typeof context.forkCleanup.cleanup).toBe('function');
+      expect(typeof context.notifier.notify).toBe('function');
+    },
+  );
+});
+
+describe('toEndDayDeps', () => {
+  it('maps AppContext fields straight through to EndDayDeps, one for one', async () => {
+    fixture = await createDiscoveryFixture();
+    const context = await buildAppContext(fixture.root);
+
+    const deps = toEndDayDeps(context);
+
+    expect(deps.sessionProvider).toBe(context.sessionProvider);
+    expect(deps.transcriptReader).toBe(context.transcriptReader);
+    expect(deps.gitReader).toBe(context.gitReader);
+    expect(deps.leanGenerator).toBe(context.leanGenerator);
+    expect(deps.deepGenerator).toBe(context.deepGenerator);
+    expect(deps.storage).toBe(context.storage);
+    expect(deps.processControl).toBe(context.processControl);
+    expect(deps.clock).toBe(context.clock);
+    expect(deps.forkCleanup).toBe(context.forkCleanup);
   });
 });

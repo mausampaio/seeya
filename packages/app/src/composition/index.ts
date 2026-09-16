@@ -26,17 +26,33 @@ import {
   realCommandResolutionFs,
   type ResolveCommandResult,
 } from '@seeya-ai/engine/adapters/process/resolve-command.js';
-import { DiscoverySessionProvider } from '@seeya-ai/engine/adapters/discovery/index.js';
+import {
+  DiscoverySessionProvider,
+  DiscoveryForkCleanup,
+} from '@seeya-ai/engine/adapters/discovery/index.js';
 import { StorageAdapter } from '@seeya-ai/engine/adapters/storage/index.js';
 import { buildAutostart } from '@seeya-ai/engine/adapters/autostart/index.js';
+import { TranscriptFileReader } from '@seeya-ai/engine/adapters/transcript/index.js';
+import { GitAdapter } from '@seeya-ai/engine/adapters/git/index.js';
+import {
+  LeanHandoffGenerator,
+  DeepHandoffGenerator,
+} from '@seeya-ai/engine/adapters/generation/index.js';
+import { notifier as realNotifier } from '@seeya-ai/engine/adapters/notification/index.js';
 import type {
   Autostart,
   Clock,
+  ForkCleanup,
+  GitReader,
+  HandoffGenerator,
+  Notifier,
   ProcessControl,
   SessionProvider,
   Storage,
+  TranscriptReader,
 } from '@seeya-ai/engine/core/ports.js';
 import type { Config } from '@seeya-ai/engine/core/types.js';
+import type { EndDayDeps } from '@seeya-ai/engine/application/types.js';
 import { NodePtyAdapter } from '../pty/node-pty-adapter.js';
 import { PtyManager, type PtyManagerCallbacks } from '../pty/pty-manager.js';
 import { defaultShellCommand, type ShellCommand } from '../pty/default-shell.js';
@@ -84,6 +100,41 @@ export interface AppContext {
    * needs a `PATH` walk, see that file's own docstring).
    */
   resolveHarnessCommand(command: string, args: readonly string[]): Promise<ResolveCommandResult>;
+  /**
+   * V2-T5a item 5: every OTHER port `application/end-day.ts#endDay` needs beyond what this
+   * context already carries (`sessionProvider`/`storage`/`processControl`/`clock`) — mirrors
+   * `packages/cli/src/composition.ts#buildEndDayContext` field for field, wired to the same real
+   * adapters, fiação only. `toEndDayDeps` below is what assembles the full `EndDayDeps` from these
+   * plus this context's own already-existing fields, the one place that mapping happens.
+   */
+  readonly transcriptReader: TranscriptReader;
+  readonly gitReader: GitReader;
+  readonly leanGenerator: HandoffGenerator;
+  readonly deepGenerator: HandoffGenerator;
+  readonly forkCleanup: ForkCleanup;
+  /** V2-T5a item 4: "Run end-day now" notifies through the SAME `Notifier`
+   * `cli/composition.ts#buildEndDayContext` wires for `seeya end-day`'s own step 5. */
+  readonly notifier: Notifier;
+}
+
+/**
+ * V2-T5a item 5: assembles the `EndDayDeps` `application/end-day.ts#endDay` needs from an
+ * `AppContext` — pure fiação (no I/O of its own), pulled out into its own function so
+ * `electron/main.ts`'s IPC handlers (excluded from this package's coverage floor) never carry
+ * logic worth testing on their own; this mapping does, via `tests/integration/app/composition.test.ts`.
+ */
+export function toEndDayDeps(context: AppContext): EndDayDeps {
+  return {
+    sessionProvider: context.sessionProvider,
+    transcriptReader: context.transcriptReader,
+    gitReader: context.gitReader,
+    leanGenerator: context.leanGenerator,
+    deepGenerator: context.deepGenerator,
+    storage: context.storage,
+    processControl: context.processControl,
+    clock: context.clock,
+    forkCleanup: context.forkCleanup,
+  };
 }
 
 /**
@@ -110,6 +161,13 @@ export async function buildAppContext(homeDir: string = os.homedir()): Promise<A
   const platform = process.platform;
   const pathEnv = process.env.PATH;
   const pathExtEnv = process.env.PATHEXT;
+  // V2-T5a item 5: same shape as cli/composition.ts#buildEndDayContext's own generatorOptions —
+  // both generators are always built, never chosen here; captureSession (application/
+  // capture-session.ts) picks between them per session (see EndDayDeps's own docstring on why).
+  const generatorOptions = {
+    model: config.captureModel,
+    budgetPerSessionUsd: config.budgetPerSessionUsd,
+  };
   return {
     clock,
     home,
@@ -129,5 +187,19 @@ export async function buildAppContext(homeDir: string = os.homedir()): Promise<A
         pathExtEnv,
         fs: realCommandResolutionFs,
       }),
+    transcriptReader: new TranscriptFileReader({ claudeHome: home.claudeHome }),
+    gitReader: new GitAdapter({ clock }),
+    leanGenerator: new LeanHandoffGenerator(generatorOptions),
+    deepGenerator: new DeepHandoffGenerator({
+      ...generatorOptions,
+      seeyaHome: home.seeyaHome,
+      clock,
+    }),
+    forkCleanup: new DiscoveryForkCleanup({
+      claudeHome: home.claudeHome,
+      seeyaHome: home.seeyaHome,
+      clock,
+    }),
+    notifier: realNotifier,
   };
 }
