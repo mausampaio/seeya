@@ -4546,8 +4546,11 @@ texto, mas não são a fila.
       pendência do mantenedor de qualquer forma.
 
 - [~] **V2-T4 — A interface retoma o dia: `start-day` em abas e pergunta antes do fallback
-      (D-042, D-043, D-039).** Especificada pelo PO em 2026-09-14; **aprovada e despachada pelo
-      mantenedor em 2026-09-16.** É a razão de existirem duas raízes de
+      (D-042, D-043, D-039).** Especificada pelo PO em 2026-09-14; aprovada e despachada pelo
+      mantenedor em 2026-09-16; **mesclada na `main` em 2026-09-16** depois da revisão do PO (uma
+      correção: a aba de retomada nascia com pty 80×24 e o renderer não mandava o `resize` ao
+      montá-la — o harness ficaria em 80×24 até alguém mexer na janela; corrigido em `electron/`,
+      fora da cobertura, conferido por tipos, lint e bundle). É a razão de existirem duas raízes de
       composição: a mesma `resumeSessions` da CLI, com um `SessionResumer` diferente — o da CLI
       abre a sessão no terminal atual e espera ela terminar; o da interface abre uma **aba** e
       segue. Nenhum comportamento novo no motor; o que muda é quem implementa a porta.

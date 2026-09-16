@@ -1,6 +1,6 @@
 # Estado atual
 
-_Atualizado em 2026-09-16, depois do trabalho da V2-T4 numa worktree isolada (ainda não mesclada).
+_Atualizado em 2026-09-16, depois da mesclagem da V2-T4 na `main`.
 Se o `git log`, a CI ou o `~/.seeya` contarem algo diferente do que está aqui, **este arquivo está
 atrasado**: confie na evidência e atualize o arquivo. Isso já aconteceu: a primeira versão dele,
 escrita à mão no mesmo dia, tinha quatro afirmações falsas, e quem achou foi uma sessão limpa
@@ -180,9 +180,13 @@ node_modules/node-pty/prebuilds/darwin-*/spawn-helper` antes de `npm run app` (q
 sozinho se faltar o bit) e conferir se uma aba de shell abre; na máquina Linux do dia a dia,
 conferir se o prompt do `oh-my-posh` agora renderiza os glifos Nerd corretamente.
 
-## V2-T4 — a interface retoma o dia (worktree isolada, 16/09, ainda não mesclada)
+## V2-T4 — a interface retoma o dia (mesclada na `main` em 16/09)
 
-Aprovada e despachada pelo mantenedor em 16/09. Quatro commits de código, um por item do despacho,
+Aprovada e despachada pelo mantenedor em 16/09; **mesclada na `main` no mesmo dia** (commit de
+merge, porque a `main` tinha andado com o filtro da CI, D-044), com uma correção do PO na revisão:
+a aba de retomada nascia com pty 80×24 e o renderer ajustava o xterm ao painel sem redimensionar o
+pty — o harness ficaria desenhando em 80×24 até alguém mexer na janela; agora o renderer manda o
+`resize` ao montar a aba. Quatro commits de código, um por item do despacho,
 mais um de instrumentação de verificação — cada um com o portão local (formatação, tipos, lint,
 build, `dependencias`, cobertura) verde antes de commitar:
 
