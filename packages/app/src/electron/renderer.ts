@@ -215,7 +215,12 @@ function openResumeTabUi(event: ResumeTabOpenedEvent): void {
     createTab({ id: event.id, command: 'claude', args: [], cwd: event.cwd }),
     event.pid,
   );
-  mountTerminalTab(tab, event.label);
+  const terminal = mountTerminalTab(tab, event.label);
+  // The main process spawned this pty at a fixed 80x24 (`main.ts#openResumeTab`: the pty has to
+  // exist before the renderer has a terminal to measure) — a "+" tab never needs this because
+  // `openTab` above measures its own terminal first. Without this resize the harness's TUI keeps
+  // drawing 80x24 inside a bigger pane until the window itself is resized (found in PO review).
+  window.seeya.resizeTab({ id: tab.id, cols: terminal.cols, rows: terminal.rows });
 }
 
 function wireIncomingEvents(): void {
