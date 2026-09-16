@@ -307,6 +307,8 @@ aqui antes de entrar no código.**
 | painel "Hoje" (V2-T4) | `state/today-panel.ts` (`buildTodayPanelData`/`TodayPanelData`/`TodaySessionRow`) — o `seeya start-day` da interface: o briefing pendente achado por `findPendingBriefing`, uma caixa de seleção por sessão (nome, `cwd`, primeira linha do plano), e o botão **Resume selected** |
 | retomada em aba (V2-T4) | abrir uma sessão retomada (`claude --resume`) numa aba embutida em vez do terminal herdado da CLI — a interface nunca espera a sessão terminar, e a aba fica rotulada com o nome do handoff, não com `claude` |
 | resumer de aba (V2-T4) | `TabSessionResumer` (`packages/app/src/resume/tab-session-resumer.ts`) — implementa `SessionResumer` sobre `PtyManager`; a corrida entre a saída da aba e `FAST_FAILURE_GRACE_MS` mora em `raceExitAgainstGrace`, e `ExitListenerRegistry` (`packages/app/src/resume/exit-listener-registry.ts`) é o que deixa o `onExit` único do `PtyManager` também avisar essa corrida |
+| prévia do end-day (V2-T5a) | `state/end-day-panel.ts` (`EndDayPanelState`/`reduceEndDayPanel`, estados `idle`/`previewPending`/`preview`/`running`/`result`) — o botão "End day…" roda `endDay(deps, { dryRun: true, scope: { kind: 'fullDay' } })` e mostra `formatEndDayReport`'s own literal text como confirmação, nunca uma segunda formatação em DOM; o teto de custo é `state/end-day-preview.ts#buildEndDayCostCeiling` |
+| progresso da captura (V2-T5a) | `EndDayOptions.onCaptureProgress` (`@seeya-ai/engine/application/types.ts`, eventos `captureStarted`/`captureFinished`) emitido pelo laço de captura de `endDay` já existente; a interface projeta cada evento para "capturing N of M: nome" por `state/end-day-progress.ts#projectEndDayProgressEvent` |
 | sessão descoberta | `DiscoveredSession` |
 | sessão com PID / sem PID | `SessionWithPid` / `SessionWithoutPid` |
 | estado da sessão | `SessionState` |
@@ -419,10 +421,14 @@ Variável de ambiente interna: `SEEYA_DAEMON_CHILD` (S4-T3) distingue o lançado
 daemon. Atravessa um `spawn`, nunca vai para disco, e ninguém digita.
 
 Variáveis de ambiente só de instrumentação de verificação (`packages/app/src/electron/main.ts`,
-V2-T2, V2-T4): `SEEYA_APP_OFFSCREEN`, `SEEYA_APP_SCREENSHOT_PATH`, `SEEYA_APP_QUIT_AFTER_MS`,
+V2-T2, V2-T4, V2-T5a): `SEEYA_APP_OFFSCREEN`, `SEEYA_APP_SCREENSHOT_PATH`, `SEEYA_APP_QUIT_AFTER_MS`,
 `SEEYA_APP_AUTO_OPEN_SHELL_TAB`, `SEEYA_APP_HOME_OVERRIDE`, `SEEYA_APP_AUTO_RESUME_ALL` (V2-T4:
 marca toda caixa de seleção do painel "Hoje" e clica **Resume selected**, respondendo **Skip** se
-o diálogo de fallback aparecer) — mesma categoria de `SEEYA_DAEMON_CHILD`
+o diálogo de fallback aparecer), `SEEYA_APP_AUTO_END_DAY` (V2-T5a: clica o botão real "End day…",
+espera a prévia carregar — ela roda `claude -p` por sessão de verdade — e clica **Run end-day
+now**; também estende a janela de `captureVerificationScreenshot` de 2.500ms para 8.000ms, porque
+esta é a única instrumentação que espera por DOIS `endDay` reais antes da captura valer a pena) —
+mesma categoria de `SEEYA_DAEMON_CHILD`
 acima (nunca vão para disco, ninguém digita), mas nenhuma delas é lida por `npm run app` nem
 documentada no `README.md`: existem só para um agente sem tela/teclado próprios provar a janela
 real (`webContents.capturePage()`) e o fluxo de uma aba contra um `homeDir` descartável, o mesmo

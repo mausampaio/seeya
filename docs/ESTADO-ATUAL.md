@@ -1,6 +1,7 @@
 # Estado atual
 
-_Atualizado em 2026-09-16, depois da mesclagem da V2-T4 na `main`.
+_Atualizado em 2026-09-16, depois da entrega da V2-T5a numa worktree isolada (V2-T4 já estava
+mesclada na `main` quando esta atualização começou).
 Se o `git log`, a CI ou o `~/.seeya` contarem algo diferente do que está aqui, **este arquivo está
 atrasado**: confie na evidência e atualize o arquivo. Isso já aconteceu: a primeira versão dele,
 escrita à mão no mesmo dia, tinha quatro afirmações falsas, e quem achou foi uma sessão limpa
@@ -8,12 +9,14 @@ escrita à mão no mesmo dia, tinha quatro afirmações falsas, e quem achou foi
 
 ## Em uma frase
 
-O Sprint 5 mínimo, o monorepo (V2-T1), o esqueleto da interface (V2-T2) e o terminal usável no dia
-a dia (V2-T3) estão mesclados na `main`; **a V2-T4 (a interface retoma o dia: `start-day` em abas
-e pergunta antes do fallback) está pronta numa worktree isolada**, portão local e
-`verificar:linux` verdes, aceite medido pelo agente com captura de tela real contra um `homeDir`
-descartável — falta a revisão do PO, a mesclagem, e o aceite manual do mantenedor (um `start-day`
-real pela interface, no dia seguinte a um `end-day` real, no Windows e no Linux dele).
+O Sprint 5 mínimo, o monorepo (V2-T1), o esqueleto da interface (V2-T2), o terminal usável no dia
+a dia (V2-T3) e a interface retomando o dia em abas (V2-T4) estão mesclados na `main`; **a V2-T5a
+(`end-day` pela interface: a prévia é a confirmação, progresso por sessão, resultado e
+notificação) está pronta numa worktree isolada**, portão local e `verificar:linux` verdes, aceite
+medido pelo agente com captura de tela real contra um `homeDir` descartável — falta a revisão do
+PO, a mesclagem, e o aceite manual do mantenedor (um `end-day` real pela interface no fim de um
+dia real, e o `start-day` pela interface na manhã seguinte, no Windows e no Linux dele — fecha
+V2-T4 e V2-T5a juntas).
 
 ## Onde o código está
 
@@ -229,6 +232,39 @@ fallback nunca espera a saída) com pty e relógio falsos, sem Electron.
 de um `seeya start-day` real **pela interface**, no dia seguinte, no Windows e no Linux dele —
 a mesma medição que V2-T2/V2-T3 pediram para o resto da interface, agora para a retomada.
 Detalhes, decisões de ferramental e o que ficou inferido (não medido) em `docs/QUESTOES.md` Q-073.
+
+## V2-T5a — `end-day` pela interface (entregue numa worktree isolada em 16/09)
+
+**Entregue pelo agente em 16/09, cinco commits (um por item).** Fecha o ciclo diário inteiro
+dentro da janela: a interface agora encerra o dia (esta tarefa) e retoma na manhã seguinte
+(V2-T4, já mesclada). Um botão **End day…** na região de estado roda a mesma prévia
+(`endDay(deps, { dryRun: true, scope: fullDay })`) que `seeya end-day --dry-run` roda, e mostra o
+resultado — o texto literal de `formatEndDayReport`, movido de `cli/` para `application/` nesta
+tarefa (mesma reutilização por construção que `format-status.ts` já tinha) — como a própria
+confirmação, com o teto de custo honesto ("até N × `budgetPerSessionUsd`", nunca uma estimativa).
+Só **Run end-day now** executa de verdade, uma vez por vez, mostrando "capturing N of M: nome"
+pelo novo gancho opcional `EndDayOptions.onCaptureProgress` (`seeya end-day`/o daemon nunca
+passam); ao terminar, o mesmo `Notifier`/`buildEndDayNotice` da CLI notifica, e o painel "Hoje"
+atualiza.
+
+**Medido pelo agente, num `homeDir` descartável com um `claude` falso compilado para esta
+verificação e a interface real compilada, offscreen (`SEEYA_APP_HOME_OVERRIDE`/
+`SEEYA_APP_OFFSCREEN`/`SEEYA_APP_AUTO_END_DAY`, este último novo nesta tarefa):** com duas sessões
+elegíveis, "End day…" seguido de "Run end-day now" grava dois handoffs e `summary.md` em
+`~/.seeya/days/<dia>/`, e o diálogo termina mostrando o relatório real mais a linha de custo —
+provado por captura de tela lida pelo agente. O `seeya end-day` compilado, contra uma cópia fresca
+e idêntica da mesma fixture, produz um relatório que bate estrutura por estrutura com o que o
+diálogo mostrou.
+
+**Portão:** `npm run verificar` completo verde a cada um dos cinco commits (formatação, tipos,
+lint, build, `dependencias`, cobertura — 1.716 testes passando no Windows) e `npm run
+verificar:linux` verde no estado final (`node:22-bookworm`, 1.711 passando, 5 pulados).
+
+**O que fica pendente do mantenedor:** revisar e mesclar; depois, um `end-day` real pela interface
+no fim de um dia real, e um `start-day` real pela interface na manhã seguinte, no Windows e no
+Linux dele — fecha V2-T4 e V2-T5a juntas. Detalhes, decisões de ferramental e a corrida (não
+resolvida por esta tarefa, como o despacho já previa) com o `end-day` agendado do daemon em
+`docs/QUESTOES.md` Q-074.
 
 ## Próximo passo
 

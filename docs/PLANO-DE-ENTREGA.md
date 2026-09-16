@@ -4704,7 +4704,7 @@ texto, mas não são a fila.
       Linux dele. Detalhes, decisões de ferramental e o que ficou inferido (não medido) em
       `docs/QUESTOES.md` Q-073.
 
-- [ ] **V2-T5a — `end-day` pela interface: a prévia é a confirmação, progresso por sessão,
+- [~] **V2-T5a — `end-day` pela interface: a prévia é a confirmação, progresso por sessão,
       resultado e notificação (D-039, D-042, D-043).** Especificada pelo PO em 2026-09-16;
       **aprovada e despachada pelo mantenedor no mesmo dia.** Fecha o ciclo diário
       inteiro dentro da janela: encerrar à noite (esta tarefa), retomar de manhã (V2-T4). Na CLI
@@ -4782,6 +4782,77 @@ texto, mas não são a fila.
       progresso. Portão, `verificar:linux` e CI verdes. **Aceite manual do mantenedor:** um
       `end-day` real pela interface no fim de um dia real, e o `start-day` pela interface na
       manhã seguinte — fecha V2-T4 e V2-T5a de uma vez.
+
+      **Entregue pelo agente em 2026-09-16, cinco commits (um por item), worktree isolada
+      (`agent-ae4acdd2ef61f3e28`).** Portão local completo verde a cada commit (`npm run
+      format:check`, `tsc -p tsconfig.json --noEmit`, `npm run lint`, `npm run build`, `npm run
+      dependencias`, `npm run cobertura -- --maxWorkers 2`, cada um com o código de saída lido) e
+      `npm run verificar:linux` verde no estado final do branch inteiro (contêiner
+      `node:22-bookworm`, `--rm`, 171 arquivos de teste, **1.711 testes passando, 5 pulados**).
+      No Windows, a mesma suíte: 1.716 testes (a mesma diferença de pulados entre SOs já
+      registrada em tarefas anteriores).
+
+      1. **`formatEndDayReport`/`buildEndDayNotice` saíram de `cli/` para
+         `application/`** (`git mv` com os testes, nenhum texto mudou) — `cli/end-day-command.ts`
+         importa de `@seeya-ai/engine/application/*.js`. Comentários que citavam o caminho antigo
+         em código (não em `docs/`, que é registro histórico) foram atualizados.
+      2. **`EndDayOptions.onCaptureProgress`** (`application/types.ts`/`end-day.ts`): eventos
+         `captureStarted`/`captureFinished` (sessão, índice/total 1-based, e no `finished` se foi
+         `captured`/`ineligible`/`failed` e por quê), emitidos pelo MESMO
+         `mapWithConcurrencyLimit` já existente — `runSession` virou um embrulho fino em torno de
+         `captureSessionOutcome` (o corpo antigo, renomeado) para caber no orçamento de ~20 linhas.
+         `seeya end-day`/o daemon continuam sem passar o gancho.
+      3. **`AppContext` ganhou `transcriptReader`/`gitReader`/`leanGenerator`/`deepGenerator`/
+         `forkCleanup`/`notifier`**, espelhando `cli/composition.ts#buildEndDayContext` campo a
+         campo — `toEndDayDeps(context)` faz a montagem (`composition/index.ts`), testado em
+         `tests/integration/app/composition.test.ts`.
+      4. **O botão "End day…"** (região de estado): `state/end-day-preview.ts` (o teto de custo,
+         `sessionsInScope × budgetPerSessionUsd`) e `state/end-day-panel.ts` (a máquina de
+         estados `idle → previewPending → preview → running → result`, cinco estados — o "prévia"
+         do despacho virou dois: a busca em si, que pode demorar de verdade porque o dry-run
+         chama `claude -p` por sessão, e o texto pronto) — cada um com teste de unidade cobrindo o
+         caminho permitido e as transições recusadas. Um `<dialog>` (`#end-day-dialog`, mesmo
+         padrão do `#fallback-dialog` da V2-T4) mostra o texto literal de `formatEndDayReport`
+         mais a linha de custo; "Run end-day now" fica visível desde este item, sem handler ainda.
+      5. **"Run end-day now"** roda o `endDay` real uma vez por vez (`electron/main.ts` recusa
+         uma segunda chamada concorrente, além do botão já ficar desabilitado no `running`),
+         projeta o progresso por `state/end-day-progress.ts` (`captureFinished` vira `null` — o
+         painel só mostra quem está capturando agora, o desfecho de cada um já está no relatório
+         final), notifica pelo `Notifier`/`buildEndDayNotice` reais, e atualiza o painel "Hoje"
+         (`refreshTodayPanel`) — o painel de estado pega a mesma escrita no próprio ciclo
+         ambiente de 10s (`runRefreshLoop`), sem push dedicado.
+
+      **Medido pelo agente, num `homeDir` descartável, com um `claude` falso compilado para esta
+      verificação (o mesmo shim `.exe` via `csc.exe` que `tests/integration/generation/_fixtures.ts`
+      usa, não commitado — mesma classe de instrumentação que Q-073 já documentou) e a interface
+      real compilada, offscreen (`SEEYA_APP_HOME_OVERRIDE`/`SEEYA_APP_OFFSCREEN`/
+      `SEEYA_APP_AUTO_END_DAY`, este último novo nesta tarefa):** com duas sessões elegíveis
+      (`project-alpha`, `project-beta`), "End day…" seguido de "Run end-day now" grava dois
+      handoffs e `summary.md` em `~/.seeya/days/<dia>/`, e o diálogo termina mostrando o relatório
+      real ("Wrote 2 handoffs and the daily briefing (summary.md).") mais a linha de custo ("Cost
+      ceiling: up to 2 × $0.25 per session (model: sonnet) — at most $0.50 total..."), provado por
+      captura de tela lida pelo agente. Rodando `seeya end-day` (CLI compilada) contra uma segunda
+      cópia idêntica da mesma fixture (não o mesmo `homeDir` — D-026 impediria uma segunda
+      captura), o texto do relatório bate estrutura por estrutura com o que o diálogo mostrou
+      (as únicas diferenças são os caminhos `cwd`, que são por natureza específicos de cada
+      `homeDir` de teste) — a igualdade literal em si é garantia de construção (a MESMA
+      `formatEndDayReport`), não uma coincidência desta medição.
+
+      **Não medido diretamente nesta verificação:** uma captura de tela do estado `preview` isolado
+      (antes de clicar "Run") — o driver de verificação clica "Run end-day now" 3s depois de abrir
+      o diálogo e só tira UMA captura, no final; que o relatório final mostre os dados reais da
+      captura prova que a prévia carregou e que o clique em "Run" funcionou, mas a tela da prévia
+      em si não foi vista isoladamente. O conteúdo do que o notificador falso recebeu não foi
+      inspecionado (o fixture de notificação, igual ao que `tests/e2e/_fake-notification-commands.ts`
+      já usa, é um `.exe` no-op que não grava o que recebeu) — a garantia aqui é de construção
+      (o mesmo `Notifier`/`buildEndDayNotice` da CLI, D-020) mais o fato de o processo Electron ter
+      saído com código 0 sem exceção não tratada. Linux e macOS não foram medidos (só Windows,
+      mais `verificar:linux` no contêiner). Detalhes, decisões de ferramental e a corrida com o
+      `end-day` agendado do daemon em `docs/QUESTOES.md` Q-074.
+
+      **O que fica pendente do mantenedor:** revisar e mesclar; depois, um `end-day` real pela
+      interface no fim de um dia real, e um `start-day` real pela interface na manhã seguinte —
+      no Windows e no Linux dele, fechando V2-T4 e V2-T5a juntas como o aceite pede.
 
 ## Definição de pronto (vale para toda tarefa)
 

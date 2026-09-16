@@ -7215,3 +7215,99 @@ binário instalado) — prova só que o argv/label/registro em disco desta taref
 2. Um `seeya end-day` real seguido de um `seeya start-day` real **pela interface**, no dia
    seguinte, no Windows e no Linux — a mesma classe de medição que V2-T2/V2-T3 já pediram para o
    resto da interface, agora para a retomada.
+
+## Q-074 — V2-T5a (`end-day` pela interface): decisões de ferramental, a corrida com o daemon, e o
+## que ficou inferido
+
+**Tarefa:** V2-T5a
+**Bloqueia:** não — a tarefa foi entregue com o portão completo verde (Windows e o contêiner
+Linux) e a captura de tela do aceite medida pelo agente. Registro no mesmo padrão de
+Q-069/Q-070/Q-071/Q-072/Q-073.
+
+### 1) A corrida com o `end-day` agendado do daemon — registrada, não resolvida (como o despacho
+### já previa)
+
+Se o daemon dispara o `end-day` agendado (`scheduler/poll.ts`) enquanto o botão "Run end-day now"
+está rodando, os dois processos chamam `application/endDay` ao mesmo tempo, contra o mesmo
+`~/.seeya`: cada um lê `config.json`/descobre sessões por conta própria e escreve handoffs/
+`summary.md` — nenhum lock entre os dois. **É a MESMA corrida que já existe hoje entre `seeya
+end-day` manual (CLI) e o daemon** — esta tarefa não piora nem melhora nada, só adiciona um
+terceiro processo (a interface) capaz de entrar na mesma corrida. O lock que existe
+(`daemon.lock`, `core/daemon-lock.ts`) é do **daemon como instância única**, não do `end-day` como
+operação — um segundo `end-day` de QUALQUER origem (CLI, interface, ou o próprio daemon disparado
+duas vezes por engano) nunca foi serializado contra o primeiro. Resolver isso é maior que esta
+tarefa (precisaria de um lock por dia, não por instância do daemon) e fica registrado aqui para
+quem despachar a solução — provavelmente quando "subir/parar o daemon pela interface" (V2-T5b)
+entrar em pauta, já que aí a pessoa vai estar olhando os dois ao mesmo tempo na mesma tela.
+
+### 2) `formatEndDayReport` reaproveitado literalmente: a prévia e o resultado são a MESMA função,
+### nunca uma segunda formatação em DOM
+
+Diferente da V2-T4 (que desenhou o resumo do `start-day` como seções de DOM, Q-073 item 2), esta
+tarefa segue o V2-T2 original: `formatEndDayReport(result, config)` produz uma string, e o
+`<pre id="end-day-dialog-report">` mostra essa string literal, sem parsing nem reformatação. É o
+que a spec pediu explicitamente ("o texto da prévia e do resultado é o mesmo da CLI, por
+construção") e o que torna a comparação do aceite (relatório do diálogo == relatório do `seeya
+end-day`) uma garantia de tipo, não uma coincidência de teste.
+
+### 3) Cinco estados, não quatro — por que `previewPending` existe
+
+O despacho nomeia "ocioso → prévia → rodando → resultado". A implementação
+(`state/end-day-panel.ts`) tem `idle`/`previewPending`/`preview`/`running`/`result`: o "prévia" do
+despacho virou dois estados porque a prévia (`dryRun: true`) **não é instantânea** —
+`application/end-day.ts`'s próprio comentário já diz que tudo antes de uma escrita roda de verdade
+mesmo em dry-run, inclusive a chamada ao `claude -p` por sessão. Sem um estado de carregamento
+explícito, o botão "Run end-day now" apareceria clicável antes do texto que ele confirma existir —
+exatamente o tipo de estado inválido D-024 pede para o tipo recusar, não só documentar.
+
+### 4) `SEEYA_APP_AUTO_END_DAY`: a sexta variável de instrumentação de verificação
+
+Mesma categoria de `SEEYA_APP_OFFSCREEN`/`SEEYA_APP_SCREENSHOT_PATH`/`SEEYA_APP_QUIT_AFTER_MS`/
+`SEEYA_APP_AUTO_OPEN_SHELL_TAB`/`SEEYA_APP_HOME_OVERRIDE`/`SEEYA_APP_AUTO_RESUME_ALL` já
+registradas (`AGENTS.md` já as documentava como categoria fechada, mas aberta a crescer). Clica o
+botão real "End day…", espera 3s (a prévia roda `claude -p` por sessão de verdade) e clica "Run
+end-day now". A janela de captura de `captureVerificationScreenshot` cresce de 2.500ms para
+8.000ms quando esta variável está ligada — 2.500ms bastava para o `SEEYA_APP_AUTO_OPEN_SHELL_TAB`
+de tarefas anteriores, mas aqui há DOIS `endDay` reais (a prévia e a execução) para esperar antes
+da captura valer a pena. Documentada em `electron/main.ts` junto de onde é lida, e no próprio
+`AGENTS.md`.
+
+### 5) O `claude` e o `powershell.exe` usados no aceite: shims compilados só para esta verificação,
+### fora do repositório
+
+Mesma técnica que `tests/integration/generation/_fixtures.ts`/`tests/e2e/_fake-notification-commands.ts`
+já usam (um `.exe` real via `csc.exe`, porque `spawn(..., {shell:false})` recusa lançar um
+`.cmd`/`.bat` — CVE-2024-27980), mas compilados por um script de verificação que não faz parte do
+repositório (mesmo padrão que Q-073 item 5 já registrou: "não commitado, vive só no driver de
+verificação"). Diferença desta vez: o driver reusa `npm run dev --workspace=@seeya-ai/app`
+(`scripts/build.mjs --dev`) para lançar o Electron, em vez de reimplementar o lançamento à mão —
+tentar chamar `import('electron')` diretamente por um caminho absoluto, fora do processo que
+`build.mjs` já sabe montar (`ensureElectronBinary`/`ensureSpawnHelperExecutable`), disparou
+silenciosamente um download do binário do Electron na primeira tentativa e travou sem sinal de
+progresso na segunda — passar pelo script real, já medido nas tarefas anteriores, resolveu.
+
+### O que ficou inferido, não medido
+
+- **A prévia isolada, antes do clique em "Run end-day now".** O driver de verificação clica em
+  "Run" 3s depois de abrir o diálogo e tira só UMA captura de tela, no final — o relatório final
+  mostrando os dados reais da captura prova que a prévia carregou a tempo (senão "Run" não teria
+  efeito, já que `handleEndDayRunClicked` só age a partir do estado `preview`), mas a tela da
+  prévia isolada, com os dois botões visíveis, não foi vista.
+- **O conteúdo que o notificador falso recebeu.** O fixture de notificação (o mesmo `.exe` no-op
+  que `tests/e2e/_fake-notification-commands.ts` já usa) não grava o que foi passado a ele — a
+  garantia de que o AVISO em si está correto já vem de `tests/unit/application/end-day-notice.test.ts`
+  (a função que o monta); o que esta verificação prova é que a chamada acontece sem lançar (o
+  processo Electron saiu com código 0, sem exceção não tratada no processo principal).
+- **Linux e macOS.** O agente só tem Windows; `verificar:linux` cobre o contêiner, não uma área de
+  trabalho real, o `node-pty`/Electron rodando de verdade lá, nem os backends de notificação
+  `notify-send`/`osascript`.
+- **A corrida com o daemon (item 1 acima) provocada de propósito.** Registrada como fato conhecido,
+  não reproduzida nesta verificação — reproduzi-la exigiria o daemon rodando de verdade contra o
+  mesmo `homeDir` no instante exato do clique, fora do escopo desta tarefa.
+
+### Pendências para o mantenedor
+
+1. Revisar e mesclar.
+2. Um `end-day` real pela interface no fim de um dia real, e um `start-day` real pela interface na
+   manhã seguinte, no Windows e no Linux — fecha V2-T4 e V2-T5a juntas, como o aceite de ambas já
+   pede.

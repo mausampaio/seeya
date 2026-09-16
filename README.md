@@ -173,6 +173,19 @@ dialog asks before opening a fresh, history-losing one in its place — **Open a
 choosing counts as Skip. The interface never starts this on its own; it only ever runs after that
 click.
 
+**Ending the day, with a preview as the confirmation (V2-T5a).** The status panel has an "End
+day…" button. Clicking it never writes or terminates anything by itself — it runs the same
+dry-run `endDay` `seeya end-day --dry-run` runs, and shows the result (the exact same report text)
+as the confirmation itself: how many sessions are in scope, which would be captured, which would
+be terminated by policy (`canTerminate`), which are left out and why, and an honest cost ceiling
+("up to N × `budgetPerSessionUsd`", never an estimate — it's the ceiling the capture itself
+enforces). Only clicking **Run end-day now** actually runs it, one at a time, showing "capturing N
+of M: name" as it goes; **Cancel**, closing the dialog, or Escape all count as cancelling. On
+completion the dialog shows the real report — the same text `seeya end-day` prints — the same
+notification `seeya end-day` sends fires, and the "Today" panel refreshes to reflect what was just
+written. `--session` (a single session, not the full day) and the Snooze/Skip today countdown
+inside the window are still CLI-only (V2-T5b).
+
 ### Before writing code
 
 Read [`AGENTS.md`](AGENTS.md). It's the project's work contract: layer boundaries, code style,
