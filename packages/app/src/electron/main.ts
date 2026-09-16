@@ -128,8 +128,11 @@ async function captureVerificationScreenshot(
 ): Promise<void> {
   // Long enough for SEEYA_APP_AUTO_OPEN_SHELL_TAB's own click (registered on the same
   // did-finish-load event, a shorter 300ms delay) to have opened its tab first when both are set
-  // together for a verification run.
-  await clock.sleep(2500);
+  // together for a verification run. SEEYA_APP_AUTO_END_DAY needs much longer: its own click
+  // sequence (below) waits through TWO real endDay runs (a dry-run preview, then the real one),
+  // each spawning a headless `claude -p` per eligible session — 2500ms is nowhere near enough for
+  // that to finish before this captures.
+  await clock.sleep(process.env.SEEYA_APP_AUTO_END_DAY === '1' ? 8000 : 2500);
   const image = await window.webContents.capturePage();
   const { writeFile } = await import('node:fs/promises');
   await writeFile(screenshotPath, image.toPNG());
@@ -227,6 +230,30 @@ function createWindow(clock: Clock): BrowserWindow {
           // one automated run. A no-op when no dialog is open (optional chaining).
           window.webContents.executeJavaScript(
             "document.getElementById('fallback-dialog-skip')?.click();",
+          ),
+        );
+    });
+  }
+  // SEEYA_APP_AUTO_END_DAY: same "instrumentação só do spike" class as the three above — clicks
+  // the real "End day..." button, waits for the real dry-run preview to arrive (it spawns a real
+  // headless `claude -p` per eligible session, so this is not instant), then clicks "Run end-day
+  // now" and waits for the real run to finish, so an agent with no keyboard/mouse of its own can
+  // prove V2-T5a's own aceite: the preview shows N sessions and the cost ceiling, and the dialog
+  // ends up showing the final report — the same literal text `seeya end-day` prints. Never set by
+  // `npm run app` or the README.
+  if (process.env.SEEYA_APP_AUTO_END_DAY === '1') {
+    window.webContents.once('did-finish-load', () => {
+      void clock
+        .sleep(500)
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('end-day-button').click();",
+          ),
+        )
+        .then(() => clock.sleep(3000))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('end-day-dialog-run')?.click();",
           ),
         );
     });
