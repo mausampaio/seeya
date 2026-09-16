@@ -28,13 +28,17 @@ import type {
   ResumeSummaryResponse,
   ResumeProgressUpdateEvent,
   ResumeTabOpenedEvent,
+  EndDayPreviewResponse,
 } from '../ipc/channels.js';
 import type { Clock } from '@seeya-ai/engine/core/ports.js';
 import { findPendingBriefing } from '@seeya-ai/engine/application/find-pending-briefing.js';
 import { resumeSessions } from '@seeya-ai/engine/application/start-day.js';
+import { endDay } from '@seeya-ai/engine/application/end-day.js';
+import { formatEndDayReport } from '@seeya-ai/engine/application/format-end-day.js';
 import type { Handoff } from '@seeya-ai/engine/core/types.js';
-import { buildAppContext, type AppContext } from '../composition/index.js';
+import { buildAppContext, toEndDayDeps, type AppContext } from '../composition/index.js';
 import { MESSAGES } from '../text/messages.js';
+import { buildEndDayCostCeiling } from '../state/end-day-preview.js';
 import {
   addTab,
   createTab,
@@ -426,6 +430,23 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
       return buildResumeSummary(result, resolveLabel);
     },
   );
+
+  // V2-T5a item 1: "End day..." — the dry-run preview shown as the confirmation itself (D-039,
+  // D-002: this NEVER writes a handoff or terminates a process — dryRun: true stops every write
+  // right before it happens, application/end-day.ts's own top comment). The report text is
+  // formatEndDayReport's own literal output, the SAME text `seeya end-day --dry-run` prints
+  // (V2-T5a item 2: moved to application/ for exactly this reuse); the cost ceiling has no CLI
+  // equivalent, so it's computed here instead.
+  ipcMain.handle(CHANNELS.endDayPreview, async (): Promise<EndDayPreviewResponse> => {
+    const result = await endDay(toEndDayDeps(context), {
+      dryRun: true,
+      scope: { kind: 'fullDay' },
+    });
+    return {
+      reportText: formatEndDayReport(result, context.config),
+      costCeiling: buildEndDayCostCeiling(result.sessionsInScope, context.config),
+    };
+  });
 
   void runRefreshLoop({
     clock: context.clock,

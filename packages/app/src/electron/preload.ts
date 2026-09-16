@@ -27,6 +27,9 @@ import type {
   ResumeSummaryResponse,
   ResumeProgressUpdateEvent,
   ResumeTabOpenedEvent,
+  EndDayPreviewResponse,
+  EndDayRunResponse,
+  EndDayProgressUpdateEvent,
 } from '../ipc/channels.js';
 
 export interface SeeyaApi {
@@ -58,6 +61,11 @@ export interface SeeyaApi {
    * `@xterm/xterm` instance/tab-strip button `openTab` creates for a command-bar tab, without
    * calling back to spawn anything (the pty already exists). */
   onResumeTabOpened(listener: (event: ResumeTabOpenedEvent) => void): void;
+  /** V2-T5a item 1: "End day…" — the dry-run preview, never writes or terminates anything. */
+  endDayPreview(): Promise<EndDayPreviewResponse>;
+  /** V2-T5a item 4: "Run end-day now" — the real run. */
+  endDayRun(): Promise<EndDayRunResponse>;
+  onEndDayProgress(listener: (event: EndDayProgressUpdateEvent) => void): void;
 }
 
 const api: SeeyaApi = {
@@ -99,6 +107,13 @@ const api: SeeyaApi = {
   },
   onResumeTabOpened: (listener) => {
     ipcRenderer.on(CHANNELS.resumeTabOpened, (_event, data: ResumeTabOpenedEvent) =>
+      listener(data),
+    );
+  },
+  endDayPreview: () => ipcRenderer.invoke(CHANNELS.endDayPreview),
+  endDayRun: () => ipcRenderer.invoke(CHANNELS.endDayRun),
+  onEndDayProgress: (listener) => {
+    ipcRenderer.on(CHANNELS.endDayProgress, (_event, data: EndDayProgressUpdateEvent) =>
       listener(data),
     );
   },

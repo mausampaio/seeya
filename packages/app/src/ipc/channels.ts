@@ -65,6 +65,19 @@ export const CHANNELS = {
    * sessão"). Unlike `createTab`, the renderer never calls back to spawn anything here — the pty
    * already exists by the time this event arrives. */
   resumeTabOpened: 'seeya:resume-tab-opened',
+  /** Renderer → main: "End day…" — runs `endDay(deps, { dryRun: true, scope: { kind: 'fullDay' } })`
+   * (V2-T5a item 1) and returns the SAME literal report text `seeya end-day --dry-run` prints,
+   * plus the interface's own cost-ceiling line (which has no CLI equivalent). Never writes or
+   * terminates anything — D-039, D-002. */
+  endDayPreview: 'seeya:end-day-preview',
+  /** Renderer → main: "Run end-day now" — runs the real `endDay` (V2-T5a item 4), notifies
+   * through the same `Notifier`/`buildEndDayNotice` `seeya end-day` uses, and returns the SAME
+   * literal report text `seeya end-day` prints. Rejects if a run is already in progress (defense
+   * in depth — the renderer already disables the button while `running`). */
+  endDayRun: 'seeya:end-day-run',
+  /** Main → renderer, pushed once per session while `endDayRun` is in flight: "capturing N of M:
+   * <name>" (`EndDayOptions.onCaptureProgress`, `state/end-day-progress.ts`'s own projection). */
+  endDayProgress: 'seeya:end-day-progress',
 } as const;
 
 export interface CreateTabRequest {
@@ -205,4 +218,34 @@ export interface ResumeTabOpenedEvent {
   readonly label: string;
   readonly cwd: string;
   readonly pid: number;
+}
+
+/** `CHANNELS.endDayPreview`'s response (V2-T5a item 1). `reportText` is the literal
+ * `formatEndDayReport` output for a `dryRun: true` run — same content `seeya end-day --dry-run`
+ * prints. `costCeiling` is `state/end-day-preview.ts#EndDayCostCeiling`, re-declared here rather
+ * than imported (same "ipc/channels.ts is pure, no engine-adjacent app module imports it back"
+ * shape `ResumeSummaryResponse` above already has for its own list entries). */
+export interface EndDayPreviewResponse {
+  readonly reportText: string;
+  readonly costCeiling: {
+    readonly sessionsInScope: number;
+    readonly budgetPerSessionUsd: number;
+    readonly captureModel: string;
+    readonly totalCeilingUsd: number;
+  };
+}
+
+/** `CHANNELS.endDayRun`'s response (V2-T5a item 4) — the literal `formatEndDayReport` output for
+ * the real run, same content `seeya end-day` prints. */
+export interface EndDayRunResponse {
+  readonly reportText: string;
+}
+
+/** `CHANNELS.endDayProgress`'s payload — mirrors `ResumeProgressUpdateEvent` above exactly (same
+ * "N of M: name" shape), projected from `application/end-day.ts`'s own `CaptureProgressEvent` by
+ * `state/end-day-progress.ts#projectEndDayProgressEvent`. */
+export interface EndDayProgressUpdateEvent {
+  readonly index: number;
+  readonly total: number;
+  readonly name: string;
 }

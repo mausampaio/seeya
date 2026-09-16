@@ -146,6 +146,13 @@ body {
   white-space: pre-wrap;
 }
 
+/* V2-T5a item 1: the "End day..." button, in the status region below the panel it reports
+ * against (docs/PLANO-DE-ENTREGA.md V2-T5a: "na região de estado"). */
+#end-day-button {
+  margin-top: 6px;
+  width: 100%;
+}
+
 #terminal-host {
   flex: 1;
   position: relative;
@@ -186,6 +193,51 @@ body {
 }
 
 #fallback-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* V2-T5a items 1/4: the "End day..." preview-as-confirmation/progress/result dialog — same
+ * shape as #fallback-dialog above (native <dialog>, showModal()), wider to fit
+ * formatEndDayReport's own multi-line report text. */
+#end-day-dialog {
+  max-width: 640px;
+  width: 90vw;
+  border: 1px solid #333;
+  border-radius: 6px;
+  background: #252525;
+  color: #e0e0e0;
+  padding: 16px;
+}
+
+#end-day-dialog::backdrop {
+  background: rgb(0 0 0 / 50%);
+}
+
+#end-day-dialog h3 {
+  margin: 0 0 8px;
+}
+
+#end-day-dialog-report {
+  max-height: 50vh;
+  overflow-y: auto;
+  font-size: 12px;
+  white-space: pre-wrap;
+  background: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 8px;
+}
+
+#end-day-dialog-cost,
+#end-day-dialog-progress {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+#end-day-dialog-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;

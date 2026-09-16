@@ -1,7 +1,10 @@
 /**
  * Every string the interface shows a person, concentrated here (D-028: English; AGENTS.md §
  * "Texto voltado ao usuário" — the same discipline `packages/cli/src` already follows for CLI
- * output, applied to the renderer instead of a terminal).
+ * output, applied to the renderer instead of a terminal). No imports on purpose (unlike `state/`,
+ * which imports THIS module) — `endDayCostCeiling` below takes a structural shape matching
+ * `state/end-day-preview.ts#EndDayCostCeiling` rather than importing that type, so `text/` never
+ * depends on `state/`.
  */
 export const MESSAGES = {
   windowTitle: 'seeya',
@@ -57,4 +60,30 @@ export const MESSAGES = {
     `Stopped after "${name}" failed: ${message}`,
   todaySummaryFallbackNote: (reasonText: string): string =>
     `Opened a new session there instead — ${reasonText}.`,
+
+  // V2-T5a item 1 — the "End day..." button and its preview-as-confirmation dialog. The report
+  // text itself (`endDayReport`, filled in by the renderer) is `formatEndDayReport`'s own literal
+  // output (`@seeya-ai/engine/application/format-end-day.js`) — never duplicated here (D-039's
+  // "the interface shows the literal text").
+  endDayButton: 'End day…',
+  endDayDialogTitle: 'End day',
+  endDayDialogLoadingPreview: 'Loading preview…',
+  endDayCostCeiling: (ceiling: {
+    readonly sessionsInScope: number;
+    readonly budgetPerSessionUsd: number;
+    readonly captureModel: string;
+    readonly totalCeilingUsd: number;
+  }): string =>
+    `Cost ceiling: up to ${ceiling.sessionsInScope} × $${ceiling.budgetPerSessionUsd.toFixed(2)} ` +
+    `per session (model: ${ceiling.captureModel}) — at most $${ceiling.totalCeilingUsd.toFixed(2)} ` +
+    'total. This is a ceiling the capture itself enforces, never an estimate of what it will spend.',
+  endDayRunNow: 'Run end-day now',
+  endDayCancel: 'Cancel',
+
+  // V2-T5a item 4 — running and the final result. "capturing N of M: <name>" mirrors
+  // todayResumeProgress's own wording for the other daily-cycle progress line.
+  endDayRunningNoProgressYet: 'Starting…',
+  endDayCaptureProgress: (index: number, total: number, name: string): string =>
+    `Capturing ${index} of ${total}: ${name}...`,
+  endDayClose: 'Close',
 } as const;

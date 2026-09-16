@@ -15,6 +15,7 @@
         <ul id="session-list"></ul>
         <h2>Status</h2>
         <pre id="status-panel"></pre>
+        <button id="end-day-button" type="button"></button>
       </aside>
       <main id="main">
         <div id="toolbar">
@@ -47,6 +48,16 @@
       <div id="fallback-dialog-actions">
         <button id="fallback-dialog-open" type="button"></button>
         <button id="fallback-dialog-skip" type="button"></button>
+      </div>
+    </dialog>
+    <dialog id="end-day-dialog">
+      <h3 id="end-day-dialog-title"></h3>
+      <pre id="end-day-dialog-report"></pre>
+      <p id="end-day-dialog-cost"></p>
+      <p id="end-day-dialog-progress" hidden></p>
+      <div id="end-day-dialog-actions">
+        <button id="end-day-dialog-run" type="button" hidden></button>
+        <button id="end-day-dialog-cancel" type="button" hidden></button>
       </div>
     </dialog>
     <script type="module" src="renderer.js"></script>
