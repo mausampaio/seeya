@@ -7250,15 +7250,23 @@ que a spec pediu explicitamente ("o texto da prévia e do resultado é o mesmo d
 construção") e o que torna a comparação do aceite (relatório do diálogo == relatório do `seeya
 end-day`) uma garantia de tipo, não uma coincidência de teste.
 
-### 3) Cinco estados, não quatro — por que `previewPending` existe
+### 3) Cinco estados, não quatro — por que `previewPending` existe (reescrito na revisão — o
+### motivo original estava errado, ver item 6)
 
 O despacho nomeia "ocioso → prévia → rodando → resultado". A implementação
 (`state/end-day-panel.ts`) tem `idle`/`previewPending`/`preview`/`running`/`result`: o "prévia" do
-despacho virou dois estados porque a prévia (`dryRun: true`) **não é instantânea** —
-`application/end-day.ts`'s próprio comentário já diz que tudo antes de uma escrita roda de verdade
-mesmo em dry-run, inclusive a chamada ao `claude -p` por sessão. Sem um estado de carregamento
-explícito, o botão "Run end-day now" apareceria clicável antes do texto que ele confirma existir —
-exatamente o tipo de estado inválido D-024 pede para o tipo recusar, não só documentar.
+despacho virou dois estados porque a prévia (`dryRun: true` **e**, desde a revisão,
+`skipGeneration: true`) **ainda não é instantânea**, mesmo sem chamar o modelo — a descoberta de
+sessões (`SessionProvider.list()`) e a coleta de evidência de git (`GitReader
+.readEvidenceAcrossRepos`, até `maxGitRootsToVisit` raízes por sessão) continuam rodando de
+verdade em qualquer dry-run (`application/end-day.ts`'s próprio comentário: "everything upstream
+of a write ... runs for real either way") — só a geração é que passou a ser pulada. Sem um estado
+de carregamento explícito, o botão "Run end-day now" apareceria clicável antes do texto que ele
+confirma existir — exatamente o tipo de estado inválido D-024 pede para o tipo recusar, não só
+documentar.
+
+**O motivo que este item dava antes da revisão — "a prévia chama `claude -p` por sessão" — estava
+errado** para captura leve, e é exatamente o que o item 6 corrige.
 
 ### 4) `SEEYA_APP_AUTO_END_DAY`: a sexta variável de instrumentação de verificação
 
@@ -7285,6 +7293,37 @@ tentar chamar `import('electron')` diretamente por um caminho absoluto, fora do 
 `build.mjs` já sabe montar (`ensureElectronBinary`/`ensureSpawnHelperExecutable`), disparou
 silenciosamente um download do binário do Electron na primeira tentativa e travou sem sinal de
 progresso na segunda — passar pelo script real, já medido nas tarefas anteriores, resolveu.
+
+### 6) A prévia não chama o modelo: correção da premissa do despacho (o `--dry-run` chama o
+### gerador leve)
+
+**Achado na revisão do PO, não pelo agente na entrega original.** O despacho descrevia
+`dryRun: true` como suficiente para uma prévia "sem custo" ("--dry-run executa tudo menos escrever
+e terminar processos"), mas a premissa estava incompleta: `capture-session.ts#resolveGeneration`
+só pulava a chamada real para captura **profunda** (D-012, para não gravar um fork em disco) — uma
+sessão de captura **leve** sob `--dry-run` sempre chamou o `leanGenerator` de verdade, porque a
+captura leve não tem pegada em disco (D-017) e por isso nunca precisou do mesmo desvio. Isso é
+**correto** para `seeya end-day --dry-run` (a pessoa já decidiu rodar aquele comando) mas estava
+**errado** para a prévia da interface (item 1): clicar "End day…" pagava o custo leve de cada
+sessão elegível, e "Run end-day now" pagava de novo — uma prévia que custa dinheiro antes da
+confirmação viola o próprio motivo do item 1 existir (D-039).
+
+**A correção:** `EndDayOptions.skipGeneration` (novo, só válido junto de `dryRun: true` — `endDay`
+lança se não for), que faz `captureSession` devolver uma prévia (nunca chama nenhum gerador) para
+**qualquer** modo de captura, não só o profundo. `generation-policy.ts#previewDeepCaptureOutcome`
+generalizou para `previewCaptureOutcome(captureMode)`, com a mensagem original preservada para
+`deep` (motivo: disco) e uma nova para `lean` (motivo: custo). Só a interface passa
+`skipGeneration: true`; `seeya end-day --dry-run` e o daemon continuam sem passar, preservando o
+contrato da S2-T5 exatamente como estava (os testes existentes de `capture-session.test.ts`/
+`end-day.test.ts` não mudaram).
+
+**Medido depois da correção**, com um `claude` falso que grava uma linha por invocação (não o
+`fake-claude.mjs` do harness de e2e, que sobrescreve um único arquivo de captura por chamada — não
+serve para contar): a mesma verificação de ponta a ponta do item 5 acima, repetida, mostrou
+**2 invocações totais** de `claude` para duas sessões elegíveis passando por prévia + execução real
+(antes da correção teriam sido 4 — uma por sessão em cada uma das duas chamadas a `endDay`). A
+captura de tela do resultado também mostra o texto novo do teto de custo: "This preview cost
+nothing — it never called the model (skipGeneration)."
 
 ### O que ficou inferido, não medido
 

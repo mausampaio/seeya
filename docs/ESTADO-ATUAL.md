@@ -235,17 +235,18 @@ Detalhes, decisões de ferramental e o que ficou inferido (não medido) em `docs
 
 ## V2-T5a — `end-day` pela interface (entregue numa worktree isolada em 16/09)
 
-**Entregue pelo agente em 16/09, cinco commits (um por item).** Fecha o ciclo diário inteiro
-dentro da janela: a interface agora encerra o dia (esta tarefa) e retoma na manhã seguinte
-(V2-T4, já mesclada). Um botão **End day…** na região de estado roda a mesma prévia
-(`endDay(deps, { dryRun: true, scope: fullDay })`) que `seeya end-day --dry-run` roda, e mostra o
-resultado — o texto literal de `formatEndDayReport`, movido de `cli/` para `application/` nesta
-tarefa (mesma reutilização por construção que `format-status.ts` já tinha) — como a própria
-confirmação, com o teto de custo honesto ("até N × `budgetPerSessionUsd`", nunca uma estimativa).
-Só **Run end-day now** executa de verdade, uma vez por vez, mostrando "capturing N of M: nome"
-pelo novo gancho opcional `EndDayOptions.onCaptureProgress` (`seeya end-day`/o daemon nunca
-passam); ao terminar, o mesmo `Notifier`/`buildEndDayNotice` da CLI notifica, e o painel "Hoje"
-atualiza.
+**Entregue pelo agente em 16/09, cinco commits (um por item), mais três da revisão do PO no mesmo
+dia (ver abaixo).** Fecha o ciclo diário inteiro dentro da janela: a interface agora encerra o dia
+(esta tarefa) e retoma na manhã seguinte (V2-T4, já mesclada). Um botão **End day…** na região de
+estado roda a mesma prévia (`endDay(deps, { dryRun: true, skipGeneration: true, scope: fullDay })`
+— `skipGeneration` é o acréscimo da revisão, ver abaixo) e mostra o resultado — o texto literal de
+`formatEndDayReport`, movido de `cli/` para `application/` nesta tarefa (mesma reutilização por
+construção que `format-status.ts` já tinha) — como a própria confirmação, com o teto de custo
+honesto ("até N × `budgetPerSessionUsd`", nunca uma estimativa, e agora dizendo explicitamente que
+a própria prévia não custou nada). Só **Run end-day now** executa de verdade, uma vez por vez,
+mostrando "capturing N of M: nome" pelo novo gancho opcional `EndDayOptions.onCaptureProgress`
+(`seeya end-day`/o daemon nunca passam); ao terminar, o mesmo `Notifier`/`buildEndDayNotice` da CLI
+notifica, e o painel "Hoje" atualiza.
 
 **Medido pelo agente, num `homeDir` descartável com um `claude` falso compilado para esta
 verificação e a interface real compilada, offscreen (`SEEYA_APP_HOME_OVERRIDE`/
@@ -259,6 +260,16 @@ diálogo mostrou.
 **Portão:** `npm run verificar` completo verde a cada um dos cinco commits (formatação, tipos,
 lint, build, `dependencias`, cobertura — 1.716 testes passando no Windows) e `npm run
 verificar:linux` verde no estado final (`node:22-bookworm`, 1.711 passando, 5 pulados).
+
+**Revisão do PO (16/09), mesma branch, três commits mais: a prévia custava dinheiro.** A premissa
+do despacho estava incompleta — `--dry-run` sempre chamou o gerador **leve** de verdade (só o
+**profundo** já era poupado, por segurança de disco, D-012), então a prévia pagava o custo leve de
+cada sessão e "Run end-day now" pagava de novo. Corrigido com `EndDayOptions.skipGeneration` (só
+válido junto de `dryRun: true`), que faz a prévia nunca chamar nenhum gerador, para qualquer modo
+de captura — só a interface passa essa opção nova; `seeya end-day --dry-run` e o daemon continuam
+exatamente como estavam. **Medido depois da correção** com um `claude` falso que conta invocações:
+a mesma verificação de ponta a ponta caiu de 4 chamadas reais ao modelo para **2** (uma por sessão,
+só na execução real). Detalhes em `docs/QUESTOES.md` Q-074, item 6.
 
 **O que fica pendente do mantenedor:** revisar e mesclar; depois, um `end-day` real pela interface
 no fim de um dia real, e um `start-day` real pela interface na manhã seguinte, no Windows e no

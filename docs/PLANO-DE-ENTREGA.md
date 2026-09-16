@@ -4850,6 +4850,27 @@ texto, mas não são a fila.
       mais `verificar:linux` no contêiner). Detalhes, decisões de ferramental e a corrida com o
       `end-day` agendado do daemon em `docs/QUESTOES.md` Q-074.
 
+      **Revisão do PO (16/09), mesma branch, três commits mais: a prévia custava dinheiro.** A
+      premissa do despacho estava incompleta — `docs/ESPECIFICACAO.md`'s "`--dry-run` executa tudo
+      menos escrever e terminar" sempre significou, para captura **leve**, uma chamada real e
+      cobrada ao `leanGenerator` (só a captura **profunda** já era poupada, por segurança de disco,
+      D-012). A prévia da interface (item 1) pagava esse custo leve por sessão elegível, e "Run
+      end-day now" pagava de novo — uma prévia que custa dinheiro antes da confirmação viola o
+      próprio motivo do item 1 existir (D-039). Corrigido com `EndDayOptions.skipGeneration`
+      (só válido junto de `dryRun: true`; `endDay` lança se não for), que faz `captureSession`
+      devolver uma prévia sem chamar nenhum gerador, para qualquer modo de captura —
+      `generation-policy.ts#previewDeepCaptureOutcome` generalizou para
+      `previewCaptureOutcome(captureMode)`. Só a interface passa a nova opção; `seeya end-day
+      --dry-run` e o daemon continuam exatamente como estavam (os testes existentes não mudaram).
+      **Medido depois da correção**, com um `claude` falso que conta invocações (não o fixture do
+      harness de e2e, que sobrescreve um único arquivo por chamada): a mesma verificação de ponta a
+      ponta caiu de 4 invocações reais (duas sessões × duas chamadas a `endDay`) para **2** (uma
+      por sessão, só na execução real) — prova direta, medida contra um processo Electron
+      real, não apenas nos testes de unidade (que também cobrem o gancho isoladamente). Detalhes
+      completos, o texto novo do teto de custo, e por que `previewPending` continua existindo (por
+      um motivo diferente do que o relatório original desta tarefa dava) em `docs/QUESTOES.md`
+      Q-074, item 6.
+
       **O que fica pendente do mantenedor:** revisar e mesclar; depois, um `end-day` real pela
       interface no fim de um dia real, e um `start-day` real pela interface na manhã seguinte —
       no Windows e no Linux dele, fechando V2-T4 e V2-T5a juntas como o aceite pede.

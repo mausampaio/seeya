@@ -174,17 +174,19 @@ choosing counts as Skip. The interface never starts this on its own; it only eve
 click.
 
 **Ending the day, with a preview as the confirmation (V2-T5a).** The status panel has an "End
-day…" button. Clicking it never writes or terminates anything by itself — it runs the same
-dry-run `endDay` `seeya end-day --dry-run` runs, and shows the result (the exact same report text)
-as the confirmation itself: how many sessions are in scope, which would be captured, which would
-be terminated by policy (`canTerminate`), which are left out and why, and an honest cost ceiling
-("up to N × `budgetPerSessionUsd`", never an estimate — it's the ceiling the capture itself
-enforces). Only clicking **Run end-day now** actually runs it, one at a time, showing "capturing N
-of M: name" as it goes; **Cancel**, closing the dialog, or Escape all count as cancelling. On
-completion the dialog shows the real report — the same text `seeya end-day` prints — the same
-notification `seeya end-day` sends fires, and the "Today" panel refreshes to reflect what was just
-written. `--session` (a single session, not the full day) and the Snooze/Skip today countdown
-inside the window are still CLI-only (V2-T5b).
+day…" button. Clicking it never writes or terminates anything, and never calls the model either —
+unlike `seeya end-day --dry-run` (which still calls the real generator for lean captures, its own
+long-standing contract), the interface's own preview costs nothing: it shows a dry run of what
+would happen — how many sessions are in scope, which would be captured, which would be terminated
+by policy (`canTerminate`), which are left out and why — plus an honest cost ceiling for actually
+running it ("up to N × `budgetPerSessionUsd`", never an estimate — it's the ceiling the capture
+itself enforces) and a line saying plainly that the preview itself cost nothing. Only clicking
+**Run end-day now** actually runs it, one at a time, showing "capturing N of M: name" as it goes;
+**Cancel**, closing the dialog, or Escape all count as cancelling. On completion the dialog shows
+the real report — the same text `seeya end-day` prints — the same notification `seeya end-day`
+sends fires, and the "Today" panel refreshes to reflect what was just written. `--session` (a
+single session, not the full day) and the Snooze/Skip today countdown inside the window are still
+CLI-only (V2-T5b).
 
 ### Before writing code
 
