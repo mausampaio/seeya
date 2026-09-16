@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { endDay } from '@seeya-ai/engine/application/end-day.js';
+import { formatEndDayReport } from '@seeya-ai/engine/application/format-end-day.js';
 import { createSessionWithPid, createSessionWithoutPid } from '../core/_fixtures.js';
 import type { RejectedDiscoveryRecord } from '@seeya-ai/engine/core/ports.js';
 import type { Config, Day, Handoff } from '@seeya-ai/engine/core/types.js';
@@ -9,6 +10,7 @@ import {
   FakeClock,
   FakeForkCleanup,
   FakeGitReader,
+  FakeHandoffGenerator,
   FakeProcessControl,
   FakeSessionProvider,
   FakeStorage,
@@ -991,5 +993,113 @@ describe('endDay — onCaptureProgress (V2-T5a item 3)', () => {
     expect(withoutHook.captured[0]?.handoff.sessionId).toBe(
       withHook.captured[0]?.handoff.sessionId,
     );
+  });
+});
+
+/** Counts how many times `generate` was actually called — the direct proof
+ * "os dois geradores falsos nunca são chamados" needs, stronger than inspecting a returned
+ * message alone (`capture-session.test.ts` already covers that angle). */
+function countingGenerator(): { readonly generator: FakeHandoffGenerator; calls: () => number } {
+  let calls = 0;
+  const generator = new FakeHandoffGenerator(() => {
+    calls += 1;
+    return Promise.resolve({
+      understanding: 'should never happen',
+      pendingItems: [],
+      tomorrowPlan: [],
+    });
+  });
+  return { generator, calls: () => calls };
+}
+
+describe('endDay — skipGeneration (V2-T5a review fix)', () => {
+  it('skipGeneration: true without dryRun: true is refused before any work happens', async () => {
+    const deps = buildDeps();
+    await expect(endDay(deps, { skipGeneration: true })).rejects.toThrow(/skipGeneration/);
+    await expect(endDay(deps, { skipGeneration: true, dryRun: false })).rejects.toThrow(/dryRun/);
+  });
+
+  it(
+    'with skipGeneration, neither leanGenerator nor deepGenerator is ever called, and the ' +
+      'report still lists scope, eligibility and termination policy correctly',
+    async () => {
+      const leanSession = createSessionWithPid({
+        sessionId: '11111111-1111-4111-8111-111111111111',
+        name: 'lean-project',
+        cwd: 'c:\\code\\lean',
+        hasTranscript: true,
+        lastActivity: NOW,
+      });
+      const deepSession = createSessionWithPid({
+        sessionId: '22222222-2222-4222-8222-222222222222',
+        name: 'deep-project',
+        cwd: 'c:\\code\\deep',
+        hasTranscript: true,
+        lastActivity: NOW,
+      });
+      const ignoredSession = createSessionWithPid({
+        sessionId: '33333333-3333-4333-8333-333333333333',
+        name: 'ignored-project',
+        cwd: 'c:\\code\\ignorada',
+        lastActivity: NOW,
+      });
+      const config = {
+        ...DEFAULT_TEST_CONFIG,
+        ignore: ['c:\\code\\ignorada'],
+        projectPolicy: {
+          'c:\\code\\deep': { canTerminate: true, deepCapture: true },
+        },
+      };
+      const lean = countingGenerator();
+      const deep = countingGenerator();
+      const deps = buildDeps({
+        sessionProvider: new FakeSessionProvider({
+          sessions: [leanSession, deepSession, ignoredSession],
+          rejected: [],
+        }),
+        storage: new FakeStorage(config),
+        leanGenerator: lean.generator,
+        deepGenerator: deep.generator,
+      });
+
+      const result = await endDay(deps, { dryRun: true, skipGeneration: true });
+
+      expect(lean.calls()).toBe(0);
+      expect(deep.calls()).toBe(0);
+      expect(result.captured).toHaveLength(2);
+      expect(result.ineligible).toEqual([
+        {
+          sessionId: ignoredSession.sessionId,
+          cwd: ignoredSession.cwd,
+          name: ignoredSession.name,
+          reasons: ['ignoredCwd'],
+        },
+      ]);
+
+      const report = formatEndDayReport(result, config);
+      expect(report).toContain('Scope: full day.');
+      expect(report).toContain('lean-project');
+      expect(report).toContain('deep-project');
+      expect(report).toContain('would terminate: yes'); // deep-project opted into canTerminate
+      expect(report).toContain('would terminate: no'); // lean-project did not
+      expect(report).toContain('Ineligible:');
+      expect(report).toContain('ignored-project');
+      // D-025: a preview handoff never claims a plan/pending list it never generated.
+      expect(report).not.toContain('pending:');
+      expect(report).not.toContain('plan:');
+    },
+  );
+
+  it('without skipGeneration (every existing caller), captureSession still calls the real generators', async () => {
+    const session = createSessionWithPid({ hasTranscript: true, lastActivity: NOW });
+    const lean = countingGenerator();
+    const deps = buildDeps({
+      sessionProvider: new FakeSessionProvider({ sessions: [session], rejected: [] }),
+      leanGenerator: lean.generator,
+    });
+
+    await endDay(deps, { dryRun: true });
+
+    expect(lean.calls()).toBe(1);
   });
 });

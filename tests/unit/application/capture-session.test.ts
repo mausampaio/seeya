@@ -640,3 +640,83 @@ describe('captureSession — dry-run (S2-T5)', () => {
     expect(outcome).toEqual({ kind: 'ineligible', reasons: ['duplicateToday'] });
   });
 });
+
+describe('captureSession — skipGeneration (V2-T5a review fix)', () => {
+  it(
+    'a LEAN-capture session with skipGeneration never calls leanGenerator — the preview must ' +
+      'not spend a real, billed model call',
+    async () => {
+      const session = createSessionWithPid({ hasTranscript: true, lastActivity: NOW });
+      const deps = buildDeps({
+        leanGenerator: failingGenerator(
+          'leanGenerator must never be called when skipGeneration is set',
+        ),
+      });
+      const outcome = await captureSession({
+        deps,
+        session,
+        config: DEFAULT_TEST_CONFIG,
+        now: NOW,
+        day: DAY,
+        dryRun: true,
+        skipGeneration: true,
+      });
+      if (outcome.kind !== 'captured') throw new Error('expected captured');
+      expect(outcome.handoff.captureMode).toBe('lean');
+      expect(outcome.handoff.source).toBe('deterministic');
+      // Proves the fake was never invoked: had it been, generationError would carry ITS message
+      // instead (same technique the "never calls the deep generator" test above already uses).
+      expect(outcome.handoff.generationError).toMatch(/^preview: lean capture skipped/);
+      expect(outcome.handoff.generationError).not.toMatch(/must never be called/);
+    },
+  );
+
+  it('a DEEP-capture session with skipGeneration never calls deepGenerator either', async () => {
+    const session = createSessionWithPid({ hasTranscript: true, lastActivity: NOW });
+    const config = {
+      ...DEFAULT_TEST_CONFIG,
+      projectPolicy: { [session.cwd]: { canTerminate: false, deepCapture: true } },
+    };
+    const deps = buildDeps({
+      deepGenerator: failingGenerator(
+        'deepGenerator must never be called when skipGeneration is set',
+      ),
+    });
+    const outcome = await captureSession({
+      deps,
+      session,
+      config,
+      now: NOW,
+      day: DAY,
+      dryRun: true,
+      skipGeneration: true,
+    });
+    if (outcome.kind !== 'captured') throw new Error('expected captured');
+    expect(outcome.handoff.captureMode).toBe('deep');
+    expect(outcome.handoff.source).toBe('deterministic');
+    // Same wording a plain --dry-run (skipGeneration unset) already produces for deep — D-012's
+    // disk-write concern applies regardless of WHY generation was skipped.
+    expect(outcome.handoff.generationError).toMatch(/^dry-run: deep capture skipped/);
+  });
+
+  it('without skipGeneration (every existing caller), the real lean generator still runs during a dry run', async () => {
+    const session = createSessionWithPid({ hasTranscript: true, lastActivity: NOW });
+    const deps = buildDeps({
+      leanGenerator: succeedingGenerator({
+        understanding: 'called for real',
+        pendingItems: [],
+        tomorrowPlan: [],
+      }),
+    });
+    const outcome = await captureSession({
+      deps,
+      session,
+      config: DEFAULT_TEST_CONFIG,
+      now: NOW,
+      day: DAY,
+      dryRun: true,
+    });
+    if (outcome.kind !== 'captured') throw new Error('expected captured');
+    expect(outcome.handoff.understanding).toBe('called for real');
+  });
+});

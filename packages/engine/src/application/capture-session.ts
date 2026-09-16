@@ -26,7 +26,7 @@ import { evaluateFullEligibility, projectPolicyFor } from './eligibility-assembl
 import { gatherEvidence } from './evidence-gathering.js';
 import {
   generateUnderstanding,
-  previewDeepCaptureOutcome,
+  previewCaptureOutcome,
   selectCaptureMode,
   type GenerationOutcome,
 } from './generation-policy.js';
@@ -64,12 +64,17 @@ interface HandoffInputs {
 }
 
 /**
- * Picks which generation actually runs for this session (`selectCaptureMode`), then either calls
- * it for real or, for a dry run whose policy calls for deep capture, substitutes
- * `previewDeepCaptureOutcome()` instead of ever touching `deps.deepGenerator` — see that
- * function's own docstring for why a preview cannot honestly run the real deep call. A dry-run
- * session that resolves to LEAN capture still calls the real generator: lean generation has no
- * disk footprint of its own (D-017), so there is nothing here for `--dry-run` to protect against.
+ * Picks which generation actually runs for this session (`selectCaptureMode`), then calls it for
+ * real UNLESS one of two independent guards says not to — see `generation-policy.ts
+ * #previewCaptureOutcome`'s own docstring for the full reasoning behind both:
+ *
+ * 1. A dry run whose policy calls for DEEP capture — D-012's fork-registration side effect a
+ *    preview must never write, regardless of `skipGeneration`.
+ * 2. `skipGeneration` (V2-T5a, `EndDayOptions`) — the interface's own preview, which must not
+ *    spend a real, billed model call before the person has confirmed anything, for EITHER capture
+ *    mode. A dry-run session that resolves to LEAN capture and has `skipGeneration` unset (the
+ *    CLI's own `--dry-run`, S2-T5) still calls the real generator: lean generation has no disk
+ *    footprint of its own (D-017), so there was nothing for `--dry-run` alone to protect against.
  */
 async function resolveGeneration(
   deps: EndDayDeps,
@@ -77,9 +82,13 @@ async function resolveGeneration(
   facts: HandoffFacts,
   captureMode: CaptureMode,
   dryRun: boolean,
+  skipGeneration: boolean,
 ): Promise<GenerationOutcome> {
   if (dryRun && captureMode === 'deep') {
-    return previewDeepCaptureOutcome();
+    return previewCaptureOutcome('deep');
+  }
+  if (skipGeneration) {
+    return previewCaptureOutcome(captureMode);
   }
   const generator = captureMode === 'deep' ? deps.deepGenerator : deps.leanGenerator;
   return generateUnderstanding(generator, session, facts);
@@ -92,11 +101,19 @@ async function buildHandoff(
   inputs: HandoffInputs,
   deps: EndDayDeps,
   dryRun: boolean,
+  skipGeneration: boolean,
 ): Promise<Handoff> {
   const { session, config, now, facts, sources } = inputs;
   const policy = projectPolicyFor(config, session.cwd);
   const captureMode = selectCaptureMode(session, policy.deepCapture);
-  const generation = await resolveGeneration(deps, session, facts, captureMode, dryRun);
+  const generation = await resolveGeneration(
+    deps,
+    session,
+    facts,
+    captureMode,
+    dryRun,
+    skipGeneration,
+  );
   return {
     sessionId: session.sessionId,
     cwd: session.cwd,
@@ -203,6 +220,16 @@ export interface CaptureSessionParams {
    * `application/end-day.ts`), never decided here — this function only obeys it.
    */
   readonly skipTermination?: boolean;
+  /**
+   * V2-T5a's own preview mode: skips the real generator call entirely (see
+   * `generation-policy.ts#previewCaptureOutcome`'s own docstring) so a preview never spends a
+   * real, billed model call. `end-day.ts#endDay` is the one place that validates this is only ever
+   * combined with `dryRun: true` — this function trusts that invariant and just obeys the flag.
+   * Defaults to `false` so every call site written before this flag existed keeps compiling and
+   * keeps calling the real generator during its own dry runs unchanged (`seeya end-day --dry-run`,
+   * S2-T5's own contract).
+   */
+  readonly skipGeneration?: boolean;
 }
 
 /**
@@ -212,7 +239,16 @@ export interface CaptureSessionParams {
  * handoff is written for a duplicate.
  */
 export async function captureSession(params: CaptureSessionParams): Promise<CaptureSessionOutcome> {
-  const { deps, session, config, now, day, dryRun = false, skipTermination = false } = params;
+  const {
+    deps,
+    session,
+    config,
+    now,
+    day,
+    dryRun = false,
+    skipTermination = false,
+    skipGeneration = false,
+  } = params;
   const evidence = await gatherEvidence(
     deps.transcriptReader,
     deps.gitReader,
@@ -235,6 +271,7 @@ export async function captureSession(params: CaptureSessionParams): Promise<Capt
     { session, config, now, facts: evidence.facts, sources: evidence.sources },
     deps,
     dryRun,
+    skipGeneration,
   );
   const policy = projectPolicyFor(config, session.cwd);
   const { terminated, notice } = await persistAndMaybeTerminate(

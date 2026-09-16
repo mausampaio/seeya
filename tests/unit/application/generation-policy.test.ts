@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   generateUnderstanding,
+  previewCaptureOutcome,
   selectCaptureMode,
 } from '@seeya-ai/engine/application/generation-policy.js';
 import { createSessionWithPid } from '../core/_fixtures.js';
@@ -97,3 +98,34 @@ describe('generateUnderstanding (D-003)', () => {
     expect(outcome.generationError).toBe('plain string rejection');
   });
 });
+
+describe(
+  'previewCaptureOutcome (V2-T5a review fix — generalized from the old previewDeepCaptureOutcome, ' +
+    'which only ever covered "deep")',
+  () => {
+    it('is always source: "deterministic", with no fabricated understanding/pending/plan (D-025)', () => {
+      for (const captureMode of ['lean', 'deep'] as const) {
+        const outcome = previewCaptureOutcome(captureMode);
+        expect(outcome.source).toBe('deterministic');
+        expect(outcome.understanding).toBe('');
+        expect(outcome.pendingItems).toEqual([]);
+        expect(outcome.tomorrowPlan).toEqual([]);
+      }
+    });
+
+    it('"deep" keeps the ORIGINAL wording (D-012 fork-registration disk write, --dry-run)', () => {
+      const outcome = previewCaptureOutcome('deep');
+      expect(outcome.generationError).toMatch(/^dry-run: deep capture skipped/);
+      expect(outcome.generationError).toMatch(/fork/);
+    });
+
+    it('"lean" has its OWN wording — never claims a fork was avoided for a mode that never writes one', () => {
+      const outcome = previewCaptureOutcome('lean');
+      expect(outcome.generationError).toMatch(/^preview: lean capture skipped/);
+      expect(outcome.generationError).not.toMatch(/fork/);
+      // The actual reason for skipping lean is cost, not disk safety (D-017 already covers that
+      // lean has no disk footprint) — the message has to say so, not reuse the deep one's reason.
+      expect(outcome.generationError).toMatch(/billed model call/);
+    });
+  },
+);

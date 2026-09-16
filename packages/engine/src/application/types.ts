@@ -105,6 +105,31 @@ export interface EndDayOptions {
    * `dryRun`/`sessionFilter`/`scope` above already give.
    */
   readonly onCaptureProgress?: (event: CaptureProgressEvent) => void;
+  /**
+   * V2-T5a (review fix): a preview that must not spend a real, billed model call before the
+   * person has confirmed anything. `docs/ESPECIFICACAO.md` § `seeya end-day` only ever promised
+   * "`--dry-run` executa tudo menos escrever e terminar processos" — for LEAN capture that has
+   * always meant a real (billed) `claude -p` call still runs during a dry run
+   * (`application/capture-session.ts#resolveGeneration`'s own docstring; only `deep` capture was
+   * already skipped, to avoid D-012's fork-registration disk write). That is exactly right for
+   * `seeya end-day --dry-run`, a command the person already decided to run — but WRONG for the
+   * interface's own "End day…" preview (V2-T5a item 1), whose whole point is to be free to look
+   * at before confirming anything (D-039). `skipGeneration: true` makes `captureSession` return a
+   * `previewCaptureOutcome` for EVERY session regardless of capture mode, never touching
+   * `deps.leanGenerator`/`deps.deepGenerator` at all — see that function's own docstring
+   * (`generation-policy.ts`) for the full reasoning and the two independent cases it covers.
+   *
+   * **`skipGeneration: true` without `dryRun: true` is refused** (`endDay` throws before doing any
+   * work) — a real run that skipped generation would persist a handoff with no understanding at
+   * all, which nothing in this codebase's contract describes and nobody asked for; the combination
+   * only makes sense as "preview, and don't even call the model for it".
+   *
+   * `seeya end-day`/the daemon never set this (`cli/composition.ts#buildEndDayContext`,
+   * `scheduler/poll.ts#buildEndDayDeps`) — only `packages/app/src`'s own "End day…" preview does,
+   * alongside `dryRun: true`. Defaults to `false` so every existing caller (including
+   * `seeya end-day --dry-run` itself) keeps its original, real-lean-generator-call behavior.
+   */
+  readonly skipGeneration?: boolean;
 }
 
 /**

@@ -65,6 +65,20 @@ type SessionOutcome =
   | { readonly kind: 'failed'; readonly session: DiscoveredSession; readonly reason: string };
 
 /**
+ * The three independent boolean switches `endDay`'s own per-session pipeline carries all the way
+ * down to `capture-session.ts#captureSession` — bundled into one object (V2-T5a review fix) so
+ * `captureSessionOutcome`/`runSession` below stay under AGENTS.md's own "~5 parameters" comfort
+ * zone instead of growing a fourth/fifth positional boolean each time this file adds one.
+ */
+interface CaptureFlags {
+  readonly dryRun: boolean;
+  readonly skipTermination: boolean;
+  /** V2-T5a (review fix): see `EndDayOptions.skipGeneration`'s own docstring — `endDay` itself is
+   * what validates this is only ever `true` alongside `dryRun`, before any of this runs. */
+  readonly skipGeneration: boolean;
+}
+
+/**
  * One session's whole journey: the cheap eligibility stage (no I/O), then — only if it passes —
  * the full capture pipeline (`capture-session.ts`), wrapped in its own `try`/`catch` so an
  * unexpected failure here becomes this session's own `SessionOutcome` instead of rejecting the
@@ -81,8 +95,7 @@ async function captureSessionOutcome(
   config: Config,
   now: Date,
   day: Day,
-  dryRun: boolean,
-  skipTermination: boolean,
+  flags: CaptureFlags,
 ): Promise<SessionOutcome> {
   const cheap = evaluateCheapEligibility(session, now, config);
   if (!cheap.eligible) {
@@ -95,8 +108,9 @@ async function captureSessionOutcome(
       config,
       now,
       day,
-      dryRun,
-      skipTermination,
+      dryRun: flags.dryRun,
+      skipTermination: flags.skipTermination,
+      skipGeneration: flags.skipGeneration,
     });
     if (outcome.kind === 'ineligible') {
       return { kind: 'ineligible', session, reasons: outcome.reasons };
@@ -152,8 +166,7 @@ async function runSession(
   config: Config,
   now: Date,
   day: Day,
-  dryRun: boolean,
-  skipTermination: boolean,
+  flags: CaptureFlags,
   progress: ProgressContext,
 ): Promise<SessionOutcome> {
   const progressSession = toProgressSession(session);
@@ -163,15 +176,7 @@ async function runSession(
     index: progress.index,
     total: progress.total,
   });
-  const outcome = await captureSessionOutcome(
-    deps,
-    session,
-    config,
-    now,
-    day,
-    dryRun,
-    skipTermination,
-  );
+  const outcome = await captureSessionOutcome(deps, session, config, now, day, flags);
   progress.onCaptureProgress?.({
     kind: 'captureFinished',
     session: progressSession,
@@ -331,11 +336,24 @@ function resolveScope(
  * // preview.briefingPreview holds the markdown that WOULD have been written; nothing was.
  */
 export async function endDay(deps: EndDayDeps, options: EndDayOptions = {}): Promise<EndDayResult> {
+  const dryRun = options.dryRun ?? false;
+  const skipGeneration = options.skipGeneration ?? false;
+  // V2-T5a (review fix): `skipGeneration` only ever means anything alongside `dryRun: true` (see
+  // `EndDayOptions.skipGeneration`'s own docstring) — a REAL run that skipped generation would
+  // persist a handoff with no understanding at all, which this codebase's contract never
+  // describes. Checked before any I/O (discovery, config read) so the caller's mistake is refused
+  // immediately, not after work that would just be thrown away.
+  if (skipGeneration && !dryRun) {
+    throw new Error(
+      'endDay: options.skipGeneration is true but options.dryRun is not — skipGeneration only ' +
+        'makes sense for a preview (dryRun: true); a real run needs a real handoff, which needs ' +
+        'the model actually called',
+    );
+  }
   const config = await deps.storage.readConfig();
   const discovery = await deps.sessionProvider.list();
   const now = deps.clock.now();
   const day = localDayString(now);
-  const dryRun = options.dryRun ?? false;
   // S4-T0c: resolved to a concrete, always-present value HERE — the one place
   // `EndDayOptions.scope`'s own optionality (an ordinary "no --session" input) turns into
   // `EndDayResult.scope`/`core/briefing.ts`'s never-optional scope (see `ResolvedEndDayScope`'s own
@@ -354,10 +372,11 @@ export async function endDay(deps: EndDayDeps, options: EndDayOptions = {}): Pro
   );
 
   const skipTermination = options.skipTermination ?? false;
+  const flags: CaptureFlags = { dryRun, skipTermination, skipGeneration };
   const { onCaptureProgress } = options;
   const [outcomes, listedSessions] = await Promise.all([
     mapWithConcurrencyLimit(sessionsInScope, config.captureConcurrency, (session, index) =>
-      runSession(deps, session, config, now, day, dryRun, skipTermination, {
+      runSession(deps, session, config, now, day, flags, {
         index: index + 1,
         total: sessionsInScope.length,
         onCaptureProgress,
