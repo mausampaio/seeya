@@ -277,6 +277,14 @@ Linux dele — fecha V2-T4 e V2-T5a juntas. Detalhes, decisões de ferramental e
 resolvida por esta tarefa, como o despacho já previa) com o `end-day` agendado do daemon em
 `docs/QUESTOES.md` Q-074.
 
+## Dois ajustes de uso pedidos e aceitos pelo mantenedor (17/09, sem tarefa numerada)
+
+Feitos pelo PO direto no renderer, no mesmo dia do pedido e aceitos ao vivo: **a aba mostrada
+recebe o foco do teclado** (pelo "+"/Open, pelo clique no botão da aba ou por uma retomada — um
+clique a menos), e **o terminal ganhou um tema fixo azul-acinzentado escuro** (`#1b1f27`,
+`state/terminal-theme.ts`, aplicado ao terminal e ao painel) no lugar do preto absoluto, até
+existir a tela de configuração de fonte e cores.
+
 ## V2-T6 — correção: letras órfãs ao redimensionar/rolar no Windows (aceita em 17/09: o ConPTY
 ## empacotado pelo node-pty resolveu; a opção do xterm.js foi revertida)
 
