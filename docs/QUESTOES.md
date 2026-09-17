@@ -5955,6 +5955,13 @@ worktree and the shared .git identical before/after") estourou 5.000 ms no `wind
 Reexecução só do job, sem mudança de código: verde. O push seguinte (`9931339`), mesmo código,
 verde de primeira.
 
+**Ocorrência (2026-09-17, PO):** classe (b) — a mesclagem da V2-T5b (`7553c73`):
+`tests/integration/process/termination.test.ts` ("the child runs its own shutdown handler to
+completion before dying") falhou no `windows-latest` com `CTRL_BREAK helper script produced no
+usable outcome (exit 5). stdout: "". stderr: #< CLIXML`; Ubuntu e macOS verdes, 1.810 dos 1.811
+passando. O teste não é tocado pela tarefa e passa nesta máquina. Reexecução só do job, sem mudança
+de código: verde.
+
 ---
 
 ## Q-065 — S4-T12: onde a normalização de `projectPolicy` mora, a escolha de resolver (não recusar) caminho relativo, e por que `buildDaemonContext` perdeu seu único `readConfig` de startup
