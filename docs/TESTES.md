@@ -769,6 +769,26 @@ casos que `endOfDayFired`/`skipped` decidem sem olhar a hora. **Para provar:** r
 `TZ=UTC`, `TZ=America/Sao_Paulo`, `TZ=Asia/Kolkata`, `TZ=Pacific/Kiritimati` e `TZ=Etc/GMT+12`
 (os dois extremos que existem); os cinco precisam passar.
 
+## O build quebrou com erros de `rootDir` e ninguém mexeu no código? Procure sobras de guard
+
+**2026-09-17, V2-T5a.** `npm run app` (que roda `npm run build` primeiro) falhou com dezenas de
+`TS2307`/`TS6059` na CLI — "arquivo de `packages/cli/src` não está sob o `rootDir` de
+`packages/engine/src`" — numa árvore em que o mesmo build tinha passado uma hora antes. Causa: os
+guards de `tests/integration/guards/` escrevem fixtures de violação de propósito em
+`packages/*/src/**/_guard-*/` (um deles importa a CLI de dentro do motor) e apagam no `afterEach`;
+a execução da cobertura tinha sido **morta pela proteção de memória da máquina** (Docker Desktop
+de pé) e o `afterEach` nunca rodou. O `tsconfig.build.json` do motor inclui `src` inteiro, puxou
+a CLI, e o build ainda emitiu `.js`/`.d.ts` ao lado dos fontes da CLI.
+
+**Como reconhecer:** erros de `rootDir`/"não listado no projeto" apontando para arquivos de outro
+pacote, e `git status` mostrando diretórios `_guard-*` ou `.js`/`.d.ts` soltos dentro de `src`.
+`npx tsc -b packages/engine/tsconfig.build.json --explainFiles | grep packages/cli` diz quem os
+puxou.
+
+**O que protege hoje:** `scripts/clean-dist.mjs`, que roda antes de todo build, varre
+`_guard-*` e `.js`/`.d.ts` de dentro de `packages/*/src` — provado com sobras plantadas. Se um
+dia aparecer um caso que a varredura não cobre, o sintoma acima é o mesmo.
+
 ## Portão de segurança (S5-T6) — três frentes, fora da suíte de testes deste arquivo
 
 Diferente de todo o resto deste documento, as três frentes abaixo **não são teste automatizado
