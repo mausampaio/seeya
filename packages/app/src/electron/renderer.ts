@@ -681,6 +681,12 @@ function wireWindowResize(): void {
     for (const [id, open] of openTabs) {
       open.fitAddon.fit();
       window.seeya.resizeTab({ id, cols: open.terminal.cols, rows: open.terminal.rows });
+      // V2-T6: measured defect — after a resize+scroll, orphaned characters stayed at the left
+      // edge of a Claude Code tab (its TUI redraws its own block with erase-to-end-of-line
+      // sequences, and a row-wrap disagreement between ConPTY and xterm.js right after a resize
+      // is what paints those wrong). A full refresh forces xterm.js to repaint every row from its
+      // own buffer — cheap, and a no-op when nothing was actually stale.
+      open.terminal.refresh(0, open.terminal.rows - 1);
     }
   });
 }
