@@ -5110,7 +5110,7 @@ texto, mas não são a fila.
       e ver `seeya status` na CLI concordar; dar Snooze pela janela num dia real e ver o
       encerramento respeitar.
 
-- [ ] **V2-T7 — Retomar sem o plano: a terceira opção quando o plano não cabe no argumento
+- [~] **V2-T7 — Retomar sem o plano: a terceira opção quando o plano não cabe no argumento
       (D-025, D-039; emenda à S5-T9).** Especificada pelo PO em 2026-09-17 a partir do uso real do
       mantenedor no mesmo dia; **aprovada e despachada pelo mantenedor no mesmo dia, antes da
       V2-T5b** — é o que destrava usar o seeya todo dia, fechando e reabrindo a interface.
@@ -5173,6 +5173,54 @@ texto, mas não são a fila.
       sessão capturada nos últimos N dias (ou descoberta nos transcripts) pelo nome, sem depender
       do briefing pendente do dia; é o que resolve "preciso lembrar o id" de vez, e conversa com o
       modelo de projeto (V2-RUMO, passo 3).
+
+      **Relatório (worktree `agent-aca034f716ef49088`, branch `tarefa/V2-T7-retomar-sem-plano`),
+      medido pelo agente no Windows em 2026-09-17.**
+
+      Os quatro itens foram entregues juntos, num commit de código: `ResumeOutcome` virou união
+      discriminada de três formas (`resumed`/`resumedWithoutPlan`/`freshSession`, `core/types.ts`)
+      no lugar do antigo `fellBack: false | ResumeFallbackReason`; `ResumeFallbackReason` ganhou um
+      terceiro `kind`, `resumeWithoutPlanFailed`, para a falha rápida de
+      `SessionResumer.resumeWithoutPrompt()` ter texto próprio; `parseFallbackAnswer`
+      (`core/resume-fallback-decision.ts`) passou a receber o motivo e só devolve `resumeWithoutPlan`
+      para `promptTooLarge` — "r"/"resume" chegando num motivo `resumeFailed` é resposta inválida,
+      com mensagem dizendo por quê (D-024). Os dois `SessionResumer` (CLI e interface) ganharam
+      `resumeWithoutPrompt(sessionId, cwd)`; `application/start-day.ts#attemptResumeWithoutPlan` é
+      quem monta o `ResumeOutcome` final com `promptLength`/`limitChars` (o resumer não tem esses
+      números — só recebe `sessionId`/`cwd` — então devolve um sinal cru "anexou", documentado nos
+      dois lugares, `core/ports.ts` e `core/types.ts#PrimaryResumeAttempt`). CLI
+      (`renderFallbackQuestion`/`formatFallbackNoTty`) e a interface (o diálogo com o botão **Resume
+      without the plan**, primeiro e com foco só para `promptTooLarge`) mudaram juntas; nenhum texto
+      das duas formas antigas mudou. Detalhes de tipo, o caminho sem TTY da CLI (decisão tomada com
+      a solução mínima, registrada para o PO) e a guarda defensiva em `attemptFallback` estão na
+      Q-077.
+
+      **Medido:** `npm run verificar` completo verde no Windows — `format:check`, `tsc -p
+      tsconfig.json --noEmit`, `npm run lint`, `npm run build`, `npm run dependencias` e `npm run
+      cobertura -- --maxWorkers 2`, cada pedaço rodado e lido em separado (172 arquivos de teste,
+      1.767 testes passando, 4 pulados; agregado 97,08% statements / 93,1% branches / 96,61%
+      funções / 97,3% linhas — `core/` 100%, todo o resto acima do piso de 80%). `npm run test:e2e`
+      verde (9 testes, 4 arquivos), incluindo um caso novo desta tarefa: `seeya start-day --all`
+      contra o binário compilado, com um handoff sintético de plano acima do teto (16.385
+      caracteres) — sem TTY (o harness de e2e nunca tem um), o `claude` falso registra `argv` igual
+      a `['--resume', '<id>']`, sem o plano como terceiro argumento, e `resumed.json` grava o id
+      (prova o aceite "resposta em branco resulta em `claude --resume <id>` sem prompt"). O caso
+      "e com 'y', na sessão limpa como antes" do mesmo aceite continua coberto pelo teste e2e nº5
+      já existente, sem mudança de comportamento. `npm run verificar:linux` disparado em segundo
+      plano nesta mesma tarefa (saída lida em arquivo, nunca esperando notificação) e verde no
+      contêiner `node:22-bookworm`: 172 arquivos, 1.766 testes passando, 5 pulados, agregado 97,03%
+      statements / 93,15% branches / 96,42% funções / 97,22% linhas.
+
+      **Não medido pelo agente (sem tela/teclado):** o diálogo real da interface — o botão novo, o
+      foco e o texto por motivo — só provados por leitura de código e testes de unidade indiretos
+      (`electron/renderer.ts` fica fora do piso de cobertura, D-042), nunca por captura de tela.
+
+      **O que fica pendente do mantenedor:** revisar e mesclar; depois, o aceite manual descrito
+      acima — retomar a sessão dele pelo painel "Hoje" com o plano dele acima do teto de verdade,
+      escolhendo **Resume without the plan**, e ver a sessão voltar com o contexto inteiro. Decidir
+      também o item da Q-077 sobre o caminho sem TTY da CLI (passou a resumir sem o plano por
+      padrão em vez de pular, para reasons `promptTooLarge` — o despacho não falou desse caminho
+      especificamente).
 
 ## Definição de pronto (vale para toda tarefa)
 

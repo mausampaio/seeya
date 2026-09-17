@@ -7488,3 +7488,90 @@ foi investigado. A doc do `node-pty` chama a opção de experimental; o VS Code 
    Windows, e dizer se os caracteres órfãos sumiram — com a comparação já feita no Windows Terminal
    (limpo) como referência. Se não sumirem, a V2-T6 reabre com a investigação continuando pelas
    hipóteses do item 5 acima, não com o renderizador WebGL (descartado no próprio despacho).
+
+## Q-077 — V2-T7 (retomar sem o plano): decisões de tipo, o padrão do caminho sem TTY, e o que fica
+## pendente do mantenedor
+
+**Tarefa:** V2-T7
+**Bloqueia:** não — os quatro itens foram entregues juntos, um commit de código (a união discriminada
+`ResumeOutcome`, o motivo `resumeWithoutPlanFailed` e a pergunta na CLI/interface se apoiam nos
+mesmos tipos, então um recorte por item teria exigido formas intermediárias descartáveis) mais este
+de documentação, com o portão completo verde (Windows; `verificar:linux` — ver item 4).
+
+### 1) `resumeWithoutPlanFailed` como terceiro membro de `ResumeFallbackReason`, não um tipo à parte
+
+A falha rápida de `SessionResumer.resumeWithoutPrompt()` precisa de um texto próprio ("resume
+without the plan failed, exit N"), diferente do `resumeFailed` comum ("the original session could
+not be resumed"). Cogitei um tipo novo só para essa falha (`SkippedFallback` ganhando uma união
+discriminada própria), mas isso obrigaria `application/start-day.ts` a inventar um valor para o
+`reason: ResumeFallbackReason` que `SkippedFallback` já carrega — e daria dois lugares decidindo
+"por que esta sessão foi pulada" em vez de um. Acrescentar o terceiro `kind` a
+`ResumeFallbackReason` mantém `SkippedFallback`/`describeFallbackReason` exatamente como estavam
+(D-024: união discriminada, texto por `kind`, sem duplicar a decisão). Custo aceito: o docstring do
+tipo teve que deixar de dizer "por que caiu para uma sessão nova" (só duas das três formas caem
+para lá) e passar a dizer "por que uma tentativa de `--resume` não produziu uma continuação
+comum" — mais genérico, mas ainda uma frase só.
+
+### 2) `resumeWithoutPrompt` devolve `PrimaryResumeAttempt` por pedido da spec — mas o `outcome`
+### do ramo `resumed` é só um sinal cru, nunca o `ResumeOutcome` final
+
+A spec pediu "o mesmo resultado (`PrimaryResumeAttempt`)" para `resumeWithoutPrompt`. O problema:
+o `ResumeOutcome` completo da forma `resumedWithoutPlan` carrega `promptLength`/`limitChars` — dois
+números que só existem no motivo `promptTooLarge` ORIGINAL, que `attemptResume` já tinha e
+`resumeWithoutPrompt` nunca recebe (a assinatura da porta é só `(sessionId, cwd)`, por pedido
+explícito da spec também). Inventar esses dois números dentro do resumer seria o erro D-025 na
+forma mais direta. A solução: `resumeWithoutPrompt` devolve `{ kind: 'resumed', outcome: {
+sessionId, cwd, kind: 'resumed' } }` — um sinal cru "anexou" — e é
+`application/start-day.ts#attemptResumeWithoutPlan` (que já tem o motivo `promptTooLarge` em mãos,
+vindo do `attemptResume` anterior) quem monta o `ResumeOutcome` de verdade. Documentado nos dois
+lugares (`core/ports.ts`, `core/types.ts#PrimaryResumeAttempt`) para que ninguém leia o `outcome`
+desse ramo como completo por conta própria.
+
+### 3) A guarda defensiva em `attemptFallback` para `resumeWithoutPlan` chegando com um motivo
+### `resumeFailed`
+
+`parseFallbackAnswer` só devolve `{ kind: 'resumeWithoutPlan' }` quando o motivo é `promptTooLarge`
+— mas `FallbackConfirmer` é uma função injetada (I/O de verdade, `cli/`/`app/`), e nada no tipo dela
+impede uma implementação errada de devolver essa decisão para o motivo errado. Em vez de confiar no
+contrato calado, `attemptFallback` verifica `reason.kind !== 'promptTooLarge'` antes de chamar
+`attemptResumeWithoutPlan` e devolve `invalidAnswer` com uma mensagem nomeando os dois lados — nunca
+alcançável pelos dois confirmadores reais hoje (testado com um `confirmFallback` fake que devolve
+essa decisão de propósito para o motivo errado, `tests/unit/application/start-day.test.ts`), mas o
+tipo sozinho (`ResumeFallbackReason` de três membros passado sem narrowing) não bastava para o
+compilador recusar a chamada.
+
+### 4) O caminho sem TTY da CLI passou a aplicar o MESMO padrão por motivo, em vez de "pular" fixo
+### — decisão que o despacho não falou explicitamente, tomada com a solução mínima e registrada aqui
+
+`cli/start-day-command.ts#makeFallbackConfirmer`, antes desta tarefa, aplicava `{ kind: 'skip' }`
+direto quando `!io.isTTY`, sem passar pelo `parseFallbackAnswer`. O despacho da V2-T7 fala do padrão
+mudar "resposta em branco na CLI e Enter/fechar no diálogo" — não menciona o caminho sem terminal.
+Troquei o valor fixo por `parseFallbackAnswer('', reason.kind)` (o mesmo default que um Enter real
+daria) por dois motivos: (a) sem isso, o aceite explícito da tarefa — "um `start-day` de e2e ...
+resposta em branco resulta em `claude --resume <id>` sem prompt" — não seria alcançável, porque o
+harness de e2e nunca tem TTY (`stdio: ['ignore', 'pipe', 'pipe']`, `tests/e2e/_harness.ts`); (b) o
+`claude --resume` que este caminho spawna já roda com `stdio: 'inherit'` independente de
+`io.isTTY` — o risco de rodar sem terminal de verdade já existia para QUALQUER sessão retomada por
+`--all`/`--session` sem TTY, não é um risco novo que esta mudança introduz. Efeito prático: uma
+execução não interativa de `seeya start-day --all` (um script, por exemplo) que hoje pularia toda
+sessão com plano grande agora tenta retomar sem o plano por padrão. Abro a questão porque é uma
+mudança de comportamento além do texto literal do despacho; a solução mínima (reusar
+`parseFallbackAnswer` em vez de inventar uma segunda regra de default) já está aplicada.
+
+### 5) `verificar:linux`
+
+Disparado em segundo plano no fim desta tarefa, com a saída lida por este agente em arquivo (nunca
+esperando notificação) — terminou verde, diferente da V2-T6 (que foi interrompida por memória).
+172 arquivos de teste, 1.766 testes passando, 5 pulados, agregado 97,03% statements / 93,15%
+branches / 96,42% funções / 97,22% linhas, sem `npm ERR!` nem erro de portão em nenhum trecho do
+log. Detalhes em `docs/ESTADO-ATUAL.md`, entrada V2-T7.
+
+### O que fica pendente do mantenedor
+
+1. Revisar e mesclar.
+2. **O aceite real da tarefa**: retomar a sessão do PO pelo painel "Hoje", com o plano dele acima
+   do teto de verdade, escolhendo **Resume without the plan**, e confirmar que a sessão volta com
+   o contexto inteiro — o caso real de 34.071 caracteres que motivou a tarefa.
+3. Decidir se o item 4 acima (o caminho sem TTY da CLI também resumindo sem o plano por padrão,
+   em vez de pular) é o comportamento desejado, ou se deveria continuar pulando por não haver
+   ninguém ali para confirmar — nada no despacho falou desse caminho especificamente.

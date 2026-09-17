@@ -16,7 +16,11 @@ dentro de uma sessão real retomada pela própria interface. **A V2-T6 (correç�
 redimensionar/rolar uma aba de Claude Code no Windows) está pronta numa worktree isolada**, portão
 local verde no Windows — falta `verificar:linux` terminar (interrompido por memória do sistema, não
 por defeito), a revisão do PO, a mesclagem, e o aceite manual do mantenedor (repetir o
-redimensionamento com rolagem e dizer se os órfãos sumiram).
+redimensionamento com rolagem e dizer se os órfãos sumiram). **A V2-T7 (retomar sem o plano —
+terceira opção quando o plano não cabe no argumento) está pronta numa worktree isolada**, portão
+local verde no Windows e no contêiner Linux (`verificar:linux`) — falta a revisão do PO, a
+mesclagem, e o aceite manual do mantenedor (retomar a sessão dele pelo painel "Hoje" com o plano
+acima do teto, escolhendo "Resume without the plan").
 
 ## Onde o código está
 
@@ -315,6 +319,66 @@ rolagem numa aba de Claude Code no Windows e dizer se os órfãos sumiram (a com
 Terminal, limpo, já está registrada). Se não sumirem, a tarefa reabre com a investigação das
 hipóteses seguintes (Q-075), não com o renderizador WebGL (descartado no despacho). Detalhes em
 `docs/PLANO-DE-ENTREGA.md` (entrada V2-T6) e `docs/QUESTOES.md` Q-075.
+
+## V2-T7 — retomar sem o plano: a terceira opção quando o plano não cabe no argumento (17/09,
+## worktree isolada, aguardando revisão)
+
+Especificada pelo PO em 17/09 a partir do uso real do mantenedor no mesmo dia — a tentativa de
+retomar a sessão do PO pelo painel "Hoje" com um plano de 34.071 caracteres (teto 16.384) só
+ofereceu "sessão limpa" ou "pular", jogando fora o transcript, que é a memória de verdade
+(spikes K/L; o handoff é só um resumo). **Aprovada e despachada pelo mantenedor no mesmo dia**,
+antes da V2-T5b.
+
+**Entregue pelo agente em 17/09, worktree isolada, um commit de código (itens 1-4 juntos) mais
+este de documentação:**
+
+1. `FallbackDecision` ganhou `{ kind: 'resumeWithoutPlan' }`; `parseFallbackAnswer` passou a
+   receber o motivo (`resumeFailed`/`promptTooLarge`) e só oferece a nova resposta para
+   `promptTooLarge` — para `resumeFailed`, "r"/"resume" vira resposta inválida (D-024: o tipo
+   recusa a combinação errada, com mensagem dizendo por quê). O padrão muda só para
+   `promptTooLarge`: branco/Enter/fechar o diálogo agora resume sem o plano; `resumeFailed`
+   continua "pular" (S5-T9 intacto).
+2. `SessionResumer` ganhou `resumeWithoutPrompt(sessionId, cwd)` — `claude --resume <id>` sem
+   argumento de prompt, mesma detecção de falha rápida de `attemptResume`, implementada nos dois
+   resumers (`ClaudeSessionResumer` na CLI, `TabSessionResumer` na interface). Uma falha rápida
+   dessa tentativa vira sessão pulada com o motivo `resumeWithoutPlanFailed` ("resume without the
+   plan failed, exit N") — sem segunda pergunta, como a spec pediu.
+3. `ResumeOutcome` virou união discriminada de três formas (`resumed` / `resumedWithoutPlan`,
+   com `promptLength`/`limitChars` / `freshSession`, com o motivo) em vez do antigo
+   `fellBack: false | ResumeFallbackReason`. `format-start-day.ts` (CLI), `state/resume-summary.ts`
+   e o resumo em DOM da interface mostram a terceira forma; nenhum texto das duas formas antigas
+   mudou.
+4. Os dois lugares que perguntam mudaram juntos: `renderFallbackQuestion`/`formatFallbackNoTty`
+   (CLI) mostram as três respostas certas por motivo; o diálogo da janela ganhou o botão **Resume
+   without the plan** primeiro e com foco quando o motivo é `promptTooLarge` (escondido para
+   `resumeFailed`), e fechar o diálogo sem escolher aplica o mesmo padrão por motivo.
+
+**Medido pelo agente, no Windows:** `npm run verificar` completo verde — tipos, lint, `npm run
+build`, `dependencias`, `format:check`, e cobertura com `--maxWorkers 2` (172 arquivos de teste,
+1.767 testes passando, 4 pulados; agregado 97,08% statements / 93,1% branches / 96,61% funções /
+97,3% linhas — `core/` 100%, todo o resto acima do piso de 80%), cada pedaço rodado e lido em
+separado. `npm run test:e2e` verde (9 testes, 4 arquivos), incluindo um teste novo desta tarefa:
+um `seeya start-day --all` de ponta a ponta (binário compilado, `claude` falso real) com um
+handoff sintético de plano acima do teto — sem TTY (o harness de e2e nunca tem um), o `claude`
+falso registra `argv` igual a `['--resume', '<id>']`, sem o plano como terceiro argumento, e
+`resumed.json` grava o id.
+
+**`npm run verificar:linux` também rodou até o fim nesta tarefa** (disparado em segundo plano,
+saída lida em arquivo pelo agente pelo relógio, nunca esperando notificação) — verde dentro do
+contêiner `node:22-bookworm`: 172 arquivos de teste, 1.766 testes passando, 5 pulados (a diferença
+de um pulado a mais que o Windows é a mesma variação plataforma-condicional já registrada em
+tarefas anteriores, não uma regressão desta), agregado 97,03% statements / 93,15% branches /
+96,42% funções / 97,22% linhas. Sem `npm ERR!`/erro de portão em nenhum trecho do log.
+
+**Não medido pelo agente (sem tela/teclado):** o diálogo real da interface (captura de tela do
+botão novo, do foco e do texto) — só os testes de unidade do DOM indireto
+(`electron/renderer.ts` fica fora do piso de cobertura, D-042) provam a lógica de foco/visibilidade
+por leitura de código, não por captura.
+
+**O que fica pendente do mantenedor:** revisar e mesclar; depois, retomar a sessão dele pelo
+painel "Hoje" com um plano acima do teto de verdade, escolhendo **Resume without the plan**, e
+ver a sessão voltar com o contexto inteiro — o caso real que motivou a tarefa. Questão registrada:
+Q-077.
 
 ## Próximo passo
 
