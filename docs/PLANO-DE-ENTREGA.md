@@ -5032,8 +5032,16 @@ texto, mas não são a fila.
       referência. Detalhes de ferramental completos na Q-075.
 
 - [~] **V2-T5b — O daemon na janela: faixa de horário com Snooze e Skip today, subir e parar o
-      daemon (D-036, D-039, D-042, D-043).** Especificada pelo PO em 2026-09-17; **aprovada pelo
-      mantenedor no mesmo dia, com o recorte do item 5, para despacho logo depois da V2-T7.**
+      daemon (D-036, D-039, D-042, D-043).** Especificada pelo PO em 2026-09-17; aprovada pelo
+      mantenedor no mesmo dia, com o recorte do item 5, e despachada logo depois da V2-T7;
+      **mesclada na `main` em 2026-09-17** (portão na worktree do PO: 1.811 passando, 4 pulados;
+      o `verificar:linux` do agente parou duas vezes no mesmo ponto por memória — o Linux fica
+      com a CI). **Revisão do PO:** o incidente do agente (uma execução sem o home descartável
+      escreveu no `~/.seeya` real e no registro do Windows, e foi revertida) foi conferido pelo PO
+      depois da entrega — chave `seeya://` ausente no registro, os arquivos do mantenedor
+      intactos, o daemon o mesmo de antes. Fica em `[~]` até o aceite do mantenedor (subir o
+      daemon pela janela e ver `seeya status` concordar; Snooze pela janela num dia real; o
+      clique de verdade no toast).
       Com ela, tudo que a pessoa faz hoje
       pela CLI no dia a dia (`snooze`, `skip-today`, `daemon`, `daemon --stop`, `status`,
       `end-day`, `start-day`) existe na janela. A interface continua um painel de controle: o

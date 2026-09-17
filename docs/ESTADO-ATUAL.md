@@ -384,7 +384,7 @@ ver a sessão voltar com o contexto inteiro — o caso real que motivou a tarefa
 Q-077.
 
 ## V2-T5b — o daemon na janela: faixa de horário, Snooze/Skip today, Start/Stop daemon, o clique no
-## toast (pronta numa worktree isolada, pendente da revisão do PO)
+## toast (mesclada na `main` em 17/09, pendente do aceite do mantenedor)
 
 Despachada pelo PO em 2026-09-17, logo depois da V2-T7. **Entregue pelo agente no mesmo dia,
 worktree isolada, cinco commits** (a ordem dos itens 1/2 foi invertida — item 2, mover
