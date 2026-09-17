@@ -57,6 +57,7 @@ describe('spawnDetachedDaemon', () => {
     const readyMarker = path.join(tmp, 'ready.marker');
     try {
       const pid = await spawnDetachedDaemon({
+        nodePath: process.execPath,
         scriptPath: FIXTURE_PATH,
         args: [shutdownMarker, readyMarker],
       });
@@ -104,7 +105,11 @@ describe('spawnDetachedDaemon', () => {
       'utf8',
     );
     try {
-      const pid = await spawnDetachedDaemon({ scriptPath: reporterPath, args: [readyMarker] });
+      const pid = await spawnDetachedDaemon({
+        nodePath: process.execPath,
+        scriptPath: reporterPath,
+        args: [readyMarker],
+      });
       await waitForFile(readyMarker, 5_000);
       expect(await readFile(readyMarker, 'utf8')).toBe('1');
       // Best-effort cleanup — this one exits on its own almost immediately, unlike the fixture
@@ -115,6 +120,50 @@ describe('spawnDetachedDaemon', () => {
         // Already exited.
       }
     } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("V2-T5b: an explicit target.env REPLACES process.env as the child's base, not merged onto it", async () => {
+    const tmp = await mkdtemp(path.join(tmpdir(), 'seeya-daemon-launch-env-override-'));
+    const readyMarker = path.join(tmp, 'ready.marker');
+    const reporterPath = path.join(tmp, 'reporter.mjs');
+    const { writeFile } = await import('node:fs/promises');
+    // Reports whether a variable ONLY set on the real process.env (never in target.env below)
+    // leaked through anyway — the app's own D-017-cleaned tabEnv depends on this NOT happening.
+    await writeFile(
+      reporterPath,
+      "import { writeFileSync } from 'node:fs';\n" +
+        'writeFileSync(process.argv[2], JSON.stringify({ marker: process.env.SEEYA_TEST_ONLY_IN_TARGET_ENV ?? null, leaked: process.env.SEEYA_TEST_ONLY_IN_PARENT_ENV ?? null }));\n',
+      'utf8',
+    );
+    const previousParentOnlyVar = process.env.SEEYA_TEST_ONLY_IN_PARENT_ENV;
+    process.env.SEEYA_TEST_ONLY_IN_PARENT_ENV = 'should-not-reach-the-child';
+    try {
+      const pid = await spawnDetachedDaemon({
+        nodePath: process.execPath,
+        scriptPath: reporterPath,
+        args: [readyMarker],
+        env: { PATH: process.env.PATH ?? '', SEEYA_TEST_ONLY_IN_TARGET_ENV: 'present' },
+      });
+      await waitForFile(readyMarker, 5_000);
+      const reported = JSON.parse(await readFile(readyMarker, 'utf8')) as {
+        marker: string | null;
+        leaked: string | null;
+      };
+      expect(reported.marker).toBe('present');
+      expect(reported.leaked).toBeNull();
+      try {
+        process.kill(pid, 'SIGTERM');
+      } catch {
+        // Already exited.
+      }
+    } finally {
+      if (previousParentOnlyVar === undefined) {
+        delete process.env.SEEYA_TEST_ONLY_IN_PARENT_ENV;
+      } else {
+        process.env.SEEYA_TEST_ONLY_IN_PARENT_ENV = previousParentOnlyVar;
+      }
       await rm(tmp, { recursive: true, force: true });
     }
   });

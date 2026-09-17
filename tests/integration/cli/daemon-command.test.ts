@@ -45,6 +45,9 @@ class UnusedProcessControl implements ProcessControl {
   terminateGracefully(): Promise<boolean> {
     return Promise.reject(new Error('not exercised'));
   }
+  terminateAbruptly(): Promise<void> {
+    return Promise.reject(new Error('not exercised'));
+  }
 }
 
 function sleep(ms: number): Promise<void> {
@@ -77,6 +80,7 @@ describe('runDaemonLauncher — real spawn path', () => {
         new NoLockStorage(DEFAULT_TEST_CONFIG),
         new UnusedProcessControl(),
         {
+          nodePath: process.execPath,
           scriptPath: FIXTURE_PATH,
           args: [shutdownMarker, readyMarker],
         },

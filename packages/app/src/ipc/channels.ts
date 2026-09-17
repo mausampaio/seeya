@@ -8,6 +8,8 @@
 import type { SidebarRow } from '../sidebar/sidebar-data.js';
 import type { TerminalFontOptions } from '../state/terminal-font.js';
 import type { TodayPanelData } from '../state/today-panel.js';
+import type { ScheduleStripData } from '../state/schedule-strip.js';
+import type { DaemonControlAvailability } from '../state/daemon-control-panel.js';
 
 export const CHANNELS = {
   /** Renderer → main: open a new tab. */
@@ -78,6 +80,28 @@ export const CHANNELS = {
   /** Main → renderer, pushed once per session while `endDayRun` is in flight: "capturing N of M:
    * <name>" (`EndDayOptions.onCaptureProgress`, `state/end-day-progress.ts`'s own projection). */
   endDayProgress: 'seeya:end-day-progress',
+  /** Main → renderer, pushed on the same refresh tick as `statusUpdate` (V2-T5b item 1): the
+   * faixa de horário's own data (`state/schedule-strip.ts#buildScheduleStripData`), computed from
+   * the same `decideSchedule` the daemon itself polls. */
+  scheduleUpdate: 'seeya:schedule-update',
+  /** Renderer → main: one of the faixa's "Snooze +15m/+30m/+1h" buttons — runs
+   * `@seeya-ai/engine/application/schedule-adjustments.js#snoozeToday` and returns the freshly
+   * recomputed strip, so the faixa updates immediately rather than waiting for the next ambient
+   * tick (V2-T5b item 1). */
+  snoozeToday: 'seeya:snooze-today',
+  /** Renderer → main: the faixa's "Skip today" button — runs
+   * `@seeya-ai/engine/application/schedule-adjustments.js#skipToday`, same immediate-update shape
+   * as `snoozeToday` above. */
+  skipToday: 'seeya:skip-today',
+  /** Main → renderer, pushed on the same refresh tick as `statusUpdate`/`scheduleUpdate`
+   * (V2-T5b item 3): the daemon's own liveness, projected by
+   * `state/daemon-control-panel.ts#resolveDaemonControlAvailability` from the SAME
+   * `checkLiveLock` the status panel's own daemon section already computes. */
+  daemonAvailabilityUpdate: 'seeya:daemon-availability-update',
+  /** Renderer → main: "Start daemon"/"Stop daemon" (V2-T5b item 3) — `action` is decided by the
+   * renderer's own `DaemonControlAvailability` at click time (`state/daemon-control-panel.ts`),
+   * never re-derived in main.ts. */
+  daemonControl: 'seeya:daemon-control',
 } as const;
 
 export interface CreateTabRequest {
@@ -258,4 +282,32 @@ export interface EndDayProgressUpdateEvent {
   readonly index: number;
   readonly total: number;
   readonly name: string;
+}
+
+/** `CHANNELS.scheduleUpdate`'s payload and `CHANNELS.snoozeToday`/`CHANNELS.skipToday`'s response
+ * — the exact shape `state/schedule-strip.ts#buildScheduleStripData` produces (V2-T5b item 1). */
+export type ScheduleUpdateEvent = ScheduleStripData;
+
+/** `CHANNELS.snoozeToday`'s payload — D-006's three named increments
+ * (`@seeya-ai/engine/application/schedule-adjustments.js#SNOOZE_INCREMENTS`'s own values), never a
+ * free-form number: the faixa only ever offers these three buttons. */
+export interface SnoozeTodayRequest {
+  readonly minutes: 15 | 30 | 60;
+}
+
+/** `CHANNELS.daemonAvailabilityUpdate`'s payload — the exact shape
+ * `state/daemon-control-panel.ts#resolveDaemonControlAvailability` produces. */
+export type DaemonAvailabilityUpdateEvent = DaemonControlAvailability;
+
+/** `CHANNELS.daemonControl`'s payload. `action` is `'start'` when the button last showed "Start
+ * daemon", `'stop'` otherwise — decided renderer-side from its own `DaemonControlAvailability`
+ * (never re-derived by `electron/main.ts`, which has no logic of its own, D-041). */
+export interface DaemonControlRequest {
+  readonly action: 'start' | 'stop';
+}
+
+/** `CHANNELS.daemonControl`'s response — the literal text `AppContext#startDaemon`/`#stopDaemon`
+ * already produces (D-039: the same text the CLI would print for the equivalent action). */
+export interface DaemonControlResponse {
+  readonly resultText: string;
 }

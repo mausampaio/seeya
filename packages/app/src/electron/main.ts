@@ -30,18 +30,32 @@ import type {
   ResumeTabOpenedEvent,
   EndDayPreviewResponse,
   EndDayRunResponse,
+  ScheduleUpdateEvent,
+  SnoozeTodayRequest,
+  DaemonAvailabilityUpdateEvent,
+  DaemonControlRequest,
+  DaemonControlResponse,
 } from '../ipc/channels.js';
 import type { Clock } from '@seeya-ai/engine/core/ports.js';
+import { checkLiveLock } from '@seeya-ai/engine/scheduler/daemon-state.js';
 import { findPendingBriefing } from '@seeya-ai/engine/application/find-pending-briefing.js';
 import { resumeSessions } from '@seeya-ai/engine/application/start-day.js';
 import { endDay } from '@seeya-ai/engine/application/end-day.js';
 import { formatEndDayReport } from '@seeya-ai/engine/application/format-end-day.js';
 import { buildEndDayNotice } from '@seeya-ai/engine/application/end-day-notice.js';
+import {
+  skipToday as skipTodayInEngine,
+  snoozeToday as snoozeTodayInEngine,
+} from '@seeya-ai/engine/application/schedule-adjustments.js';
+import { decideSchedule, emptyDayState } from '@seeya-ai/engine/core/schedule.js';
+import { localDayString } from '@seeya-ai/engine/core/day.js';
 import type { Handoff } from '@seeya-ai/engine/core/types.js';
 import { buildAppContext, toEndDayDeps, type AppContext } from '../composition/index.js';
 import { MESSAGES } from '../text/messages.js';
 import { buildEndDayCostCeiling } from '../state/end-day-preview.js';
 import { projectEndDayProgressEvent } from '../state/end-day-progress.js';
+import { buildScheduleStripData } from '../state/schedule-strip.js';
+import { resolveDaemonControlAvailability } from '../state/daemon-control-panel.js';
 import {
   addTab,
   createTab,
@@ -254,6 +268,22 @@ function createWindow(clock: Clock): BrowserWindow {
         .then(() =>
           window.webContents.executeJavaScript(
             "document.getElementById('end-day-dialog-run')?.click();",
+          ),
+        );
+    });
+  }
+  // SEEYA_APP_AUTO_SNOOZE_15: same "instrumentação só do spike" class as the four above — clicks
+  // the real "Snooze +15m" button in the faixa de horário (V2-T5b item 1), so an agent with no
+  // keyboard/mouse of its own can prove the click round trip actually persists: `estado.json`
+  // gains `snoozeMinutesTotal: 15` and the faixa's own text updates immediately (not waiting for
+  // the next ambient refresh tick). Never set by `npm run app` or the README.
+  if (process.env.SEEYA_APP_AUTO_SNOOZE_15 === '1') {
+    window.webContents.once('did-finish-load', () => {
+      void clock
+        .sleep(500)
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('schedule-strip-snooze-15')?.click();",
           ),
         );
     });
@@ -529,6 +559,45 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
     }
   });
 
+  // V2-T5b item 1: "Snooze +15m/+30m/+1h" / "Skip today" — both run the SAME orchestration
+  // `application/schedule-adjustments.js` gives the CLI's own `snooze`/`skip-today` commands
+  // (item 2), and return the freshly recomputed strip so the faixa updates immediately instead of
+  // waiting for the next ambient `onTick` below (which will also reflect it, harmlessly, at most
+  // REFRESH_INTERVAL_MS later).
+  ipcMain.handle(
+    CHANNELS.snoozeToday,
+    async (_event, request: SnoozeTodayRequest): Promise<ScheduleUpdateEvent> => {
+      const now = context.clock.now();
+      const result = await snoozeTodayInEngine(
+        context.storage,
+        context.clock,
+        context.config,
+        request.minutes,
+      );
+      return buildScheduleStripData(result.decision, now);
+    },
+  );
+
+  ipcMain.handle(CHANNELS.skipToday, async (): Promise<ScheduleUpdateEvent> => {
+    const now = context.clock.now();
+    const result = await skipTodayInEngine(context.storage, context.clock, context.config);
+    return buildScheduleStripData(result.decision, now);
+  });
+
+  // V2-T5b item 3: "Start daemon"/"Stop daemon" — the renderer decides WHICH action from its own
+  // last-known `DaemonControlAvailability` (never re-derived here, D-041); this handler just runs
+  // it and hands back the literal result text. The availability itself refreshes on the next
+  // ambient tick below (same "at most REFRESH_INTERVAL_MS later" shape every other button here
+  // already has), never assumed to have flipped just because the command resolved.
+  ipcMain.handle(
+    CHANNELS.daemonControl,
+    async (_event, request: DaemonControlRequest): Promise<DaemonControlResponse> => {
+      const resultText =
+        request.action === 'start' ? await context.startDaemon() : await context.stopDaemon();
+      return { resultText };
+    },
+  );
+
   void runRefreshLoop({
     clock: context.clock,
     intervalMs: REFRESH_INTERVAL_MS,
@@ -564,6 +633,32 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
       });
       const statusEvent: StatusUpdateEvent = { text };
       window.webContents.send(CHANNELS.statusUpdate, statusEvent);
+
+      // V2-T5b item 1: the faixa de horário — same `decideSchedule` the daemon itself polls
+      // every 30s, read fresh every tick (never cached: a snooze/skip typed in another terminal,
+      // or the daemon's own poll, can change `estado.json` between ticks — D-025, the interface
+      // never shows a stale decision on purpose).
+      const today = localDayString(now);
+      const dayState = (await context.storage.readState()) ?? emptyDayState(today);
+      const { decision } = decideSchedule(context.config, dayState, now);
+      const scheduleEvent: ScheduleUpdateEvent = buildScheduleStripData(decision, now);
+      window.webContents.send(CHANNELS.scheduleUpdate, scheduleEvent);
+
+      // V2-T5b item 3: a SECOND checkLiveLock this tick (buildStatusPanelText's own
+      // describeDaemonState already did one for the status panel's text) — a deliberate,
+      // measured-acceptable cost (the SAME ~0.24-0.88s class this file's own REFRESH_INTERVAL_MS
+      // docstring already accepts once per tick for describeDaemonState), not shared: threading a
+      // precomputed LiveLockCheck INTO describeDaemonState would mean changing that function's own
+      // signature for a caller outside its existing two (seeya status/--status), which is a
+      // bigger change than this task's own scope.
+      const liveLockCheck = await checkLiveLock({
+        storage: context.storage,
+        processControl: context.processControl,
+        clock: context.clock,
+      });
+      const daemonAvailabilityEvent: DaemonAvailabilityUpdateEvent =
+        resolveDaemonControlAvailability(liveLockCheck);
+      window.webContents.send(CHANNELS.daemonAvailabilityUpdate, daemonAvailabilityEvent);
     },
   });
 }

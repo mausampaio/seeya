@@ -25,4 +25,10 @@ export class FakeProcessControl implements ProcessControl {
       new Error('FakeProcessControl.terminateGracefully is not exercised by the discovery suite'),
     );
   }
+
+  terminateAbruptly(): Promise<void> {
+    return Promise.reject(
+      new Error('FakeProcessControl.terminateAbruptly is not exercised by the discovery suite'),
+    );
+  }
 }

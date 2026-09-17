@@ -53,10 +53,21 @@ export interface Clock {
  * the phenomenon didn't hold up under measurement — so the two methods have no caller left and
  * came out with it. See docs/DECISOES.md D-029 and docs/QUESTOES.md Q-011 (the privacy question
  * `readCommandLine` raised, now moot because nothing captures a command line at all).
+ *
+ * **`terminateAbruptly` joined the port in V2-T5b.** Until this task it was a free function
+ * (`adapters/process/termination.ts#terminateAbruptly`), reachable directly because its only
+ * caller (`packages/cli/src/daemon-command.ts#runDaemonStop`) lived in `cli/`, a composition root
+ * allowed to name a concrete adapter (D-020). Once `runDaemonStop` itself moved to `scheduler/`
+ * (so the interface's own "Stop daemon" button could reuse it — see
+ * `scheduler/daemon-control.ts`'s own module comment), it needed this call to go through a port:
+ * `scheduler/` cannot import `adapters/` directly (docs/ARQUITETURA.md's matrix). Unconditional,
+ * immediate termination — **never** used on a discovered Claude Code session (D-002 bans forced
+ * kill for those in v1); see the adapter's own docstring for the one caller this exists for.
  */
 export interface ProcessControl {
   isAlive(pid: number, procStart?: string): Promise<boolean>;
   terminateGracefully(pid: number, deadlineMs: number): Promise<boolean>;
+  terminateAbruptly(pid: number): Promise<void>;
 }
 
 /**

@@ -521,6 +521,12 @@ export class FakeProcessControl implements ProcessControl {
   async terminateGracefully(pid: number): Promise<boolean> {
     return this.terminateResult(pid);
   }
+
+  terminateAbruptly(): Promise<void> {
+    return Promise.reject(
+      new Error('FakeProcessControl.terminateAbruptly is not exercised by endDay'),
+    );
+  }
 }
 
 export const DEFAULT_TEST_CONFIG: Config = {

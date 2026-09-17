@@ -2,7 +2,7 @@
   "name": "@seeya-ai/app",
   "version": "0.1.0",
   "private": true,
-  "description": "Desktop interface for seeya (D-042): an embedded terminal (Electron + @xterm/xterm + node-pty) that shows the sessions this machine discovers and lets a person open the harness in a tab. Second composition root (D-043) — consumes @seeya-ai/engine in-process, never as a subprocess of @seeya-ai/cli.",
+  "description": "Desktop interface for seeya (D-042): an embedded terminal (Electron + @xterm/xterm + node-pty) that shows the sessions this machine discovers and lets a person open the harness in a tab. Second composition root (D-043) — consumes @seeya-ai/engine in-process. V2-T5b: also resolves @seeya-ai/cli's own compiled bin entry point (never imports its source) to spawn the daemon worker as a detached child, the same subprocess @seeya-ai/cli's own `seeya daemon` launches for itself.",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -13,6 +13,7 @@
     "dev": "node scripts/build.mjs --dev"
   },
   "dependencies": {
+    "@seeya-ai/cli": "0.1.0",
     "@seeya-ai/engine": "0.1.0",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",

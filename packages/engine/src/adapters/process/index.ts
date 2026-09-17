@@ -24,7 +24,7 @@ import { pidRepresentsSameProcess } from '../../core/classification.js';
 import { resolveIsAlive } from './liveness.js';
 import { processExists } from './existence.js';
 import { captureObservedProcStart } from './proc-start.js';
-import { terminateGracefully } from './termination.js';
+import { terminateGracefully, terminateAbruptly } from './termination.js';
 
 async function isAlive(pid: number, procStart?: string): Promise<boolean> {
   const pidExists = await processExists(pid);
@@ -38,4 +38,5 @@ async function isAlive(pid: number, procStart?: string): Promise<boolean> {
 export const processControl: ProcessControl = {
   isAlive,
   terminateGracefully,
+  terminateAbruptly,
 };

@@ -190,7 +190,13 @@ program
     }
     const { storage, processControl } = await buildDaemonContext();
     const scriptPath = fileURLToPath(import.meta.url);
-    console.log(await runDaemonLauncher(storage, processControl, { scriptPath, args: ['daemon'] }));
+    console.log(
+      await runDaemonLauncher(storage, processControl, {
+        nodePath: process.execPath,
+        scriptPath,
+        args: ['daemon'],
+      }),
+    );
   });
 
 const autostartCommand = program
