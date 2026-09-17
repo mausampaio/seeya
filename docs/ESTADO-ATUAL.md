@@ -10,13 +10,13 @@ escrita à mão no mesmo dia, tinha quatro afirmações falsas, e quem achou foi
 ## Em uma frase
 
 O Sprint 5 mínimo, o monorepo (V2-T1), o esqueleto da interface (V2-T2), o terminal usável no dia
-a dia (V2-T3) e a interface retomando o dia em abas (V2-T4) estão mesclados na `main`; **a V2-T5a
-(`end-day` pela interface: a prévia é a confirmação, progresso por sessão, resultado e
-notificação) está pronta numa worktree isolada**, portão local e `verificar:linux` verdes, aceite
-medido pelo agente com captura de tela real contra um `homeDir` descartável — falta a revisão do
-PO, a mesclagem, e o aceite manual do mantenedor (um `end-day` real pela interface no fim de um
-dia real, e o `start-day` pela interface na manhã seguinte, no Windows e no Linux dele — fecha
-V2-T4 e V2-T5a juntas).
+a dia (V2-T3), a interface retomando o dia em abas (V2-T4) e o `end-day` pela interface (V2-T5a)
+estão mesclados na `main` — **V2-T4 e V2-T5a foram aceitas pelo mantenedor em 17/09**, medido de
+dentro de uma sessão real retomada pela própria interface. **A V2-T6 (correção: letras órfãs ao
+redimensionar/rolar uma aba de Claude Code no Windows) está pronta numa worktree isolada**, portão
+local verde no Windows — falta `verificar:linux` terminar (interrompido por memória do sistema, não
+por defeito), a revisão do PO, a mesclagem, e o aceite manual do mantenedor (repetir o
+redimensionamento com rolagem e dizer se os órfãos sumiram).
 
 ## Onde o código está
 
@@ -276,6 +276,37 @@ no fim de um dia real, e um `start-day` real pela interface na manhã seguinte, 
 Linux dele — fecha V2-T4 e V2-T5a juntas. Detalhes, decisões de ferramental e a corrida (não
 resolvida por esta tarefa, como o despacho já previa) com o `end-day` agendado do daemon em
 `docs/QUESTOES.md` Q-074.
+
+## V2-T6 — correção: letras órfãs ao redimensionar/rolar no Windows (numa worktree isolada,
+## pendente de revisão)
+
+Especificada e despachada pelo mantenedor em 17/09, a partir de um defeito visto ao vivo (captura
+de tela): redimensionar a janela e rolar o scrollback deixa caracteres órfãos na borda esquerda de
+uma aba com o Claude Code — só nela; uma aba de shell (PowerShell) redimensionada e rolada da mesma
+forma fica limpa, e o mesmo teste no Windows Terminal (fora do produto) também fica limpo, então o
+defeito é do emulador embutido (`xterm.js`), não do ConPTY nem da TUI do harness por si só.
+
+**Entregue pelo agente em 17/09, dois commits (um por item), worktree isolada
+(`agent-a9d0419594005737a`):** (1) `windowsPty` na opção do `Terminal`, derivado por um módulo puro
+(`state/terminal-options.ts`, renomeado de `terminal-font.ts`) a partir de `process.platform`/
+`os.release()` lidos uma única vez na raiz de composição — `undefined` fora do Windows e quando
+`os.release()` não parseia (D-025); (2) `terminal.refresh(0, rows - 1)` depois de cada
+redimensionamento. Portão local em pedaços verde no Windows a cada commit (1.727 testes passando, 4
+pulados; cobertura agregada 97%). Investigadas, sem mudar código, as duas hipóteses seguintes que a
+V2-T6 já previa (ordem `resize`/`fit`, `convertEol`) — nenhuma delas justificou uma terceira
+mudança sem evidência adicional; detalhes na Q-075.
+
+**`npm run verificar:linux` não terminou** — foi interrompido pelo próprio harness do agente por
+pressão de memória do sistema (não uma falha do código; o job chegou a passar formatação, lint,
+build, `dependencias` e começar a cobertura dentro do contêiner antes de ser encerrado). Fica
+pendente rodar até o fim quando houver memória disponível.
+
+**O agente não tem tela interativa — não afirma que o defeito sumiu.** O aceite real é do
+mantenedor: revisar e mesclar; rodar `verificar:linux` até o fim; repetir o redimensionamento com
+rolagem numa aba de Claude Code no Windows e dizer se os órfãos sumiram (a comparação com o Windows
+Terminal, limpo, já está registrada). Se não sumirem, a tarefa reabre com a investigação das
+hipóteses seguintes (Q-075), não com o renderizador WebGL (descartado no despacho). Detalhes em
+`docs/PLANO-DE-ENTREGA.md` (entrada V2-T6) e `docs/QUESTOES.md` Q-075.
 
 ## Próximo passo
 

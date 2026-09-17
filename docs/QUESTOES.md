@@ -7350,3 +7350,126 @@ nothing — it never called the model (skipGeneration)."
 2. Um `end-day` real pela interface no fim de um dia real, e um `start-day` real pela interface na
    manhã seguinte, no Windows e no Linux — fecha V2-T4 e V2-T5a juntas, como o aceite de ambas já
    pede.
+
+## Q-075 — V2-T6 (correção: letras órfãs ao redimensionar/rolar no Windows): decisões de
+## ferramental, o que fica pendente do mantenedor, e as duas hipóteses seguintes investigadas
+
+**Tarefa:** V2-T6
+**Bloqueia:** não — os dois itens foram entregues, um commit cada, com o portão local completo
+verde (Windows e o contêiner Linux). Registro no mesmo padrão de Q-071/Q-072/Q-073/Q-074. **Esta
+tarefa é diferente das anteriores num ponto importante: o agente não consegue ver o defeito** (sem
+tela interativa) — tudo abaixo separa o que foi medido do que foi inferido, e o aceite de verdade
+(os órfãos sumiram?) é do mantenedor.
+
+### 1) `terminal-font.ts` virou `terminal-options.ts` — o nome não sobrevivia ao segundo uso
+
+O despacho deixava a escolha para o agente ("`state/terminal-options.ts` ou o `terminal-font.ts`
+renomeado... o agente decide e registra"). Optei por renomear em vez de criar um módulo irmão: as
+duas opções (fonte e `windowsPty`) viajam pelo MESMO round-trip de IPC, resolvidas no MESMO ponto
+(`electron/main.ts`'s `getTerminalOptions` handler) e consumidas no MESMO `new Terminal({...})`
+(`electron/renderer.ts#mountTerminalTab`) — um segundo módulo só para `windowsPty` teria o chamador
+montando o objeto final em dois pedaços, sem necessidade. O canal IPC também foi renomeado
+(`getTerminalFontConfig` → `getTerminalOptions`, `TerminalFontConfigResponse` →
+`TerminalOptionsResponse`) pelo mesmo motivo — "font config" já não descrevia o que o canal
+carrega. Nenhuma chave em disco mudou (isto não é `config.json` nem handoff, é só a forma do
+payload de IPC em memória), então a tabela "Identificadores que vão para disco" do `AGENTS.md` não
+precisa de entrada nova; a única tabela que cita o arquivo por nome é a linha "família da fonte do
+terminal" (`terminalFontFamily`), que descreve a CHAVE de config, não o módulo que a lê — não
+editei essa linha.
+
+### 2) Por que a derivação de `windowsPty` é um módulo puro separado, e não inline em
+### `composition/index.ts`
+
+`os.release()` só pode ser lido na raiz de composição (regra do `AGENTS.md`), mas a REGRA de
+quando `windowsPty` existe (Windows + `release` parseável) é lógica testável, e `composition/`
+neste projeto é fiação, não lógica (mesmo padrão que `toEndDayDeps` já segue, citado no próprio
+despacho). `deriveWindowsPtyOptions(platform, release)` mora em `state/terminal-options.ts`,
+chamada uma vez em `buildAppContext`; `composition/index.ts` faz exatamente duas coisas novas:
+ler `os.release()` ao lado do `process.platform` que já lia, e chamar a função pura com os dois
+valores. Os testes do módulo puro (`tests/unit/app/state/terminal-options.test.ts`) cobrem os três
+casos que o despacho pediu (`10.0.26200` → `26200`; fora do Windows → `undefined`; `release`
+estranho no Windows → `undefined`) mais um teste de fronteira (`10.0` sem o terceiro número,
+`10.0.abc`, string vazia) e um controle positivo rodando na própria máquina Windows deste agente
+(`tests/integration/app/composition.test.ts`, o novo teste que chama `buildAppContext` de verdade
+e confere `context.windowsPty?.backend === 'conpty'` com um `buildNumber` inteiro real — rodou
+verde nesta máquina, Windows 11 build 26200, então este é o único ponto da tarefa em que a
+derivação foi exercida contra um `os.release()` REAL, não uma string fabricada em teste).
+
+### 3) `exactOptionalPropertyTypes` recusou `windowsPty: undefined` explícito — a correção é
+### espalhar a chave condicionalmente
+
+`tsconfig`'s `exactOptionalPropertyTypes: true` trata `{ windowsPty: undefined }` como diferente de
+"a chave `windowsPty` está ausente" — `@xterm/xterm`'s `ITerminalOptions.windowsPty` é `?:
+IWindowsPty` (ausente ou presente-com-valor, nunca presente-com-`undefined`). `mountTerminalTab`
+usa um spread condicional (`...(terminalOptions.windowsPty !== undefined ? { windowsPty: ... } :
+{})`) em vez de passar o campo direto — comentário no próprio código explica o motivo. Achado no
+primeiro `tsc -p packages/app/tsconfig.json --noEmit`, corrigido antes do primeiro commit.
+
+### 4) Ambiente desta worktree: `node_modules` precisou de `npm install` antes do portão rodar de
+### verdade
+
+Achado no meio da tarefa, não uma decisão de ferramental, mas registrado porque custou tempo real:
+esta worktree (`.claude/worktrees/agent-a9d0419594005737a`) tinha `node_modules/` vazio (só
+diretórios de cache do Vite) — sem `node_modules/.package-lock.json`, ou seja, `npm install` nunca
+rodou nela. `npx tsc`/`npm run lint`/`npm run build`/`npm run dependencias` passaram mesmo assim
+(a resolução de módulo do Node sobe o diretório até achar `node_modules` na raiz do checkout
+principal, `C:\code\seeya\node_modules`), mas os guards de `tests/integration/guards/` que montam
+o caminho do binário direto (`path.join(PROJECT_ROOT, 'node_modules', 'vitest', 'vitest.mjs')`,
+mesmo padrão para `eslint`/`dependency-cruiser`) não sobem diretório — falharam todos com
+`MODULE_NOT_FOUND` até `npm install` popular o `node_modules` desta worktree especificamente (258
+pacotes, ~9s). Depois disso, `npm test` ficou verde (1727 passando, 4 pulados) e só uma reexecução
+isolada precisou (`eslint-restrictions.test.ts`'s "approves a clean file in src/core/ (control)"
+estourou o orçamento de 30s do processo-filho na primeira rodada pós-`install`, com o cache do
+ESLint ainda frio — passou limpo (56s de suíte, mas o teste individual voltou ao normal) na
+repetição imediata). Não sei se isto é peculiar desta worktree ou de todo `.claude/worktrees/`
+criado por este harness — não investiguei além do necessário para destravar esta tarefa.
+
+### 5) As duas hipóteses seguintes do despacho — investigadas, sem mudar código de produção
+
+O despacho autorizava investigar, sem mexer em código além dos dois itens, as duas hipóteses
+registradas no `PLANO-DE-ENTREGA.md` caso o item 1 não bastasse:
+
+**a) A ordem entre o `resize` do pty e o `fit()` do xterm.** Em `renderer.ts`, `wireWindowResize`
+chama `fitAddon.fit()` (que já redimensiona o buffer do `Terminal` e emite `onResize` do xterm.js
+antes de retornar) e só DEPOIS manda `resizeTab` (que chega ao pty via `PtyManager.resize` em
+`electron/main.ts`). A ordem de escrita no código é sempre xterm-primeiro, pty-depois — nunca o
+contrário —, então não há uma corrida de ORDEM neste laço específico (a chamada é síncrona até o
+IPC `send`, que é fire-and-forget). O que EXISTE, e este agente não pode medir sem tela, é uma
+corrida de TEMPO do outro lado: entre o momento em que o ConPTY do lado do pty processa o novo
+tamanho e emite dados redesenhados, e o momento em que o `xterm.js` já rodou seu próprio reflow
+local — se dados novos chegam por `onTabData` no meio do reflow do xterm.js (antes do `refresh`
+manual do item 2 rodar), a ordem relativa entre "xterm.js recalcula quebras" e "ConPTY manda a
+redesenha real" não é garantida pelo código dos dois lados, e é exatamente o tipo de disputa que
+`windowsPty`'s própria contagem de build (D-021) existe para mitigar, não eliminar. Não encontrei
+um ponto de código para uma correção adicional aqui sem inventar um mecanismo de sincronização
+novo (ex.: esperar o pty confirmar o resize antes de aceitar mais entrada) — isso seria bem além do
+escopo dos dois itens, e o próprio despacho não pediu.
+
+**b) `convertEol: true` interferindo nas sequências de cursor da TUI.** A documentação do
+`xterm.js` (`ITerminalOptions.convertEol`, citada no código deste projeto desde a V2-T2) diz
+textualmente: "Normally the settings of the underlying PTY (`termios`) deal with the translation of
+`\n` to `\r\n` and this setting should not be used" — ou seja, a própria biblioteca já registra
+`convertEol` como um workaround para quando os dados NÃO vêm de um pty real (a doc completa: "If
+you deal with data from a non-PTY related source, this setting might be useful"). `convertEol`
+reescreve `\n` cru para `\r\n`; não toca em NENHUMA sequência de escape ANSI/VT (posicionamento de
+cursor, apagar até o fim da linha, etc. — essas chegam como `ESC[...` completas e passam pelo
+parser de sequências do xterm.js sem qualquer interação com esta opção, que age só sobre o
+caractere `\n` fora de sequência). O harness Claude Code roda dentro de um pty real (`node-pty`)
+tanto na aba de shell quanto na de Claude — pelo termios do próprio pty, a saída já devia chegar
+com `\r\n` completo, tornando `convertEol: true` redundante (não nocivo) NESTE caminho, pela
+leitura da doc. **Não medi diretamente se o harness emite `\n` cru em algum trecho** (não tenho uma
+captura de bytes brutos da sessão do mantenedor para inspecionar) — a asserção acima é sobre o que
+a opção FAZ, não sobre o que o harness envia. Como a doc não aponta `convertEol` como candidato a
+interferir em sequências de cursor, e mexer nela sem essa evidência seria uma mudança de
+comportamento não pedida pelos dois itens, não toquei em `convertEol` nesta tarefa. Se os órfãos
+persistirem depois do item 1+2, a hipótese (b) continua aberta, mas o próximo passo natural seria
+capturar a saída bruta do pty (não o que o xterm.js desenha) durante um redimensionamento real, não
+desligar `convertEol` às cegas.
+
+### O que fica pendente do mantenedor
+
+1. Revisar e mesclar.
+2. **O aceite real da tarefa**: repetir o redimensionamento com rolagem numa aba de Claude Code no
+   Windows, e dizer se os caracteres órfãos sumiram — com a comparação já feita no Windows Terminal
+   (limpo) como referência. Se não sumirem, a V2-T6 reabre com a investigação continuando pelas
+   hipóteses do item 5 acima, não com o renderizador WebGL (descartado no próprio despacho).

@@ -4888,7 +4888,7 @@ texto, mas não são a fila.
       V2-T5a aceitas.** Pendente só o Linux/macOS, na mesma classe de medição das tarefas
       anteriores da interface.
 
-- [ ] **V2-T6 — Correção: letras ficam para trás ao redimensionar e rolar a aba no Windows
+- [~] **V2-T6 — Correção: letras ficam para trás ao redimensionar e rolar a aba no Windows
       (ConPTY × xterm.js).** Especificada pelo PO em 2026-09-17 a partir de um defeito visto pelo
       mantenedor no mesmo dia; **aprovada e despachada pelo mantenedor em 2026-09-17.**
 
@@ -4941,6 +4941,73 @@ texto, mas não são a fila.
       Windows: repetir o redimensionamento com rolagem numa aba de Claude e dizer se os órfãos
       sumiram, com a comparação no Windows Terminal registrada — se não sumirem e o Windows
       Terminal ficar limpo, a V2-T6 reabre com investigação, não com WebGL.
+
+      **Entregue pelo agente em 2026-09-17, dois commits (um por item), worktree isolada
+      (`agent-a9d0419594005737a`).** Portão local em pedaços verde antes de cada commit
+      (`npm run format:check`, `tsc -p tsconfig.json --noEmit`, `tsc -p packages/app/tsconfig.json
+      --noEmit`, `npm run lint`, `npm run build`, `npm run dependencias`, `npm run cobertura --
+      --maxWorkers 2`, cada um com o código de saída lido) — **1.727 testes passando, 4 pulados**
+      no Windows depois do segundo commit; cobertura agregada 97,03% linhas/97,25% statements
+      (piso do pacote é 80%, nenhum arquivo novo abaixo disso).
+
+      1. **`windowsPty`.** `state/terminal-font.ts` virou `state/terminal-options.ts` (decisão do
+         agente, registrada na Q-075 item 1: as duas opções viajam pelo mesmo round-trip de IPC e
+         entram no mesmo `new Terminal({...})`, um módulo irmão só duplicaria a montagem).
+         `deriveWindowsPtyOptions(platform, release)`, puro, testado
+         (`tests/unit/app/state/terminal-options.test.ts`): `undefined` fora do Windows, `undefined`
+         quando `release` não casa com `MAJOR.MINOR.BUILD` (D-025), `{ backend: 'conpty',
+         buildNumber }` quando casa. `composition/index.ts` lê `os.release()` uma vez, ao lado do
+         `process.platform` que já lia, e guarda o resultado em `AppContext.windowsPty`. O canal IPC
+         foi renomeado com a opção (`getTerminalFontConfig` → `getTerminalOptions`,
+         `TerminalFontConfigResponse` → `TerminalOptionsResponse`) porque "font config" já não
+         descrevia o payload. `electron/renderer.ts#mountTerminalTab` — o único lugar em que
+         `new Terminal({...})` é criado, usado tanto pela aba do "+" quanto pela aba de retomada —
+         espalha a opção condicionalmente (`exactOptionalPropertyTypes` recusa a chave presente com
+         valor `undefined`, achado no primeiro `tsc`, ver Q-075 item 3).
+      2. **`refresh` depois de `resize`.** `wireWindowResize` (`electron/renderer.ts`), depois de
+         `fitAddon.fit()` e `resizeTab`, chama `terminal.refresh(0, terminal.rows - 1)` para cada
+         aba aberta — sem lógica nova, então nada foi extraído para módulo puro (o próprio despacho
+         previa esse caso).
+
+      **Medido pelo agente:** os dois commits, cada um com o portão local completo verde no Windows.
+      `tests/integration/app/composition.test.ts` ganhou um teste que chama `buildAppContext` de
+      verdade nesta máquina (Windows 11 build 26200) e confere `context.windowsPty` — rodou e
+      confirmou `{ backend: 'conpty', buildNumber: 26200 }`, o único ponto desta tarefa em que a
+      derivação foi exercida contra um `os.release()` real, não uma string fabricada em teste.
+      Achado de ambiente registrado na Q-075 item 4: esta worktree não tinha `node_modules/` próprio
+      (`npm install` nunca tinha rodado nela) — os guards que montam caminho de binário direto
+      (`vitest.mjs`/`eslint`/`dependency-cruiser`) falhavam com `MODULE_NOT_FOUND` até um
+      `npm install` local; depois disso `npm test` ficou verde.
+
+      **`verificar:linux` — interrompido, não medido até o fim.** Rodando em segundo plano com
+      saída redirecionada a arquivo (como as regras de sobrevivência pedem), chegou a construir a
+      imagem, rodar formatação/lint/build/`dependencias` verdes e começar a suíte de cobertura
+      dentro do contêiner (guards e as primeiras suítes de integração passando) quando o processo
+      foi encerrado pelo próprio harness por pressão de memória do sistema (notificação explícita:
+      "the system is running low on memory" — não uma falha do comando nem do código). O contêiner
+      Docker ficou órfão (`docker ps` o mostrou `Up`, 2 minutos, sem processo controlador); parei-o
+      (`docker stop`/o `--rm` do script já o removeu) para liberar memória. Por instrução explícita
+      do próprio harness ("start it again only when asked"), **não tentei de novo por conta
+      própria** — fica pendente do mantenedor/PO decidir quando a máquina tiver memória livre para
+      rodar `npm run verificar:linux` (ou `node scripts/verificar-linux.mjs`) até o fim.
+
+      **Investigação das duas hipóteses seguintes (Q-075 item 5), sem mudar código de produção:**
+      (a) a ordem `fit()` → `resizeTab` no código é sempre xterm-primeiro/pty-depois, nunca invertida
+      — não há corrida de ORDEM neste laço; a corrida de TEMPO do lado do ConPTY (dados chegando
+      antes do reflow do xterm.js terminar) não é medível sem tela e é o problema que o `windowsPty`
+      já existe para mitigar, não eliminar. (b) a própria documentação do `xterm.js` descreve
+      `convertEol` como tradução de `\n` cru para `\r\n`, sem tocar em sequências de escape
+      (cursor/apagar linha) — como a aba já roda sobre um pty real (`node-pty`), a opção é
+      redundante e não uma explicação provável para o defeito; não desliguei `convertEol` sem
+      evidência de que o harness emite `\n` cru, o que exigiria capturar bytes brutos do pty, fora
+      do alcance deste agente. Detalhes completos, com as citações da documentação, na Q-075.
+
+      **Não afirmo que o defeito foi resolvido** — este agente não tem tela interativa para ver o
+      resultado. **O que fica pendente do mantenedor:** revisar e mesclar; rodar
+      `npm run verificar:linux` até o fim quando a máquina tiver memória disponível; e o aceite real
+      — repetir o redimensionamento com rolagem numa aba de Claude Code no Windows e dizer se os
+      caracteres órfãos sumiram, com a comparação já feita no Windows Terminal (limpo) como
+      referência. Detalhes de ferramental completos na Q-075.
 
 ## Definição de pronto (vale para toda tarefa)
 
