@@ -5110,6 +5110,71 @@ texto, mas não são a fila.
       e ver `seeya status` na CLI concordar; dar Snooze pela janela num dia real e ver o
       encerramento respeitar.
 
+- [ ] **V2-T7 — Retomar sem o plano: a terceira opção quando o plano não cabe no argumento
+      (D-025, D-039; emenda à S5-T9).** Especificada pelo PO em 2026-09-17 a partir do uso real do
+      mantenedor no mesmo dia; **aguarda aprovação do mantenedor antes de qualquer despacho.**
+      Recomendação do PO: **antes da V2-T5b** — é o que destrava usar o seeya todo dia, fechando
+      e reabrindo a interface.
+
+      **O achado.** O mantenedor tentou retomar a sessão do PO pelo painel "Hoje"; o plano tinha
+      34.071 caracteres (teto 16.384) e o diálogo da S5-T9 ofereceu só "sessão limpa com o
+      handoff" ou "pular". As duas jogam fora o que só o `--resume` traz de volta: o transcript,
+      que é a memória de verdade (spikes K/L: a sessão retomada volta com a memória do próprio
+      transcript; o handoff é um resumo). E como o seletor `--resume` do Claude Code lista por
+      diretório atual, uma sessão nascida em outra pasta só volta por id — sem o seeya, a pessoa
+      precisa lembrar o id. A terceira opção, **retomar sem o plano**, é a que quase sempre se
+      quer: a sessão volta inteira, e o plano continua legível no briefing do dia.
+
+      **O que entra:**
+      1. **A decisão ganha a terceira opção.** `core/resume-fallback-decision.ts#FallbackDecision`
+         ganha `{ kind: 'resumeWithoutPlan' }`; `parseFallbackAnswer` aceita `r`/`resume`.
+         **A opção só existe para o motivo `promptTooLarge`**: quando o motivo é `resumeFailed`
+         (o próprio `--resume` morreu rápido), retomar de novo sem o plano falharia igual, e as
+         opções continuam "abrir limpa"/"pular" — o tipo do motivo decide quais respostas são
+         válidas (D-024: o tipo recusa a combinação inválida, não um `if` solto). **O padrão muda
+         para `promptTooLarge`:** resposta em branco na CLI e Enter/fechar no diálogo passam a
+         ser "retomar sem o plano" — não custa nada a mais e não perde nada; para `resumeFailed`
+         o padrão continua "pular" (S5-T9).
+      2. **A porta `SessionResumer` ganha `resumeWithoutPrompt(sessionId, cwd)`**, com a mesma
+         detecção de falha rápida de `attemptResume` e o mesmo resultado (`PrimaryResumeAttempt`):
+         o resumer da CLI lança `claude --resume <id>` interativo sem argumento de prompt; o da
+         interface (`TabSessionResumer`) abre a aba do mesmo jeito. Se a retomada sem plano
+         falhar rápido (código ≠ 0), a sessão é reportada como pulada com o motivo ("resume
+         without the plan failed, exit N") — **sem segunda pergunta**; a pessoa tenta de novo.
+      3. **O resultado diz que o plano não foi entregue.** `ResumeOutcome` hoje é `fellBack:
+         false | ResumeFallbackReason`; passa a distinguir "retomada com o plano", "retomada sem o
+         plano (o plano tinha N caracteres, teto M)" e "sessão limpa com o handoff" — união
+         discriminada, não um booleano a mais (D-024). `format-start-day.ts` (CLI) e o resumo da
+         interface (`state/resume-summary.ts`) mostram a terceira forma; `resumed.json` registra a
+         sessão como retomada do mesmo jeito (o dia não a oferece de novo).
+      4. **Os dois lugares que perguntam** mudam juntos: a pergunta da CLI
+         (`renderFallbackQuestion`) lista as três respostas com o padrão certo para cada motivo; o
+         diálogo da janela ganha o botão **Resume without the plan** em primeiro lugar, com foco,
+         e os outros dois depois. O texto do motivo continua o mesmo (`describeFallbackReason`).
+
+      **O que não entra:** entregar o plano por outro canal na sessão retomada (Q-069 mediu que
+      `--append-system-prompt-file` não chega numa sessão retomada); retomar sessões de dias
+      antigos fora do briefing pendente (é candidato à fila: "sessões recentes", ver abaixo).
+
+      **Cuidados:** nenhum comportamento muda para quem responde como antes ("y"/"n"); a CLI e a
+      interface mudam na mesma tarefa; toda lógica em módulos puros com teste (a decisão por
+      motivo, o resultado novo, a corrida de falha rápida no resumer de aba); texto em
+      `text/messages.ts` na interface e no módulo de texto da CLI; **um commit por item**, portão
+      em primeiro plano em pedaços, `verificar:linux` lido em arquivo. Questão: Q-077.
+
+      *Aceite:* testes de unidade cobrindo as três respostas por motivo e os padrões; na CLI, um
+      `start-day` com um handoff sintético acima do teto e resposta em branco resulta em
+      `claude --resume <id>` sem prompt (o `claude` falso do e2e registra o argv); na interface, o
+      mesmo com o diálogo (captura de tela lida pelo agente, se a captura funcionar) e
+      `resumed.json` gravado; portão e CI verdes. **Aceite manual do mantenedor:** retomar a
+      sessão do PO pelo painel "Hoje" com o plano acima do teto, escolhendo "Resume without the
+      plan", e vê-la voltar com o contexto inteiro — o caso que motivou a tarefa.
+
+      **Candidato à fila, não especificado:** "sessões recentes" na interface — retomar qualquer
+      sessão capturada nos últimos N dias (ou descoberta nos transcripts) pelo nome, sem depender
+      do briefing pendente do dia; é o que resolve "preciso lembrar o id" de vez, e conversa com o
+      modelo de projeto (V2-RUMO, passo 3).
+
 ## Definição de pronto (vale para toda tarefa)
 
 1. Código implementa exatamente a spec; divergência virou questão, não improviso.
