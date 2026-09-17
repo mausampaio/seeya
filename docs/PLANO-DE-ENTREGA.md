@@ -5318,6 +5318,91 @@ texto, mas não são a fila.
       padrão em vez de pular, para reasons `promptTooLarge` — o despacho não falou desse caminho
       especificamente).
 
+- [ ] **V2-T8 — O instalador: a interface instalável no Windows e no Linux, sem checkout (D-041,
+      D-042, D-034).** Especificada pelo PO em 2026-09-17; **aguarda aprovação do mantenedor
+      antes de qualquer despacho** — e carrega duas decisões dele (abaixo). Hoje a interface só
+      roda de um clone (`npm run app`), e isso já custou duas vezes: o `npm ci` quebrou com a
+      interface aberta do mesmo checkout (TESTES.md), e o clique no toast não existe no Linux
+      porque o handler de `seeya://` só vem de um pacote instalado. É também o que deixa o seeya
+      ser usado todo dia sem o checkout de desenvolvimento embaixo.
+
+      **Duas decisões do mantenedor antes do despacho:**
+      - **Dependência nova (AGENTS.md):** `electron-builder` como `devDependency` de
+        `packages/app`. Recomendação do PO: é o que resolve de uma vez os três pontos que
+        dariam trabalho à mão — `asarUnpack` dos nativos do `node-pty` (e do `conpty.dll` da
+        V2-T6), o registro do protocolo `seeya://` pelo próprio instalador em cada formato
+        (entrada no registro no NSIS, `MimeType=x-scheme-handler/seeya` no `.desktop`,
+        `CFBundleURLTypes` no `Info.plist`) e os formatos por SO numa configuração só.
+        Alternativa: `electron-forge` (mais peças, mesma dependência nova).
+      - **Formatos de Linux:** o `.deb` registra o protocolo pelo `.desktop` na instalação; o
+        `AppImage` roda sem instalar, mas não integra o protocolo sozinho. Recomendação: os dois,
+        com o `.deb` como o formato do dia a dia **se a distro do mantenedor for da família
+        Debian/Ubuntu** — se não for, ele diz qual, e o formato nativo dela entra no lugar.
+
+      **O que entra:**
+
+      1. **Empacotamento** (`npm run dist` na raiz → `electron-builder` para o SO atual):
+         Windows **NSIS por usuário** (sem admin, atalho no menu Iniciar, desinstalador); Linux
+         `.deb` + `AppImage`; macOS `.dmg` x64 **só construído pela CI**, sem aceite nesta tarefa.
+         Dentro do pacote: o bundle da interface (`dist/electron`, com fontes e licença),
+         `@seeya-ai/engine` e `@seeya-ai/cli` compilados (o daemon é a CLI), `node-pty` com os
+         `.node`, o `conpty.dll`/`OpenConsole.exe` e o `spawn-helper` **fora do asar**
+         (`asarUnpack`). **Sem assinatura** (SmartScreen e Gatekeeper vão avisar — custo e
+         certificado são decisão futura, registrada na Q-078). Nada do ferramental de dev
+         (`dist-tsc`, testes, `esbuild`) vai junto. Medir e registrar o tamanho de cada
+         artefato.
+      2. **O que só valia no dev passa a valer instalado.** A resolução do `bin` da CLI
+         (`require.resolve` em `composition/index.ts`), o caminho do preload e do `index.html`
+         (`import.meta.url`), e o `ensureElectronBinary`/`ensureSpawnHelperExecutable` do
+         `build.mjs` (dev apenas — instalado, o builder já garante) — cada um conferido dentro de
+         um pacote instalado de verdade. **O daemon subido pela janela instalada**
+         (`ELECTRON_RUN_AS_NODE=1` com o script da CLI): medir se o Node do Electron lê o script
+         de dentro do asar; se não ler, a CLI vai para o `asarUnpack` — registrar qual. **Não
+         desligar o fuse `RunAsNode`** do Electron (endurecimento que o builder oferece): o
+         daemon depende dele; registrar a troca na Q-078.
+      3. **O `PATH` de quem abre pelo menu.** No Linux e no macOS, um app aberto pelo lançador
+         gráfico herda o `PATH` da sessão gráfica, que costuma não ter `~/.local/bin`, o `nvm` ou
+         o `npm` global — onde `claude` e `codex` moram; aberto pelo terminal, funciona, e o
+         defeito só aparece instalado. Correção conhecida (a mesma do VS Code): ao subir, fora do
+         Windows, ler o `PATH` do shell de login da pessoa uma vez (`$SHELL -lic` com um
+         marcador para separar a saída do ruído do perfil, prazo curto, e em falha ficar com o
+         `PATH` herdado e dizer isso) e usá-lo em `resolve-command.ts` e no ambiente das abas.
+         Módulo puro para o parse, com teste; a leitura mora na raiz de composição.
+      4. **O clique no toast no Linux.** O backend `notify-send` ganha, **só quando o marcador de
+         protocolo existe** (V2-T5b), a ação padrão (`--action=default=Open`, que é o clique no
+         corpo, não um botão — a D-034 não muda) com `--wait`, num processo destacado e invisível
+         (D-038), e ao receber `default` abre `seeya://open` pelo `xdg-open`. Se a versão do
+         `notify-send` não aceitar `--action` (anterior à 0.7.10), fica como hoje — medir a
+         versão e registrar. macOS fica sem clique nesta tarefa: o `osascript` não entrega clique
+         de volta, e a alternativa (`terminal-notifier`) é a que a D-034 recusou.
+      5. **A CI constrói, a pessoa baixa.** Um workflow com `workflow_dispatch` (manual) constrói
+         os três artefatos na matriz de sistemas e os publica como **artefatos do workflow**, não
+         como release: a D-041 guarda a publicação para a fronteira da v2. O portão de sempre
+         roda antes do empacotamento no mesmo workflow.
+
+      **O que não entra:** assinatura e notarização; atualização automática; o `seeya` da CLI no
+      `PATH` pelo instalador (a CLI continua pelo `npm link` do checkout); o autostart apontando
+      para o app instalado (continua o que `seeya autostart enable` registrou — decisão para
+      quando a CLI for instalada junto); clique no toast no macOS; release pública (D-041).
+
+      **Cuidados:** instalar e desinstalar não tocam `~/.seeya/` (os dados são da pessoa, não do
+      app); o app instalado e o checkout de dev não brigam (mesmo `~/.seeya/`, mesmo lock do
+      daemon — só um daemon, como hoje); nenhum caminho de dev escrito em código de produção;
+      `process.platform` só na raiz de composição e nos adapters; **um commit por item**, portão
+      em primeiro plano em pedaços, `verificar:linux` lido em arquivo; **nada de `npm ci` no
+      checkout principal** (a interface do mantenedor roda de lá). Questão: Q-078.
+
+      *Aceite:* o agente constrói o instalador do Windows na máquina dele e **instala de verdade**
+      num perfil de teste só se for descartável — senão para no artefato construído e medido, e
+      a instalação fica com o mantenedor; o `.deb`/`AppImage` construídos no contêiner Linux, com
+      a inspeção do conteúdo (`dpkg -c`: `.desktop` com o `MimeType`, nativos fora do asar);
+      testes dos módulos novos (parse do `PATH` do shell, a decisão da ação no `notify-send`);
+      portão e CI verdes; o workflow manual rodado uma vez com os três artefatos. **Aceite do
+      mantenedor:** no **Linux** (o dia a dia), instalar o pacote, abrir pelo menu, abrir uma aba
+      de `claude`, subir o daemon pela janela, e clicar num aviso prévio trazendo a janela para
+      frente; no **Windows**, instalar pelo NSIS, abrir pelo menu Iniciar, e o mesmo clique no
+      toast.
+
 ## Definição de pronto (vale para toda tarefa)
 
 1. Código implementa exatamente a spec; divergência virou questão, não improviso.
