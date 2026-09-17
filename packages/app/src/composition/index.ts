@@ -174,7 +174,9 @@ export async function buildAppContext(homeDir: string = os.homedir()): Promise<A
     homeDir,
     tabEnv: buildResumptionEnv(process.env),
     defaultShell: defaultShellCommand(platform, process.env),
-    buildPtyManager: (callbacks) => new PtyManager(new NodePtyAdapter(), callbacks),
+    // V2-T6: the bundled (Windows Terminal) ConPTY, Windows only — see NodePtyAdapterOptions.
+    buildPtyManager: (callbacks) =>
+      new PtyManager(new NodePtyAdapter({ useConptyDll: platform === 'win32' }), callbacks),
     sessionProvider,
     storage,
     processControl: realProcessControl,
