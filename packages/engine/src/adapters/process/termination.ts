@@ -35,8 +35,9 @@ export function terminateGracefully(
 /**
  * Unconditional, immediate termination (`SIGKILL`) — **never** used on a discovered Claude Code
  * session (D-002 bans forced kill for those in v1; `terminateGracefully` above is the only verb
- * that ever touches one). This exists solely for `cli/daemon-command.ts#runDaemonStop` (S4-T5) to
- * end `seeya`'s OWN background daemon when there is no graceful path left to try:
+ * that ever touches one). This exists for `scheduler/daemon-control.ts#runDaemonStop` (S4-T5,
+ * moved out of `cli/daemon-command.ts` in V2-T5b so the interface's own "Stop daemon" button can
+ * call it too) to end `seeya`'s OWN background daemon when there is no graceful path left to try:
  *
  * - **Windows**: the daemon runs detached with no console at all (D-005), so
  *   `terminateGracefullyWindows`'s `CTRL_BREAK_EVENT` can never be delivered — `AttachConsole`

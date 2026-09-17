@@ -146,11 +146,40 @@ body {
   white-space: pre-wrap;
 }
 
+/* V2-T5b item 1: the faixa de horário, below the status panel it's computed alongside
+ * (docs/PLANO-DE-ENTREGA.md V2-T5b: "na região de estado"). Buttons are hidden by default in the
+ * HTML — `renderer.ts#renderScheduleStrip` only un-hides the ones `canSnooze`/`canSkip` allow. */
+#schedule-strip {
+  margin-top: 6px;
+}
+
+#schedule-strip-text {
+  font-size: 11px;
+  margin: 0 0 4px;
+}
+
+#schedule-strip button {
+  font-size: 11px;
+  margin: 0 4px 4px 0;
+}
+
 /* V2-T5a item 1: the "End day..." button, in the status region below the panel it reports
  * against (docs/PLANO-DE-ENTREGA.md V2-T5a: "na região de estado"). */
 #end-day-button {
   margin-top: 6px;
   width: 100%;
+}
+
+/* V2-T5b item 3: "Start daemon"/"Stop daemon", same region. */
+#daemon-control-button {
+  margin-top: 6px;
+  width: 100%;
+}
+
+#daemon-control-result {
+  font-size: 11px;
+  margin: 4px 0 0;
+  white-space: pre-wrap;
 }
 
 #terminal-host {

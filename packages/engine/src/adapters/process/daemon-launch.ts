@@ -22,14 +22,33 @@
 // wrapper to add. Direct import, not `spawnHidden`.
 import { spawn } from 'node:child_process';
 
-/** What actually launches the detached worker — `process.execPath` (the same Node binary already
- * running this launcher) plus `scriptPath` (this package's own compiled entry point) and `args`
- * (`['daemon']`, so the child runs the exact same command the human typed). Not `process.argv[1]`
- * directly: that would also carry along whatever OTHER flags the launcher itself was invoked with,
- * which is not what re-running `daemon` specifically means. */
+/**
+ * What actually launches the detached worker: `nodePath` (the runtime to spawn), `scriptPath`
+ * (this package's own compiled entry point) and `args` (`['daemon']`, so the child runs the exact
+ * same command the human typed). Not `process.argv[1]` directly for the script: that would also
+ * carry along whatever OTHER flags the launcher itself was invoked with, which is not what
+ * re-running `daemon` specifically means.
+ *
+ * **`nodePath`/`env` became explicit fields in V2-T5b, not always `process.execPath`/
+ * `process.env`.** Until this task both were read straight from the calling process itself
+ * (fine for `cli/`: `process.execPath` there IS a real Node binary). The interface's own "Start
+ * daemon" button (`packages/app/src/composition/index.ts`) is a SECOND caller whose own
+ * `process.execPath` is the Electron binary, not Node — it has to pass `ELECTRON_RUN_AS_NODE=1`
+ * in the child's environment for that binary to behave as plain Node at all (Electron's own
+ * documented mechanism), which means the composition root building this target has to control the
+ * environment explicitly too, not inherit whatever `spawnDetachedDaemon` would have grabbed on its
+ * own. `env` is optional: omitted, this still defaults to `process.env` exactly as before this
+ * task — `cli/index.ts`'s own call site is unaffected other than naming `nodePath` explicitly.
+ */
 export interface DaemonLaunchTarget {
+  readonly nodePath: string;
   readonly scriptPath: string;
   readonly args: readonly string[];
+  /** The FULL base environment for the child (not a set of overrides merged onto
+   * `process.env` — a caller that wants D-017-cleaned variables, like `app/`'s own
+   * `buildResumptionEnv`-derived `tabEnv`, passes that whole object here). `undefined` falls back
+   * to `process.env` itself, unchanged from this function's pre-V2-T5b behavior. */
+  readonly env?: NodeJS.ProcessEnv;
 }
 
 /** The one environment variable this project adds when spawning itself as the detached worker —
@@ -55,11 +74,11 @@ export const DAEMON_CHILD_ENV_VAR = 'SEEYA_DAEMON_CHILD';
  */
 export function spawnDetachedDaemon(target: DaemonLaunchTarget): Promise<number> {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [target.scriptPath, ...target.args], {
+    const child = spawn(target.nodePath, [target.scriptPath, ...target.args], {
       detached: true,
       stdio: 'ignore',
       shell: false,
-      env: { ...process.env, [DAEMON_CHILD_ENV_VAR]: '1' },
+      env: { ...(target.env ?? process.env), [DAEMON_CHILD_ENV_VAR]: '1' },
     });
     child.once('error', reject);
     if (child.pid === undefined) {

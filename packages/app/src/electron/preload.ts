@@ -30,6 +30,11 @@ import type {
   EndDayPreviewResponse,
   EndDayRunResponse,
   EndDayProgressUpdateEvent,
+  ScheduleUpdateEvent,
+  SnoozeTodayRequest,
+  DaemonAvailabilityUpdateEvent,
+  DaemonControlRequest,
+  DaemonControlResponse,
 } from '../ipc/channels.js';
 
 export interface SeeyaApi {
@@ -66,6 +71,17 @@ export interface SeeyaApi {
   /** V2-T5a item 4: "Run end-day now" — the real run. */
   endDayRun(): Promise<EndDayRunResponse>;
   onEndDayProgress(listener: (event: EndDayProgressUpdateEvent) => void): void;
+  /** V2-T5b item 1: the faixa de horário's own data, pushed on the same refresh tick as
+   * `onStatusUpdate`. */
+  onScheduleUpdate(listener: (event: ScheduleUpdateEvent) => void): void;
+  /** V2-T5b item 1: one of "Snooze +15m/+30m/+1h" — resolves with the freshly recomputed strip. */
+  snoozeToday(request: SnoozeTodayRequest): Promise<ScheduleUpdateEvent>;
+  /** V2-T5b item 1: "Skip today" — resolves with the freshly recomputed strip. */
+  skipToday(): Promise<ScheduleUpdateEvent>;
+  /** V2-T5b item 3: the daemon's own liveness, pushed on the same refresh tick. */
+  onDaemonAvailabilityUpdate(listener: (event: DaemonAvailabilityUpdateEvent) => void): void;
+  /** V2-T5b item 3: "Start daemon"/"Stop daemon". */
+  daemonControl(request: DaemonControlRequest): Promise<DaemonControlResponse>;
 }
 
 const api: SeeyaApi = {
@@ -117,6 +133,18 @@ const api: SeeyaApi = {
       listener(data),
     );
   },
+  onScheduleUpdate: (listener) => {
+    ipcRenderer.on(CHANNELS.scheduleUpdate, (_event, data: ScheduleUpdateEvent) => listener(data));
+  },
+  snoozeToday: (request) => ipcRenderer.invoke(CHANNELS.snoozeToday, request),
+  skipToday: () => ipcRenderer.invoke(CHANNELS.skipToday),
+  onDaemonAvailabilityUpdate: (listener) => {
+    ipcRenderer.on(
+      CHANNELS.daemonAvailabilityUpdate,
+      (_event, data: DaemonAvailabilityUpdateEvent) => listener(data),
+    );
+  },
+  daemonControl: (request) => ipcRenderer.invoke(CHANNELS.daemonControl, request),
 };
 
 contextBridge.exposeInMainWorld('seeya', api);

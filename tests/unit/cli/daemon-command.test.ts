@@ -61,6 +61,9 @@ class FixedAliveness implements ProcessControl {
   terminateGracefully(): Promise<boolean> {
     return Promise.reject(new Error('not exercised'));
   }
+  terminateAbruptly(): Promise<void> {
+    return Promise.reject(new Error('not exercised'));
+  }
 }
 
 describe('runDaemonLauncher — refuse path (no spawn)', () => {
@@ -74,6 +77,7 @@ describe('runDaemonLauncher — refuse path (no spawn)', () => {
     const processControl = new FixedAliveness(true);
 
     const message = await runDaemonLauncher(storage, processControl, {
+      nodePath: process.execPath,
       scriptPath: '/nonexistent/should-not-be-spawned.js',
       args: ['daemon'],
     });
@@ -158,6 +162,10 @@ class ScriptedProcessControl implements ProcessControl {
 
   async terminateGracefully(): Promise<boolean> {
     return this.gracefulResult();
+  }
+
+  terminateAbruptly(): Promise<void> {
+    return Promise.reject(new Error('terminateAbruptly not exercised by this test'));
   }
 }
 
@@ -354,11 +362,12 @@ describe('runDaemonStop — states that never touch a real process', () => {
     expect(await storage.readDaemonLock()).toBeNull();
   });
 
-  // The forced-stop path ("forcibly" + the nothing-was-lost sentence, and no Windows-mechanism
-  // explanation on screen) is NOT re-tested here: `finishAbruptStop` calls the real
-  // `adapters/process/termination.ts#terminateAbruptly` directly (not something `DaemonControlDeps`
-  // injects), so exercising it against a made-up pid like this file's own `LOCK` would send a real
-  // OS-level kill signal to whatever process happens to hold that pid on the machine running the
-  // test — exactly what `tests/integration/cli/daemon-command.test.ts`'s "real abrupt stop" describe
-  // block exists to do safely, against a real fixture process it spawned itself.
+  // The forced-stop path itself (Windows/escalation, "forcibly" + the nothing-was-lost sentence,
+  // no Windows-mechanism explanation on screen) moved to `tests/unit/scheduler/daemon-control.test.ts`
+  // in V2-T5b, now that `terminateAbruptly` is a `ProcessControl` port method
+  // (`ControllableProcessControl`'s own fake) rather than a raw, uninjected OS call — this file's
+  // own scope stays "runDaemonStop as re-exported by cli/daemon-command.ts", the graceful/error/
+  // stale-lock states above. `tests/integration/cli/daemon-command.test.ts`'s "real abrupt stop"
+  // describe block still separately proves the REAL adapter against a real fixture process it
+  // spawned itself.
 });

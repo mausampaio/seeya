@@ -300,6 +300,18 @@ export class FakeStorage implements Storage {
     return Promise.reject(new Error('FakeStorage.writeDaemonLock is not exercised by endDay'));
   }
 
+  readProtocolHandlerRegistered(): ReturnType<Storage['readProtocolHandlerRegistered']> {
+    return Promise.reject(
+      new Error('FakeStorage.readProtocolHandlerRegistered is not exercised by endDay'),
+    );
+  }
+
+  saveProtocolHandlerRegistered(): ReturnType<Storage['saveProtocolHandlerRegistered']> {
+    return Promise.reject(
+      new Error('FakeStorage.saveProtocolHandlerRegistered is not exercised by endDay'),
+    );
+  }
+
   clearDaemonLock(): ReturnType<Storage['clearDaemonLock']> {
     return Promise.reject(new Error('FakeStorage.clearDaemonLock is not exercised by endDay'));
   }
@@ -520,6 +532,12 @@ export class FakeProcessControl implements ProcessControl {
 
   async terminateGracefully(pid: number): Promise<boolean> {
     return this.terminateResult(pid);
+  }
+
+  terminateAbruptly(): Promise<void> {
+    return Promise.reject(
+      new Error('FakeProcessControl.terminateAbruptly is not exercised by endDay'),
+    );
   }
 }
 

@@ -53,10 +53,21 @@ export interface Clock {
  * the phenomenon didn't hold up under measurement — so the two methods have no caller left and
  * came out with it. See docs/DECISOES.md D-029 and docs/QUESTOES.md Q-011 (the privacy question
  * `readCommandLine` raised, now moot because nothing captures a command line at all).
+ *
+ * **`terminateAbruptly` joined the port in V2-T5b.** Until this task it was a free function
+ * (`adapters/process/termination.ts#terminateAbruptly`), reachable directly because its only
+ * caller (`packages/cli/src/daemon-command.ts#runDaemonStop`) lived in `cli/`, a composition root
+ * allowed to name a concrete adapter (D-020). Once `runDaemonStop` itself moved to `scheduler/`
+ * (so the interface's own "Stop daemon" button could reuse it — see
+ * `scheduler/daemon-control.ts`'s own module comment), it needed this call to go through a port:
+ * `scheduler/` cannot import `adapters/` directly (docs/ARQUITETURA.md's matrix). Unconditional,
+ * immediate termination — **never** used on a discovered Claude Code session (D-002 bans forced
+ * kill for those in v1); see the adapter's own docstring for the one caller this exists for.
  */
 export interface ProcessControl {
   isAlive(pid: number, procStart?: string): Promise<boolean>;
   terminateGracefully(pid: number, deadlineMs: number): Promise<boolean>;
+  terminateAbruptly(pid: number): Promise<void>;
 }
 
 /**
@@ -368,6 +379,27 @@ export interface Storage {
    * `readDaemonLock` + a liveness check, not this method.
    */
   clearDaemonLock(): Promise<void>;
+
+  /**
+   * V2-T5b item 5: whether the interface has ever registered itself as the `seeya://` protocol
+   * handler on this machine (`app.setAsDefaultProtocolClient`, `packages/app/src/composition/
+   * index.ts`). `false` when the marker (`~/.seeya/protocol-handler.json`) doesn't exist —
+   * D-025: absence reads as "not registered", never as a guess either way. The daemon's own
+   * Windows toast backend (`adapters/notification/windows-toast.ts`) reads this BEFORE deciding
+   * whether to include `launch="seeya://open"` on a toast: without it, a click would surface
+   * Windows' own "how do you want to open seeya?" picker instead of focusing the window.
+   */
+  readProtocolHandlerRegistered(): Promise<boolean>;
+
+  /**
+   * Persists that the registration above just happened — atomically, idempotent (calling this
+   * again when the marker already exists is a no-op in effect, same "overwrite the whole
+   * document" contract every other `save*` method on this port already has). Never CLEARED by
+   * this project: once the interface has registered the protocol on a machine, Windows itself
+   * keeps the association even across a `seeya` uninstall/reinstall, so there is no "unregister"
+   * event for this method's own caller to react to in v2's own scope.
+   */
+  saveProtocolHandlerRegistered(): Promise<void>;
 }
 
 /**

@@ -87,10 +87,16 @@ export class RecordingNotifier implements Notifier {
  * `(pid, procStart)` pair it was asked about, in order, for exactly that assertion. */
 export class ControllableProcessControl implements ProcessControl {
   readonly isAliveCalls: Array<{ pid: number; procStart: string | undefined }> = [];
+  readonly terminateAbruptlyCalls: number[] = [];
 
   constructor(
     private readonly aliveByPid: ReadonlyMap<number, boolean> = new Map(),
     private readonly terminateResult: (pid: number) => Promise<boolean> | boolean = () => true,
+    // V2-T5b: `runDaemonStop`'s Windows/escalation path calls `terminateAbruptly` (now a
+    // `ProcessControl` port method) — controllable the same way `terminateGracefully` already is,
+    // defaulting to a plain success (nothing thrown) since most tests here are about the graceful
+    // path instead.
+    private readonly abruptResult: (pid: number) => Promise<void> | void = () => undefined,
   ) {}
 
   isAlive(pid: number, procStart?: string): Promise<boolean> {
@@ -100,5 +106,10 @@ export class ControllableProcessControl implements ProcessControl {
 
   async terminateGracefully(pid: number): Promise<boolean> {
     return this.terminateResult(pid);
+  }
+
+  async terminateAbruptly(pid: number): Promise<void> {
+    this.terminateAbruptlyCalls.push(pid);
+    await this.abruptResult(pid);
   }
 }

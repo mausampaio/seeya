@@ -41,6 +41,9 @@ class FixedAliveness implements ProcessControl {
   terminateGracefully(): Promise<boolean> {
     return Promise.reject(new Error('not exercised — seeya status never stops anything'));
   }
+  terminateAbruptly(): Promise<void> {
+    return Promise.reject(new Error('not exercised — seeya status never stops anything'));
+  }
 }
 
 /**

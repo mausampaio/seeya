@@ -104,4 +104,28 @@ export const MESSAGES = {
   endDayCaptureProgress: (index: number, total: number, name: string): string =>
     `Capturing ${index} of ${total}: ${name}...`,
   endDayClose: 'Close',
+
+  // V2-T5b item 1 — the faixa de horário (state/schedule-strip.ts). One string per
+  // `ScheduleDecision` variant (D-024, "nada achatado"), computed on every refresh tick from the
+  // same `decideSchedule` the daemon itself polls.
+  scheduleStripDisabled: 'End of day: not configured.',
+  scheduleStripSkipped: 'End of day: skipped today.',
+  scheduleStripAlreadyEnded: 'End of day: already ran today.',
+  scheduleStripWaiting: (time: string, remaining: string): string =>
+    `End of day at ${time} — in ${remaining}`,
+  scheduleStripLeadTimeWarning: (remaining: string): string => `End of day in ${remaining}`,
+  scheduleStripEndOfDay: 'End of day: due now — the daemon acts on its next poll.',
+  scheduleStripSnooze15: 'Snooze +15m',
+  scheduleStripSnooze30: 'Snooze +30m',
+  scheduleStripSnooze1h: 'Snooze +1h',
+  scheduleStripSkipToday: 'Skip today',
+
+  // V2-T5b item 3 — Start/Stop daemon (state/daemon-control-panel.ts). `resultText` is whatever
+  // the composition root's own start orchestration or
+  // `@seeya-ai/engine/scheduler/daemon-control.js#runDaemonStop` already prints for the CLI's own
+  // `seeya daemon`/`seeya daemon --stop` (D-039: literal text, not a second wording).
+  daemonControlStart: 'Start daemon',
+  daemonControlStop: 'Stop daemon',
+  daemonControlUnknown: 'Daemon: cannot verify — see the status panel.',
+  daemonControlRunning: 'Working…',
 } as const;

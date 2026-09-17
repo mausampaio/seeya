@@ -1110,6 +1110,16 @@ ações — é alguém construir.**
 backend por SO. Nenhum `terminal-notifier`, nenhum `notify-send -A`, nenhuma escrita em registro no
 caminho de produção. Se alguém propuser acrescentar, a resposta está aqui.
 
+**Fechamento (confirmado pelo mantenedor em 2026-09-17, V2-T5b).** A interface chegou, e a pergunta
+que esta decisão deixava em aberto — "quando a GUI existir, ela ganha o botão?" — tem resposta: não.
+A D-034 fica exatamente como está, em todo SO, inclusive agora que há onde colocar um botão. As
+ações que o Spike B previa para a notificação (adiar, pular) moram na **faixa de horário** da
+própria janela (V2-T5b item 1: Snooze +15m/+30m/+1h, Skip today) — visíveis e clicáveis sempre que
+a pessoa tem a janela aberta, sem depender de o SO entregar um clique de volta a um app específico.
+O toast do SO continua título e corpo; o único comportamento novo que um clique nele ganha
+(V2-T5b item 5, só Windows nesta versão) é trazer a janela para frente — não uma ação sobre o dia,
+só foco. Isto não reabre a decisão; fecha o "e se" que ela deixou pendurado.
+
 ## D-035 — O que vira config e o que fica constante
 
 **Decisão do mantenedor, em 2026-09-05**, ao revisar três números escolhidos sem medição.

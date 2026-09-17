@@ -6,19 +6,21 @@
  * from `~/.seeya/estado.json` (`scheduler/poll.ts` re-reads `readState()` at the top of every
  * cycle, never keeping an in-memory copy across polls, precisely so this is true).
  *
- * `core/schedule.ts` already owns every actual mutation rule (`applySnooze`/`applySkipToday`,
- * `resetIfNewDay`'s midnight reset, D-006's "não há limite de adiamentos") — this module only
- * resolves `today` from the injected `Clock` (D-019: never `new Date()` here), reads/writes
- * `Storage`, and renders the result as plain text (AGENTS.md § "Registro e saída").
+ * **V2-T5b item 2: the orchestration (read/apply/save/re-decide) and the three named increments
+ * moved to `@seeya-ai/engine/application/schedule-adjustments.js`** — the interface's own faixa de
+ * horário needs the exact same sequence behind its own Snooze/Skip today buttons, and
+ * `application/` is the one layer both composition roots (`cli/`, `app/`, D-043) can reach. This
+ * module now only resolves `context`, calls that shared orchestration, and renders the result as
+ * plain text (AGENTS.md § "Registro e saída") — `core/schedule.ts` still owns every actual
+ * mutation rule (`applySnooze`/`applySkipToday`, `resetIfNewDay`'s midnight reset).
  */
-import { localDayString } from '@seeya-ai/engine/core/day.js';
 import {
-  applySkipToday,
-  applySnooze,
-  decideSchedule,
-  emptyDayState,
-  type ScheduleDecision,
-} from '@seeya-ai/engine/core/schedule.js';
+  parseSnoozeIncrement,
+  skipToday,
+  snoozeToday,
+  SNOOZE_INCREMENTS,
+} from '@seeya-ai/engine/application/schedule-adjustments.js';
+import type { ScheduleDecision } from '@seeya-ai/engine/core/schedule.js';
 import type { Clock, Storage } from '@seeya-ai/engine/core/ports.js';
 import type { Config } from '@seeya-ai/engine/core/types.js';
 
@@ -28,25 +30,10 @@ export interface SnoozeCommandContext {
   readonly config: Config;
 }
 
-/**
- * D-006's three named increments. The CLI is what enforces this exact set —
- * `core/schedule.ts#applySnooze`'s own docstring is explicit that the core function itself accepts
- * any positive number of minutes on purpose, leaving "which increments a UI exposes" to the
- * caller. Keys match `scheduler/notices.ts#buildLeadTimeNotice`'s own wording ("Run \"seeya snooze
- * +15m\" (or +30m/+1h)...") exactly, so the notice a person reads and the command they type never
- * drift apart.
- */
-const SNOOZE_INCREMENTS: Readonly<Record<string, number>> = {
-  '+15m': 15,
-  '+30m': 30,
-  '+1h': 60,
-};
-
-/** `null` on anything not in `SNOOZE_INCREMENTS` — exported so `tests/unit/cli/snooze-command.test.ts`
- * can cover the parser's own boundary directly, not only through `runSnoozeCommand`'s full flow. */
-export function parseSnoozeIncrement(raw: string): number | null {
-  return SNOOZE_INCREMENTS[raw] ?? null;
-}
+/** Re-exported so `tests/unit/cli/snooze-command.test.ts` keeps its existing import path — the
+ * parser itself now lives in `application/schedule-adjustments.js` (see this file's own module
+ * comment). */
+export { parseSnoozeIncrement };
 
 function formatLocalTime(instant: Date): string {
   const pad2 = (value: number): string => String(value).padStart(2, '0');
@@ -97,21 +84,12 @@ export async function runSnoozeCommand(
     const expected = Object.keys(SNOOZE_INCREMENTS).join('|');
     return `seeya snooze: invalid increment "${rawIncrement}"; expected one of ${expected}.`;
   }
-  const now = context.clock.now();
-  const today = localDayString(now);
-  const stored = (await context.storage.readState()) ?? emptyDayState(today);
-  const next = applySnooze(stored, today, minutes);
-  await context.storage.saveState(next);
-  const { decision } = decideSchedule(context.config, next, now);
-  return renderSnoozeConfirmation(minutes, next.snoozeMinutesTotal, decision);
+  const result = await snoozeToday(context.storage, context.clock, context.config, minutes);
+  return renderSnoozeConfirmation(result.minutesAdded, result.totalMinutesToday, result.decision);
 }
 
 export async function runSkipTodayCommand(context: SnoozeCommandContext): Promise<string> {
-  const now = context.clock.now();
-  const today = localDayString(now);
-  const stored = (await context.storage.readState()) ?? emptyDayState(today);
-  const next = applySkipToday(stored, today);
-  await context.storage.saveState(next);
+  await skipToday(context.storage, context.clock, context.config);
   if (context.config.endOfDayTime === null) {
     return (
       'Today is marked as skipped. End-of-day is not configured (endOfDayTime is unset), so ' +

@@ -101,6 +101,10 @@ const PROCESS_HEAVY_INTEGRATION_FILES = [
   'tests/integration/process/liveness.test.ts',
   'tests/integration/process/termination.test.ts',
   'tests/integration/scheduler/lock.test.ts',
+  // V2-T5b: the same real-daemon-plus-real-CLI-subprocess shape as
+  // tests/integration/cli/daemon-command.test.ts above, now exercised through
+  // AppContext#startDaemon/#stopDaemon instead of the CLI's own runDaemonLauncher/runDaemonStop.
+  'tests/integration/app/daemon-launch.test.ts',
 ];
 
 /**

@@ -189,8 +189,32 @@ itself enforces) and a line saying plainly that the preview itself cost nothing.
 **Cancel**, closing the dialog, or Escape all count as cancelling. On completion the dialog shows
 the real report — the same text `seeya end-day` prints — the same notification `seeya end-day`
 sends fires, and the "Today" panel refreshes to reflect what was just written. `--session` (a
-single session, not the full day) and the Snooze/Skip today countdown inside the window are still
-CLI-only (V2-T5b).
+single session, not the full day) is still CLI-only.
+
+**The schedule strip, and starting/stopping the daemon (V2-T5b).** Below the status panel, a
+one-line strip shows the same `seeya status`-style schedule fact by name — "End of day at 19:30 —
+in 2h 13min", "End of day in 12 min" once a lead-time warning fires, "End of day: due now — the
+daemon acts on its next poll", "End of day: skipped today", "End of day: already ran today", or
+"End of day: not configured" — recomputed every refresh tick from the exact `decideSchedule` the
+daemon itself polls. **Snooze +15m/+30m/+1h** and **Skip today** appear whenever the schedule is
+still live, and update the strip immediately, without waiting for the next tick — the same
+`seeya snooze`/`seeya skip-today` orchestration, shared with the CLI (`application/
+schedule-adjustments.ts`). A second button, **Start daemon**/**Stop daemon**, follows the daemon's
+own liveness the same way `seeya daemon --status` reports it — starting spawns the daemon as a
+real, detached process (the interface's own runtime resolves `@seeya-ai/cli`'s compiled entry
+point and spawns it with `ELECTRON_RUN_AS_NODE=1`, never depending on a `node` found on `PATH`);
+stopping reuses the exact same stop sequence `seeya daemon --stop` runs. The interface never acts
+on the schedule by itself (D-039) — the daemon is still what closes the day when nobody clicks
+anything.
+
+**A toast click brings the window to front (Windows, V2-T5b).** The interface registers itself as
+the `seeya://` protocol handler on startup (`app.setAsDefaultProtocolClient`) and requests the
+single-instance lock, so a `seeya://` activation — including a click on the daemon's own toast —
+focuses the already-open window instead of starting a second one. The daemon's Windows toast only
+carries the clickable `launch="seeya://open"` attribute once the interface has registered itself
+at least once on the machine (a small marker file records this, D-025: no marker, plain toast as
+before). Linux and macOS get their own `seeya://` handler from the installer package (`.desktop`/
+`Info.plist`), not from a checkout — out of scope here.
 
 ### Before writing code
 

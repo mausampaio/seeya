@@ -29,6 +29,9 @@ class ScriptedProcessControl implements ProcessControl {
   terminateGracefully(): Promise<boolean> {
     return Promise.reject(new Error('not exercised by this agreement check'));
   }
+  terminateAbruptly(): Promise<void> {
+    return Promise.reject(new Error('not exercised by this agreement check'));
+  }
 }
 
 class ThrowingProcessControl implements ProcessControl {
@@ -36,6 +39,9 @@ class ThrowingProcessControl implements ProcessControl {
     return Promise.reject(new Error('unrecognized errno'));
   }
   terminateGracefully(): Promise<boolean> {
+    return Promise.reject(new Error('not exercised by this agreement check'));
+  }
+  terminateAbruptly(): Promise<void> {
     return Promise.reject(new Error('not exercised by this agreement check'));
   }
 }

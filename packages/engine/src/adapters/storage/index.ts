@@ -40,6 +40,11 @@ import {
   parseDaemonLockDocument,
   serializeDaemonLock,
 } from './daemon-lock-schema.js';
+import {
+  PROTOCOL_HANDLER_SCHEMA_VERSION,
+  parseProtocolHandlerDocument,
+  serializeProtocolHandlerDocument,
+} from './protocol-handler-schema.js';
 import { resolveSchemaVersion, type SchemaMigration } from './schema-version.js';
 import { writeFileAtomic } from './atomic-write.js';
 
@@ -344,5 +349,29 @@ export class StorageAdapter implements Storage {
         throw new Error(`clearing ${this.daemonLockPath()} failed: ${String(error)}`);
       }
     }
+  }
+
+  /** `~/.seeya/protocol-handler.json` (V2-T5b item 5). */
+  private protocolHandlerPath(): string {
+    return path.join(this.seeyaHome, 'protocol-handler.json');
+  }
+
+  async readProtocolHandlerRegistered(): Promise<boolean> {
+    const resolved = await readVersionedDocument(
+      this.protocolHandlerPath(),
+      PROTOCOL_HANDLER_SCHEMA_VERSION,
+    );
+    if (resolved === null) {
+      // Never registered on this machine yet (D-025), not an error.
+      return false;
+    }
+    return parseProtocolHandlerDocument(resolved);
+  }
+
+  async saveProtocolHandlerRegistered(): Promise<void> {
+    await writeFileAtomic(
+      this.protocolHandlerPath(),
+      JSON.stringify(serializeProtocolHandlerDocument()),
+    );
   }
 }

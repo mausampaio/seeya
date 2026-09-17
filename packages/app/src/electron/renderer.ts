@@ -21,10 +21,12 @@ import type {
   FallbackConfirmRequestEvent,
   ResumeSummaryResponse,
   ResumeTabOpenedEvent,
+  ScheduleUpdateEvent,
   TerminalFontConfigResponse,
 } from '../ipc/channels.js';
 import type { TodayPanelData, TodaySessionRow } from '../state/today-panel.js';
 import { reduceEndDayPanel, type EndDayPanelState } from '../state/end-day-panel.js';
+import { reduceDaemonControl, type DaemonControlState } from '../state/daemon-control-panel.js';
 
 declare global {
   interface Window {
@@ -264,6 +266,16 @@ function wireIncomingEvents(): void {
     }
   });
   window.seeya.onResumeTabOpened((event) => openResumeTabUi(event));
+  // V2-T5b item 1: the faixa de horário, pushed on the same refresh tick as onStatusUpdate above.
+  window.seeya.onScheduleUpdate((event) => renderScheduleStrip(event));
+  // V2-T5b item 3: the daemon's own liveness, same refresh tick.
+  window.seeya.onDaemonAvailabilityUpdate((availability) => {
+    daemonControlState = reduceDaemonControl(daemonControlState, {
+      kind: 'availabilityUpdated',
+      availability,
+    });
+    renderDaemonControl();
+  });
   // V2-T5a item 4: "capturing N of M: <name>" while "Run end-day now" is in flight — a no-op if
   // the dialog has already moved past `running` (e.g. a straggler event after `runFinished`),
   // same guard `reduceEndDayPanel`'s own `progress` case already enforces.
@@ -499,6 +511,103 @@ function wireEndDayDialog(): void {
   });
   endDayDialog().addEventListener('cancel', () => {
     handleEndDayCancelOrClose();
+  });
+}
+
+/**
+ * V2-T5b item 1: renders the faixa de horário from whatever `buildScheduleStripData` last
+ * produced — called after every `onScheduleUpdate` push (the ambient refresh tick) and again,
+ * immediately, after a Snooze/Skip click resolves (`handleScheduleAdjustment` below), so the
+ * faixa never waits up to `REFRESH_INTERVAL_MS` to reflect what the person just clicked.
+ */
+function renderScheduleStrip(data: ScheduleUpdateEvent): void {
+  (document.getElementById('schedule-strip-text') as HTMLElement).textContent = data.text;
+  const snooze15 = document.getElementById('schedule-strip-snooze-15') as HTMLButtonElement;
+  const snooze30 = document.getElementById('schedule-strip-snooze-30') as HTMLButtonElement;
+  const snooze1h = document.getElementById('schedule-strip-snooze-1h') as HTMLButtonElement;
+  const skip = document.getElementById('schedule-strip-skip') as HTMLButtonElement;
+  snooze15.hidden = !data.canSnooze;
+  snooze30.hidden = !data.canSnooze;
+  snooze1h.hidden = !data.canSnooze;
+  skip.hidden = !data.canSkip;
+}
+
+/** One click handler for all three Snooze buttons and "Skip today" — `request` is `null` for
+ * skip, one of D-006's three increments otherwise. Both IPC calls return the freshly recomputed
+ * strip (`main.ts`'s own handler docstring), rendered immediately rather than waiting for the
+ * next ambient `onScheduleUpdate` tick. */
+async function handleScheduleAdjustment(minutes: 15 | 30 | 60 | null): Promise<void> {
+  const updated =
+    minutes === null ? await window.seeya.skipToday() : await window.seeya.snoozeToday({ minutes });
+  renderScheduleStrip(updated);
+}
+
+/** Wired once, at startup. */
+function wireScheduleStrip(): void {
+  const snooze15 = document.getElementById('schedule-strip-snooze-15') as HTMLButtonElement;
+  const snooze30 = document.getElementById('schedule-strip-snooze-30') as HTMLButtonElement;
+  const snooze1h = document.getElementById('schedule-strip-snooze-1h') as HTMLButtonElement;
+  const skip = document.getElementById('schedule-strip-skip') as HTMLButtonElement;
+  snooze15.textContent = MESSAGES.scheduleStripSnooze15;
+  snooze30.textContent = MESSAGES.scheduleStripSnooze30;
+  snooze1h.textContent = MESSAGES.scheduleStripSnooze1h;
+  skip.textContent = MESSAGES.scheduleStripSkipToday;
+  snooze15.addEventListener('click', () => void handleScheduleAdjustment(15));
+  snooze30.addEventListener('click', () => void handleScheduleAdjustment(30));
+  snooze1h.addEventListener('click', () => void handleScheduleAdjustment(60));
+  skip.addEventListener('click', () => void handleScheduleAdjustment(null));
+}
+
+/**
+ * V2-T5b item 3: "Start daemon"/"Stop daemon" — one native button, driven end to end by
+ * `state/daemon-control-panel.ts#reduceDaemonControl`, the same "one state machine, one render
+ * function" discipline `endDayState`/`renderEndDayDialog` above already establish for the
+ * "End day…" dialog.
+ */
+let daemonControlState: DaemonControlState = { kind: 'idle', availability: { kind: 'unknown' } };
+
+function renderDaemonControl(): void {
+  const button = document.getElementById('daemon-control-button') as HTMLButtonElement;
+  const result = document.getElementById('daemon-control-result') as HTMLElement;
+
+  if (daemonControlState.kind === 'running') {
+    button.textContent = MESSAGES.daemonControlRunning;
+    button.disabled = true;
+    return;
+  }
+  if (daemonControlState.kind === 'result') {
+    result.textContent = daemonControlState.resultText;
+  }
+  const availability = daemonControlState.availability;
+  if (availability.kind === 'unknown') {
+    button.textContent = MESSAGES.daemonControlUnknown;
+    button.disabled = true;
+    return;
+  }
+  button.textContent =
+    availability.kind === 'start' ? MESSAGES.daemonControlStart : MESSAGES.daemonControlStop;
+  button.disabled = false;
+}
+
+async function handleDaemonControlClicked(): Promise<void> {
+  if (daemonControlState.kind !== 'idle' || daemonControlState.availability.kind === 'unknown') {
+    return;
+  }
+  const action = daemonControlState.availability.kind === 'start' ? 'start' : 'stop';
+  daemonControlState = reduceDaemonControl(daemonControlState, { kind: 'clicked' });
+  renderDaemonControl();
+  const response = await window.seeya.daemonControl({ action });
+  daemonControlState = reduceDaemonControl(daemonControlState, {
+    kind: 'finished',
+    resultText: response.resultText,
+  });
+  renderDaemonControl();
+}
+
+/** Wired once, at startup. */
+function wireDaemonControl(): void {
+  document.getElementById('daemon-control-button')?.addEventListener('click', () => {
+    void handleDaemonControlClicked();
   });
 }
 
@@ -779,6 +888,8 @@ async function main(): Promise<void> {
   wireCommandBar();
   wireFallbackDialog();
   wireEndDayDialog();
+  wireScheduleStrip();
+  wireDaemonControl();
   await refreshTodayPanel();
 }
 

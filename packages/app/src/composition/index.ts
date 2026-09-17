@@ -18,6 +18,7 @@
  */
 import os from 'node:os';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import { systemClock } from '@seeya-ai/engine/adapters/clock/index.js';
 import { buildResumptionEnv } from '@seeya-ai/engine/adapters/resumption/env.js';
 import { processControl as realProcessControl } from '@seeya-ai/engine/adapters/process/index.js';
@@ -26,6 +27,10 @@ import {
   realCommandResolutionFs,
   type ResolveCommandResult,
 } from '@seeya-ai/engine/adapters/process/resolve-command.js';
+import {
+  spawnDetachedDaemon,
+  type DaemonLaunchTarget,
+} from '@seeya-ai/engine/adapters/process/daemon-launch.js';
 import {
   DiscoverySessionProvider,
   DiscoveryForkCleanup,
@@ -39,6 +44,8 @@ import {
   DeepHandoffGenerator,
 } from '@seeya-ai/engine/adapters/generation/index.js';
 import { notifier as realNotifier } from '@seeya-ai/engine/adapters/notification/index.js';
+import { checkDaemonLock } from '@seeya-ai/engine/scheduler/index.js';
+import { runDaemonStop } from '@seeya-ai/engine/scheduler/daemon-control.js';
 import type {
   Autostart,
   Clock,
@@ -115,6 +122,24 @@ export interface AppContext {
   /** V2-T5a item 4: "Run end-day now" notifies through the SAME `Notifier`
    * `cli/composition.ts#buildEndDayContext` wires for `seeya end-day`'s own step 5. */
   readonly notifier: Notifier;
+  /**
+   * V2-T5b item 3: "Start daemon"/"Stop daemon" in the state region.
+   *
+   * **`startDaemon` is NOT reused from `cli/daemon-command.ts#runDaemonLauncher`** — `app/` and
+   * `cli/` are independent composition roots that never import each other (D-043), and this
+   * function calls `adapters/process/daemon-launch.ts#spawnDetachedDaemon` directly (a concrete
+   * adapter, not a port method), which only a composition root may do at all. Same SHAPE as the
+   * CLI's own (check `scheduler/lock.ts#checkDaemonLock`, refuse or spawn, name the pid), same
+   * wording, built against THIS composition root's own `daemonLaunchTarget` below — see Q-076 for
+   * the alternative considered (`node` resolved from `PATH`) and why it was rejected.
+   *
+   * **`stopDaemon` genuinely IS the shared function** — `@seeya-ai/engine/scheduler/
+   * daemon-control.js#runDaemonStop`, moved out of `cli/daemon-command.ts` in this same task
+   * because it only calls `ProcessControl` port methods, so both composition roots import the
+   * exact same implementation and can never disagree about its text.
+   */
+  startDaemon(): Promise<string>;
+  stopDaemon(): Promise<string>;
 }
 
 /**
@@ -135,6 +160,51 @@ export function toEndDayDeps(context: AppContext): EndDayDeps {
     clock: context.clock,
     forkCleanup: context.forkCleanup,
   };
+}
+
+const requireFromHere = createRequire(import.meta.url);
+
+/** A minimal, hand-checked shape — not a zod schema (AGENTS.md's "dados de fora" rule targets the
+ * Claude Code registry/transcript/config/`claude -p` output specifically; `@seeya-ai/cli`'s own
+ * `package.json` is this monorepo's own build artifact, read the same way Node's own module
+ * resolution already reads every `package.json` on disk, not data arriving from outside the
+ * project). Still checked, not cast blindly, so a `@seeya-ai/cli` release that ever drops its
+ * `bin.seeya` entry fails with a message naming exactly what's missing (AGENTS.md's error-message
+ * rule) instead of `spawn` failing later with an opaque ENOENT. */
+function readCliBinRelativePath(cliPackage: unknown, packageJsonPath: string): string {
+  const bin =
+    typeof cliPackage === 'object' && cliPackage !== null
+      ? (cliPackage as { readonly bin?: unknown }).bin
+      : undefined;
+  const seeya =
+    typeof bin === 'object' && bin !== null
+      ? (bin as { readonly seeya?: unknown }).seeya
+      : undefined;
+  if (typeof seeya !== 'string') {
+    throw new Error(
+      `@seeya-ai/cli's package.json (${packageJsonPath}) has no "bin.seeya" string entry — cannot ` +
+        'build the daemon launch target.',
+    );
+  }
+  return seeya;
+}
+
+/**
+ * V2-T5b item 3: resolves `@seeya-ai/cli`'s own compiled bin entry point (`bin.seeya` in its
+ * `package.json`) by walking the package boundary, the same way `require.resolve` finds any
+ * package on disk — never a hardcoded relative path across the two packages, so this keeps working
+ * if `@seeya-ai/cli`'s own `dist/` layout ever changes. This is the ONE place `packages/app/src`
+ * resolves anything from `@seeya-ai/cli` — never its source, never its exports, only this single
+ * file path to spawn as a detached child (`app-does-not-import-cli`'s own guard, `.dependency-
+ * cruiser.cjs`, is about SOURCE imports; a `require.resolve` string literal to a `package.json` two
+ * layers below `packages/cli/` — not `packages/cli/src` — is not one, and was confirmed by running
+ * `npm run dependencias` after this change, see the report for this task).
+ */
+function resolveCliDaemonScriptPath(): string {
+  const packageJsonPath = requireFromHere.resolve('@seeya-ai/cli/package.json');
+  const cliPackage: unknown = requireFromHere(packageJsonPath);
+  const binRelativePath = readCliBinRelativePath(cliPackage, packageJsonPath);
+  return path.join(path.dirname(packageJsonPath), binRelativePath);
 }
 
 /**
@@ -168,11 +238,42 @@ export async function buildAppContext(homeDir: string = os.homedir()): Promise<A
     model: config.captureModel,
     budgetPerSessionUsd: config.budgetPerSessionUsd,
   };
+  const tabEnv = buildResumptionEnv(process.env);
+  // V2-T5b item 3: "Subir" — the target this composition root's own `startDaemon` (below) spawns.
+  // `nodePath` is THIS process's own runtime (`process.execPath`): under `npm run app`'s dev mode
+  // that's a plain Node binary already; packaged under real Electron, `electron/main.ts`'s own
+  // main process is Electron with `ELECTRON_RUN_AS_NODE=1` added to the child's environment below
+  // — Electron's own documented mechanism for making its binary behave as plain Node — so this
+  // never depends on a `node` found on `PATH` (Q-076 registers the alternative and why it was
+  // rejected). `env` reuses `tabEnv` (already D-017-cleaned, same object every tab spawns with)
+  // instead of a second, independently-built "clean environment" — one cleaning, one place.
+  const daemonLaunchTarget: DaemonLaunchTarget = {
+    nodePath: process.execPath,
+    scriptPath: resolveCliDaemonScriptPath(),
+    args: ['daemon'],
+    env: { ...tabEnv, ELECTRON_RUN_AS_NODE: '1' },
+  };
+  // Mirrors cli/daemon-command.ts#runDaemonLauncher's own two branches and wording exactly — see
+  // AppContext's own docstring on `startDaemon` for why this can't just BE that function.
+  async function startDaemon(): Promise<string> {
+    const decision = await checkDaemonLock(storage, realProcessControl);
+    if (decision.kind === 'refuse') {
+      return `seeya daemon is already running (pid ${decision.heldByPid}). Nothing started.`;
+    }
+    const pid = await spawnDetachedDaemon(daemonLaunchTarget);
+    return (
+      `seeya daemon started (pid ${pid}), detached from this window — closing seeya or logging ` +
+      'out will not stop it.'
+    );
+  }
+  function stopDaemon(): Promise<string> {
+    return runDaemonStop({ storage, processControl: realProcessControl, clock });
+  }
   return {
     clock,
     home,
     homeDir,
-    tabEnv: buildResumptionEnv(process.env),
+    tabEnv,
     defaultShell: defaultShellCommand(platform, process.env),
     // V2-T6: the bundled (Windows Terminal) ConPTY, Windows only — see NodePtyAdapterOptions.
     buildPtyManager: (callbacks) =>
@@ -203,5 +304,7 @@ export async function buildAppContext(homeDir: string = os.homedir()): Promise<A
       clock,
     }),
     notifier: realNotifier,
+    startDaemon,
+    stopDaemon,
   };
 }

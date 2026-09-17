@@ -631,6 +631,9 @@ describe('pollOnce — D-036 case 2/3: same day, captures always, terminates onl
     terminateGracefully(): Promise<boolean> {
       throw new Error('D-036: must not terminate a session on an overdue, same-day close');
     }
+    terminateAbruptly(): Promise<void> {
+      throw new Error('D-036: must not terminate a session on an overdue, same-day close');
+    }
   }
 
   it('THE test that protects real work: overdue past the threshold captures but does NOT terminate, even with canTerminate: true', async () => {
@@ -675,6 +678,8 @@ describe('pollOnce — D-036 case 2/3: same day, captures always, terminates onl
         terminateCalledWith = pid;
         return Promise.resolve(true);
       },
+      terminateAbruptly: () =>
+        Promise.reject(new Error('terminateAbruptly not exercised by this test')),
     };
     const harness = buildHarness(config, {
       transcriptReader: transcriptReaderFor(justAfter),
