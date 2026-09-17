@@ -5031,6 +5031,85 @@ texto, mas não são a fila.
       caracteres órfãos sumiram, com a comparação já feita no Windows Terminal (limpo) como
       referência. Detalhes de ferramental completos na Q-075.
 
+- [ ] **V2-T5b — O daemon na janela: faixa de horário com Snooze e Skip today, subir e parar o
+      daemon (D-036, D-039, D-042, D-043).** Especificada pelo PO em 2026-09-17; **aguarda
+      aprovação do mantenedor antes de qualquer despacho.** Com ela, tudo que a pessoa faz hoje
+      pela CLI no dia a dia (`snooze`, `skip-today`, `daemon`, `daemon --stop`, `status`,
+      `end-day`, `start-day`) existe na janela. A interface continua um painel de controle: o
+      daemon segue sendo o processo separado de sempre (sobrevive à janela fechar, é o que o
+      autostart sobe) — a alternativa de hospedar o laço do daemon dentro da interface foi
+      descartada por isso.
+
+      **O que entra:**
+
+      1. **A faixa de horário.** Na região de estado, a cada ciclo de atualização (o mesmo laço
+         de 10 s da V2-T2), a interface lê `estado.json` e calcula `decideSchedule(config,
+         state, now)` — a mesma função pura do daemon (`core/schedule.ts`) — e mostra uma faixa
+         por variante, com o vocabulário da CLI (D-024, nada achatado): `waiting` ("End of day at
+         11:00 — in 2 h 13 min"), `leadTimeWarning` ("in 12 min"), `endOfDay` ("due now — the
+         daemon acts on its next poll"), `skipped` ("skipped today"), `alreadyEnded` ("already ran
+         today"), `disabled` ("not configured"). Botões **Snooze +15m / +30m / +1h** e **Skip
+         today**, mostrados só quando fazem sentido (`waiting`, `leadTimeWarning`, `endOfDay`);
+         a faixa é o lugar das ações que a D-034 reservou para a interface.
+      2. **`snooze`/`skip-today` saem da CLI para o motor.** Hoje a orquestração (ler o estado,
+         `applySnooze`/`applySkipToday`, salvar, `decideSchedule`) e os incrementos aceitos
+         (`+15m`/`+30m`/`+1h`) vivem em `packages/cli/src/snooze-command.ts` junto com o texto
+         de confirmação. A orquestração e os incrementos vão para `application/` (por exemplo
+         `application/schedule-adjustments.ts`: `snoozeToday(storage, clock, minutes)` e
+         `skipToday(storage, clock)` devolvendo o `ScheduleDecision` resultante; a tabela de
+         incrementos vira constante exportada). A CLI passa a chamar de lá e mantém a renderização
+         de texto; a interface renderiza a faixa em DOM a partir do mesmo `ScheduleDecision`
+         (mesmo dado, não o mesmo texto — critério da V2-T4). O daemon vê a mudança no poll
+         seguinte, como vê a da CLI hoje; a escrita concorrente de `estado.json` já é atômica.
+      3. **Subir e parar o daemon.** Na região de estado, um botão conforme a vivacidade que
+         `describeDaemonState`/`checkLiveLock` já calcula: **Start daemon** quando não há daemon
+         vivo, **Stop daemon** quando há; enquanto o comando roda, o botão fica desabilitado; o
+         resultado (o mesmo texto que a CLI imprime) aparece no painel e o estado atualiza no
+         ciclo seguinte. **Parar:** `runDaemonStop` (`packages/cli/src/daemon-command.ts`) sai
+         da CLI para o motor — e para isso a terminação abrupta que ele usa direto do adapter
+         (`adapters/process/termination.ts#terminateAbruptly`) **entra na porta
+         `ProcessControl`** (`terminateAbruptly(pid)`), implementada pelo adapter real e pelos
+         dublês; o módulo pousa em `scheduler/` ao lado de `daemon-state.ts` (mesma camada, mesma
+         razão da V2-T2), com os textos que a CLI já imprime — a CLI importa de lá, nada muda de
+         comportamento nem de texto. **Subir:** `spawnDetachedDaemon` (`adapters/process/
+         daemon-launch.ts`) com um `DaemonLaunchTarget` construído na raiz de composição da
+         interface: o script é o `bin` de `@seeya-ai/cli` resolvido pelo pacote
+         (`require.resolve('@seeya-ai/cli/package.json')` + `bin.seeya`), e o Node é o próprio
+         runtime da interface (`process.execPath` do Electron com `ELECTRON_RUN_AS_NODE=1` no
+         ambiente do filho) — sem depender de um `node` no `PATH`, que é o que o instalador vai
+         precisar depois. Ambiente do filho limpo das variáveis de sessão (D-017) e com o mesmo
+         `SEEYA_DAEMON_CHILD` que a CLI usa. Registrar na Q-076 a escolha e a alternativa
+         (`node` do `PATH`), e **medir** que o daemon subido assim grava o lock e que `seeya
+         status` pela CLI o vê vivo.
+      4. **Decisão sobre notificação do SO com botão (D-034):** proposta do PO, a confirmar no
+         aval — **a D-034 fica como está**: as ações moram na faixa da janela; a notificação do
+         SO continua título e corpo em todo SO. Motivo: o `Notification` do Electron só tem ações
+         no macOS, e o toast com ação no Windows exige o handler de protocolo que a D-034 já
+         decidiu não pagar. Entra como parágrafo de fechamento na própria D-034, não decisão
+         nova.
+
+      **O que não entra:** `end-day` de uma sessão só pela interface; instalador; projetos.
+
+      **Cuidados:** a interface não adianta nem encerra nada sozinha — cada mudança de estado é
+      um clique (D-039), e o daemon continua sendo quem age no horário (D-036); nada de
+      `process.execPath`/`process.platform` fora da raiz de composição; toda lógica fora de
+      `electron/` com teste (o modelo da faixa a partir do `ScheduleDecision`, a disponibilidade
+      dos botões, a máquina de estados do botão do daemon); texto em `text/messages.ts`; as
+      guardas valem; nenhuma dependência nova; **um commit por item**, portão em primeiro plano
+      em pedaços (`--maxWorkers 2`), `verificar:linux` lido em arquivo pelo relógio. Questão:
+      Q-076.
+
+      *Aceite:* num `homeDir` descartável com `endOfDayTime` configurado, a faixa mostra o
+      horário e o tempo restante; **Snooze +15m** grava `snoozeMinutesTotal` em `estado.json` e a
+      faixa atualiza; **Skip today** grava `skipped` e a faixa muda; **Start daemon** sobe o
+      daemon da CLI como processo separado (lock gravado, `seeya status` da CLI o vê vivo, contra
+      o mesmo home); **Stop daemon** o para e limpa o lock; tudo provado por captura de tela lida
+      pelo agente (se a captura falhar nesta sandbox, dizer) e pelo conteúdo do home. Testes dos
+      módulos novos e da porta estendida (o dublê de `ProcessControl` ganha `terminateAbruptly`).
+      Portão e CI verdes. **Aceite manual do mantenedor:** subir o daemon pela janela no Windows
+      e ver `seeya status` na CLI concordar; dar Snooze pela janela num dia real e ver o
+      encerramento respeitar.
+
 ## Definição de pronto (vale para toda tarefa)
 
 1. Código implementa exatamente a spec; divergência virou questão, não improviso.
