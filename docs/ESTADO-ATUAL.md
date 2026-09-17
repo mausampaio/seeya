@@ -1,6 +1,7 @@
 # Estado atual
 
-_Atualizado em 2026-09-16, depois da mesclagem da V2-T5a na `main`.
+_Atualizado em 2026-09-17, depois do aceite ao vivo de V2-T4 e V2-T5a no Windows — esta sessão do
+PO foi capturada pelo `end-day` da interface e reaberta pelo "Resume selected" numa aba do seeya.
 Se o `git log`, a CI ou o `~/.seeya` contarem algo diferente do que está aqui, **este arquivo está
 atrasado**: confie na evidência e atualize o arquivo. Isso já aconteceu: a primeira versão dele,
 escrita à mão no mesmo dia, tinha quatro afirmações falsas, e quem achou foi uma sessão limpa

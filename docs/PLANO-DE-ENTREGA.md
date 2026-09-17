@@ -4545,7 +4545,7 @@ texto, mas não são a fila.
       aba de shell abrindo); a tarefa fica em `[~]` até um dos dois, com o Mac registrado como
       pendência do mantenedor de qualquer forma.
 
-- [~] **V2-T4 — A interface retoma o dia: `start-day` em abas e pergunta antes do fallback
+- [x] **V2-T4 — A interface retoma o dia: `start-day` em abas e pergunta antes do fallback
       (D-042, D-043, D-039).** Especificada pelo PO em 2026-09-14; aprovada e despachada pelo
       mantenedor em 2026-09-16; **mesclada na `main` em 2026-09-16** depois da revisão do PO (uma
       correção: a aba de retomada nascia com pty 80×24 e o renderer não mandava o `resize` ao
@@ -4704,7 +4704,7 @@ texto, mas não são a fila.
       Linux dele. Detalhes, decisões de ferramental e o que ficou inferido (não medido) em
       `docs/QUESTOES.md` Q-073.
 
-- [~] **V2-T5a — `end-day` pela interface: a prévia é a confirmação, progresso por sessão,
+- [x] **V2-T5a — `end-day` pela interface: a prévia é a confirmação, progresso por sessão,
       resultado e notificação (D-039, D-042, D-043).** Especificada pelo PO em 2026-09-16;
       aprovada e despachada pelo mantenedor no mesmo dia; **mesclada na `main` em 2026-09-16**
       depois de uma rodada de revisão (a prévia sem chamada ao modelo — premissa errada do
@@ -4876,6 +4876,17 @@ texto, mas não são a fila.
       **O que fica pendente do mantenedor:** revisar e mesclar; depois, um `end-day` real pela
       interface no fim de um dia real, e um `start-day` real pela interface na manhã seguinte —
       no Windows e no Linux dele, fechando V2-T4 e V2-T5a juntas como o aceite pede.
+
+      **Aceite do mantenedor no Windows (2026-09-17), medido de dentro da sessão retomada:** o
+      `end-day` pela interface capturou a sessão do PO (modo leve, evidência git + transcript +
+      registro) às 09:08 UTC e escreveu `days/<dia>/summary.md` e o handoff; em seguida o
+      "Resume selected" do painel "Hoje" reabriu essa sessão numa aba — a cadeia de processos
+      vista de dentro é `claude.exe --resume <id> ← electron.exe ← node (build.mjs --dev) ← npm run
+      app`, o `TERM` é o do pty embutido, e `days/<dia>/resumed.json` registra o id. Caminho
+      principal, sem diálogo de fallback (o plano coube no teto de 16.384). A prévia, a execução e
+      a retomada foram feitas no mesmo dia, o que o painel "Hoje" aceita sem estranhar. **V2-T4 e
+      V2-T5a aceitas.** Pendente só o Linux/macOS, na mesma classe de medição das tarefas
+      anteriores da interface.
 
 ## Definição de pronto (vale para toda tarefa)
 
