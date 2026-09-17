@@ -5334,10 +5334,10 @@ texto, mas não são a fila.
         (entrada no registro no NSIS, `MimeType=x-scheme-handler/seeya` no `.desktop`,
         `CFBundleURLTypes` no `Info.plist`) e os formatos por SO numa configuração só.
         Alternativa: `electron-forge` (mais peças, mesma dependência nova).
-      - **Formatos de Linux:** o `.deb` registra o protocolo pelo `.desktop` na instalação; o
-        `AppImage` roda sem instalar, mas não integra o protocolo sozinho. Recomendação: os dois,
-        com o `.deb` como o formato do dia a dia **se a distro do mantenedor for da família
-        Debian/Ubuntu** — se não for, ele diz qual, e o formato nativo dela entra no lugar.
+      - **Formatos de Linux — respondido pelo mantenedor em 2026-09-17: Ubuntu.** Então `.deb`
+        é o formato do dia a dia (registra o protocolo pelo `.desktop` na instalação, que é o que
+        o clique no toast precisa) e o `AppImage` entra como segundo artefato, para rodar sem
+        instalar; nenhum formato de outra família é construído.
 
       **O que entra:**
 
