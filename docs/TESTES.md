@@ -769,6 +769,25 @@ casos que `endOfDayFired`/`skipped` decidem sem olhar a hora. **Para provar:** r
 `TZ=UTC`, `TZ=America/Sao_Paulo`, `TZ=Asia/Kolkata`, `TZ=Pacific/Kiritimati` e `TZ=Etc/GMT+12`
 (os dois extremos que existem); os cinco precisam passar.
 
+## A interface está aberta a partir deste checkout? Não rode `npm ci` nele — o portão vai para uma worktree
+
+**2026-09-17, V2-T6.** O PO rodou `npm ci` em `C:\code\seeya` com a interface aberta a partir desse
+mesmo checkout (`npm run app`) — e com a própria sessão do PO rodando numa aba dela. O `npm ci`
+apaga `node_modules` inteiro antes de reinstalar; o `electron.exe` em uso não pode ser apagado
+(`EPERM`), o `npm ci` parou com `node_modules` pela metade, e nem `npm install` conseguiu
+reconciliar (`EBUSY` ao tentar mover o diretório do Electron). A interface continuou funcionando
+(o bundle do processo principal já estava em memória), mas o checkout ficou sem ferramental até
+a interface fechar.
+
+**Regra:** enquanto a interface estiver aberta a partir de um checkout, nada de `npm ci`/`npm
+install` nele. O portão do PO roda numa **worktree** própria (`git worktree add -b po-gate
+.claude/worktrees/po-gate main`, `npm ci` lá dentro, portão em pedaços), o commit de documentação
+é feito nessa worktree (o hook de pre-commit precisa do `node_modules` dela) e a `main` recebe
+por fast-forward. O `npm ci` no checkout principal fica para depois de fechar a interface.
+**Consequência para a D-042:** desenvolver o seeya de dentro do seeya é o caso de uso real, e
+esta é a primeira fricção medida dele — quando houver instalador, a interface do dia a dia roda
+do pacote instalado, não do checkout, e a regra deixa de ser necessária.
+
 ## O build quebrou com erros de `rootDir` e ninguém mexeu no código? Procure sobras de guard
 
 **2026-09-17, V2-T5a.** `npm run app` (que roda `npm run build` primeiro) falhou com dezenas de

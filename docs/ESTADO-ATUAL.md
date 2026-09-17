@@ -277,8 +277,8 @@ Linux dele — fecha V2-T4 e V2-T5a juntas. Detalhes, decisões de ferramental e
 resolvida por esta tarefa, como o despacho já previa) com o `end-day` agendado do daemon em
 `docs/QUESTOES.md` Q-074.
 
-## V2-T6 — correção: letras órfãs ao redimensionar/rolar no Windows (numa worktree isolada,
-## pendente de revisão)
+## V2-T6 — correção: letras órfãs ao redimensionar/rolar no Windows (mesclada na `main` em 17/09,
+## pendente do aceite visual do mantenedor)
 
 Especificada e despachada pelo mantenedor em 17/09, a partir de um defeito visto ao vivo (captura
 de tela): redimensionar a janela e rolar o scrollback deixa caracteres órfãos na borda esquerda de

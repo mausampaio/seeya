@@ -4890,7 +4890,9 @@ texto, mas não são a fila.
 
 - [~] **V2-T6 — Correção: letras ficam para trás ao redimensionar e rolar a aba no Windows
       (ConPTY × xterm.js).** Especificada pelo PO em 2026-09-17 a partir de um defeito visto pelo
-      mantenedor no mesmo dia; **aprovada e despachada pelo mantenedor em 2026-09-17.**
+      mantenedor no mesmo dia; aprovada e despachada pelo mantenedor em 2026-09-17; **mesclada na
+      `main` em 2026-09-17** (portão verde numa worktree do PO: 1.727 passando, 4 pulados; Linux
+      pela CI). Fica em `[~]` até o aceite visual do mantenedor.
 
       **O defeito, medido:** numa aba com o Claude Code rodando, redimensionar a janela e rolar
       o scrollback deixa caracteres órfãos na borda esquerda (captura de tela do mantenedor,
