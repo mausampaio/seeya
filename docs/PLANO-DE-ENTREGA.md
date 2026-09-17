@@ -4926,7 +4926,12 @@ texto, mas não são a fila.
       explicaria conteúdo órfão. **Comparação que decide de quem é o defeito, a fazer pelo
       mantenedor:** o mesmo redimensionar e rolar com o Claude Code no Windows Terminal — se lá
       também sobram fragmentos, é a TUI com o ConPTY e a correção só reduz; se lá fica limpo, é
-      do nosso emulador e a correção tem que resolver.
+      do nosso emulador e a correção tem que resolver. **Feita (2026-09-17): no Windows Terminal
+      não acontece.** O defeito é do nosso emulador (o Windows Terminal é o próprio host do
+      console e não passa pela tradução ConPTY → VT → `xterm.js` onde a contagem de quebras pode
+      divergir). A V2-T6 tem que resolver; se o item 1 não bastar, a investigação continua nela
+      (próximas hipóteses, nesta ordem: o `resize` do pty chegando antes do `fit` do xterm ou
+      vice-versa, e o `convertEol: true` interferindo nas sequências de cursor da TUI).
 
       **Cuidados:** nada de `process.platform`/`os.release()` fora da raiz de composição; texto
       nenhum voltado à pessoa muda; guardas valem; um commit por item, portão em primeiro plano,
