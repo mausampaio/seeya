@@ -320,8 +320,8 @@ Terminal, limpo, já está registrada). Se não sumirem, a tarefa reabre com a i
 hipóteses seguintes (Q-075), não com o renderizador WebGL (descartado no despacho). Detalhes em
 `docs/PLANO-DE-ENTREGA.md` (entrada V2-T6) e `docs/QUESTOES.md` Q-075.
 
-## V2-T7 — retomar sem o plano: a terceira opção quando o plano não cabe no argumento (17/09,
-## worktree isolada, aguardando revisão)
+## V2-T7 — retomar sem o plano: a terceira opção quando o plano não cabe no argumento (mesclada
+## na `main` em 17/09, pendente do aceite do mantenedor)
 
 Especificada pelo PO em 17/09 a partir do uso real do mantenedor no mesmo dia — a tentativa de
 retomar a sessão do PO pelo painel "Hoje" com um plano de 34.071 caracteres (teto 16.384) só
