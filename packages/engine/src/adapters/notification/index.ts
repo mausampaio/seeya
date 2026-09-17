@@ -20,6 +20,14 @@
  * wiring — not re-exported, same "adapter's public surface is its `index.ts`" convention
  * `adapters/discovery/index.ts`/`adapters/generation/index.ts` already follow. Tests import the
  * specific file they need directly.
+ *
+ * **V2-T5b item 5: the Windows backend can now include `launch="seeya://open"` on the toast** —
+ * still no `<actions>` element, still no button (D-034's closing paragraph is explicit this
+ * doesn't change): a click on the toast BODY asks Windows to activate whatever registered
+ * `seeya://` protocol handler, which the interface's own composition root registers. Whether to
+ * include it depends on `Storage.readProtocolHandlerRegistered()` (D-025) — a fact this adapter
+ * has no `Storage` of its own to read (D-020), so `buildNotifier` below is what a caller WITH a
+ * `Storage` uses instead of the bare `notifier` singleton.
  */
 import type { Notifier } from '../../core/ports.js';
 import type { NotificationBackend } from './backend.js';
@@ -35,12 +43,22 @@ import { LinuxNotifySendBackend } from './linux-notify-send.js';
  * (the S2-T1 lesson: a test that only passes on one OS hides a defect on the other two). An
  * unrecognized `platform` returns no native backend at all: `ChainNotifier` still works, falling
  * straight to its own built-in stderr fallback.
+ *
+ * `isProtocolHandlerRegistered` (V2-T5b item 5) is only ever read by the Windows branch — passed
+ * straight through to `WindowsToastBackend`'s own option of the same name; every other platform's
+ * backend has no toast-click mechanism this project wires up at all (this task's own "o que não
+ * entra": Linux/macOS are the installer's job, see that module's own docstring).
  */
 export function buildDefaultBackends(
   platform: NodeJS.Platform = process.platform,
+  isProtocolHandlerRegistered?: () => Promise<boolean>,
 ): NotificationBackend[] {
   if (platform === 'win32') {
-    return [new WindowsToastBackend()];
+    return [
+      new WindowsToastBackend(
+        isProtocolHandlerRegistered === undefined ? {} : { isProtocolHandlerRegistered },
+      ),
+    ];
   }
   if (platform === 'darwin') {
     return [new MacOsascriptBackend()];
@@ -52,5 +70,22 @@ export function buildDefaultBackends(
 }
 
 /** Ready-to-use singleton, same convention `adapters/process/index.ts#processControl` already
- * established — `cli/` (D-020) imports this directly rather than constructing the chain itself. */
+ * established — `cli/` (D-020) imports this directly rather than constructing the chain itself.
+ * Never includes the V2-T5b `launch` attribute (no `isProtocolHandlerRegistered` passed) — a
+ * caller that HAS a `Storage` to check (`packages/cli/src/composition.ts#buildDaemonContext`, the
+ * one place that matters — "quem manda o toast é o daemon") uses `buildNotifier` below instead. */
 export const notifier: Notifier = new ChainNotifier(buildDefaultBackends());
+
+/**
+ * V2-T5b item 5: the notifier a caller WITH a `Storage` builds instead of importing the bare
+ * `notifier` singleton above — so far, only `cli/composition.ts#buildDaemonContext` (the daemon is
+ * what sends every toast this project shows; the interface itself never sends its own, this task's
+ * own "alternativa descartada"). `platform` defaults to `process.platform`, same seam
+ * `buildDefaultBackends` already offers.
+ */
+export function buildNotifier(
+  isProtocolHandlerRegistered: () => Promise<boolean>,
+  platform: NodeJS.Platform = process.platform,
+): Notifier {
+  return new ChainNotifier(buildDefaultBackends(platform, isProtocolHandlerRegistered));
+}

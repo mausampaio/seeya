@@ -33,7 +33,10 @@ import {
   DeepHandoffGenerator,
 } from '@seeya-ai/engine/adapters/generation/index.js';
 import { ClaudeSessionResumer } from '@seeya-ai/engine/adapters/resumption/index.js';
-import { notifier as realNotifier } from '@seeya-ai/engine/adapters/notification/index.js';
+import {
+  notifier as realNotifier,
+  buildNotifier,
+} from '@seeya-ai/engine/adapters/notification/index.js';
 import type { EndDayDeps } from '@seeya-ai/engine/application/types.js';
 import type { DaemonDeps } from '@seeya-ai/engine/scheduler/index.js';
 
@@ -304,7 +307,12 @@ export function buildDaemonContext(homeDir: string = os.homedir()): Promise<Daem
   return Promise.resolve({
     clock,
     storage,
-    notifier: realNotifier,
+    // V2-T5b item 5: "quem manda o toast é o daemon" — this is the one place that needs to know
+    // whether the interface has registered itself as the seeya:// handler
+    // (Storage.readProtocolHandlerRegistered) before a Windows toast can safely carry
+    // launch="seeya://open" (adapters/notification/index.ts#buildNotifier's own docstring). Every
+    // other caller of this package still imports the bare `notifier` singleton unchanged.
+    notifier: buildNotifier(() => storage.readProtocolHandlerRegistered()),
     processControl: realProcessControl,
     transcriptReader: new TranscriptFileReader({ claudeHome: home.claudeHome }),
     gitReader: new GitAdapter({ clock }),

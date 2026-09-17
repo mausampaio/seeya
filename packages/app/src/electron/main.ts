@@ -680,31 +680,104 @@ async function resolveHarnessOrThrow(
   );
 }
 
-void app.whenReady().then(async () => {
-  // Built once per process (mirrors `packages/cli/src/composition.ts`'s own "read once" shape).
-  // `wireIpc` registers every `ipcMain.handle`/`ipcMain.on` — process-global in Electron, not
-  // per-window (`ipcMain.handle` throws "Attempted to register a second handler" on a repeat
-  // registration) — so it runs exactly ONCE here, never again from `activate` below.
-  //
-  // SEEYA_APP_HOME_OVERRIDE: same undocumented, internal, verification-only class as
-  // SEEYA_APP_OFFSCREEN/SEEYA_APP_SCREENSHOT_PATH above — `buildAppContext` already accepts a home
-  // directory as a parameter for exactly this (every test in tests/integration/app/composition.test.ts
-  // uses it against a tmpdir fixture, never the real home). Never set by `npm run app`.
-  const context = await buildAppContext(process.env.SEEYA_APP_HOME_OVERRIDE);
-  const window = createWindow(context.clock);
-  wireIpc(window, context);
+/**
+ * V2-T5b item 5: focuses whichever window is already open — the `second-instance` handler's own
+ * job when a `seeya://` click (or a person just double-clicking the app again) launches a SECOND
+ * process while the interface is already running. Never opens a new one (mirrors the `activate`
+ * handler below, which only creates a window when NONE exist at all).
+ */
+function focusExistingWindow(): void {
+  const [window] = BrowserWindow.getAllWindows();
+  if (window === undefined) {
+    return;
+  }
+  if (window.isMinimized()) {
+    window.restore();
+  }
+  window.focus();
+}
 
-  // macOS convention (re-opening a window when the dock icon is clicked with none left) — this
-  // skeleton only ever wires ONE window's worth of IPC (see the comment above); a second window
-  // is out of scope for V2-T2 (docs/PLANO-DE-ENTREGA.md's own "o que não entra": no multi-window
-  // support is asked for), so this only recreates a window on Windows/Linux never being reached
-  // in the first place (`window-all-closed` below already quits there).
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow(context.clock);
+/**
+ * V2-T5b item 5, Windows only this task (this file's own "o que não entra" for Linux/macOS — see
+ * the module comment on the platform guard around this function's one call site below): registers
+ * `seeya://` with `app.setAsDefaultProtocolClient`, exactly the way Electron's own documentation
+ * describes handling BOTH the packaged and the unpackaged (dev) case — `process.defaultApp` is
+ * `true` only when running unpackaged (`npm run app`'s own `electron .` invocation), and that case
+ * needs the runtime (`process.execPath`) and the script path passed explicitly, since there is no
+ * single packaged `.exe` yet for Windows to associate the protocol with.
+ *
+ * Returns whether registration actually succeeded — `false` on a dev launch with no script
+ * argument to point at (defensive; `npm run app` always provides one) as well as whatever
+ * `app.setAsDefaultProtocolClient` itself reports.
+ */
+function registerSeeyaProtocolHandler(): boolean {
+  if (process.defaultApp) {
+    const scriptPath = process.argv[1];
+    if (scriptPath === undefined) {
+      return false;
     }
+    return app.setAsDefaultProtocolClient('seeya', process.execPath, [path.resolve(scriptPath)]);
+  }
+  return app.setAsDefaultProtocolClient('seeya');
+}
+
+// V2-T5b item 5: `requestSingleInstanceLock` has to run before `app.whenReady()` — Electron's own
+// documented ordering, so a duplicate launch (including one caused by a `seeya://` click while the
+// interface is already open) quits itself immediately instead of doing any of the work below
+// first. A launch that LOSES the race quits outright; the one that keeps it wires `second-instance`
+// to focus the real window instead of ever opening a second one.
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    focusExistingWindow();
   });
-});
+
+  void app.whenReady().then(async () => {
+    // Built once per process (mirrors `packages/cli/src/composition.ts`'s own "read once" shape).
+    // `wireIpc` registers every `ipcMain.handle`/`ipcMain.on` — process-global in Electron, not
+    // per-window (`ipcMain.handle` throws "Attempted to register a second handler" on a repeat
+    // registration) — so it runs exactly ONCE here, never again from `activate` below.
+    //
+    // SEEYA_APP_HOME_OVERRIDE: same undocumented, internal, verification-only class as
+    // SEEYA_APP_OFFSCREEN/SEEYA_APP_SCREENSHOT_PATH above — `buildAppContext` already accepts a home
+    // directory as a parameter for exactly this (every test in tests/integration/app/composition.test.ts
+    // uses it against a tmpdir fixture, never the real home). Never set by `npm run app`.
+    const context = await buildAppContext(process.env.SEEYA_APP_HOME_OVERRIDE);
+
+    // V2-T5b item 5: Windows only this task — the `seeya://` handler on Linux comes from the
+    // package's own `.desktop` file and on macOS from its `Info.plist`, neither of which exists
+    // from a checkout (only the installer task can write them); attempting
+    // `setAsDefaultProtocolClient` there today would be a no-op at best (Electron's own docs: "this
+    // method is only implemented on macOS and Windows") and a false claim in the marker at worst.
+    // `process.platform` read directly here, not in `composition/index.ts`, matches this same
+    // file's own pre-existing `window-all-closed` handler below — an Electron-lifecycle branch, not
+    // a choice of which adapter to wire (composition/index.ts's own job).
+    if (process.platform === 'win32' && registerSeeyaProtocolHandler()) {
+      await context.storage.saveProtocolHandlerRegistered().catch(() => {
+        // Best-effort: a failed write here just means the daemon's own toast keeps omitting
+        // `launch` until a later run of the interface writes the marker successfully — the same
+        // "no marker, toast as before" fallback D-025 already gives a marker that was never
+        // written at all.
+      });
+    }
+
+    const window = createWindow(context.clock);
+    wireIpc(window, context);
+
+    // macOS convention (re-opening a window when the dock icon is clicked with none left) — this
+    // skeleton only ever wires ONE window's worth of IPC (see the comment above); a second window
+    // is out of scope for V2-T2 (docs/PLANO-DE-ENTREGA.md's own "o que não entra": no multi-window
+    // support is asked for), so this only recreates a window on Windows/Linux never being reached
+    // in the first place (`window-all-closed` below already quits there).
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow(context.clock);
+      }
+    });
+  });
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

@@ -38,12 +38,33 @@ export function escapeForPowerShellSingleQuotedString(value: string): string {
   return value.replace(/'/g, "''");
 }
 
-/** The toast's visual content — title + body, no `<actions>` element: this task's contract has
- * none (docs/ESPECIFICACAO.md § "Notificações"). Exported for direct unit testing of the XML shape
- * without going through the whole script. */
-export function buildToastXml(notice: Notice): string {
+/** V2-T5b item 5: the URI the toast's `launch` attribute carries. Always `seeya://open` — never
+ * an action-specific one (D-034's closing paragraph: the toast itself has no `<actions>` element
+ * and never will; this is only ever "bring the window to front", not a decision about the day). */
+const PROTOCOL_LAUNCH_URI = 'seeya://open';
+
+/**
+ * The toast's visual content — title + body, no `<actions>` element: this task's contract has
+ * none (docs/ESPECIFICACAO.md § "Notificações"; D-034's closing paragraph confirms this stays true
+ * even now that the interface exists to click INTO).
+ *
+ * **`includeLaunch` (V2-T5b item 5).** `true` adds `launch="seeya://open" activationType="protocol"`
+ * on the `<toast>` root — Spike B's own validated mechanism (docs/spikes/B-notificacoes.md §
+ * "VALIDADO"): clicking the toast body (not a button) asks Windows to activate whatever handler is
+ * registered for `seeya://`, which `packages/app/src/composition/index.ts` registers via
+ * `app.setAsDefaultProtocolClient('seeya')`. `false` (the default every EXISTING caller of this
+ * function gets, unchanged) omits both attributes entirely — the exact toast this project already
+ * sent before this task. Whoever calls this decides `includeLaunch` from
+ * `Storage.readProtocolHandlerRegistered()` (D-025: no marker, no launch attribute — a toast whose
+ * click target isn't registered would surface Windows' own "how do you want to open seeya?" picker
+ * instead of focusing the window, worse than the plain toast this project already had).
+ */
+export function buildToastXml(notice: Notice, includeLaunch = false): string {
+  const toastAttributes = includeLaunch
+    ? ` launch="${escapeXml(PROTOCOL_LAUNCH_URI)}" activationType="protocol"`
+    : '';
   return (
-    '<toast><visual><binding template="ToastGeneric">' +
+    `<toast${toastAttributes}><visual><binding template="ToastGeneric">` +
     `<text>${escapeXml(notice.title)}</text>` +
     `<text>${escapeXml(notice.body)}</text>` +
     '</binding></visual></toast>'
@@ -55,8 +76,8 @@ export function buildToastXml(notice: Notice): string {
  * skipping either one fails with a `PSArgumentException` pointing at the wrong type) and shows the
  * toast under `POWERSHELL_APP_ID`.
  */
-export function buildToastScript(notice: Notice): string {
-  const xml = escapeForPowerShellSingleQuotedString(buildToastXml(notice));
+export function buildToastScript(notice: Notice, includeLaunch = false): string {
+  const xml = escapeForPowerShellSingleQuotedString(buildToastXml(notice, includeLaunch));
   const appId = escapeForPowerShellSingleQuotedString(POWERSHELL_APP_ID);
   return `
 $ErrorActionPreference = 'Stop'
@@ -86,6 +107,14 @@ export interface WindowsToastBackendOptions {
    * a fake executable instead of ever spawning the real one. */
   readonly command?: string;
   readonly run?: CommandRunner;
+  /** V2-T5b item 5: reports `Storage.readProtocolHandlerRegistered()` — this adapter never imports
+   * `Storage` itself (D-020: only a composition root names a concrete adapter), so whoever builds
+   * this backend (`adapters/notification/index.ts#buildNotifier`) injects the read. Defaults to a
+   * function that always resolves `false` — D-025's own reading of "no evidence a marker was
+   * checked at all" is the SAME as "no marker exists": every caller of the bare `notifier`
+   * singleton (unaware of `Storage`) keeps sending the pre-V2-T5b toast shape unless explicitly
+   * wired otherwise. */
+  readonly isProtocolHandlerRegistered?: () => Promise<boolean>;
 }
 
 export class WindowsToastBackend implements NotificationBackend {
@@ -93,11 +122,14 @@ export class WindowsToastBackend implements NotificationBackend {
   private readonly platform: NodeJS.Platform;
   private readonly command: string;
   private readonly run: CommandRunner;
+  private readonly isProtocolHandlerRegistered: () => Promise<boolean>;
 
   constructor(options: WindowsToastBackendOptions = {}) {
     this.platform = options.platform ?? process.platform;
     this.command = options.command ?? 'powershell.exe';
     this.run = options.run ?? spawnCommand;
+    this.isProtocolHandlerRegistered =
+      options.isProtocolHandlerRegistered ?? (() => Promise.resolve(false));
   }
 
   /** Spike B measured this resolves with zero extra dependency on every Windows host tried — no
@@ -111,7 +143,12 @@ export class WindowsToastBackend implements NotificationBackend {
   }
 
   async send(notice: Notice): Promise<void> {
-    const args = buildPowerShellArgs(buildToastScript(notice));
+    // A broken/throwing check reads as "not registered" (isAvailableSafely's own precedent in
+    // chain.ts for a broken capability probe) — never let a marker-read failure escalate into a
+    // WORSE toast than this project already had, and never let it take the whole notify() chain
+    // down with it either.
+    const includeLaunch = await this.isProtocolHandlerRegistered().catch(() => false);
+    const args = buildPowerShellArgs(buildToastScript(notice, includeLaunch));
     const result = await this.run(this.command, args);
     if (result.exitCode !== 0) {
       throw new Error(

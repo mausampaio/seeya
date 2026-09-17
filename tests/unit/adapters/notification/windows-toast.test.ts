@@ -32,6 +32,18 @@ describe('buildToastXml', () => {
     expect(xml).toContain('A &amp; B &lt;script&gt; &quot;quote&quot; &apos;apos&apos;');
     expect(xml).not.toContain('<script>');
   });
+
+  // V2-T5b item 5.
+  it('omits launch/activationType by default (unchanged pre-V2-T5b toast shape)', () => {
+    expect(buildToastXml(NOTICE)).toBe(buildToastXml(NOTICE, false));
+    expect(buildToastXml(NOTICE)).not.toContain('launch=');
+    expect(buildToastXml(NOTICE)).not.toContain('activationType');
+  });
+
+  it('includeLaunch: true adds launch="seeya://open" activationType="protocol" on the <toast> root', () => {
+    const xml = buildToastXml(NOTICE, true);
+    expect(xml).toContain('<toast launch="seeya://open" activationType="protocol">');
+  });
 });
 
 describe('buildToastScript', () => {
@@ -108,5 +120,51 @@ describe('WindowsToastBackend — send', () => {
     const backend = new WindowsToastBackend({ run: runner.run });
 
     await expect(backend.send(NOTICE)).rejects.toThrow(/exited 1.*boom/s);
+  });
+
+  // V2-T5b item 5.
+  it('with no isProtocolHandlerRegistered injected, never includes launch (D-025: no check, no marker)', async () => {
+    const runner = new RecordingCommandRunner();
+    const backend = new WindowsToastBackend({ run: runner.run });
+
+    await backend.send(NOTICE);
+
+    expect(runner.calls[0]?.args).toEqual(buildPowerShellArgs(buildToastScript(NOTICE, false)));
+  });
+
+  it('isProtocolHandlerRegistered resolving true includes launch on the sent toast', async () => {
+    const runner = new RecordingCommandRunner();
+    const backend = new WindowsToastBackend({
+      run: runner.run,
+      isProtocolHandlerRegistered: () => Promise.resolve(true),
+    });
+
+    await backend.send(NOTICE);
+
+    expect(runner.calls[0]?.args).toEqual(buildPowerShellArgs(buildToastScript(NOTICE, true)));
+  });
+
+  it('isProtocolHandlerRegistered resolving false omits launch', async () => {
+    const runner = new RecordingCommandRunner();
+    const backend = new WindowsToastBackend({
+      run: runner.run,
+      isProtocolHandlerRegistered: () => Promise.resolve(false),
+    });
+
+    await backend.send(NOTICE);
+
+    expect(runner.calls[0]?.args).toEqual(buildPowerShellArgs(buildToastScript(NOTICE, false)));
+  });
+
+  it('a throwing isProtocolHandlerRegistered reads as false, never derails the send itself', async () => {
+    const runner = new RecordingCommandRunner();
+    const backend = new WindowsToastBackend({
+      run: runner.run,
+      isProtocolHandlerRegistered: () => Promise.reject(new Error('boom')),
+    });
+
+    await backend.send(NOTICE);
+
+    expect(runner.calls[0]?.args).toEqual(buildPowerShellArgs(buildToastScript(NOTICE, false)));
   });
 });
