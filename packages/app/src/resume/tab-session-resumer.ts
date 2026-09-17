@@ -25,6 +25,7 @@ import type {
 import {
   buildFallbackArgs,
   buildResumeArgs,
+  buildResumeWithoutPromptArgs,
   RESUME_PROMPT_ARG_LIMIT_CHARS,
 } from '@seeya-ai/engine/adapters/resumption/args.js';
 import { FAST_FAILURE_GRACE_MS } from '@seeya-ai/engine/adapters/resumption/spawn-interactive.js';
@@ -167,7 +168,36 @@ export class TabSessionResumer implements SessionResumer {
     if (raced.kind === 'exited' && raced.exitCode !== 0) {
       return { kind: 'needsFallback', reason: { kind: 'resumeFailed', exitCode: raced.exitCode } };
     }
-    return { kind: 'resumed', outcome: { sessionId, cwd, fellBack: false } };
+    return { kind: 'resumed', outcome: { sessionId, cwd, kind: 'resumed' } };
+  }
+
+  /**
+   * V2-T7 item 2's tab-backed twin of `ClaudeSessionResumer#resumeWithoutPrompt` — same race
+   * against `fastFailureGraceMs`, same "bare `resumed` signal, caller builds the real outcome"
+   * contract (`core/ports.ts#SessionResumer.resumeWithoutPrompt`'s own docstring), just opening a
+   * tab instead of spawning with the inherited terminal.
+   */
+  async resumeWithoutPrompt(sessionId: string, cwd: string): Promise<PrimaryResumeAttempt> {
+    const graceMs = this.options.fastFailureGraceMs ?? FAST_FAILURE_GRACE_MS;
+    const tab = await this.options.opener.openTab({
+      command: this.options.claudeCommand,
+      args: buildResumeWithoutPromptArgs(sessionId),
+      cwd,
+      label: this.options.resolveLabel(sessionId),
+    });
+    const raced = await raceExitAgainstGrace(
+      this.options.opener,
+      this.options.clock,
+      graceMs,
+      tab.id,
+    );
+    if (raced.kind === 'exited' && raced.exitCode !== 0) {
+      return {
+        kind: 'needsFallback',
+        reason: { kind: 'resumeWithoutPlanFailed', exitCode: raced.exitCode },
+      };
+    }
+    return { kind: 'resumed', outcome: { sessionId, cwd, kind: 'resumed' } };
   }
 
   /**
@@ -204,6 +234,6 @@ export class TabSessionResumer implements SessionResumer {
     this.options.opener.onceExit(tab.id, () => {
       void removeFallbackContextFile(contextFilePath);
     });
-    return { sessionId, cwd, fellBack: reason };
+    return { sessionId, cwd, kind: 'freshSession', reason };
   }
 }

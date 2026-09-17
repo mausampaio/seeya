@@ -24,37 +24,61 @@ describe('buildResumeSummary', () => {
     });
   });
 
-  it('resumed: a clean attach carries fellBack: false and the resolved label', () => {
+  it('resumed: a clean attach carries kind "resumed" and the resolved label', () => {
     const result: ResumeSessionsResult = {
       ...emptyResult,
-      resumed: [{ sessionId: 'session-1', cwd: '/projects/alpha', fellBack: false }],
+      resumed: [{ sessionId: 'session-1', cwd: '/projects/alpha', kind: 'resumed' }],
     };
 
     const summary = buildResumeSummary(result, () => 'alpha');
 
     expect(summary.resumed).toEqual([
-      { sessionId: 'session-1', name: 'alpha', cwd: '/projects/alpha', fellBack: false },
+      { sessionId: 'session-1', name: 'alpha', cwd: '/projects/alpha', kind: 'resumed' },
     ]);
   });
 
-  it('resumed: a fallback outcome carries the exact CLI-shared reason text, not the raw reason', () => {
+  it('resumed: a freshSession outcome carries the exact CLI-shared reason text, not the raw reason', () => {
     const result: ResumeSessionsResult = {
       ...emptyResult,
       resumed: [
         {
           sessionId: 'session-1',
           cwd: '/projects/alpha',
-          fellBack: { kind: 'resumeFailed', exitCode: 1 },
+          kind: 'freshSession',
+          reason: { kind: 'resumeFailed', exitCode: 1 },
         },
       ],
     };
 
     const summary = buildResumeSummary(result, () => 'alpha');
 
-    const fellBack = summary.resumed[0]?.fellBack ?? false;
-    expect(fellBack).not.toBe(false);
-    expect(fellBack !== false && fellBack.reasonText).toContain('could not be resumed');
-    expect(fellBack !== false && fellBack.reasonText).toContain('code 1');
+    const outcome = summary.resumed[0];
+    expect(outcome?.kind).toBe('freshSession');
+    expect(outcome?.kind === 'freshSession' && outcome.noteText).toContain('could not be resumed');
+    expect(outcome?.kind === 'freshSession' && outcome.noteText).toContain('code 1');
+  });
+
+  // V2-T7: the third ResumeOutcome form.
+  it('resumed: a resumedWithoutPlan outcome carries the "N characters, over the limit" fact', () => {
+    const result: ResumeSessionsResult = {
+      ...emptyResult,
+      resumed: [
+        {
+          sessionId: 'session-1',
+          cwd: '/projects/alpha',
+          kind: 'resumedWithoutPlan',
+          promptLength: 20_000,
+          limitChars: 16_384,
+        },
+      ],
+    };
+
+    const summary = buildResumeSummary(result, () => 'alpha');
+
+    const outcome = summary.resumed[0];
+    expect(outcome?.kind).toBe('resumedWithoutPlan');
+    expect(outcome?.kind === 'resumedWithoutPlan' && outcome.noteText).toContain('20000');
+    expect(outcome?.kind === 'resumedWithoutPlan' && outcome.noteText).toContain('16384');
   });
 
   it('skipped: carries the handoff name/cwd and the reason text', () => {

@@ -14,4 +14,30 @@ describe('MESSAGES', () => {
     expect(MESSAGES.tabExited(0)).toBe('exited (code 0)');
     expect(MESSAGES.tabExited(130)).toBe('exited (code 130)');
   });
+
+  // V2-T7 item 4: the fallback dialog's body text depends on whether "Resume without the plan" is
+  // offered at all (only for a promptTooLarge reason) — two different sentences, never the same
+  // text with a word swapped in.
+  describe('fallbackDialogBody', () => {
+    it('mentions the free "resume without the plan" option when offered', () => {
+      const text = MESSAGES.fallbackDialogBody(true);
+      expect(text).toMatch(/resuming without the plan/i);
+      expect(text).toMatch(/real history/i);
+    });
+
+    it('falls back to the original S5-T9 wording when not offered', () => {
+      const text = MESSAGES.fallbackDialogBody(false);
+      expect(text).toMatch(/FRESH conversation/);
+      expect(text).not.toMatch(/resume without the plan/i);
+    });
+  });
+
+  it('todaySummaryResumedWithoutPlanNote wraps the bare fact in a sentence, distinct from the fallback note', () => {
+    const text = MESSAGES.todaySummaryResumedWithoutPlanNote(
+      'it was 20000 characters, over the 16384-character limit',
+    );
+    expect(text).toContain('Resumed without');
+    expect(text).toContain('20000 characters');
+    expect(text).not.toContain('Opened a new session');
+  });
 });

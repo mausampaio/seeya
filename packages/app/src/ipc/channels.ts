@@ -145,12 +145,20 @@ export interface FallbackConfirmRequestEvent {
   readonly sessionName: string;
   readonly cwd: string;
   readonly reasonText: string;
+  /** V2-T7 item 4: whether the dialog should offer "Resume without the plan" at all — `true` only
+   * for a `promptTooLarge` reason (`resume/fallback-confirmer.ts#buildFallbackConfirmer`'s own
+   * computation, never re-derived in `renderer.ts`, D-041). `false` for `resumeFailed`: that
+   * reason has no free option to fall back to (`core/resume-fallback-decision.ts`'s own
+   * docstring). */
+  readonly offersResumeWithoutPlan: boolean;
 }
 
-/** `CHANNELS.confirmFallbackAnswer`'s payload. */
+/** `CHANNELS.confirmFallbackAnswer`'s payload. `'resumeWithoutPlan'` (V2-T7) is only ever sent for
+ * a request whose `offersResumeWithoutPlan` was `true` — `renderer.ts#wireFallbackDialog` hides
+ * that button otherwise. */
 export interface FallbackConfirmAnswerRequest {
   readonly requestId: string;
-  readonly decision: 'open' | 'skip';
+  readonly decision: 'open' | 'resumeWithoutPlan' | 'skip';
 }
 
 /** `CHANNELS.getTodayPanel`'s response — the exact shape `state/today-panel.ts#buildTodayPanelData`
@@ -174,14 +182,16 @@ export interface ResumeSummarySession {
   readonly cwd: string;
 }
 
-/** `false` means `--resume` attached cleanly; otherwise the same wording
- * `core/resume-notice.ts#describeFallbackReason` gives the CLI's own `formatResumeNotice` for why
- * a fresh session opened instead — computed once, in `state/resume-summary.ts`, never re-derived
- * from the raw `ResumeFallbackReason` in `electron/renderer.ts` (which has no logic of its own,
- * D-041). */
-export interface ResumeSummaryOutcome extends ResumeSummarySession {
-  readonly fellBack: false | { readonly reasonText: string };
-}
+/** The three `ResumeOutcome` forms (V2-T7, `core/types.ts#ResumeOutcome`'s own docstring),
+ * projected for display: `'resumed'` needs no extra text; `'resumedWithoutPlan'`/`'freshSession'`
+ * carry the same wording `core/resume-notice.ts#formatResumeNotice` gives the CLI's own summary —
+ * computed once, in `state/resume-summary.ts`, never re-derived from the raw `ResumeOutcome` in
+ * `electron/renderer.ts` (which has no logic of its own, D-041). A discriminated union rather than
+ * a boolean-shaped `fellBack` (D-024, mirroring the engine type it projects). */
+export type ResumeSummaryOutcome =
+  | (ResumeSummarySession & { readonly kind: 'resumed' })
+  | (ResumeSummarySession & { readonly kind: 'resumedWithoutPlan'; readonly noteText: string })
+  | (ResumeSummarySession & { readonly kind: 'freshSession'; readonly noteText: string });
 
 export interface ResumeSummarySkipped extends ResumeSummarySession {
   /** The exact same wording `core/resume-notice.ts#describeFallbackReason` gives the CLI. */

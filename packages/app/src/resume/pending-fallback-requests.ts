@@ -12,7 +12,12 @@
  * independently), the same defensive shape `ExitListenerRegistry` already takes for tab ids rather
  * than trusting a caller's usage pattern to stay singular forever.
  */
-export type FallbackDialogDecision = 'open' | 'skip';
+/** V2-T7 item 4: `'resumeWithoutPlan'` — the dialog's new default button, offered only for a
+ * `promptTooLarge` reason (`electron/renderer.ts#showFallbackDialog`'s own guard). Fits in the same
+ * three-word vocabulary `FallbackDecision` already uses (`core/resume-fallback-decision.ts`), so
+ * `resume/fallback-confirmer.ts#buildFallbackConfirmer` maps this straight across with no
+ * translation table to keep in sync. */
+export type FallbackDialogDecision = 'open' | 'resumeWithoutPlan' | 'skip';
 
 export class PendingFallbackRequests {
   private readonly resolvers = new Map<string, (decision: FallbackDialogDecision) => void>();

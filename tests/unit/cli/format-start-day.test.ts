@@ -103,7 +103,7 @@ describe('formatResumeProgress', () => {
 describe('formatStartDaySummary', () => {
   it('lists every resumed session, with a clean resume showing no extra notice', () => {
     const result: ResumeSessionsResult = {
-      resumed: [{ sessionId: 'alpha-id', cwd: 'c:\\code\\alpha', fellBack: false }],
+      resumed: [{ sessionId: 'alpha-id', cwd: 'c:\\code\\alpha', kind: 'resumed' }],
       skipped: [],
       invalidFallbackAnswers: [],
       remaining: [],
@@ -121,7 +121,8 @@ describe('formatStartDaySummary', () => {
         {
           sessionId: 'alpha-id',
           cwd: 'c:\\code\\alpha',
-          fellBack: { kind: 'resumeFailed', exitCode: 1 },
+          kind: 'freshSession',
+          reason: { kind: 'resumeFailed', exitCode: 1 },
         },
       ],
       skipped: [],
@@ -133,6 +134,31 @@ describe('formatStartDaySummary', () => {
     expect(text).toContain('could not be resumed');
   });
 
+  // V2-T7: the third ResumeOutcome form gets its own notice, never the "opened a new session"
+  // wording that only applies to freshSession.
+  it('surfaces the "resumed without the plan" notice for that third outcome form', () => {
+    const result: ResumeSessionsResult = {
+      resumed: [
+        {
+          sessionId: 'alpha-id',
+          cwd: 'c:\\code\\alpha',
+          kind: 'resumedWithoutPlan',
+          promptLength: 20_000,
+          limitChars: 16_384,
+        },
+      ],
+      skipped: [],
+      invalidFallbackAnswers: [],
+      remaining: [],
+      stoppedEarly: false,
+    };
+    const text = formatStartDaySummary(result);
+    expect(text).toContain('without');
+    expect(text).toContain('20000');
+    expect(text).toContain('16384');
+    expect(text).not.toContain('Opened a new session');
+  });
+
   it('names what stopped the loop AND lists every session that never got a chance', () => {
     const failed = createHandoff({ name: 'beta', cwd: 'c:\\code\\beta' });
     const neverTried = createHandoff({
@@ -141,7 +167,7 @@ describe('formatStartDaySummary', () => {
       cwd: 'c:\\code\\gamma',
     });
     const result: ResumeSessionsResult = {
-      resumed: [{ sessionId: 'alpha-id', cwd: 'c:\\code\\alpha', fellBack: false }],
+      resumed: [{ sessionId: 'alpha-id', cwd: 'c:\\code\\alpha', kind: 'resumed' }],
       skipped: [],
       invalidFallbackAnswers: [],
       remaining: [failed, neverTried],
@@ -197,24 +223,52 @@ describe('formatStartDaySummary', () => {
   });
 });
 
+const RESUME_FAILED_REASON: ResumeFallbackReason = { kind: 'resumeFailed', exitCode: 1 };
+
 describe('renderFallbackQuestion', () => {
-  it('names the session, the reason, warns about a fresh conversation, and defaults to no', () => {
+  it('resumeFailed: names the session, the reason, warns about a fresh conversation, and defaults to no', () => {
+    const handoff = createHandoff({ name: 'alpha', cwd: 'c:\\code\\alpha' });
+    const text = renderFallbackQuestion(handoff, RESUME_FAILED_REASON);
+    expect(text).toContain('"alpha"');
+    expect(text).toContain('c:\\code\\alpha');
+    expect(text).toContain('could not be resumed');
+    expect(text).toContain('FRESH conversation');
+    expect(text).toContain('[y/N]');
+    // V2-T7's third answer never appears for this reason.
+    expect(text).not.toMatch(/resume without the plan/i);
+  });
+
+  // V2-T7: the promptTooLarge question gets a third answer and a new default.
+  it('promptTooLarge: names the session, the reason, offers "resume without the plan", and defaults to it', () => {
     const handoff = createHandoff({ name: 'alpha', cwd: 'c:\\code\\alpha' });
     const text = renderFallbackQuestion(handoff, PROMPT_TOO_LARGE_REASON);
     expect(text).toContain('"alpha"');
     expect(text).toContain('c:\\code\\alpha');
     expect(text).toContain('too long to pass safely');
-    expect(text).toContain('FRESH conversation');
-    expect(text).toContain('[y/N]');
+    expect(text).toMatch(/resume without the plan/i);
+    expect(text).toContain('[R/y/n]');
+    expect(text).toContain('blank = resume without the plan');
   });
 });
 
 describe('formatFallbackNoTty', () => {
-  it('states the reason AND that it is skipping by default, without asking', () => {
+  it('resumeFailed: states the reason AND that it is skipping by default, without asking', () => {
+    const handoff = createHandoff({ name: 'alpha', cwd: 'c:\\code\\alpha' });
+    const text = formatFallbackNoTty(handoff, RESUME_FAILED_REASON);
+    expect(text).toContain('"alpha"');
+    expect(text).toContain('could not be resumed');
+    expect(text).toContain('skipping it by default');
+  });
+
+  // V2-T7: the no-TTY default now matches the same per-reason default parseFallbackAnswer('')
+  // applies — "resume without the plan" for promptTooLarge, never "skipping" (which would silently
+  // discard a session that could have kept its full history for free).
+  it('promptTooLarge: states the reason AND that it is resuming without the plan by default', () => {
     const handoff = createHandoff({ name: 'alpha', cwd: 'c:\\code\\alpha' });
     const text = formatFallbackNoTty(handoff, PROMPT_TOO_LARGE_REASON);
     expect(text).toContain('"alpha"');
     expect(text).toContain('too long to pass safely');
-    expect(text).toContain('skipping it by default');
+    expect(text).toMatch(/resuming it without yesterday's plan by default/i);
+    expect(text).not.toContain('skipping it by default');
   });
 });

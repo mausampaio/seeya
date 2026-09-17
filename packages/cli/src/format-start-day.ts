@@ -4,6 +4,7 @@
  * `start-day-command.ts`). Same convention `format-end-day.ts`/`format-sessions.ts` already use.
  */
 import { describeFallbackReason, formatResumeNotice } from '@seeya-ai/engine/core/resume-notice.js';
+import { parseFallbackAnswer } from '@seeya-ai/engine/core/resume-fallback-decision.js';
 import type { Handoff, ResumeFallbackReason } from '@seeya-ai/engine/core/types.js';
 import type {
   ResumeProgressEvent,
@@ -94,30 +95,55 @@ export function formatResumeProgress(event: ResumeProgressEvent): string {
 /**
  * S5-T9's "warn BEFORE, and ask" question — the reason text is identical to
  * `core/resume-notice.ts#formatResumeNotice`'s after-the-fact wording (same `describeFallbackReason`
- * helper) because it is the SAME fact, just shown before the fallback runs instead of after. Default
- * is "skip" (D-004's fallback loses history, so a distracted Enter must never choose it) — spelled
- * out as `[y/N]`, the capital letter marking the default the same way a shell prompt would.
+ * helper) because it is the SAME fact, just shown before the fallback runs instead of after.
+ *
+ * **`resumeFailed` keeps S5-T9's original two answers and default** ("skip" — D-004's fallback
+ * loses history, so a distracted Enter must never choose it) — spelled out as `[y/N]`, the capital
+ * letter marking the default the same way a shell prompt would.
+ *
+ * **`promptTooLarge` gets a third answer (V2-T7) and a different default.** "Resume without the
+ * plan" keeps the original session's real transcript (the memory that actually matters, spikes
+ * K/L) and costs nothing extra — the plan itself stays readable in today's briefing either way —
+ * so it's safe for a distracted Enter to choose, unlike "open a fresh session" (which still loses
+ * history) or "skip" (which loses the session entirely for today).
  */
 export function renderFallbackQuestion(handoff: Handoff, reason: ResumeFallbackReason): string {
   const why = describeFallbackReason(reason);
+  const header = `Could not resume session "${handoff.name}" (${handoff.cwd}) as-is — ${why}.\n`;
+  if (reason.kind !== 'promptTooLarge') {
+    return (
+      header +
+      'Opening a new session there would start a FRESH conversation: it would not have this ' +
+      "session's full history.\n" +
+      'Open a new session anyway? [y/N]: '
+    );
+  }
   return (
-    `Could not resume session "${handoff.name}" (${handoff.cwd}) as-is — ${why}.\n` +
-    'Opening a new session there would start a FRESH conversation: it would not have this ' +
-    "session's full history.\n" +
-    'Open a new session anyway? [y/N]: '
+    header +
+    "Resuming without the plan keeps this session's real history — the plan stays readable in " +
+    "today's briefing either way. Opening a fresh session instead would start a FRESH " +
+    'conversation with none of that history.\n' +
+    'Resume without the plan, open a fresh session instead, or skip? [R/y/n] ' +
+    '(blank = resume without the plan): '
   );
 }
 
 /** Printed when there is no real terminal to ask the fallback question through — the safe default
- * (skip) is applied automatically instead of asking `node:readline` to read a line from a stream
- * that may never send one (`start-day-command.ts`'s own `isTTY` guard). */
+ * for THIS `reason` (`parseFallbackAnswer`'s own blank-answer default: "resume without the plan"
+ * for `promptTooLarge`, V2-T7; "skip" for `resumeFailed`, unchanged from S5-T9) is applied
+ * automatically instead of asking `node:readline` to read a line from a stream that may never send
+ * one (`start-day-command.ts`'s own `isTTY` guard). */
 export function formatFallbackNoTty(handoff: Handoff, reason: ResumeFallbackReason): string {
   const why = describeFallbackReason(reason);
+  const appliedDefault = parseFallbackAnswer('', reason.kind);
+  const appliedText =
+    appliedDefault.kind === 'resumeWithoutPlan'
+      ? "resuming it without yesterday's plan by default"
+      : 'skipping it by default';
   return (
     `Could not resume session "${handoff.name}" (${handoff.cwd}) as-is — ${why}. ` +
-    'Not running in an interactive terminal, so seeya cannot ask whether to open a new session ' +
-    'there — skipping it by default (use "seeya start-day --session <id>" from a real terminal ' +
-    'to be asked).'
+    'Not running in an interactive terminal, so seeya cannot ask what to do about it — ' +
+    `${appliedText} (use "seeya start-day --session <id>" from a real terminal to be asked).`
   );
 }
 

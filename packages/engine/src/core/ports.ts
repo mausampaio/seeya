@@ -706,6 +706,26 @@ export interface SessionResumer {
     prompt: string,
     reason: ResumeFallbackReason,
   ): Promise<ResumeOutcome>;
+
+  /**
+   * Tries the original session again, WITHOUT the plan as an argument at all (V2-T7 item 2) — only
+   * ever called after the caller decided to, from a `promptTooLarge` fallback question answered
+   * "resume without the plan" (`FallbackDecision.kind === 'resumeWithoutPlan'`,
+   * `core/resume-fallback-decision.ts`). Same fast-failure detection as `attemptResume`: this port
+   * gets no stdout/stderr from the child (`stdio: 'inherit'`), so a genuine interactive session and
+   * one that never really opened are told apart the same way, by how long the process stayed up.
+   *
+   * Returns `PrimaryResumeAttempt` — the SAME result shape `attemptResume` uses — but see that
+   * type's own docstring for how the two branches differ here: a `resumed` outcome's `outcome`
+   * field is only a bare `{ kind: 'resumed' }` signal (this method has no `prompt` to measure a
+   * length from, so it cannot itself build the full `resumedWithoutPlan` `ResumeOutcome` — the
+   * caller does, from the `promptTooLarge` reason it already has); a `needsFallback` reason is
+   * always `{ kind: 'resumeWithoutPlanFailed' }`, never `resumeFailed`/`promptTooLarge` — those
+   * only ever come from `attemptResume`. A `needsFallback` result here is never asked about again
+   * (docs/PLANO-DE-ENTREGA.md V2-T7 item 2: "sem segunda pergunta") — the caller reports the
+   * session skipped, with that exit code, and moves on to the next one.
+   */
+  resumeWithoutPrompt(sessionId: string, cwd: string): Promise<PrimaryResumeAttempt>;
 }
 
 // Own block at the end of the file on purpose (S4-T1), same pattern `ForkCleanup`/`Briefing`/

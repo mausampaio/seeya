@@ -16,6 +16,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { localDayString } from '@seeya-ai/engine/core/day.js';
+import { RESUME_PROMPT_ARG_LIMIT_CHARS } from '@seeya-ai/engine/adapters/resumption/args.js';
 import {
   createE2eHome,
   readLastClaudeCall,
@@ -36,11 +37,19 @@ afterEach(async () => {
 /** A minimal, valid handoff document (`adapters/storage/handoff-schema.ts`'s real shape) written
  * straight to disk — `seeya start-day` reads it back through `Storage.readBriefing`, never through
  * `end-day`'s own pipeline. `source: 'model'` with non-empty `pendingItems` makes this handoff
- * content-pending (`core/pending-briefing.ts`), which is what makes the day findable at all. */
+ * content-pending (`core/pending-briefing.ts`), which is what makes the day findable at all.
+ *
+ * `understanding` is overridable (V2-T7's own fixture: an oversized plan, `RESUME_PROMPT_ARG_LIMIT_
+ * CHARS`-plus characters, to drive the `promptTooLarge` fallback for real). */
 async function writeHandoffFixture(
   home: E2eHome,
   day: string,
-  options: { readonly sessionId: string; readonly name: string; readonly cwd: string },
+  options: {
+    readonly sessionId: string;
+    readonly name: string;
+    readonly cwd: string;
+    readonly understanding?: string;
+  },
 ): Promise<void> {
   const dir = path.join(home.seeyaHome, 'days', day, 'sessions');
   await mkdir(dir, { recursive: true });
@@ -63,7 +72,7 @@ async function writeHandoffFixture(
       touchedFiles: [],
       git: null,
     },
-    understanding: 'Was refactoring the parser.',
+    understanding: options.understanding ?? 'Was refactoring the parser.',
     pendingItems: ['finish the parser refactor'],
     tomorrowPlan: ['ship it'],
     generationError: null,
@@ -94,6 +103,44 @@ describe('e2e: seeya start-day --all (nº5)', () => {
     expect(call.argv[0]).toBe('--resume');
     expect(call.argv[1]).toBe(session.sessionId);
     expect(call.argv[2]).toContain('finish the parser refactor');
+
+    const resumedRaw = await readFile(
+      path.join(home.seeyaHome, 'days', today, 'resumed.json'),
+      'utf8',
+    );
+    expect(JSON.parse(resumedRaw)).toMatchObject({ sessionIds: [session.sessionId] });
+  }, 20_000);
+});
+
+// V2-T7 aceite: "um start-day de e2e com um handoff sintético acima do teto e resposta em branco
+// resulta em claude --resume <id> sem prompt no argv registrado pelo claude falso". `runSeeya`'s
+// own stdio (['ignore', 'pipe', 'pipe'], `_harness.ts`) is never a TTY — the exact path
+// `makeFallbackConfirmer`'s no-TTY branch exists for — so this is the SAME "blank answer" default
+// a real interactive Enter would produce (`parseFallbackAnswer('', 'promptTooLarge')`), just
+// applied automatically because there is no terminal here to ask through at all.
+describe('e2e: seeya start-day --all with a plan over the resume-argument ceiling (V2-T7)', () => {
+  it('resumes without the plan by default: claude --resume <id> with NO third argv entry', async () => {
+    home = await createE2eHome();
+    const today = localDayString(new Date());
+    const session = {
+      sessionId: '33333333-3333-4333-8333-333333333333',
+      name: 'project-gamma',
+      cwd: path.join(home.root, 'projects', 'gamma'),
+    };
+    const oversizedUnderstanding = 'x'.repeat(RESUME_PROMPT_ARG_LIMIT_CHARS + 1);
+    await writeHandoffFixture(home, today, { ...session, understanding: oversizedUnderstanding });
+
+    const result = await runSeeya(home, ['start-day', '--all'], {
+      FAKE_CLAUDE_CAPTURE_FILE: home.claudeFixture.captureFile,
+    });
+
+    expect(result.exitCode, `stderr: ${result.stderr}`).toBe(0);
+    expect(result.stdout).toMatch(/resuming it without yesterday's plan by default/i);
+    expect(result.stdout).toContain('Resumed:');
+    expect(result.stdout).toMatch(/without yesterday's plan/i);
+
+    const call = await readLastClaudeCall(home);
+    expect(call.argv).toStrictEqual(['--resume', session.sessionId]);
 
     const resumedRaw = await readFile(
       path.join(home.seeyaHome, 'days', today, 'resumed.json'),

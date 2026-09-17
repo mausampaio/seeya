@@ -1,9 +1,9 @@
 /**
  * `SessionResumer`'s only implementation (S3-T2, D-004; split into `attemptResume`/`runFallback`
- * in S5-T9 — see `core/ports.ts`'s docstring for why). Ties together this directory's other
- * modules: `args.ts` decides the argument shape and the size ceiling, `env.ts` sanitizes per
- * D-017, `spawn-interactive.ts` is the one place a real process gets spawned, and
- * `context-file.ts` is the fallback's scratch file.
+ * in S5-T9 — see `core/ports.ts`'s docstring for why; `resumeWithoutPrompt` added in V2-T7). Ties
+ * together this directory's other modules: `args.ts` decides the argument shape and the size
+ * ceiling, `env.ts` sanitizes per D-017, `spawn-interactive.ts` is the one place a real process
+ * gets spawned, and `context-file.ts` is the fallback's scratch file.
  */
 import type { SessionResumer } from '../../core/ports.js';
 import type {
@@ -14,6 +14,7 @@ import type {
 import {
   buildFallbackArgs,
   buildResumeArgs,
+  buildResumeWithoutPromptArgs,
   describeFallbackAttempt,
   describeResumeAttempt,
   RESUME_PROMPT_ARG_LIMIT_CHARS,
@@ -127,9 +128,34 @@ export class ClaudeSessionResumer implements SessionResumer {
       fastFailureGraceMs,
     });
     if (!isFastFailure(primary)) {
-      return { kind: 'resumed', outcome: { sessionId, cwd, fellBack: false } };
+      return { kind: 'resumed', outcome: { sessionId, cwd, kind: 'resumed' } };
     }
     return { kind: 'needsFallback', reason: { kind: 'resumeFailed', exitCode: primary.exitCode } };
+  }
+
+  /**
+   * V2-T7 item 2: `claude --resume <id>`, no prompt argument at all — only ever called after the
+   * person answered "resume without the plan" to a `promptTooLarge` fallback question. Same
+   * fast-failure grace window as `attemptResume`; see `core/ports.ts#SessionResumer
+   * .resumeWithoutPrompt`'s own docstring for why the `resumed` branch's `outcome` here is only a
+   * bare signal, and why a `needsFallback` reason is always `resumeWithoutPlanFailed`.
+   */
+  async resumeWithoutPrompt(sessionId: string, cwd: string): Promise<PrimaryResumeAttempt> {
+    const { claudeBinary, env, fastFailureGraceMs } = resolveCallBasics(this.options);
+    const primary = await runInteractive({
+      claudeBinary,
+      args: buildResumeWithoutPromptArgs(sessionId),
+      cwd,
+      env,
+      fastFailureGraceMs,
+    });
+    if (!isFastFailure(primary)) {
+      return { kind: 'resumed', outcome: { sessionId, cwd, kind: 'resumed' } };
+    }
+    return {
+      kind: 'needsFallback',
+      reason: { kind: 'resumeWithoutPlanFailed', exitCode: primary.exitCode },
+    };
   }
 
   /** Only ever called after the caller decided to open it (S5-T9: after asking the person, default
@@ -181,6 +207,6 @@ export class ClaudeSessionResumer implements SessionResumer {
           `claude version still recognizes the flags shown above.`,
       );
     }
-    return { sessionId, cwd, fellBack: reason };
+    return { sessionId, cwd, kind: 'freshSession', reason };
   }
 }

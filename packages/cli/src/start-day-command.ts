@@ -124,17 +124,20 @@ async function pickSessions(
 /**
  * S5-T9's "warn BEFORE, and ask" — the only place this command reads an answer other than the
  * session picker. Without a real terminal, asking would mean handing `node:readline` a stream
- * that may never send a line at all; the safe default (skip, D-004's fallback is the path that
- * loses history) is applied directly instead, after still printing the reason (`formatFallbackNoTty`)
- * so the person sees WHY that session was skipped, same as the TTY path would show before asking.
- * Interpreting the raw answer is `core/resume-fallback-decision.ts#parseFallbackAnswer`'s job —
- * this function only reads stdin and prints, per S5-T9's own "o cli/ só lê e imprime".
+ * that may never send a line at all; the safe default for this `reason` — `parseFallbackAnswer`'s
+ * own blank-answer default, per motive (V2-T7: "resume without the plan" for `promptTooLarge`,
+ * "skip" for `resumeFailed`, unchanged from S5-T9) — is applied directly instead, after still
+ * printing the reason (`formatFallbackNoTty`) so the person sees WHY, same as the TTY path would
+ * show before asking. Interpreting the raw answer is
+ * `core/resume-fallback-decision.ts#parseFallbackAnswer`'s job — this function only reads stdin
+ * and prints, per S5-T9's own "o cli/ só lê e imprime".
  */
 function makeFallbackConfirmer(io: StartDayIo): FallbackConfirmer {
   return async (handoff: Handoff, reason: ResumeFallbackReason) => {
     if (!io.isTTY) {
+      const decision = parseFallbackAnswer('', reason.kind);
       io.stdout.write(`\n${formatFallbackNoTty(handoff, reason)}\n`);
-      return { kind: 'skip' };
+      return decision;
     }
     const rl = createInterface({ input: io.stdin, output: io.stdout });
     let answer: string;
@@ -143,7 +146,7 @@ function makeFallbackConfirmer(io: StartDayIo): FallbackConfirmer {
     } finally {
       rl.close();
     }
-    return parseFallbackAnswer(answer);
+    return parseFallbackAnswer(answer, reason.kind);
   };
 }
 

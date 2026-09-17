@@ -27,20 +27,41 @@ import type {
 /**
  * @example
  * const summary = buildResumeSummary(result, resolveLabel);
- * // summary.resumed[0]?.fellBack === false -> attached cleanly
+ * // summary.resumed[0]?.kind === 'resumed' -> attached cleanly, with the plan
  * // summary.skipped[0]?.reasonText -> the exact CLI-shared "why" text
  */
 export function buildResumeSummary(
   result: ResumeSessionsResult,
   resolveLabel: (sessionId: string) => string,
 ): ResumeSummaryResponse {
-  const resumed: readonly ResumeSummaryOutcome[] = result.resumed.map((outcome) => ({
-    sessionId: outcome.sessionId,
-    name: resolveLabel(outcome.sessionId),
-    cwd: outcome.cwd,
-    fellBack:
-      outcome.fellBack === false ? false : { reasonText: describeFallbackReason(outcome.fellBack) },
-  }));
+  const resumed: readonly ResumeSummaryOutcome[] = result.resumed.map((outcome) => {
+    const session = {
+      sessionId: outcome.sessionId,
+      name: resolveLabel(outcome.sessionId),
+      cwd: outcome.cwd,
+    };
+    if (outcome.kind === 'resumed') {
+      return { ...session, kind: 'resumed' as const };
+    }
+    if (outcome.kind === 'resumedWithoutPlan') {
+      // Same "N characters, over the M-character limit" fragment
+      // `core/resume-notice.ts#formatResumeNotice` gives the CLI, minus the sentence this module's
+      // own caller (`renderer.ts#renderResumeSummary`) wraps it in — kept as a plain fact here so
+      // that wrapping stays in `text/messages.ts`, not duplicated in two places (D-041).
+      return {
+        ...session,
+        kind: 'resumedWithoutPlan' as const,
+        noteText:
+          `it was ${outcome.promptLength} characters, over the ` +
+          `${outcome.limitChars}-character limit`,
+      };
+    }
+    return {
+      ...session,
+      kind: 'freshSession' as const,
+      noteText: describeFallbackReason(outcome.reason),
+    };
+  });
 
   const skipped: readonly ResumeSummarySkipped[] = result.skipped.map(({ handoff, reason }) => ({
     sessionId: handoff.sessionId,

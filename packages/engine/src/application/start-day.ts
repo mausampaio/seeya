@@ -108,10 +108,48 @@ type AttemptOutcome =
   | { readonly ok: true; readonly kind: 'invalidAnswer'; readonly reason: string }
   | { readonly ok: false; readonly error: Error };
 
+/**
+ * V2-T7 item 2's own half of `attemptFallback` below — only reached when the person answered
+ * "resume without the plan" to a `promptTooLarge` question. Never asks a second question: a
+ * `needsFallback` result from `resumeWithoutPrompt` is reported as skipped directly (that reason's
+ * own docstring in `core/types.ts#ResumeFallbackReason`), and only `resumeWithoutPrompt` itself
+ * throwing counts as the loop-stopping failure `resumeSessions` reacts to — same discipline
+ * `attemptFallback`'s "open" branch already applies to `runFallback` throwing.
+ *
+ * `reason` is narrowed to `promptTooLarge` by the caller before this runs (`FallbackDecision.kind
+ * === 'resumeWithoutPlan'` only ever comes from a `promptTooLarge` question,
+ * `core/resume-fallback-decision.ts`'s own docstring) — that's what lets this function build the
+ * final `resumedWithoutPlan` `ResumeOutcome` honestly, with the real `promptLength`/`limitChars`
+ * the port method itself has no way to know (see `core/ports.ts#SessionResumer
+ * .resumeWithoutPrompt`'s own docstring on why its bare `resumed` signal isn't the full outcome).
+ */
+async function attemptResumeWithoutPlan(
+  deps: StartDayDeps,
+  handoff: Handoff,
+  reason: Extract<ResumeFallbackReason, { kind: 'promptTooLarge' }>,
+): Promise<AttemptOutcome> {
+  try {
+    const attempt = await deps.sessionResumer.resumeWithoutPrompt(handoff.sessionId, handoff.cwd);
+    if (attempt.kind === 'resumed') {
+      const outcome: ResumeOutcome = {
+        sessionId: handoff.sessionId,
+        cwd: handoff.cwd,
+        kind: 'resumedWithoutPlan',
+        promptLength: reason.promptLength,
+        limitChars: reason.limitChars,
+      };
+      return { ok: true, kind: 'resumed', outcome };
+    }
+    return { ok: true, kind: 'skipped', reason: attempt.reason };
+  } catch (error) {
+    return { ok: false, error: toError(error) };
+  }
+}
+
 /** The fallback half of one session's attempt — only reached once `attemptResume` itself already
- * reported `needsFallback`. Asks first (`deps.confirmFallback`); only "open" ever calls
- * `runFallback`, and only `runFallback` throwing counts as the loop-stopping failure `resumeSessions`
- * reacts to. */
+ * reported `needsFallback`. Asks first (`deps.confirmFallback`); "open" calls `runFallback`,
+ * "resumeWithoutPlan" (V2-T7) calls `attemptResumeWithoutPlan` above, and only either of those
+ * throwing counts as the loop-stopping failure `resumeSessions` reacts to. */
 async function attemptFallback(
   deps: StartDayDeps,
   handoff: Handoff,
@@ -124,6 +162,23 @@ async function attemptFallback(
   }
   if (decision.kind === 'invalid') {
     return { ok: true, kind: 'invalidAnswer', reason: decision.reason };
+  }
+  if (decision.kind === 'resumeWithoutPlan') {
+    // Defensive narrow (D-024): a `FallbackConfirmer` is I/O-backed (`cli/`/`app/`'s own
+    // implementations), and `resumeWithoutPlan` is only ever supposed to come back for a
+    // `promptTooLarge` question — this guards against a confirmer that misbehaves rather than
+    // trusting the contract silently, same spirit as `attemptFallback`'s own "invalid answer"
+    // branch never crashing the loop.
+    if (reason.kind !== 'promptTooLarge') {
+      return {
+        ok: true,
+        kind: 'invalidAnswer',
+        reason:
+          '"resume without the plan" only applies when the plan itself was too large to pass — ' +
+          `this session's fallback reason was "${reason.kind}"`,
+      };
+    }
+    return attemptResumeWithoutPlan(deps, handoff, reason);
   }
   try {
     const outcome = await deps.sessionResumer.runFallback(

@@ -307,9 +307,10 @@ export class FakeStorage implements Storage {
 
 /** Named double for `SessionResumer` (S3-T3, docs/TESTES.md: "duplo de I/O é classe/objeto
  * nomeado implementando a porta"). Split into `attemptResume`/`runFallback` in S5-T9, mirroring
- * the real port (`core/ports.ts`). Records every call to each, in order, so a test can assert both
- * the outcome AND the exact sequence `application/start-day.ts#resumeSessions` produced —
- * `fallbackCalls` stays empty for any test that never reaches a fallback at all. */
+ * the real port (`core/ports.ts`); `resumeWithoutPrompt` added in V2-T7. Records every call to
+ * each, in order, so a test can assert both the outcome AND the exact sequence
+ * `application/start-day.ts#resumeSessions` produced — `fallbackCalls`/`resumeWithoutPromptCalls`
+ * stay empty for any test that never reaches that path at all. */
 export class FakeSessionResumer implements SessionResumer {
   readonly calls: { readonly sessionId: string; readonly cwd: string; readonly prompt: string }[] =
     [];
@@ -319,6 +320,7 @@ export class FakeSessionResumer implements SessionResumer {
     readonly prompt: string;
     readonly reason: ResumeFallbackReason;
   }[] = [];
+  readonly resumeWithoutPromptCalls: { readonly sessionId: string; readonly cwd: string }[] = [];
 
   constructor(
     private readonly attemptImpl: (
@@ -336,6 +338,15 @@ export class FakeSessionResumer implements SessionResumer {
       reason: ResumeFallbackReason,
     ) => Promise<ResumeOutcome> = () =>
       Promise.reject(new Error('FakeSessionResumer.runFallback was not configured for this test')),
+    // Same "loud rejection by default" discipline as `fallbackImpl` above — most tests never reach
+    // V2-T7's "resume without the plan" path either.
+    private readonly resumeWithoutPromptImpl: (
+      sessionId: string,
+      cwd: string,
+    ) => Promise<PrimaryResumeAttempt> = () =>
+      Promise.reject(
+        new Error('FakeSessionResumer.resumeWithoutPrompt was not configured for this test'),
+      ),
   ) {}
 
   attemptResume(sessionId: string, cwd: string, prompt: string): Promise<PrimaryResumeAttempt> {
@@ -352,13 +363,18 @@ export class FakeSessionResumer implements SessionResumer {
     this.fallbackCalls.push({ sessionId, cwd, prompt, reason });
     return this.fallbackImpl(sessionId, cwd, prompt, reason);
   }
+
+  resumeWithoutPrompt(sessionId: string, cwd: string): Promise<PrimaryResumeAttempt> {
+    this.resumeWithoutPromptCalls.push({ sessionId, cwd });
+    return this.resumeWithoutPromptImpl(sessionId, cwd);
+  }
 }
 
-/** A `SessionResumer` whose every call attaches cleanly (`fellBack: false`) — never even reaches
+/** A `SessionResumer` whose every call attaches cleanly (`kind: 'resumed'`) — never even reaches
  * `runFallback`. */
 export function cleanlyResumingResumer(): FakeSessionResumer {
   return new FakeSessionResumer((sessionId, cwd) =>
-    Promise.resolve({ kind: 'resumed', outcome: { sessionId, cwd, fellBack: false } }),
+    Promise.resolve({ kind: 'resumed', outcome: { sessionId, cwd, kind: 'resumed' } }),
   );
 }
 
@@ -371,12 +387,12 @@ export function throwingResumer(message: string): FakeSessionResumer {
 }
 
 /** A `SessionResumer` whose `attemptResume` always reports `needsFallback` with `reason`, and
- * whose `runFallback` attaches cleanly (`fellBack: reason`) — for testing the S5-T9 ask-before-
- * fallback flow without needing a resumer that ever succeeds on the first try. */
+ * whose `runFallback` attaches cleanly (`kind: 'freshSession'`) — for testing the S5-T9
+ * ask-before-fallback flow without needing a resumer that ever succeeds on the first try. */
 export function fallbackNeedingResumer(reason: ResumeFallbackReason): FakeSessionResumer {
   return new FakeSessionResumer(
     () => Promise.resolve({ kind: 'needsFallback', reason }),
-    (sessionId, cwd) => Promise.resolve({ sessionId, cwd, fellBack: reason }),
+    (sessionId, cwd) => Promise.resolve({ sessionId, cwd, kind: 'freshSession', reason }),
   );
 }
 
@@ -389,6 +405,38 @@ export function fallbackNeedingThenFailingResumer(
   return new FakeSessionResumer(
     () => Promise.resolve({ kind: 'needsFallback', reason }),
     () => Promise.reject(new Error(message)),
+  );
+}
+
+/** A `SessionResumer` whose `attemptResume` always reports `needsFallback` with a `promptTooLarge`
+ * `reason`, and whose `resumeWithoutPrompt` attaches cleanly (bare `{ kind: 'resumed' }`) — for
+ * testing V2-T7's "resume without the plan" path. */
+export function fallbackNeedingThenResumingWithoutPromptResumer(
+  reason: ResumeFallbackReason,
+): FakeSessionResumer {
+  return new FakeSessionResumer(
+    () => Promise.resolve({ kind: 'needsFallback', reason }),
+    undefined,
+    (sessionId, cwd) =>
+      Promise.resolve({ kind: 'resumed', outcome: { sessionId, cwd, kind: 'resumed' } }),
+  );
+}
+
+/** Same shape as `fallbackNeedingThenResumingWithoutPromptResumer`, but `resumeWithoutPrompt`
+ * itself fails fast (V2-T7 item 2: "sem segunda pergunta" — reported as skipped, never asked
+ * again). */
+export function fallbackNeedingThenFailingResumeWithoutPromptResumer(
+  reason: ResumeFallbackReason,
+  exitCode: number,
+): FakeSessionResumer {
+  return new FakeSessionResumer(
+    () => Promise.resolve({ kind: 'needsFallback', reason }),
+    undefined,
+    () =>
+      Promise.resolve({
+        kind: 'needsFallback',
+        reason: { kind: 'resumeWithoutPlanFailed', exitCode },
+      }),
   );
 }
 
