@@ -7558,6 +7558,11 @@ sessão com plano grande agora tenta retomar sem o plano por padrão. Abro a que
 mudança de comportamento além do texto literal do despacho; a solução mínima (reusar
 `parseFallbackAnswer` em vez de inventar uma segunda regra de default) já está aplicada.
 
+**Decisão do PO na revisão (2026-09-17):** mantido. "Retomar sem o plano" é o que acontece quando
+ninguém responde — não custa nada e não perde nada —, e quem chamou `start-day` num script pediu
+para retomar; o padrão "pular" da S5-T9 continua para `resumeFailed`, onde retomar de novo
+falharia igual.
+
 ### 5) `verificar:linux`
 
 Disparado em segundo plano no fim desta tarefa, com a saída lida por este agente em arquivo (nunca
