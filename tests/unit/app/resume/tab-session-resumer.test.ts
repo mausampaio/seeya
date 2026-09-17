@@ -133,7 +133,7 @@ describe('TabSessionResumer#attemptResume', () => {
 
     expect(result).toEqual({
       kind: 'resumed',
-      outcome: { sessionId: 'session-1', cwd: '/project', fellBack: false },
+      outcome: { sessionId: 'session-1', cwd: '/project', kind: 'resumed' },
     });
     expect(opener.openedTabs).toEqual([
       {
@@ -185,7 +185,58 @@ describe('TabSessionResumer#attemptResume', () => {
 
     expect(result).toEqual({
       kind: 'resumed',
-      outcome: { sessionId: 'session-1', cwd: '/project', fellBack: false },
+      outcome: { sessionId: 'session-1', cwd: '/project', kind: 'resumed' },
+    });
+  });
+});
+
+describe('TabSessionResumer#resumeWithoutPrompt (V2-T7)', () => {
+  const labelFor = (sessionId: string): string => `label-for-${sessionId}`;
+
+  it('opens a tab with buildResumeWithoutPromptArgs (no prompt) and reports bare "resumed" once it survives the grace window', async () => {
+    const opener = new FakeOpener();
+    const resumer = new TabSessionResumer({
+      seeyaHome: '/unused',
+      claudeCommand: 'claude',
+      opener,
+      clock: new FakeClock(),
+      resolveLabel: labelFor,
+    });
+
+    const result = await resumer.resumeWithoutPrompt('session-1', '/project');
+
+    expect(result).toEqual({
+      kind: 'resumed',
+      outcome: { sessionId: 'session-1', cwd: '/project', kind: 'resumed' },
+    });
+    expect(opener.openedTabs).toEqual([
+      {
+        command: 'claude',
+        args: ['--resume', 'session-1'],
+        cwd: '/project',
+        label: 'label-for-session-1',
+      },
+    ]);
+  });
+
+  it('reports "needsFallback" with resumeWithoutPlanFailed and the exit code when the tab exits fast with a non-zero code', async () => {
+    const opener = new FakeOpener();
+    const resumer = new TabSessionResumer({
+      seeyaHome: '/unused',
+      claudeCommand: 'claude',
+      opener,
+      clock: new FakeClock(),
+      resolveLabel: labelFor,
+    });
+
+    const resultPromise = resumer.resumeWithoutPrompt('session-1', '/project');
+    await Promise.resolve();
+    opener.triggerExit('tab-1', 9);
+    const result = await resultPromise;
+
+    expect(result).toEqual({
+      kind: 'needsFallback',
+      reason: { kind: 'resumeWithoutPlanFailed', exitCode: 9 },
     });
   });
 });
@@ -214,7 +265,12 @@ describe('TabSessionResumer#runFallback', () => {
 
     const outcome = await resumer.runFallback('session-1', '/project', 'the plan', reason);
 
-    expect(outcome).toEqual({ sessionId: 'session-1', cwd: '/project', fellBack: reason });
+    expect(outcome).toEqual({
+      sessionId: 'session-1',
+      cwd: '/project',
+      kind: 'freshSession',
+      reason,
+    });
     expect(opener.openedTabs).toHaveLength(1);
     expect(opener.openedTabs[0]?.args[0]).toBe('--append-system-prompt-file');
     expect(opener.openedTabs[0]?.label).toBe('label-for-session-1');

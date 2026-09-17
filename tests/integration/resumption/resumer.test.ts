@@ -81,7 +81,7 @@ describe('ClaudeSessionResumer — S3-T2', () => {
     await rm(seeyaHome, { recursive: true, force: true });
   });
 
-  it('attaches cleanly when --resume succeeds: fellBack is false, one call, the argument prompt', async () => {
+  it('attaches cleanly when --resume succeeds: kind is "resumed", one call, the argument prompt', async () => {
     process.env['FAKE_CLAUDE_EXIT_CODE'] = '0';
     const resumer = new ClaudeSessionResumer({ seeyaHome, claudeBinary: fixture.binaryPath });
 
@@ -92,7 +92,7 @@ describe('ClaudeSessionResumer — S3-T2', () => {
       "yesterday's plan",
     );
 
-    expect(outcome).toStrictEqual({ sessionId: 'session-1', cwd: PROJECT_CWD, fellBack: false });
+    expect(outcome).toStrictEqual({ sessionId: 'session-1', cwd: PROJECT_CWD, kind: 'resumed' });
     const calls = await readCapturedInteractiveClaudeCalls(fixture);
     expect(calls).toHaveLength(1);
     expect(calls[0]?.argv).toStrictEqual(['--resume', 'session-1', "yesterday's plan"]);
@@ -116,7 +116,11 @@ describe('ClaudeSessionResumer — S3-T2', () => {
         "yesterday's plan",
       );
 
-      expect(outcome.fellBack).toStrictEqual({ kind: 'resumeFailed', exitCode: 1 });
+      expect(outcome).toMatchObject({ kind: 'freshSession' });
+      expect(outcome.kind === 'freshSession' && outcome.reason).toStrictEqual({
+        kind: 'resumeFailed',
+        exitCode: 1,
+      });
       const calls = await readCapturedInteractiveClaudeCalls(fixture);
       expect(calls).toHaveLength(2);
       expect(calls[0]?.argv).toStrictEqual(['--resume', 'session-1', "yesterday's plan"]);
@@ -144,7 +148,8 @@ describe('ClaudeSessionResumer — S3-T2', () => {
       oversized,
     );
 
-    expect(outcome.fellBack).toStrictEqual({
+    expect(outcome).toMatchObject({ kind: 'freshSession' });
+    expect(outcome.kind === 'freshSession' && outcome.reason).toStrictEqual({
       kind: 'promptTooLarge',
       promptLength: oversized.length,
       limitChars: RESUME_PROMPT_ARG_LIMIT_CHARS,
@@ -234,5 +239,55 @@ describe('ClaudeSessionResumer — S3-T2', () => {
 
     const [call] = await readCapturedInteractiveClaudeCalls(fixture);
     expect(call?.env['CLAUDE_CODE_CHILD_SESSION']).toBeUndefined();
+  });
+
+  // V2-T7 item 2: `resumeWithoutPrompt` — the same `claude --resume <id>` call, but with no prompt
+  // argument at all, and its own `resumeWithoutPlanFailed` reason on a fast failure.
+  describe('resumeWithoutPrompt (V2-T7)', () => {
+    it('attaches cleanly with no prompt argument: bare "resumed", one call, no third argv entry', async () => {
+      process.env['FAKE_CLAUDE_EXIT_CODE'] = '0';
+      const resumer = new ClaudeSessionResumer({ seeyaHome, claudeBinary: fixture.binaryPath });
+
+      const result = await resumer.resumeWithoutPrompt('session-1', PROJECT_CWD);
+
+      expect(result).toStrictEqual({
+        kind: 'resumed',
+        outcome: { sessionId: 'session-1', cwd: PROJECT_CWD, kind: 'resumed' },
+      });
+      const calls = await readCapturedInteractiveClaudeCalls(fixture);
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.argv).toStrictEqual(['--resume', 'session-1']);
+    });
+
+    it('reports resumeWithoutPlanFailed, never opening a second fallback itself, on a fast non-zero exit', async () => {
+      process.env['FAKE_CLAUDE_FAIL_IF_RESUME'] = '1';
+      const resumer = new ClaudeSessionResumer({
+        seeyaHome,
+        claudeBinary: fixture.binaryPath,
+        fastFailureGraceMs: 2_000,
+      });
+
+      const result = await resumer.resumeWithoutPrompt('session-1', PROJECT_CWD);
+
+      expect(result).toStrictEqual({
+        kind: 'needsFallback',
+        reason: { kind: 'resumeWithoutPlanFailed', exitCode: 1 },
+      });
+      // Only the one call — this method never spawns anything else on its own (V2-T7: "sem
+      // segunda pergunta", enforced by application/start-day.ts, not by this adapter).
+      const calls = await readCapturedInteractiveClaudeCalls(fixture);
+      expect(calls).toHaveLength(1);
+    });
+
+    it('sanitizes the child env here too (D-017)', async () => {
+      process.env['FAKE_CLAUDE_EXIT_CODE'] = '0';
+      process.env['CLAUDE_CODE_CHILD_SESSION'] = '1';
+      const resumer = new ClaudeSessionResumer({ seeyaHome, claudeBinary: fixture.binaryPath });
+
+      await resumer.resumeWithoutPrompt('session-1', PROJECT_CWD);
+
+      const [call] = await readCapturedInteractiveClaudeCalls(fixture);
+      expect(call?.env['CLAUDE_CODE_CHILD_SESSION']).toBeUndefined();
+    });
   });
 });

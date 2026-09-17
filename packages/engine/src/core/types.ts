@@ -617,9 +617,9 @@ export interface GeneratedUnderstanding {
 // instead of inserting mid-file.
 
 /**
- * Why a `--resume` attempt fell back to a fresh session instead of attaching to the original one
+ * Why a `--resume` attempt didn't produce a plain, unassisted continuation of the original session
  * (S3-T2, D-004 — corrected by docs/spikes/H-retomada-interativa.md's measurement, see D-015). A
- * discriminated union (D-024): the two causes are told apart for the user, and nothing else is
+ * discriminated union (D-024): every cause is told apart for the user, and nothing else is
  * representable.
  *
  * - `resumeFailed` — `claude --resume` itself exited non-zero, and did so fast (before
@@ -631,7 +631,18 @@ export interface GeneratedUnderstanding {
  *   screen, not to a pipe this port could read).
  * - `promptTooLarge` — the prompt is longer than the positional-argument size threshold Spike H
  *   measured, so `--resume` was never attempted with it as an argument at all: better to know the
- *   ceiling in advance than to find it by failing (D-015's corrected text).
+ *   ceiling in advance than to find it by failing (D-015's corrected text). This is the ONE reason
+ *   that ever offers a real question with more than "open a fresh session or skip" — V2-T7's own
+ *   third answer, "resume without the plan", only ever applies here (item 1 of that task).
+ * - `resumeWithoutPlanFailed` (V2-T7) — the person answered "resume without the plan" for a
+ *   `promptTooLarge` fallback, `SessionResumer.resumeWithoutPrompt()` was tried, and IT ALSO exited
+ *   non-zero fast. Distinct from `resumeFailed` on purpose: that one is the ORIGINAL `--resume`
+ *   attempt (with the plan as an argument) failing, this one is a SEPARATE attempt (no argument at
+ *   all) failing after the person already chose it — same D-025 discipline (name the exit code,
+ *   never guess why), different wording (`core/resume-notice.ts#describeFallbackReason`) because
+ *   it's a different fact. Never asked about again (docs/PLANO-DE-ENTREGA.md V2-T7 item 2: "sem
+ *   segunda pergunta") — `application/start-day.ts` reports the session skipped with this reason
+ *   the moment it sees this value, it never routes back through `FallbackConfirmer`.
  */
 export type ResumeFallbackReason =
   | { readonly kind: 'resumeFailed'; readonly exitCode: number }
@@ -639,21 +650,45 @@ export type ResumeFallbackReason =
       readonly kind: 'promptTooLarge';
       readonly promptLength: number;
       readonly limitChars: number;
-    };
+    }
+  | { readonly kind: 'resumeWithoutPlanFailed'; readonly exitCode: number };
 
 /**
- * One session's resumption outcome (S3-T2). `sessionId`/`cwd` name which session this is about —
- * `seeya start-day --all` (S3-T3) resumes several sessions one at a time and needs to report each
- * by name, never just "something fell back".
+ * One session's resumption outcome (S3-T2; redesigned in V2-T7 from a boolean-shaped `fellBack:
+ * false | ResumeFallbackReason` into a proper discriminated union — D-024). `sessionId`/`cwd` name
+ * which session this is about — `seeya start-day --all` (S3-T3) resumes several sessions one at a
+ * time and needs to report each by name, never just "something happened".
+ *
+ * Three forms, never a fourth (V2-T7's own "o achado"):
+ * - `resumed` — `--resume` attached to the original session WITH the plan as its first message. A
+ *   real, unassisted interactive continuation; nothing more to say (`core/resume-notice.ts#
+ *   formatResumeNotice` returns `null` for this one, same as the old `fellBack: false`).
+ * - `resumedWithoutPlan` (V2-T7) — `--resume` attached to the original session's own transcript,
+ *   but with NO plan as an argument: the transcript, which is the real memory (spikes K/L), came
+ *   back; the plan itself stayed written down in today's briefing instead of being typed into the
+ *   session. `promptLength`/`limitChars` are the SAME two numbers `promptTooLarge` already
+ *   measured — carried here so the notice can still say "N characters, over the M-character
+ *   limit" without `application/start-day.ts` re-deriving them.
+ * - `freshSession` — the fallback session opened: brand-new, no transcript at all, the plan handed
+ *   over as a system-prompt file. `reason` says why the original attempt didn't work — D-004's
+ *   fallback mechanism, reused for `resumeFailed` and `promptTooLarge` alike, never a second one.
+ *   This is the old `fellBack: ResumeFallbackReason` case, renamed but unchanged in meaning.
  */
-export interface ResumeOutcome {
-  readonly sessionId: string;
-  readonly cwd: string;
-  /** `false` when `--resume` attached to the original session — a real interactive continuation.
-   * Otherwise names why a fresh session opened instead: D-004's single fallback mechanism,
-   * reused for both triggers above, never a second one. */
-  readonly fellBack: false | ResumeFallbackReason;
-}
+export type ResumeOutcome =
+  | { readonly sessionId: string; readonly cwd: string; readonly kind: 'resumed' }
+  | {
+      readonly sessionId: string;
+      readonly cwd: string;
+      readonly kind: 'resumedWithoutPlan';
+      readonly promptLength: number;
+      readonly limitChars: number;
+    }
+  | {
+      readonly sessionId: string;
+      readonly cwd: string;
+      readonly kind: 'freshSession';
+      readonly reason: ResumeFallbackReason;
+    };
 
 /**
  * `SessionResumer.attemptResume()`'s result (S5-T9). Splits what used to be one `resume()` call
@@ -663,6 +698,17 @@ export interface ResumeOutcome {
  * caller (`application/start-day.ts`) must decide — with the person, not for them — whether
  * `SessionResumer.runFallback()` should actually run. D-024: a discriminated union, not a boolean
  * plus an optional reason, because "needs fallback" and "here's why" are never meaningful apart.
+ *
+ * **Reused as-is for `SessionResumer.resumeWithoutPrompt()` (V2-T7 item 2).** That method's own
+ * `resumed.outcome` only ever carries the bare `{ kind: 'resumed' }` shape — it has no `prompt` to
+ * measure a length from, so it cannot honestly build a `resumedWithoutPlan` `ResumeOutcome` on its
+ * own (D-025: that would invent `promptLength`/`limitChars` from nothing). The caller
+ * (`application/start-day.ts#attemptResumeWithoutPlan`) already holds the `promptTooLarge` reason
+ * that justified asking the question in the first place, and is what actually builds the final,
+ * accurate `resumedWithoutPlan` outcome from it — this type's `resumed` branch here is only ever a
+ * bare "it attached" signal for that one call site, never read as a complete outcome on its own.
+ * Its `needsFallback.reason` is always `{ kind: 'resumeWithoutPlanFailed' }` for that same method —
+ * never `resumeFailed`/`promptTooLarge`, which only ever come from `attemptResume` itself.
  */
 export type PrimaryResumeAttempt =
   | { readonly kind: 'resumed'; readonly outcome: ResumeOutcome }

@@ -7,6 +7,7 @@
  * `pending.resolve(...)`.
  */
 import { describeFallbackReason } from '@seeya-ai/engine/core/resume-notice.js';
+import type { FallbackDecision } from '@seeya-ai/engine/core/resume-fallback-decision.js';
 import type { FallbackConfirmer } from '@seeya-ai/engine/application/start-day.js';
 import type { Handoff, ResumeFallbackReason } from '@seeya-ai/engine/core/types.js';
 import type { FallbackConfirmRequestEvent } from '../ipc/channels.js';
@@ -18,6 +19,21 @@ import {
 /** The one piece of real I/O this module needs but never does itself — `electron/main.ts` wires
  * this to `window.webContents.send(CHANNELS.confirmFallbackRequest, request)`. */
 export type SendFallbackRequest = (request: FallbackConfirmRequestEvent) => void;
+
+/** Maps the dialog's own three-word answer straight onto `FallbackDecision` (V2-T7) — no
+ * translation table, since `FallbackDialogDecision` was deliberately named to match. A stale or
+ * malformed answer (should never happen: `renderer.ts#wireFallbackDialog` only ever sends one of
+ * the three) falls back to "skip", the same safe choice `core/resume-fallback-decision.ts#
+ * parseFallbackAnswer` gives an unparseable CLI answer for `resumeFailed`. */
+function toFallbackDecision(decision: FallbackDialogDecision): FallbackDecision {
+  if (decision === 'open') {
+    return { kind: 'open' };
+  }
+  if (decision === 'resumeWithoutPlan') {
+    return { kind: 'resumeWithoutPlan' };
+  }
+  return { kind: 'skip' };
+}
 
 /**
  * @example
@@ -38,8 +54,13 @@ export function buildFallbackConfirmer(
       sessionName: handoff.name,
       cwd: handoff.cwd,
       reasonText: describeFallbackReason(reason),
+      // V2-T7 item 4: the dialog only ever offers "resume without the plan" for THIS reason —
+      // `core/resume-fallback-decision.ts`'s own docstring on why `resumeFailed` has no free
+      // option to fall back to. Computed here, once, rather than re-derived in `renderer.ts`
+      // (D-041: the renderer has no logic of its own).
+      offersResumeWithoutPlan: reason.kind === 'promptTooLarge',
     });
     const decision: FallbackDialogDecision = await answer;
-    return decision === 'open' ? { kind: 'open' } : { kind: 'skip' };
+    return toFallbackDecision(decision);
   };
 }

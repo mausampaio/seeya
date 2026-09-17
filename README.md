@@ -168,10 +168,14 @@ click **Resume selected**: each one opens in its own tab, labeled with the sessi
 `claude --resume` with yesterday's plan as the first message — the interface's own `SessionResumer`
 implementation, over a tab instead of the CLI's inherited terminal, but calling the exact same
 `resumeSessions` the CLI does. If a plan is too long to pass safely to an interactive session, a
-dialog asks before opening a fresh, history-losing one in its place — **Open a fresh session** or
-**Skip**, mirroring `seeya start-day`'s own "warn BEFORE, and ask" — and closing the dialog without
-choosing counts as Skip. The interface never starts this on its own; it only ever runs after that
-click.
+dialog asks before doing anything else, mirroring `seeya start-day`'s own "warn BEFORE, and ask":
+**Resume without the plan** (the default — the session comes back with its real history intact,
+and the plan stays readable in today's briefing either way), **Open a fresh session** (starts
+clean, losing history), or **Skip**. Closing the dialog without choosing counts as **Resume
+without the plan**. A `--resume` that fails outright (not a long plan — the process itself exiting
+non-zero) only ever offers **Open a fresh session** or **Skip**, same as before — there is no
+free option to fall back to when `--resume` itself is what broke. The interface never starts this
+on its own; it only ever runs after that click.
 
 **Ending the day, with a preview as the confirmation (V2-T5a).** The status panel has an "End
 day…" button. Clicking it never writes or terminates anything, and never calls the model either —

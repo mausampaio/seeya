@@ -21,6 +21,7 @@ import {
   FakeStorage,
   cleanlyResumingResumer,
   fallbackNeedingResumer,
+  fallbackNeedingThenResumingWithoutPromptResumer,
   throwingResumer,
 } from '../application/_fakes.js';
 import type { ResumeFallbackReason } from '@seeya-ai/engine/core/types.js';
@@ -30,6 +31,8 @@ const PROMPT_TOO_LARGE_REASON: ResumeFallbackReason = {
   promptLength: 4135,
   limitChars: 4096,
 };
+
+const RESUME_FAILED_REASON: ResumeFallbackReason = { kind: 'resumeFailed', exitCode: 1 };
 
 const TODAY = new Date(2026, 7, 16, 21, 0, 0); // 2026-08-16, local
 
@@ -384,12 +387,12 @@ describe('runStartDayCommand — interactive picker (a TTY, no flags)', () => {
   });
 });
 
-describe('runStartDayCommand — the fallback question (S5-T9)', () => {
+describe('runStartDayCommand — the fallback question (S5-T9, resumeFailed — unchanged by V2-T7)', () => {
   it('warns BEFORE asking, and "y" opens the fallback and marks the session resumed', async () => {
     const storage = new FakeStorage(DEFAULT_TEST_CONFIG);
     const alpha = createHandoff({ sessionId: 'alpha-id', name: 'alpha', pendingItems: ['x'] });
     await storage.saveHandoff('2026-08-15', alpha);
-    const resumer = fallbackNeedingResumer(PROMPT_TOO_LARGE_REASON);
+    const resumer = fallbackNeedingResumer(RESUME_FAILED_REASON);
     const context = makeContext({ storage, sessionResumer: resumer });
     const { io, output } = makeIo({ isTTY: true, answer: 'y' });
 
@@ -397,7 +400,7 @@ describe('runStartDayCommand — the fallback question (S5-T9)', () => {
 
     expect(exitCode).toBe(0);
     expect(output()).toContain('Open a new session anyway?');
-    expect(output()).toContain('too long to pass safely');
+    expect(output()).toContain('could not be resumed');
     expect(resumer.fallbackCalls).toHaveLength(1);
     expect([...(await storage.readResumedSessionIds('2026-08-15'))]).toEqual(['alpha-id']);
   });
@@ -406,7 +409,7 @@ describe('runStartDayCommand — the fallback question (S5-T9)', () => {
     const storage = new FakeStorage(DEFAULT_TEST_CONFIG);
     const alpha = createHandoff({ sessionId: 'alpha-id', name: 'alpha', pendingItems: ['x'] });
     await storage.saveHandoff('2026-08-15', alpha);
-    const resumer = fallbackNeedingResumer(PROMPT_TOO_LARGE_REASON);
+    const resumer = fallbackNeedingResumer(RESUME_FAILED_REASON);
     const context = makeContext({ storage, sessionResumer: resumer });
     const { io, output } = makeIo({ isTTY: true, answer: '' });
 
@@ -422,7 +425,7 @@ describe('runStartDayCommand — the fallback question (S5-T9)', () => {
     const storage = new FakeStorage(DEFAULT_TEST_CONFIG);
     const alpha = createHandoff({ sessionId: 'alpha-id', name: 'alpha', pendingItems: ['x'] });
     await storage.saveHandoff('2026-08-15', alpha);
-    const resumer = fallbackNeedingResumer(PROMPT_TOO_LARGE_REASON);
+    const resumer = fallbackNeedingResumer(RESUME_FAILED_REASON);
     const context = makeContext({ storage, sessionResumer: resumer });
     const { io, output } = makeIo({ isTTY: true, answer: 'banana' });
 
@@ -439,16 +442,88 @@ describe('runStartDayCommand — the fallback question (S5-T9)', () => {
     const storage = new FakeStorage(DEFAULT_TEST_CONFIG);
     const alpha = createHandoff({ sessionId: 'alpha-id', name: 'alpha', pendingItems: ['x'] });
     await storage.saveHandoff('2026-08-15', alpha);
-    const resumer = fallbackNeedingResumer(PROMPT_TOO_LARGE_REASON);
+    const resumer = fallbackNeedingResumer(RESUME_FAILED_REASON);
     const context = makeContext({ storage, sessionResumer: resumer });
     const { io, output } = makeIo({ isTTY: false });
 
     const exitCode = await runStartDayCommand(context, { all: true }, io);
 
     expect(exitCode).toBe(0);
-    expect(output()).toContain('cannot ask whether to open a new session');
+    expect(output()).toContain('cannot ask what to do about it');
     expect(output()).toContain('skipping it by default');
     expect(resumer.fallbackCalls).toHaveLength(0);
     expect([...(await storage.readResumedSessionIds('2026-08-15'))]).toEqual([]);
+  });
+});
+
+describe('runStartDayCommand — the fallback question, promptTooLarge (V2-T7: a third answer and a new default)', () => {
+  it('warns BEFORE asking, offers "resume without the plan", and "y" still opens a fresh session', async () => {
+    const storage = new FakeStorage(DEFAULT_TEST_CONFIG);
+    const alpha = createHandoff({ sessionId: 'alpha-id', name: 'alpha', pendingItems: ['x'] });
+    await storage.saveHandoff('2026-08-15', alpha);
+    const resumer = fallbackNeedingResumer(PROMPT_TOO_LARGE_REASON);
+    const context = makeContext({ storage, sessionResumer: resumer });
+    const { io, output } = makeIo({ isTTY: true, answer: 'y' });
+
+    const exitCode = await runStartDayCommand(context, { all: true }, io);
+
+    expect(exitCode).toBe(0);
+    expect(output()).toMatch(/resume without the plan/i);
+    expect(output()).toContain('too long to pass safely');
+    expect(resumer.fallbackCalls).toHaveLength(1);
+    expect([...(await storage.readResumedSessionIds('2026-08-15'))]).toEqual(['alpha-id']);
+  });
+
+  it('a blank answer (Enter) resumes without the plan — the new default, never a fallback', async () => {
+    const storage = new FakeStorage(DEFAULT_TEST_CONFIG);
+    const alpha = createHandoff({ sessionId: 'alpha-id', name: 'alpha', pendingItems: ['x'] });
+    await storage.saveHandoff('2026-08-15', alpha);
+    const resumer = fallbackNeedingThenResumingWithoutPromptResumer(PROMPT_TOO_LARGE_REASON);
+    const context = makeContext({ storage, sessionResumer: resumer });
+    const { io, output } = makeIo({ isTTY: true, answer: '' });
+
+    const exitCode = await runStartDayCommand(context, { all: true }, io);
+
+    expect(exitCode).toBe(0);
+    expect(output()).toContain('Resumed:');
+    expect(output()).toMatch(/without yesterday's plan/i);
+    expect(resumer.resumeWithoutPromptCalls).toEqual([
+      { sessionId: 'alpha-id', cwd: 'c:\\code\\projeto' },
+    ]);
+    expect(resumer.fallbackCalls).toHaveLength(0);
+    expect([...(await storage.readResumedSessionIds('2026-08-15'))]).toEqual(['alpha-id']);
+  });
+
+  it('"n" still skips', async () => {
+    const storage = new FakeStorage(DEFAULT_TEST_CONFIG);
+    const alpha = createHandoff({ sessionId: 'alpha-id', name: 'alpha', pendingItems: ['x'] });
+    await storage.saveHandoff('2026-08-15', alpha);
+    const resumer = fallbackNeedingResumer(PROMPT_TOO_LARGE_REASON);
+    const context = makeContext({ storage, sessionResumer: resumer });
+    const { io, output } = makeIo({ isTTY: true, answer: 'n' });
+
+    const exitCode = await runStartDayCommand(context, { all: true }, io);
+
+    expect(exitCode).toBe(0);
+    expect(output()).toContain('Skipped at your request');
+    expect(resumer.fallbackCalls).toHaveLength(0);
+    expect([...(await storage.readResumedSessionIds('2026-08-15'))]).toEqual([]);
+  });
+
+  it('without a real terminal, resumes without the plan by default (the same default a blank answer would give)', async () => {
+    const storage = new FakeStorage(DEFAULT_TEST_CONFIG);
+    const alpha = createHandoff({ sessionId: 'alpha-id', name: 'alpha', pendingItems: ['x'] });
+    await storage.saveHandoff('2026-08-15', alpha);
+    const resumer = fallbackNeedingThenResumingWithoutPromptResumer(PROMPT_TOO_LARGE_REASON);
+    const context = makeContext({ storage, sessionResumer: resumer });
+    const { io, output } = makeIo({ isTTY: false });
+
+    const exitCode = await runStartDayCommand(context, { all: true }, io);
+
+    expect(exitCode).toBe(0);
+    expect(output()).toContain('cannot ask what to do about it');
+    expect(output()).toMatch(/resuming it without yesterday's plan by default/i);
+    expect(resumer.resumeWithoutPromptCalls).toHaveLength(1);
+    expect([...(await storage.readResumedSessionIds('2026-08-15'))]).toEqual(['alpha-id']);
   });
 });

@@ -53,4 +53,51 @@ describe('buildFallbackConfirmer', () => {
     pending.resolve(sent[0]?.requestId ?? '', 'skip');
     await decisionPromise;
   });
+
+  // V2-T7 item 4.
+  describe('offersResumeWithoutPlan (V2-T7)', () => {
+    it('is true for a promptTooLarge reason', async () => {
+      const pending = new PendingFallbackRequests();
+      const sent: FallbackConfirmRequestEvent[] = [];
+      const confirmFallback = buildFallbackConfirmer(pending, (request) => sent.push(request));
+
+      const decisionPromise = confirmFallback(buildHandoffFixture(), {
+        kind: 'promptTooLarge',
+        promptLength: 20_000,
+        limitChars: 16_384,
+      });
+      expect(sent[0]?.offersResumeWithoutPlan).toBe(true);
+      pending.resolve(sent[0]?.requestId ?? '', 'skip');
+      await decisionPromise;
+    });
+
+    it('is false for a resumeFailed reason — that one has no free option to fall back to', async () => {
+      const pending = new PendingFallbackRequests();
+      const sent: FallbackConfirmRequestEvent[] = [];
+      const confirmFallback = buildFallbackConfirmer(pending, (request) => sent.push(request));
+
+      const decisionPromise = confirmFallback(buildHandoffFixture(), {
+        kind: 'resumeFailed',
+        exitCode: 1,
+      });
+      expect(sent[0]?.offersResumeWithoutPlan).toBe(false);
+      pending.resolve(sent[0]?.requestId ?? '', 'skip');
+      await decisionPromise;
+    });
+  });
+
+  it('resolves "resumeWithoutPlan" from a "resumeWithoutPlan" answer', async () => {
+    const pending = new PendingFallbackRequests();
+    const sent: FallbackConfirmRequestEvent[] = [];
+    const confirmFallback = buildFallbackConfirmer(pending, (request) => sent.push(request));
+
+    const decisionPromise = confirmFallback(buildHandoffFixture(), {
+      kind: 'promptTooLarge',
+      promptLength: 20_000,
+      limitChars: 16_384,
+    });
+    pending.resolve(sent[0]?.requestId ?? '', 'resumeWithoutPlan');
+
+    await expect(decisionPromise).resolves.toEqual({ kind: 'resumeWithoutPlan' });
+  });
 });

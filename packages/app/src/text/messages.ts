@@ -43,9 +43,21 @@ export const MESSAGES = {
   // `resume/fallback-confirmer.ts` (core/resume-notice.ts#describeFallbackReason, the exact same
   // wording the CLI shows) — never duplicated here.
   fallbackDialogTitle: (sessionName: string): string => `Could not resume "${sessionName}" as-is`,
-  fallbackDialogBody:
-    'Opening a new session there would start a FRESH conversation: it would not have this ' +
-    "session's full history.",
+  // V2-T7 item 4: the body text now depends on whether "Resume without the plan" is offered at all
+  // (only for a promptTooLarge reason — `offersResumeWithoutPlan`,
+  // `resume/fallback-confirmer.ts`'s own computation). The `resumeFailed` body is the original
+  // S5-T9 text, unchanged.
+  fallbackDialogBody: (offersResumeWithoutPlan: boolean): string =>
+    offersResumeWithoutPlan
+      ? "Resuming without the plan keeps this session's real history — the plan stays readable " +
+        "in today's briefing either way. Opening a fresh session instead would start a FRESH " +
+        'conversation with none of that history.'
+      : 'Opening a new session there would start a FRESH conversation: it would not have this ' +
+        "session's full history.",
+  // V2-T7 item 4: "Resume without the plan" comes first and takes focus when offered (the new
+  // default, mirroring the CLI's blank-answer default for the same reason) — `fallbackDialogOpen`
+  // moves to second place in that case, and `fallbackDialogSkip` stays last either way.
+  fallbackDialogResumeWithoutPlan: 'Resume without the plan',
   fallbackDialogOpen: 'Open a fresh session',
   fallbackDialogSkip: 'Skip',
 
@@ -60,6 +72,11 @@ export const MESSAGES = {
     `Stopped after "${name}" failed: ${message}`,
   todaySummaryFallbackNote: (reasonText: string): string =>
     `Opened a new session there instead — ${reasonText}.`,
+  // V2-T7: the third `ResumeOutcome` form — resumed WITH the original transcript, but the plan
+  // itself didn't travel as an argument (`noteText` is `state/resume-summary.ts`'s own "N
+  // characters, over the M-character limit" fragment).
+  todaySummaryResumedWithoutPlanNote: (noteText: string): string =>
+    `Resumed without yesterday's plan — ${noteText}.`,
 
   // V2-T5a item 1 — the "End day..." button and its preview-as-confirmation dialog. The report
   // text itself (`endDayReport`, filled in by the renderer) is `formatEndDayReport`'s own literal

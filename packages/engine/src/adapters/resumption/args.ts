@@ -56,6 +56,14 @@ export function buildResumeArgs(sessionId: string, prompt: string): string[] {
   return ['--resume', sessionId, prompt];
 }
 
+/** `claude --resume <sessionId>` — no prompt argument at all (V2-T7 item 2). The session attaches
+ * with its own transcript intact (the real memory, spikes K/L); the plan that didn't fit stays
+ * readable in today's briefing instead. Never combined with a prompt — that's `buildResumeArgs`
+ * above, for the ordinary case where the plan fits under `RESUME_PROMPT_ARG_LIMIT_CHARS`. */
+export function buildResumeWithoutPromptArgs(sessionId: string): string[] {
+  return ['--resume', sessionId];
+}
+
 /** Fixed, short, English (AGENTS.md § "Idioma": CLI-facing text) — safe as an argument regardless
  * of prompt size, because it never varies. Gives the fallback session an actual first turn instead
  * of opening on a blank prompt the user has to know to fill in themselves. */

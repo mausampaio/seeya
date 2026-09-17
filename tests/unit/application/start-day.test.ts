@@ -13,7 +13,9 @@ import {
   alwaysOpenFallback,
   cleanlyResumingResumer,
   fallbackNeedingResumer,
+  fallbackNeedingThenFailingResumeWithoutPromptResumer,
   fallbackNeedingThenFailingResumer,
+  fallbackNeedingThenResumingWithoutPromptResumer,
   throwingResumer,
 } from './_fakes.js';
 import type { ResumeFallbackReason } from '@seeya-ai/engine/core/types.js';
@@ -52,8 +54,8 @@ describe('resumeSessions — the happy path', () => {
     expect(result.stoppedEarly).toBe(false);
     expect(result.remaining).toEqual([]);
     expect(result.resumed).toEqual([
-      { sessionId: 'alpha', cwd: 'c:\\code\\alpha', fellBack: false },
-      { sessionId: 'beta', cwd: 'c:\\code\\beta', fellBack: false },
+      { sessionId: 'alpha', cwd: 'c:\\code\\alpha', kind: 'resumed' },
+      { sessionId: 'beta', cwd: 'c:\\code\\beta', kind: 'resumed' },
     ]);
     expect(resumer.calls.map((call) => call.sessionId)).toEqual(['alpha', 'beta']);
   });
@@ -78,7 +80,7 @@ describe('resumeSessions — the happy path', () => {
     const seenAfterFirst: ReadonlySet<string>[] = [];
     const resumer = new FakeSessionResumer(async (sessionId, cwd) => {
       seenAfterFirst.push(await storage.readResumedSessionIds(DAY));
-      return { kind: 'resumed', outcome: { sessionId, cwd, fellBack: false } };
+      return { kind: 'resumed', outcome: { sessionId, cwd, kind: 'resumed' } };
     });
     await resumeSessions(
       { storage, sessionResumer: resumer, confirmFallback: alwaysOpenFallback },
@@ -92,7 +94,7 @@ describe('resumeSessions — the happy path', () => {
     expect([...(await storage.readResumedSessionIds(DAY))].sort()).toEqual(['alpha', 'beta']);
   });
 
-  it('a fallback outcome (fellBack !== false) still counts as resumed — the person got a session', async () => {
+  it('a freshSession outcome still counts as resumed — the person got a session', async () => {
     const handoff = createHandoff({ sessionId: 'alpha', cwd: 'c:\\code\\alpha' });
     const reason: ResumeFallbackReason = { kind: 'resumeFailed', exitCode: 1 };
     const storage = new FakeStorage(DEFAULT_TEST_CONFIG);
@@ -103,7 +105,7 @@ describe('resumeSessions — the happy path', () => {
     );
 
     expect(result.resumed).toEqual([
-      { sessionId: 'alpha', cwd: 'c:\\code\\alpha', fellBack: reason },
+      { sessionId: 'alpha', cwd: 'c:\\code\\alpha', kind: 'freshSession', reason },
     ]);
     expect([...(await storage.readResumedSessionIds(DAY))]).toEqual(['alpha']);
   });
@@ -135,7 +137,7 @@ describe('resumeSessions — an attemptResume()/runFallback() that throws stops 
         ? Promise.reject(new Error('claude is not on PATH'))
         : Promise.resolve({
             kind: 'resumed',
-            outcome: { sessionId, cwd: 'c:\\code\\x', fellBack: false },
+            outcome: { sessionId, cwd: 'c:\\code\\x', kind: 'resumed' },
           }),
     );
 
@@ -311,10 +313,135 @@ describe('resumeSessions — the fallback question (S5-T9)', () => {
     );
 
     expect(result.resumed).toEqual([
-      { sessionId: 'alpha', cwd: 'c:\\code\\alpha', fellBack: PROMPT_TOO_LARGE_REASON },
+      {
+        sessionId: 'alpha',
+        cwd: 'c:\\code\\alpha',
+        kind: 'freshSession',
+        reason: PROMPT_TOO_LARGE_REASON,
+      },
     ]);
     expect(resumer.fallbackCalls).toHaveLength(1);
     expect(resumer.fallbackCalls[0]?.reason).toEqual(PROMPT_TOO_LARGE_REASON);
     expect([...(await storage.readResumedSessionIds(DAY))]).toEqual(['alpha']);
+  });
+});
+
+describe('resumeSessions — "resume without the plan" (V2-T7)', () => {
+  it('a promptTooLarge fallback answered "resumeWithoutPlan" resumes WITHOUT calling runFallback, marks the session resumed, and builds resumedWithoutPlan from the reason already in hand', async () => {
+    const alpha = createHandoff({ sessionId: 'alpha', cwd: 'c:\\code\\alpha' });
+    const storage = new FakeStorage(DEFAULT_TEST_CONFIG);
+    const resumer = fallbackNeedingThenResumingWithoutPromptResumer(PROMPT_TOO_LARGE_REASON);
+
+    const result = await resumeSessions(
+      {
+        storage,
+        sessionResumer: resumer,
+        confirmFallback: () => Promise.resolve({ kind: 'resumeWithoutPlan' }),
+      },
+      { day: DAY, handoffs: [alpha] },
+    );
+
+    expect(result.resumed).toEqual([
+      {
+        sessionId: 'alpha',
+        cwd: 'c:\\code\\alpha',
+        kind: 'resumedWithoutPlan',
+        promptLength: PROMPT_TOO_LARGE_REASON.promptLength,
+        limitChars: PROMPT_TOO_LARGE_REASON.limitChars,
+      },
+    ]);
+    expect(resumer.resumeWithoutPromptCalls).toEqual([
+      { sessionId: 'alpha', cwd: 'c:\\code\\alpha' },
+    ]);
+    expect(resumer.fallbackCalls).toHaveLength(0);
+    expect([...(await storage.readResumedSessionIds(DAY))]).toEqual(['alpha']);
+  });
+
+  it('resumeWithoutPrompt failing fast is reported as skipped with resumeWithoutPlanFailed, never asked about again, and never marks the session resumed', async () => {
+    const alpha = createHandoff({ sessionId: 'alpha', name: 'alpha' });
+    const beta = createHandoff({ sessionId: 'beta', name: 'beta' });
+    const storage = new FakeStorage(DEFAULT_TEST_CONFIG);
+    const resumer = fallbackNeedingThenFailingResumeWithoutPromptResumer(
+      PROMPT_TOO_LARGE_REASON,
+      17,
+    );
+    let asked = 0;
+
+    const result = await resumeSessions(
+      {
+        storage,
+        sessionResumer: resumer,
+        confirmFallback: () => {
+          asked += 1;
+          return Promise.resolve({ kind: 'resumeWithoutPlan' });
+        },
+      },
+      { day: DAY, handoffs: [alpha, beta] },
+    );
+
+    expect(result.resumed).toEqual([]);
+    expect(result.skipped).toEqual([
+      {
+        handoff: alpha,
+        reason: { kind: 'resumeWithoutPlanFailed', exitCode: 17 },
+      },
+      {
+        handoff: beta,
+        reason: { kind: 'resumeWithoutPlanFailed', exitCode: 17 },
+      },
+    ]);
+    // One question per session, never a second one for the same session after
+    // resumeWithoutPrompt itself fails (V2-T7 item 2: "sem segunda pergunta").
+    expect(asked).toBe(2);
+    expect(result.stoppedEarly).toBe(false);
+    expect([...(await storage.readResumedSessionIds(DAY))]).toEqual([]);
+  });
+
+  it('resumeWithoutPrompt throwing outright stops the loop, the same as runFallback throwing', async () => {
+    const alpha = createHandoff({ sessionId: 'alpha', name: 'alpha' });
+    const resumer = new FakeSessionResumer(
+      () => Promise.resolve({ kind: 'needsFallback', reason: PROMPT_TOO_LARGE_REASON }),
+      undefined,
+      () => Promise.reject(new Error('claude is not on PATH')),
+    );
+
+    const result = await resumeSessions(
+      {
+        storage: new FakeStorage(DEFAULT_TEST_CONFIG),
+        sessionResumer: resumer,
+        confirmFallback: () => Promise.resolve({ kind: 'resumeWithoutPlan' }),
+      },
+      { day: DAY, handoffs: [alpha] },
+    );
+
+    expect(result.stoppedEarly).not.toBe(false);
+    if (result.stoppedEarly !== false) {
+      expect(result.stoppedEarly.handoff.sessionId).toBe('alpha');
+      expect(result.stoppedEarly.error.message).toBe('claude is not on PATH');
+    }
+  });
+
+  // D-024 defensive narrow (`application/start-day.ts#attemptFallback`): a confirmer is I/O-backed
+  // and could misbehave — "resumeWithoutPlan" answered for a resumeFailed question (which never
+  // offers it) is reported as an invalid answer, never silently treated as "open".
+  it('"resumeWithoutPlan" answered for a resumeFailed reason is reported invalid, never opens anything', async () => {
+    const alpha = createHandoff({ sessionId: 'alpha', name: 'alpha' });
+    const reason: ResumeFallbackReason = { kind: 'resumeFailed', exitCode: 1 };
+    const resumer = fallbackNeedingResumer(reason);
+
+    const result = await resumeSessions(
+      {
+        storage: new FakeStorage(DEFAULT_TEST_CONFIG),
+        sessionResumer: resumer,
+        confirmFallback: () => Promise.resolve({ kind: 'resumeWithoutPlan' }),
+      },
+      { day: DAY, handoffs: [alpha] },
+    );
+
+    expect(result.resumed).toEqual([]);
+    expect(result.invalidFallbackAnswers).toHaveLength(1);
+    expect(result.invalidFallbackAnswers[0]?.reason).toContain('resumeFailed');
+    expect(resumer.fallbackCalls).toHaveLength(0);
+    expect(resumer.resumeWithoutPromptCalls).toHaveLength(0);
   });
 });
