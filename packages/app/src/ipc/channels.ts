@@ -6,16 +6,16 @@
  * other); this module is the one place the string exists.
  */
 import type { SidebarRow } from '../sidebar/sidebar-data.js';
-import type { TerminalOptions } from '../state/terminal-options.js';
+import type { TerminalFontOptions } from '../state/terminal-font.js';
 import type { TodayPanelData } from '../state/today-panel.js';
 
 export const CHANNELS = {
   /** Renderer → main: open a new tab. */
   createTab: 'seeya:create-tab',
-  /** Renderer → main: fetch every `new Terminal({...})` option — font and, on Windows, `windowsPty`
-   * (`state/terminal-options.ts`, V2-T3/V2-T6) — once at startup. Config is read once when the
-   * interface starts (V2-T2); the renderer never re-fetches this on its own. */
-  getTerminalOptions: 'seeya:get-terminal-options',
+  /** Renderer → main: fetch the terminal's font config, once at startup
+   * (`state/terminal-font.ts`). Config is read once when the interface starts (V2-T2); the
+   * renderer never re-fetches this on its own. */
+  getTerminalFontConfig: 'seeya:get-terminal-font-config',
   /** Renderer → main: keystrokes/paste for one tab. */
   writeTab: 'seeya:write-tab',
   /** Renderer → main: the terminal element for one tab was resized. */
@@ -49,7 +49,7 @@ export const CHANNELS = {
   confirmFallbackAnswer: 'seeya:confirm-fallback-answer',
   /** Renderer → main: the "Today" panel's own data (V2-T4 item 1, `state/today-panel.ts`) —
    * fetched once at startup and again after `resumeSelected` finishes, same "no polling of its
-   * own" shape `getTerminalOptions` already has. */
+   * own" shape `getTerminalFontConfig` already has. */
   getTodayPanel: 'seeya:get-today-panel',
   /** Renderer → main: "Resume selected" — the sessions the person checked, for the day the panel
    * is showing. */
@@ -132,9 +132,8 @@ export interface StatusUpdateEvent {
   readonly text: string;
 }
 
-/** `getTerminalOptions`'s response — the exact shape `state/terminal-options.ts#resolveTerminalOptions`
- * produces. */
-export type TerminalOptionsResponse = TerminalOptions;
+/** `getTerminalFontConfig`'s response — the exact shape `state/terminal-font.ts` produces. */
+export type TerminalFontConfigResponse = TerminalFontOptions;
 
 /** `CHANNELS.confirmFallbackRequest`'s payload — the exact shape
  * `resume/fallback-confirmer.ts#FallbackConfirmRequestPayload` produces (re-declared here rather
@@ -160,7 +159,7 @@ export type TodayPanelResponse = TodayPanelData;
 
 /** `CHANNELS.resumeSelected`'s payload. `day` is `core/types.ts`'s `Day` (a plain string,
  * `YYYY-MM-DD`) — not imported from the engine here, same "this file only ever imports app-internal
- * state modules" shape every other type above already keeps (`SidebarRow`/`TerminalOptions`/
+ * state modules" shape every other type above already keeps (`SidebarRow`/`TerminalFontOptions`/
  * `TodayPanelData`). */
 export interface ResumeSelectedRequest {
   readonly day: string;

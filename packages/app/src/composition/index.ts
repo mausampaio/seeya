@@ -56,7 +56,6 @@ import type { EndDayDeps } from '@seeya-ai/engine/application/types.js';
 import { NodePtyAdapter } from '../pty/node-pty-adapter.js';
 import { PtyManager, type PtyManagerCallbacks } from '../pty/pty-manager.js';
 import { defaultShellCommand, type ShellCommand } from '../pty/default-shell.js';
-import { deriveWindowsPtyOptions, type WindowsPtyOptions } from '../state/terminal-options.js';
 
 export interface AppHome {
   readonly claudeHome: string;
@@ -83,11 +82,6 @@ export interface AppContext {
    * the same base instead of re-deriving it. */
   readonly tabEnv: NodeJS.ProcessEnv;
   readonly defaultShell: ShellCommand;
-  /** V2-T6: `state/terminal-options.ts#deriveWindowsPtyOptions`'s own output, from this function's
-   * single `process.platform`/`os.release()` read (AGENTS.md: neither belongs anywhere else).
-   * `electron/main.ts`'s `getTerminalOptions` handler carries this straight through to
-   * `new Terminal({...})`; `undefined` off Windows or when `os.release()` didn't parse. */
-  readonly windowsPty: WindowsPtyOptions | undefined;
   buildPtyManager(callbacks: PtyManagerCallbacks): PtyManager;
   /** The same `SessionProvider` `seeya sessions` uses (`cli/composition.ts#buildSessionProvider`,
    * same wiring) — the sidebar's "same list as `seeya sessions`" (docs/PLANO-DE-ENTREGA.md V2-T2). */
@@ -165,10 +159,6 @@ export async function buildAppContext(homeDir: string = os.homedir()): Promise<A
     relevanceHours: config.relevanceHours,
   });
   const platform = process.platform;
-  // V2-T6: os.release() belongs here, next to the platform read above — the only spot in
-  // packages/app/src allowed to call either (AGENTS.md). "10.0.26200" on Windows; the exact shape
-  // deriveWindowsPtyOptions below expects.
-  const release = os.release();
   const pathEnv = process.env.PATH;
   const pathExtEnv = process.env.PATHEXT;
   // V2-T5a item 5: same shape as cli/composition.ts#buildEndDayContext's own generatorOptions —
@@ -184,7 +174,6 @@ export async function buildAppContext(homeDir: string = os.homedir()): Promise<A
     homeDir,
     tabEnv: buildResumptionEnv(process.env),
     defaultShell: defaultShellCommand(platform, process.env),
-    windowsPty: deriveWindowsPtyOptions(platform, release),
     buildPtyManager: (callbacks) => new PtyManager(new NodePtyAdapter(), callbacks),
     sessionProvider,
     storage,
