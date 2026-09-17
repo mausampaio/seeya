@@ -75,7 +75,9 @@ const packageSrcRoots = ['packages/engine', 'packages/cli', 'packages/app'].map(
 );
 const EMITTED_INTO_SRC = /\.(js|js\.map|d\.ts|d\.ts\.map)$/;
 
+/** @param {string} directory */
 function sweepResidue(directory) {
+  /** @type {import('node:fs').Dirent[]} */
   let entries;
   try {
     entries = readdirSync(directory, { withFileTypes: true });
