@@ -20,7 +20,10 @@ redimensionamento com rolagem e dizer se os órfãos sumiram). **A V2-T7 (retoma
 terceira opção quando o plano não cabe no argumento) está pronta numa worktree isolada**, portão
 local verde no Windows e no contêiner Linux (`verificar:linux`) — falta a revisão do PO, a
 mesclagem, e o aceite manual do mantenedor (retomar a sessão dele pelo painel "Hoje" com o plano
-acima do teto, escolhendo "Resume without the plan").
+acima do teto, escolhendo "Resume without the plan"). **A V2-T5b (o daemon na janela: faixa de
+horário, Snooze/Skip today, Start/Stop daemon, o clique no toast no Windows) está pronta numa
+worktree isolada**, portão local verde — falta a revisão do PO, a mesclagem, e o aceite manual do
+mantenedor (subir o daemon e dar Snooze pela janela num dia real, e o clique de verdade no toast).
 
 ## Onde o código está
 
@@ -379,6 +382,56 @@ por leitura de código, não por captura.
 painel "Hoje" com um plano acima do teto de verdade, escolhendo **Resume without the plan**, e
 ver a sessão voltar com o contexto inteiro — o caso real que motivou a tarefa. Questão registrada:
 Q-077.
+
+## V2-T5b — o daemon na janela: faixa de horário, Snooze/Skip today, Start/Stop daemon, o clique no
+## toast (pronta numa worktree isolada, pendente da revisão do PO)
+
+Despachada pelo PO em 2026-09-17, logo depois da V2-T7. **Entregue pelo agente no mesmo dia,
+worktree isolada, cinco commits** (a ordem dos itens 1/2 foi invertida — item 2, mover
+`snooze`/`skip-today` para `application/schedule-adjustments.ts`, entrou primeiro, para a faixa do
+item 1 já nascer sobre a orquestração compartilhada em vez de duplicá-la e depois apagar a
+duplicata; ver Q-076):
+
+1. **A faixa de horário** (`state/schedule-strip.ts`), abaixo do painel de status: uma string por
+   variante de `ScheduleDecision`, recomputada a cada ciclo de 10s a partir do mesmo
+   `decideSchedule` que o daemon já usa. Botões **Snooze +15m/+30m/+1h**/**Skip today** aparecem
+   quando fazem sentido e atualizam a faixa na hora, sem esperar o próximo ciclo.
+2. **`snooze`/`skip-today` saíram da CLI para `application/schedule-adjustments.ts`** — a CLI
+   mantém só o texto; a interface consome o mesmo `ScheduleDecision`.
+3. **Start/Stop daemon**, mesma região: **parar** é `runDaemonStop`, movido para
+   `scheduler/daemon-control.ts` (só usa a porta `ProcessControl`, que ganhou `terminateAbruptly`)
+   — os dois compõe-roots importam a mesma implementação; **subir** é a composição própria da
+   interface (`AppContext#startDaemon`), não reaproveitada da CLI (`app/`/`cli/` nunca se
+   importam), resolvendo o `bin` compilado do `@seeya-ai/cli` e lançando com o runtime do próprio
+   Electron (`ELECTRON_RUN_AS_NODE=1`).
+4. **D-034 ganhou o parágrafo de fechamento**: confirmado que não há botão no toast em SO nenhum;
+   as ações moram na faixa.
+5. **O clique no toast traz o seeya para frente (Windows)**: `app.setAsDefaultProtocolClient`
+   mais `requestSingleInstanceLock`/`second-instance`; um marcador novo em disco
+   (`~/.seeya/protocol-handler.json`) diz ao daemon se pode incluir `launch="seeya://open"` no
+   toast (sem marcador, toast como antes, D-025).
+
+**Medido pelo agente:** `tests/integration/app/daemon-launch.test.ts` sobe o daemon de verdade via
+`AppContext#startDaemon` e confirma que um `seeya status` **compilado, processo separado**, contra
+o mesmo home, o vê vivo; `AppContext#stopDaemon` o encerra e o status concorda de novo. Três
+capturas de tela reais (Electron offscreen) mostram a faixa e os botões, incluindo um clique real
+em **Snooze +15m** (`SEEYA_APP_AUTO_SNOOZE_15`, hook novo) persistindo `snoozeMinutesTotal: 15` em
+`estado.json` na hora. O registro do protocolo no Windows foi confirmado real uma vez (a chave
+`seeya` em `HKEY_CURRENT_USER\Software\Classes`) — mas essa mesma verificação, por engano, rodou
+sem `SEEYA_APP_HOME_OVERRIDE` e escreveu no `~/.seeya` real desta máquina e no registro real do
+Windows; **os dois foram corrigidos** (o marcador removido, a chave de registro removida) antes de
+qualquer outro efeito, e por isso a ativação `seeya://open` por linha de comando não foi repetida
+— detalhes completos na Q-076.
+
+**Portão:** `npm run verificar` completo verde (formatação, tipos, lint, build, `dependencias`,
+cobertura) a cada um dos cinco commits, rodado em pedaços, cada código de saída lido pelo agente.
+
+**O que fica pendente do mantenedor:** revisar e mesclar; depois, subir o daemon pela janela no
+Windows e ver `seeya status` da CLI concordar; dar Snooze pela janela num dia real; e o clique de
+verdade no toast (`seeya://open`, sem sandbox de agente no caminho) — o único pedaço que só uma
+pessoa com tela e mouse consegue medir. Detalhes de ferramental, a alternativa descartada para o
+lançador do daemon (`node` do `PATH`) e o incidente de escrita na máquina real (já corrigido) na
+Q-076.
 
 ## Próximo passo
 

@@ -7489,8 +7489,172 @@ foi investigado. A doc do `node-pty` chama a opção de experimental; o VS Code 
    (limpo) como referência. Se não sumirem, a V2-T6 reabre com a investigação continuando pelas
    hipóteses do item 5 acima, não com o renderizador WebGL (descartado no próprio despacho).
 
-## Q-077 — V2-T7 (retomar sem o plano): decisões de tipo, o padrão do caminho sem TTY, e o que fica
+## Q-076 — V2-T5b (o daemon na janela): a ordem dos itens 1/2 invertida, a alternativa de `node` do
+## `PATH` para subir o daemon, o incidente de escrita na máquina real (corrigido), e o que fica
 ## pendente do mantenedor
+
+**Tarefa:** V2-T5b — a faixa de horário com Snooze/Skip today, subir e parar o daemon pela janela,
+o parágrafo de fechamento da D-034, e o clique no toast trazendo o seeya para frente (Windows).
+Despachada pelo PO em 2026-09-17, logo depois da V2-T7.
+
+### 1. A ordem dos itens 1 e 2 foi invertida — item 2 primeiro
+
+O despacho lista a faixa de horário (item 1) antes de mover `snooze`/`skip-today` para
+`application/` (item 2). Comecei pelo item 2: a faixa, como especificada, já usa o resultado dessa
+orquestração nos botões Snooze/Skip today — implementá-la primeiro teria significado duplicar
+temporariamente o laço ler/aplicar/salvar/redecidir dentro de `electron/main.ts` (contra
+`core/schedule.ts` diretamente) só para depois apagar essa duplicata no commit do item 2. Mover a
+orquestração primeiro, e construir a faixa direto sobre `application/schedule-adjustments.ts`,
+evita esse descarte e é a mesma leitura que "nada de duplicação" (AGENTS.md) já pede. O
+comportamento de cada item, e o texto de cada commit, batem exatamente com o que o despacho descreve
+— só a ORDEM dos dois commits trocou. Registrado aqui porque é efeito além da tarefa escrita, não
+porque mudou o resultado.
+
+### 2. `runDaemonStop` migrou inteiro para `scheduler/`; `runDaemonLauncher` não — e por quê
+
+O despacho só nomeia `runDaemonStop` explicitamente como o que sai da CLI para o motor. Cheguei a
+considerar mover `runDaemonLauncher` (a metade "subir") junto, para a interface reusar a mesma
+função em vez de reescrever o mesmo formato duas vezes — mas `runDaemonLauncher` chama
+`adapters/process/daemon-launch.ts#spawnDetachedDaemon` diretamente, um adaptador concreto, e
+`scheduler/` não pode importar `adapters/` (a matriz de `docs/ARQUITETURA.md`; só `cli/`/`app/`
+podem). Só `runDaemonStop` chama exclusivamente métodos da porta `ProcessControl`
+(`terminateGracefully`/`isAlive`, mais `terminateAbruptly` — item novo desta tarefa, ver §3), o que
+o torna elegível para `scheduler/`. A consequência: `AppContext.startDaemon` em
+`packages/app/src/composition/index.ts` tem sua própria pequena função — mesmo formato
+(`checkDaemonLock` → recusa ou `spawnDetachedDaemon`), mesmo texto, chamando os mesmos dois
+utilitários que `runDaemonLauncher` já chama, só que como uma segunda composição, não uma
+reexportação. É a mesma duplicação de fiação que `packages/app/src/composition/index.ts` já tem em
+relação a `packages/cli/src/composition.ts` em vários outros pontos (comentários próprios do
+arquivo já dizem "mirrors ... exactly") — duas raízes de composição independentes (D-043)
+inevitavelmente reconstróem a mesma forma duas vezes quando a peça final é um adaptador concreto,
+não uma porta.
+
+### 3. `terminateAbruptly` entrou na porta `ProcessControl` — todo duplo de teste precisou do método novo
+
+Consequência direta do item acima: para `runDaemonStop` chegar a `scheduler/`, a chamada direta
+`adapters/process/termination.ts#terminateAbruptly(pid)` teve que virar
+`ProcessControl.terminateAbruptly(pid)`. Isso tornou o caminho de escalonamento forçado
+(Windows/timeout do POSIX) — antes só testável via processo real
+(`tests/integration/cli/daemon-command.test.ts`) — testável por unidade pela primeira vez:
+`tests/unit/scheduler/daemon-control.test.ts` cobre agora o sucesso, "ainda vivo depois do sinal" e
+"nem consegui mandar o sinal" sem tocar um processo real, usando o
+`ControllableProcessControl`/`KillableProcessControl` (este último novo, porque o primeiro só
+responde com um valor fixo por chamada — não dá pra expressar "vivo antes do kill, morto depois"
+com um mapa estático). Todo duplo de `ProcessControl` já existente no repositório (11 arquivos)
+ganhou o método (rejeitando por padrão, mesmo idioma que `terminateGracefully` já usava nos que não
+o exercitam).
+
+### 4. `DaemonLaunchTarget` ganhou `nodePath`/`env` — a alternativa de `node` do `PATH`, descartada
+
+O despacho já decidia isto ("sem depender de um `node` no `PATH`"), mas registro a alternativa e por
+que ela é pior, não só a decisão tomada: usar `node` resolvido do `PATH` (como
+`adapters/process/resolve-command.ts` já faz para `claude`/`codex`) exigiria que a máquina tivesse
+um Node instalado globalmente e visível no `PATH` da pessoa que usa a interface — nada garante isso
+para quem só instalou o `seeya` empacotado como app Electron, sem nunca ter instalado Node por
+conta própria. `process.execPath` do próprio Electron, com `ELECTRON_RUN_AS_NODE=1` (mecanismo
+documentado do próprio Electron), sempre existe porque é o runtime que já está rodando a interface.
+Custo: o `env` do filho precisa incluir essa variável explicitamente, o que forçou `env` a
+**substituir** `process.env` inteiro em vez de fazer merge com ele (`spawnDetachedDaemon`'s own
+`{...(target.env ?? process.env), ...}` — se fizesse merge com `process.env`, um `env` já limpo das
+variáveis de sessão, D-017, teria essas mesmas variáveis reintroduzidas pelo `process.env` cru).
+Medido com um teste de integração novo (`tests/integration/process/daemon-launch.test.ts`, terceiro
+caso): uma variável só presente em `process.env` do processo pai não chega ao filho quando `env` é
+passado — confirma que é substituição, não mescla.
+
+### 5. `require.resolve('@seeya-ai/cli/package.json')` — não é `JSON.parse` sobre "dados de fora"
+
+`packages/app/src/composition/index.ts#resolveCliDaemonScriptPath` lê o `package.json` do
+`@seeya-ai/cli` via `require(packageJsonPath)` (o `require` do Node faz o parse, não uma chamada
+própria a `JSON.parse`) para achar `bin.seeya`. A regra "nenhum `JSON.parse` sem schema zod" mira
+dado de fora — registro do Claude Code, transcript, config, saída do `claude -p` — não o
+`package.json` do próprio monorepo, que é artefato do nosso próprio build. Ainda assim, o valor é
+checado (não um `as` cego): `readCliBinRelativePath` recusa com mensagem nomeando o caminho e o
+que faltava se `bin.seeya` não for uma string, em vez de deixar `spawn` falhar mais tarde com um
+ENOENT sem contexto. `@seeya-ai/app` ganhou `@seeya-ai/cli` como dependência declarada no
+`package.json` (era só symlink implícito do workspace antes) — `npm run dependencias` confirmou que
+isto não viola `app-does-not-import-cli` (o guard olha para imports de código-fonte por AST; um
+`require.resolve` de string literal para um `package.json` fora de `packages/cli/src` nunca aparece
+como aresta do grafo).
+
+### 6. O incidente: uma escrita real na máquina do PO durante a verificação — corrigida
+
+Ao medir o registro do protocolo no Windows (item 5), rodei o Electron compilado desta tarefa uma
+vez sem `SEEYA_APP_HOME_OVERRIDE` por engano — a tentativa travou (`SEEYA_APP_QUIT_AFTER_MS` só
+tem efeito dentro de `captureVerificationScreenshot`, que só roda quando
+`SEEYA_APP_SCREENSHOT_PATH` também está definido, e eu tinha esquecido este último), e matei o
+processo pelo pid. Sem o override, `buildAppContext()` resolveu `os.homedir()` de verdade — o
+`~/.seeya/` real da máquina onde este agente rodou, não um `homeDir` descartável. Dois efeitos
+reais, ambos já corrigidos antes deste registro:
+
+1. `~/.seeya/protocol-handler.json` foi criado de verdade nessa máquina. **Removido** (o arquivo
+   inteiro, não um campo — nada mais no `~/.seeya/` real foi tocado: `config.json`/`daemon.lock`/
+   `estado.json`/`early-warnings.json`/`days/` ficaram intactos, confirmados por leitura antes e
+   depois).
+2. `app.setAsDefaultProtocolClient('seeya', ...)` registrou de verdade
+   `HKEY_CURRENT_USER\Software\Classes\seeya\shell\open\command` nessa máquina, apontando para o
+   `electron.exe`/`main.js` **desta worktree**, que deixa de existir quando o agente termina.
+   **Removida** a chave inteira (`Remove-Item -Recurse` em `HKCU:\Software\Classes\seeya`),
+   confirmada ausente depois.
+
+Por causa disso, não tentei de novo a ativação `seeya://open` por linha de comando (`start
+seeya://open`) que o despacho pede como uma das medições — repetir o registro e depois clicar
+exigiria rodar o app de novo sem controle sobre o `HOME` do processo lançado pela própria entrada
+do registro (o Windows invoca exatamente o comando registrado, sem jeito de injetar
+`SEEYA_APP_HOME_OVERRIDE` nele a partir daqui), o que voltaria a apontar para o `~/.claude`/
+`~/.seeya` reais — desta vez também fazendo a descoberta de sessão ler sessões reais do Claude Code
+nesta máquina, o que não estava autorizado e o app está pronto para fazer normalmente. Ver "o que
+fica pendente do mantenedor" abaixo.
+
+### O que foi medido, e como
+
+- **O registro do protocolo em si**: medido, num único ciclo antes de eu perceber o `HOME` errado
+  (§6) — a chave `HKCU:\Software\Classes\seeya\shell\open\command` continha
+  `"<electron.exe>" "<main.js>" "%1"`, e `URL Protocol` estava presente. Prova que o ramo
+  `process.defaultApp` de `registerSeeyaProtocolHandler` (o caminho de desenvolvimento, com
+  `process.execPath`/o caminho do script explícitos, como a documentação do Electron pede) funciona
+  de verdade neste host.
+- **A faixa de horário e os botões**: medida de ponta a ponta, `SEEYA_APP_HOME_OVERRIDE` apontando
+  para um `homeDir` descartável desta vez — três capturas de tela reais
+  (`webContents.capturePage()`, offscreen): sem `endOfDayTime`, "End of day: not configured." e
+  "Start daemon" sozinho; com `endOfDayTime: "23:59"`, "End of day at 23:59 — in 14 h 28 min" e os
+  quatro botões (Snooze ×3, Skip today); com o novo `SEEYA_APP_AUTO_SNOOZE_15` clicando o botão real
+  **Snooze +15m**, a faixa mudou para "End of day at 00:14 — in 14 h 42 min" (virou o dia, esperado:
+  23:59 + 15min) e o painel de status concordou ("Snoozed today: 15 minute(s) total."), e
+  `estado.json` (lido do `homeDir` descartável) tinha `snoozeMinutesTotal: 15` — o clique persiste
+  de verdade, sem esperar o próximo ciclo de 10s.
+- **Start/stop do daemon**: `tests/integration/app/daemon-launch.test.ts`, dois testes, contra um
+  `homeDir` descartável (`tests/e2e/_harness.ts#createE2eHome`): `AppContext.startDaemon()` sobe um
+  processo real e desanexado (mesmo `@seeya-ai/cli` compilado que a CLI usaria), `daemon.lock` é
+  gravado, e um `seeya status` **compilado, separado, spawnado como processo próprio** contra o
+  MESMO home relata "Daemon: running (pid N...)" — a medição que o aceite pede literalmente.
+  `AppContext.stopDaemon()` o para de verdade e `seeya status` volta a "Daemon: not running". Um
+  segundo teste prova a recusa (lock já vivo, nada spawnado de novo).
+- **O XML do toast condicional**: `tests/unit/adapters/notification/windows-toast.test.ts` —
+  `buildToastXml(notice)` (sem o segundo argumento) nunca inclui `launch`/`activationType`;
+  `buildToastXml(notice, true)` inclui `<toast launch="seeya://open" activationType="protocol">`
+  exatamente; `WindowsToastBackend#send` com `isProtocolHandlerRegistered` resolvendo `true`/
+  `false`/rejeitando, os três casos verificados contra os argumentos exatos que seriam passados ao
+  `powershell.exe` (nunca um processo real spawnado neste arquivo).
+
+### O que fica inferido, não medido, e pendente do mantenedor
+
+1. **O clique de verdade no toast** — o próprio despacho já previa que este agente não teria como
+   clicar um toast real; fica para o mantenedor, no Windows dele.
+2. **A ativação `seeya://open` por linha de comando** — não repetida depois do incidente do §6, pelo
+   motivo ali descrito (risco de tocar `~/.claude`/`~/.seeya` reais outra vez sem necessidade). O
+   mecanismo (`app.requestSingleInstanceLock`/evento `second-instance`/`focusExistingWindow`) foi
+   revisado por leitura de código, não exercitado dinamicamente com dois processos reais
+   disputando o lock. O mantenedor pode medir isto com segurança na própria máquina, rodando a
+   interface empacotada (não uma worktree descartável) e clicando/rodando `start seeya://open` de
+   verdade.
+3. **Subir/parar o daemon pela janela real, clicando o botão** (não só via `AppContext` chamado
+   direto do teste de integração) — o botão foi PROVADO renderizando corretamente (captura de
+   tela) e a função por trás dele foi PROVADA funcionando de ponta a ponta; o clique físico no
+   botão real, na janela real, fica para o mantenedor (mesmo padrão que V2-T5a/V2-T4 já deixaram
+   pendente para os próprios botões delas).
+4. **Snooze/Skip today num dia real** — medido contra um relógio real (`systemClock`, sem `Clock`
+   falso) e um `homeDir` descartável; o comportamento num dia de uso real, com o daemon rodando
+   simultaneamente e agindo sobre o mesmo `estado.json`, fica para o mantenedor observar.
 
 **Tarefa:** V2-T7
 **Bloqueia:** não — os quatro itens foram entregues juntos, um commit de código (a união discriminada

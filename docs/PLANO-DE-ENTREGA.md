@@ -5031,7 +5031,7 @@ texto, mas não são a fila.
       caracteres órfãos sumiram, com a comparação já feita no Windows Terminal (limpo) como
       referência. Detalhes de ferramental completos na Q-075.
 
-- [ ] **V2-T5b — O daemon na janela: faixa de horário com Snooze e Skip today, subir e parar o
+- [~] **V2-T5b — O daemon na janela: faixa de horário com Snooze e Skip today, subir e parar o
       daemon (D-036, D-039, D-042, D-043).** Especificada pelo PO em 2026-09-17; **aprovada pelo
       mantenedor no mesmo dia, com o recorte do item 5, para despacho logo depois da V2-T7.**
       Com ela, tudo que a pessoa faz hoje
@@ -5130,6 +5130,42 @@ texto, mas não são a fila.
       Portão e CI verdes. **Aceite manual do mantenedor:** subir o daemon pela janela no Windows
       e ver `seeya status` na CLI concordar; dar Snooze pela janela num dia real e ver o
       encerramento respeitar.
+
+      **Entregue pelo agente em 2026-09-17, worktree isolada, cinco commits (a ordem dos itens 1/2
+      invertida — motivo na Q-076).** Item 1: `state/schedule-strip.ts`, uma string por variante
+      de `ScheduleDecision`, recomputada a cada ciclo de 10s; botões **Snooze +15m/+30m/+1h**/
+      **Skip today** atualizam a faixa na hora. Item 2: `snoozeToday`/`skipToday` movidos para
+      `application/schedule-adjustments.ts`; a CLI mantém só o texto. Item 3: `runDaemonStop`
+      migrou inteiro para `scheduler/daemon-control.ts` (só usa a porta `ProcessControl`, que
+      ganhou `terminateAbruptly`); `AppContext#startDaemon` é a composição própria da interface
+      (não reaproveitada da CLI, `app/`/`cli/` nunca se importam), resolvendo o `bin` compilado do
+      `@seeya-ai/cli` e lançando com o runtime do próprio Electron
+      (`ELECTRON_RUN_AS_NODE=1`) — a alternativa de `node` do `PATH` foi descartada e está
+      registrada na Q-076. Item 4: parágrafo de fechamento na D-034. Item 5:
+      `app.setAsDefaultProtocolClient`/`requestSingleInstanceLock`/`second-instance`, e um
+      marcador novo em disco (`~/.seeya/protocol-handler.json`) que diz ao backend de toast do
+      Windows quando incluir `launch="seeya://open"` (D-025: sem marcador, toast como antes).
+
+      **Medido pelo agente:** `tests/integration/app/daemon-launch.test.ts` sobe o daemon de
+      verdade via `AppContext#startDaemon` e confirma que um `seeya status` **compilado, processo
+      separado**, contra o mesmo home, o vê vivo; `AppContext#stopDaemon` o encerra e o status
+      concorda de novo. Três capturas de tela reais (Electron offscreen) mostram a faixa e os
+      botões, incluindo um clique real em **Snooze +15m** (`SEEYA_APP_AUTO_SNOOZE_15`, hook novo)
+      persistindo `snoozeMinutesTotal: 15` em `estado.json` na hora. O registro do protocolo no
+      Windows foi confirmado real uma vez (a chave `seeya` em
+      `HKEY_CURRENT_USER\Software\Classes`) — mas essa verificação, por engano, rodou sem
+      `SEEYA_APP_HOME_OVERRIDE` e escreveu no `~/.seeya` real desta máquina e no registro real do
+      Windows; **os dois foram corrigidos** antes de qualquer outro efeito, e por isso a ativação
+      `seeya://open` por linha de comando não foi repetida depois — o incidente completo está na
+      Q-076.
+
+      **Portão:** `npm run verificar` completo verde a cada um dos cinco commits, rodado em
+      pedaços, cada código de saída lido pelo agente.
+
+      **O que fica pendente do mantenedor:** revisar e mesclar; depois, subir o daemon pela janela
+      no Windows e ver `seeya status` da CLI concordar; dar Snooze pela janela num dia real; e o
+      clique de verdade no toast (`seeya://open`), o único pedaço que só uma pessoa com tela e
+      mouse consegue medir. Detalhes completos na Q-076.
 
 - [~] **V2-T7 — Retomar sem o plano: a terceira opção quando o plano não cabe no argumento
       (D-025, D-039; emenda à S5-T9).** Especificada pelo PO em 2026-09-17 a partir do uso real do
