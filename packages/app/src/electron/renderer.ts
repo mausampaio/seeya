@@ -20,7 +20,7 @@ import type {
   FallbackConfirmRequestEvent,
   ResumeSummaryResponse,
   ResumeTabOpenedEvent,
-  TerminalFontConfigResponse,
+  TerminalOptionsResponse,
 } from '../ipc/channels.js';
 import type { TodayPanelData, TodaySessionRow } from '../state/today-panel.js';
 import { reduceEndDayPanel, type EndDayPanelState } from '../state/end-day-panel.js';
@@ -45,9 +45,10 @@ let nextTabId = 0;
  * Fetched once, at startup (`main` below), before `wireCommandBar` is wired — no tab can be
  * opened before this is populated, so `openTab` never needs a defensive fallback (V2-T2: "a
  * interface lê o config uma vez ao subir"; changing `terminalFontFamily`/`terminalFontSize`
- * needs a relaunch, documented in `README.md`, not here).
+ * needs a relaunch, documented in `README.md`, not here). Also carries `windowsPty` (V2-T6),
+ * derived once by the composition root from `process.platform`/`os.release()`.
  */
-let terminalFontConfig: TerminalFontConfigResponse;
+let terminalOptions: TerminalOptionsResponse;
 
 function newTabId(): string {
   nextTabId += 1;
@@ -150,15 +151,23 @@ function mountTerminalTab(tab: Tab, label: string): Terminal {
   container.className = 'terminal-pane';
   terminalHost().appendChild(container);
 
-  // V2-T3: terminalFontConfig (fontFamily/fontSize, `state/terminal-font.ts`) — the embedded Nerd
+  // V2-T3: terminalOptions.fontFamily/fontSize (`state/terminal-options.ts`) — the embedded Nerd
   // Font falls back into effect here whenever the config-supplied stack doesn't resolve to
   // something installed, since the stack's own last entry is a generic `monospace`
   // (`config-schema.ts#TERMINAL_FONT_FAMILY_DEFAULT`'s own docstring). `fitAddon.fit()` right
   // below re-measures cell size against whatever font actually got applied here.
+  // V2-T6: terminalOptions.windowsPty — `undefined` off Windows, so this is a no-op there; on
+  // Windows it's what makes ConPTY bring scrollback back into the viewport on a row increase
+  // instead of drawing empty rows (see `state/terminal-options.ts#deriveWindowsPtyOptions`'s own
+  // docstring, which quotes `@xterm/xterm`'s `windowsPty` doc in full).
   const terminal = new Terminal({
     convertEol: true,
-    fontFamily: terminalFontConfig.fontFamily,
-    fontSize: terminalFontConfig.fontSize,
+    fontFamily: terminalOptions.fontFamily,
+    fontSize: terminalOptions.fontSize,
+    // `exactOptionalPropertyTypes` (tsconfig): `IWindowsPty | undefined` can't be assigned to an
+    // optional `windowsPty?: IWindowsPty` property directly — the key has to be OMITTED off
+    // Windows, not present with an `undefined` value, so this spreads it in only when it exists.
+    ...(terminalOptions.windowsPty !== undefined ? { windowsPty: terminalOptions.windowsPty } : {}),
   });
   const fitAddon = new FitAddon();
   terminal.loadAddon(fitAddon);
@@ -711,11 +720,11 @@ function wireCommandBar(): void {
   });
 }
 
-/** Fetches `terminalFontConfig` before wiring anything that could open a tab (the command bar's
+/** Fetches `terminalOptions` before wiring anything that could open a tab (the command bar's
  * submit handler, and `SEEYA_APP_AUTO_OPEN_SHELL_TAB`'s own simulated click) — see
- * `terminalFontConfig`'s own docstring for why `openTab` never needs a fallback value. */
+ * `terminalOptions`'s own docstring for why `openTab` never needs a fallback value. */
 async function main(): Promise<void> {
-  terminalFontConfig = await window.seeya.getTerminalFontConfig();
+  terminalOptions = await window.seeya.getTerminalOptions();
   wireIncomingEvents();
   wireWindowResize();
   wireCommandBar();

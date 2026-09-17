@@ -21,7 +21,7 @@ import type {
   TabExitEvent,
   SessionsUpdateEvent,
   StatusUpdateEvent,
-  TerminalFontConfigResponse,
+  TerminalOptionsResponse,
   FallbackConfirmAnswerRequest,
   TodayPanelResponse,
   ResumeSelectedRequest,
@@ -56,7 +56,7 @@ import { describeAutostartState } from '@seeya-ai/engine/application/autostart-s
 import { buildSidebarRows } from '../sidebar/sidebar-data.js';
 import { buildStatusPanelText } from '../state/status-panel.js';
 import { runRefreshLoop } from '../state/refresh-loop.js';
-import { resolveTerminalFontOptions } from '../state/terminal-font.js';
+import { resolveTerminalOptions } from '../state/terminal-options.js';
 import {
   resolveAutostartReport,
   DEFAULT_AUTOSTART_REFRESH_INTERVAL_MS,
@@ -343,11 +343,11 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
     onceExit: (id, listener) => exitListenerRegistry.register(id, listener),
   };
 
-  // V2-T3: fetched once by `renderer.ts#main`, before any `new Terminal({...})` is constructed —
-  // the two-way handshake (`invoke`, not `send`) matches `createTab` below, the only other channel
-  // the renderer needs a value back from.
-  ipcMain.handle(CHANNELS.getTerminalFontConfig, (): TerminalFontConfigResponse =>
-    resolveTerminalFontOptions(context.config),
+  // V2-T3/V2-T6: fetched once by `renderer.ts#main`, before any `new Terminal({...})` is
+  // constructed — the two-way handshake (`invoke`, not `send`) matches `createTab` below, the only
+  // other channel the renderer needs a value back from.
+  ipcMain.handle(CHANNELS.getTerminalOptions, (): TerminalOptionsResponse =>
+    resolveTerminalOptions(context.config, context.windowsPty),
   );
 
   ipcMain.handle(

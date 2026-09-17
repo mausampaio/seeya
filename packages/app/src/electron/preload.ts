@@ -19,7 +19,7 @@ import type {
   TabExitEvent,
   SessionsUpdateEvent,
   StatusUpdateEvent,
-  TerminalFontConfigResponse,
+  TerminalOptionsResponse,
   FallbackConfirmRequestEvent,
   FallbackConfirmAnswerRequest,
   TodayPanelResponse,
@@ -41,9 +41,9 @@ export interface SeeyaApi {
   /** V2-T3 review: `electron/renderer.ts#removeTabUi` calls this AFTER its own DOM cleanup, for a
    * tab whose process has already exited — see `CHANNELS.removeTab`'s own docstring for why. */
   removeTab(request: RemoveTabRequest): void;
-  /** V2-T3: fetched once, at renderer startup, before any tab's `new Terminal({...})` is
+  /** V2-T3/V2-T6: fetched once, at renderer startup, before any tab's `new Terminal({...})` is
    * constructed (`electron/renderer.ts`'s own `main`). */
-  getTerminalFontConfig(): Promise<TerminalFontConfigResponse>;
+  getTerminalOptions(): Promise<TerminalOptionsResponse>;
   onTabData(listener: (event: TabDataEvent) => void): void;
   onTabExit(listener: (event: TabExitEvent) => void): void;
   onSessionsUpdate(listener: (event: SessionsUpdateEvent) => void): void;
@@ -79,7 +79,7 @@ const api: SeeyaApi = {
   resizeTab: (request) => ipcRenderer.send(CHANNELS.resizeTab, request),
   closeTab: (request) => ipcRenderer.send(CHANNELS.closeTab, request),
   removeTab: (request) => ipcRenderer.send(CHANNELS.removeTab, request),
-  getTerminalFontConfig: () => ipcRenderer.invoke(CHANNELS.getTerminalFontConfig),
+  getTerminalOptions: () => ipcRenderer.invoke(CHANNELS.getTerminalOptions),
   onTabData: (listener) => {
     ipcRenderer.on(CHANNELS.tabData, (_event, data: TabDataEvent) => listener(data));
   },

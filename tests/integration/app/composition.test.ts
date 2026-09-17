@@ -115,6 +115,22 @@ describe('buildAppContext', () => {
   });
 
   it(
+    'windowsPty (V2-T6) is derived from the real process.platform/os.release() — undefined off ' +
+      'Windows, a conpty build number on it',
+    async () => {
+      fixture = await createDiscoveryFixture();
+      const context = await buildAppContext(fixture.root);
+
+      if (process.platform === 'win32') {
+        expect(context.windowsPty?.backend).toBe('conpty');
+        expect(Number.isInteger(context.windowsPty?.buildNumber)).toBe(true);
+      } else {
+        expect(context.windowsPty).toBeUndefined();
+      }
+    },
+  );
+
+  it(
     'V2-T5a item 5: wires transcriptReader/gitReader/leanGenerator/deepGenerator/forkCleanup/' +
       'notifier — every port endDay needs beyond what this context already had',
     async () => {
