@@ -5041,7 +5041,14 @@ texto, mas não são a fila.
       depois da entrega — chave `seeya://` ausente no registro, os arquivos do mantenedor
       intactos, o daemon o mesmo de antes. Fica em `[~]` até o aceite do mantenedor (subir o
       daemon pela janela e ver `seeya status` concordar; Snooze pela janela num dia real; o
-      clique de verdade no toast).
+      clique de verdade no toast). **Aceite parcial do mantenedor (2026-09-17):** Stop daemon pela
+      janela funcionou. O que ainda não deu para medir e por quê: Snooze/Skip não apareceram
+      porque o encerramento das 11:00 já tinha disparado (`endOfDayFired: true` → faixa em "already
+      ran today", sem nada a adiar — é o desenho; teste na manhã seguinte, antes das 11:00); o
+      clique em toasts antigos não fez nada porque eles foram emitidos antes do marcador existir
+      (o marcador `protocol-handler.json` e a chave `seeya://` no registro apareceram quando a
+      interface subiu a partir da `main`; os próximos toasts do daemon levam o `launch`); Start
+      daemon fica para o próximo clique (o daemon estava parado pelo teste do Stop).
       Com ela, tudo que a pessoa faz hoje
       pela CLI no dia a dia (`snooze`, `skip-today`, `daemon`, `daemon --stop`, `status`,
       `end-day`, `start-day`) existe na janela. A interface continua um painel de controle: o
@@ -5189,7 +5196,7 @@ texto, mas não são a fila.
       Snooze pela janela num dia real; e o clique de verdade no toast (`seeya://open`), o único
       pedaço que só uma pessoa com tela e mouse consegue medir. Detalhes completos na Q-076.
 
-- [~] **V2-T7 — Retomar sem o plano: a terceira opção quando o plano não cabe no argumento
+- [x] **V2-T7 — Retomar sem o plano: a terceira opção quando o plano não cabe no argumento
       (D-025, D-039; emenda à S5-T9).** Especificada pelo PO em 2026-09-17 a partir do uso real do
       mantenedor no mesmo dia; aprovada e despachada pelo mantenedor no mesmo dia, antes da
       V2-T5b — é o que destrava usar o seeya todo dia, fechando e reabrindo a interface;
@@ -5199,8 +5206,10 @@ texto, mas não são a fila.
       na Q-077); e o caminho sem TTY da CLI retomar sem o plano automaticamente (Q-077 item 4)
       é o comportamento certo — "retomar sem o plano" é exatamente o que acontece quando ninguém
       responde, sem custo e sem perda, e quem chamou `start-day` num script pediu para retomar.
-      Fica em `[~]` até o aceite do mantenedor: retomar a sessão do PO pelo painel "Hoje"
-      escolhendo "Resume without the plan".
+      **Aceite do mantenedor (2026-09-17):** retomou a sessão do PO pelo painel "Hoje" com o
+      plano real acima do teto escolhendo "Resume without the plan"; a sessão voltou com o
+      contexto inteiro, dentro de uma aba do seeya (medido de dentro: o processo pai do `claude`
+      é o `electron.exe` da interface). **Aceita.**
 
       **O achado.** O mantenedor tentou retomar a sessão do PO pelo painel "Hoje"; o plano tinha
       34.071 caracteres (teto 16.384) e o diálogo da S5-T9 ofereceu só "sessão limpa com o
