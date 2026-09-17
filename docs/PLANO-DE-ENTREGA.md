@@ -5032,8 +5032,9 @@ texto, mas não são a fila.
       referência. Detalhes de ferramental completos na Q-075.
 
 - [ ] **V2-T5b — O daemon na janela: faixa de horário com Snooze e Skip today, subir e parar o
-      daemon (D-036, D-039, D-042, D-043).** Especificada pelo PO em 2026-09-17; **aguarda
-      aprovação do mantenedor antes de qualquer despacho.** Com ela, tudo que a pessoa faz hoje
+      daemon (D-036, D-039, D-042, D-043).** Especificada pelo PO em 2026-09-17; **aprovada pelo
+      mantenedor no mesmo dia, com o recorte do item 5, para despacho logo depois da V2-T7.**
+      Com ela, tudo que a pessoa faz hoje
       pela CLI no dia a dia (`snooze`, `skip-today`, `daemon`, `daemon --stop`, `status`,
       `end-day`, `start-day`) existe na janela. A interface continua um painel de controle: o
       daemon segue sendo o processo separado de sempre (sobrevive à janela fechar, é o que o
