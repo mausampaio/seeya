@@ -4888,11 +4888,31 @@ texto, mas não são a fila.
       V2-T5a aceitas.** Pendente só o Linux/macOS, na mesma classe de medição das tarefas
       anteriores da interface.
 
-- [~] **V2-T6 — Correção: letras ficam para trás ao redimensionar e rolar a aba no Windows
+- [x] **V2-T6 — Correção: letras ficam para trás ao redimensionar e rolar a aba no Windows
       (ConPTY × xterm.js).** Especificada pelo PO em 2026-09-17 a partir de um defeito visto pelo
-      mantenedor no mesmo dia; aprovada e despachada pelo mantenedor em 2026-09-17; **mesclada na
-      `main` em 2026-09-17** (portão verde numa worktree do PO: 1.727 passando, 4 pulados; Linux
-      pela CI). Fica em `[~]` até o aceite visual do mantenedor.
+      mantenedor no mesmo dia; aprovada e despachada em 2026-09-17; a primeira entrega (a opção
+      `windowsPty` do xterm.js) foi mesclada e **não resolveu** — o mantenedor testou e viu o
+      mesmo defeito; **reaberta e fechada no mesmo dia** com a alavanca certa, medida por ele em
+      cinco variantes (abaixo). **Aceita em 2026-09-17.**
+
+      **A medição que decidiu (mantenedor, Windows 11 build 26200, aba de Claude Code com 150
+      linhas numeradas, redimensionar e rolar):** (A) `windowsPty` com o build real → órfãos;
+      (B) sem a opção → órfãos, **menos**; (B') `windowsPty` com build 19041 (reflow do xterm
+      desligado) → órfãos; (D) **ConPTY empacotado pelo `node-pty` (o `conpty.dll` + `OpenConsole`
+      do Windows Terminal, `third_party/conpty/1.23.251008001`) sem a opção → limpo** — o defeito
+      ainda aparece por milissegundos e some, porque esse ConPTY repinta a área visível inteira
+      depois do redimensionamento, coisa que o embutido no Windows não fazia; (E) ConPTY
+      empacotado com a opção → não medido, desnecessário. **Leitura:** a captura do mantenedor
+      mostrava sempre dois caracteres nas colunas 0–1, restos de "Linha 1**48**" da disposição
+      anterior, com o texto novo (que começa com dois espaços) a partir da coluna 2 — a
+      assinatura do redesenho diferencial do ConPTY, que não reemite células que acredita já
+      corretas; o do Windows Terminal repinta tudo. **O que ficou em código:** `useConptyDll:
+      true` no `NodePtyAdapter`, passado pela raiz de composição só no Windows; a opção
+      `windowsPty` do xterm.js foi revertida (só piorava); o `refresh` depois do `resize` ficou
+      (barato, sem contraindicação medida). Portão verde na worktree do PO (1.721 passando, 4
+      pulados — seis a menos pela reversão), Linux pela CI. **Consequência para o instalador
+      (tarefa futura):** o `conpty.dll` e o `OpenConsole.exe` do `node-pty` precisam ser
+      empacotados junto com a interface no Windows.
 
       **O defeito, medido:** numa aba com o Claude Code rodando, redimensionar a janela e rolar
       o scrollback deixa caracteres órfãos na borda esquerda (captura de tela do mantenedor,

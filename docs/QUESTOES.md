@@ -7466,6 +7466,21 @@ persistirem depois do item 1+2, a hipótese (b) continua aberta, mas o próximo 
 capturar a saída bruta do pty (não o que o xterm.js desenha) durante um redimensionamento real, não
 desligar `convertEol` às cegas.
 
+### 6) Fechamento (PO, 2026-09-17): a opção `windowsPty` não era a alavanca; o ConPTY era
+
+O mantenedor testou a entrega e viu o mesmo defeito. A partir da captura dele (dois caracteres
+nas colunas 0–1, restos da disposição anterior, com o texto novo — que começa com dois espaços —
+a partir da coluna 2), a leitura mudou para o redesenho diferencial do ConPTY: ele não reemite
+células que acredita já corretas, e depois do reflow do xterm.js o modelo dele e a tela divergem.
+Cinco variantes medidas pelo mantenedor por interruptores temporários de ambiente (nunca
+commitados): `windowsPty` com o build real (órfãos), sem a opção (órfãos, menos), com build
+19041 para desligar o reflow (órfãos), **o ConPTY empacotado pelo `node-pty` sem a opção (limpo;
+o resto aparece por milissegundos e o repaint completo apaga)**, e o ConPTY empacotado com a
+opção (não medido — desnecessário). Resultado em código: o item 1 desta questão foi revertido
+(`revert` explícito, com a medição na mensagem) e `useConptyDll: true` entrou no `NodePtyAdapter`,
+passado pela composição só no Windows. Os itens 2–5 acima continuam valendo como registro do que
+foi investigado. A doc do `node-pty` chama a opção de experimental; o VS Code a liga por padrão.
+
 ### O que fica pendente do mantenedor
 
 1. Revisar e mesclar.
