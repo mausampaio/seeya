@@ -5112,9 +5112,8 @@ texto, mas não são a fila.
 
 - [ ] **V2-T7 — Retomar sem o plano: a terceira opção quando o plano não cabe no argumento
       (D-025, D-039; emenda à S5-T9).** Especificada pelo PO em 2026-09-17 a partir do uso real do
-      mantenedor no mesmo dia; **aguarda aprovação do mantenedor antes de qualquer despacho.**
-      Recomendação do PO: **antes da V2-T5b** — é o que destrava usar o seeya todo dia, fechando
-      e reabrindo a interface.
+      mantenedor no mesmo dia; **aprovada e despachada pelo mantenedor no mesmo dia, antes da
+      V2-T5b** — é o que destrava usar o seeya todo dia, fechando e reabrindo a interface.
 
       **O achado.** O mantenedor tentou retomar a sessão do PO pelo painel "Hoje"; o plano tinha
       34.071 caracteres (teto 16.384) e o diálogo da S5-T9 ofereceu só "sessão limpa com o
