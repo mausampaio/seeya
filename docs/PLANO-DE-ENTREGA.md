@@ -4915,17 +4915,27 @@ texto, mas não são a fila.
          prova é do mantenedor. O relatório diz o que mudou e por quê, cita a documentação do
          `xterm.js`, e **não afirma que resolveu**.
 
-      **O que não entra, salvo decisão:** o renderizador WebGL (`@xterm/addon-webgl`) é a segunda
-      alavanca conhecida para artefatos de redesenho e é o que o VS Code usa, mas é dependência
-      nova (AGENTS.md) — só entra se o item 1 não bastar, com decisão do mantenedor.
+      **Medição adicional do mantenedor (2026-09-17):** numa aba de shell (PowerShell, 500
+      linhas largas numeradas), redimensionar e rolar **não** deixa órfão nenhum; só na aba do
+      Claude. Leitura do PO: saída de shell não usa sequências de apagar linha, e a TUI do Claude
+      Code usa o tempo todo (redesenha o próprio bloco com cursor e "apagar até o fim da linha");
+      se depois do redimensionamento o ConPTY e o `xterm.js` discordam de onde uma linha quebra,
+      o apagar acerta as células erradas e sobram fragmentos — é o caso que `windowsPty` trata
+      (contagem de quebras/reflow), então o item 1 continua sendo a alavanca certa. **O
+      renderizador WebGL sai da tarefa**: ele muda o desenho, não o conteúdo do buffer, e não
+      explicaria conteúdo órfão. **Comparação que decide de quem é o defeito, a fazer pelo
+      mantenedor:** o mesmo redimensionar e rolar com o Claude Code no Windows Terminal — se lá
+      também sobram fragmentos, é a TUI com o ConPTY e a correção só reduz; se lá fica limpo, é
+      do nosso emulador e a correção tem que resolver.
 
       **Cuidados:** nada de `process.platform`/`os.release()` fora da raiz de composição; texto
       nenhum voltado à pessoa muda; guardas valem; um commit por item, portão em primeiro plano,
       `verificar:linux` lido em arquivo. Questão: Q-075.
 
       *Aceite:* portão e CI verdes; testes do módulo puro; **aceite manual do mantenedor** no
-      Windows: repetir o redimensionamento com rolagem numa aba de Claude e numa aba de shell com
-      muita saída, e dizer se os órfãos sumiram — se não, a V2-T6 reabre com o item WebGL.
+      Windows: repetir o redimensionamento com rolagem numa aba de Claude e dizer se os órfãos
+      sumiram, com a comparação no Windows Terminal registrada — se não sumirem e o Windows
+      Terminal ficar limpo, a V2-T6 reabre com investigação, não com WebGL.
 
 ## Definição de pronto (vale para toda tarefa)
 
