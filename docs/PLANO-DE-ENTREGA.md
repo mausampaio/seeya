@@ -4888,6 +4888,45 @@ texto, mas não são a fila.
       V2-T5a aceitas.** Pendente só o Linux/macOS, na mesma classe de medição das tarefas
       anteriores da interface.
 
+- [ ] **V2-T6 — Correção: letras ficam para trás ao redimensionar e rolar a aba no Windows
+      (ConPTY × xterm.js).** Especificada pelo PO em 2026-09-17 a partir de um defeito visto pelo
+      mantenedor no mesmo dia; **aguarda aprovação do mantenedor antes de qualquer despacho.**
+
+      **O defeito, medido:** numa aba com o Claude Code rodando, redimensionar a janela e rolar
+      o scrollback deixa caracteres órfãos na borda esquerda (captura de tela do mantenedor,
+      2026-09-17, Windows 11 build 26200). **A causa provável está documentada no próprio
+      `xterm.js`** (`typings/xterm.d.ts`, opção `windowsPty`): ao aumentar as linhas do terminal,
+      o ConPTY não traz o scrollback de volta para a área visível — cria linhas vazias — e sem
+      o ajuste "pode faltar dado enquanto as linhas são substituídas"; para builds do ConPTY
+      abaixo de 21376 o reflow também é desligado. A nossa aba cria o `Terminal` sem essa opção.
+
+      **O que entra:**
+      1. **`windowsPty` na aba, só no Windows.** A raiz de composição lê `os.release()` uma vez
+         (é onde `process.platform` já é lido) e deriva `{ backend: 'conpty', buildNumber }` num
+         módulo puro testado (`state/terminal-options.ts` ou o `terminal-font.ts` renomeado para
+         cobrir as duas coisas — o agente decide e registra): entrada `platform` + `release`,
+         saída a opção ou `undefined` fora do Windows; teste para `10.0.26200` → 26200, para
+         Linux/macOS → `undefined`, e para um `release` que não parseia → `undefined` com o motivo
+         (D-025: sem número, sem afirmação). Viaja pelo mesmo canal de IPC que a fonte já viaja e
+         entra em `new Terminal({...})` nos dois lugares em que a aba nasce.
+      2. **Depois de redimensionar, um `refresh` completo** do terminal (`terminal.refresh(0,
+         rows - 1)`) no manipulador de `resize` do renderer, barato e sem efeito fora do redesenho.
+      3. **Registro honesto:** o agente não consegue ver o defeito (sem tela interativa); a
+         prova é do mantenedor. O relatório diz o que mudou e por quê, cita a documentação do
+         `xterm.js`, e **não afirma que resolveu**.
+
+      **O que não entra, salvo decisão:** o renderizador WebGL (`@xterm/addon-webgl`) é a segunda
+      alavanca conhecida para artefatos de redesenho e é o que o VS Code usa, mas é dependência
+      nova (AGENTS.md) — só entra se o item 1 não bastar, com decisão do mantenedor.
+
+      **Cuidados:** nada de `process.platform`/`os.release()` fora da raiz de composição; texto
+      nenhum voltado à pessoa muda; guardas valem; um commit por item, portão em primeiro plano,
+      `verificar:linux` lido em arquivo. Questão: Q-075.
+
+      *Aceite:* portão e CI verdes; testes do módulo puro; **aceite manual do mantenedor** no
+      Windows: repetir o redimensionamento com rolagem numa aba de Claude e numa aba de shell com
+      muita saída, e dizer se os órfãos sumiram — se não, a V2-T6 reabre com o item WebGL.
+
 ## Definição de pronto (vale para toda tarefa)
 
 1. Código implementa exatamente a spec; divergência virou questão, não improviso.
