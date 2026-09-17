@@ -35,7 +35,7 @@
 // EMPTY `dist/` on the next `npm run build`: `tsc -b` saw an unchanged, still-valid buildinfo and
 // silently skipped re-emitting anything, exiting 0. `npm link`'s `seeya` then failed with
 // `MODULE_NOT_FOUND` even though `npm run verificar` had just reported success.
-import { rmSync } from 'node:fs';
+import { readdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -57,4 +57,45 @@ const packagePathsToClean = [
 
 for (const target of packagePathsToClean) {
   rmSync(target, { recursive: true, force: true });
+}
+
+// Residue of an INTERRUPTED test run (measured 2026-09-17, after the machine's low-memory guard
+// killed `npm run cobertura` mid-way): the guard tests in tests/integration/guards/ write
+// deliberate-violation fixtures under `packages/*/src/**/_guard-*/` (one of them imports the CLI
+// from inside the engine) and delete them in `afterEach`/`afterAll` — which never ran. The engine's
+// tsconfig.build.json includes all of `src`, so the next `tsc -b` pulled the CLI into the engine
+// program, failed with rootDir errors, and even emitted `.js`/`.d.ts` next to the CLI's sources.
+// `npm run app` was broken until someone deleted the residue by hand. This sweep runs before every
+// build (same trigger as the dist cleanup above), so a killed test run can never leave the tree in
+// a state that fails the next build. Nothing legitimate ever lives under a `_guard-*` directory or
+// as a `.js`/`.d.ts` inside a package's `src` — every source is TypeScript. The test suite's own
+// guards run AFTER `npm run build` inside `npm run verificar`, so this sweep never races them.
+const packageSrcRoots = ['packages/engine', 'packages/cli', 'packages/app'].map((pkg) =>
+  path.join(repoRoot, pkg, 'src'),
+);
+const EMITTED_INTO_SRC = /\.(js|js\.map|d\.ts|d\.ts\.map)$/;
+
+function sweepResidue(directory) {
+  let entries;
+  try {
+    entries = readdirSync(directory, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    const full = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name.startsWith('_guard-')) {
+        rmSync(full, { recursive: true, force: true });
+      } else {
+        sweepResidue(full);
+      }
+    } else if (EMITTED_INTO_SRC.test(entry.name)) {
+      rmSync(full, { force: true });
+    }
+  }
+}
+
+for (const srcRoot of packageSrcRoots) {
+  sweepResidue(srcRoot);
 }
