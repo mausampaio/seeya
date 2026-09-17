@@ -7655,6 +7655,30 @@ fica pendente do mantenedor" abaixo.
 4. **Snooze/Skip today num dia real** — medido contra um relógio real (`systemClock`, sem `Clock`
    falso) e um `homeDir` descartável; o comportamento num dia de uso real, com o daemon rodando
    simultaneamente e agindo sobre o mesmo `estado.json`, fica para o mantenedor observar.
+5. **`npm run verificar:linux` não terminou, tentado duas vezes.** Ambas as tentativas, no estado
+   final do código (todos os cinco commits já aplicados), chegaram ao MESMO ponto exato: `npm ci`,
+   `format:check`, `tsc`, `lint`, `build` e `dependencias` verdes dentro do container, e a suíte de
+   cobertura inteira — 178/178 arquivos de teste, 1.810/1.815 testes (5 pulados), incluindo os
+   quatro guards pesados (`dependency-cruiser.test.ts`, `layer-matrix` dentro dele,
+   `eslint-restrictions.test.ts`, `app-eslint-restrictions.test.ts`) e toda a suíte
+   `integration-process` (com o `tests/integration/app/daemon-launch.test.ts` novo desta tarefa
+   passando de verdade lá dentro, 14,3s, um daemon real subido e derrubado dentro do container) —
+   mas o log para logo depois de imprimir a tabela de cobertura por arquivo, sem nenhuma mensagem
+   de erro do Docker nem do script `scripts/verificar-linux.mjs` (nem "Falha ao executar o Docker"
+   nem "Container encerrado pelo sinal", os dois únicos caminhos de erro que esse script sabe
+   imprimir), e sem o resumo agregado (`Statements`/`Branches`/`Functions`/`Lines`) que aparece
+   normalmente. `docker ps` depois de cada tentativa não mostra container nenhum rodando (o
+   `--rm` já removeu). A máquina tinha 3,69 GB livres de 15,85 GB no momento da segunda tentativa —
+   apertado para um `node:22-bookworm` com `npm ci` mais uma suíte de cobertura v8 grande. Isto é a
+   MESMA classe de interrupção que a V2-T6 já registrou explicitamente ("interrompido pelo próprio
+   harness por pressão de memória do sistema, não uma falha do comando nem do código") —
+   reproduzida agora duas vezes seguidas, no mesmo ponto, o que aponta para um teto de memória do
+   próprio Docker Desktop nesta máquina (não necessariamente do sistema operacional como um todo),
+   não para um defeito no código: todo teste que RODOU, rodou e passou, em ambas as tentativas, sem
+   uma única falha. Não tentei uma terceira vez — mesmo raciocínio que motivou não insistir na
+   V2-T6. Fica para o mantenedor rodar `npm run verificar:linux` (ou `node
+   scripts/verificar-linux.mjs`) até o fim quando a máquina tiver mais memória livre, ou aumentar o
+   limite de memória do Docker Desktop para este projeto.
 
 **Tarefa:** V2-T7
 **Bloqueia:** não — os quatro itens foram entregues juntos, um commit de código (a união discriminada

@@ -5162,10 +5162,24 @@ texto, mas não são a fila.
       **Portão:** `npm run verificar` completo verde a cada um dos cinco commits, rodado em
       pedaços, cada código de saída lido pelo agente.
 
-      **O que fica pendente do mantenedor:** revisar e mesclar; depois, subir o daemon pela janela
-      no Windows e ver `seeya status` da CLI concordar; dar Snooze pela janela num dia real; e o
-      clique de verdade no toast (`seeya://open`), o único pedaço que só uma pessoa com tela e
-      mouse consegue medir. Detalhes completos na Q-076.
+      **`npm run verificar:linux` tentado duas vezes no estado final, nenhuma terminou até o
+      resumo agregado de cobertura — mas as duas chegaram ao MESMO ponto exato:** 178 de 178
+      arquivos de teste e 1.810 de 1.815 testes passando (5 pulados), incluindo os quatro guards
+      pesados (`dependency-cruiser`, `layer-matrix`, `eslint-restrictions`,
+      `app-eslint-restrictions`) e a suíte `integration-process` inteira — com o novo
+      `tests/integration/app/daemon-launch.test.ts` passando de verdade dentro do container
+      (14,3s, um daemon real subido e derrubado). O log para sem nenhuma mensagem de erro do
+      Docker nem do script, bem depois da tabela de cobertura por arquivo e antes do resumo
+      agregado (`Statements`/`Branches`/...) — a mesma classe de interrupção que a V2-T6 já
+      registrou ("pressão de memória do sistema, não falha do comando nem do código"), agora
+      reproduzida identicamente duas vezes seguidas, o que aponta para um teto de memória do
+      próprio container Docker nesta máquina, não para o código. Não tentei uma terceira vez.
+
+      **O que fica pendente do mantenedor:** revisar e mesclar; rodar `npm run verificar:linux`
+      até o fim quando houver memória disponível (ou com um limite de memória do Docker maior);
+      depois, subir o daemon pela janela no Windows e ver `seeya status` da CLI concordar; dar
+      Snooze pela janela num dia real; e o clique de verdade no toast (`seeya://open`), o único
+      pedaço que só uma pessoa com tela e mouse consegue medir. Detalhes completos na Q-076.
 
 - [~] **V2-T7 — Retomar sem o plano: a terceira opção quando o plano não cabe no argumento
       (D-025, D-039; emenda à S5-T9).** Especificada pelo PO em 2026-09-17 a partir do uso real do

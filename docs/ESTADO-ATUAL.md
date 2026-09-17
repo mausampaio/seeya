@@ -425,8 +425,16 @@ qualquer outro efeito, e por isso a ativação `seeya://open` por linha de coman
 
 **Portão:** `npm run verificar` completo verde (formatação, tipos, lint, build, `dependencias`,
 cobertura) a cada um dos cinco commits, rodado em pedaços, cada código de saída lido pelo agente.
+**`verificar:linux` tentado duas vezes, nenhuma terminou até o resumo agregado de cobertura, mas
+as duas pararam no MESMO ponto**: 178/178 arquivos de teste e 1.810/1.815 testes passando dentro
+do container, incluindo os quatro guards pesados e a suíte `integration-process` inteira (o novo
+`tests/integration/app/daemon-launch.test.ts` passou de verdade lá dentro) — sem nenhuma mensagem
+de erro, parando bem depois da tabela de cobertura por arquivo e antes do resumo agregado. Mesma
+classe de interrupção que a V2-T6 já registrou (pressão de memória, não o código), agora
+reproduzida identicamente duas vezes seguidas — não tentei uma terceira.
 
-**O que fica pendente do mantenedor:** revisar e mesclar; depois, subir o daemon pela janela no
+**O que fica pendente do mantenedor:** revisar e mesclar; rodar `verificar:linux` até o fim com
+memória disponível; depois, subir o daemon pela janela no
 Windows e ver `seeya status` da CLI concordar; dar Snooze pela janela num dia real; e o clique de
 verdade no toast (`seeya://open`, sem sandbox de agente no caminho) — o único pedaço que só uma
 pessoa com tela e mouse consegue medir. Detalhes de ferramental, a alternativa descartada para o
