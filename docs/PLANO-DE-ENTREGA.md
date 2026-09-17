@@ -5081,12 +5081,32 @@ texto, mas não são a fila.
          `SEEYA_DAEMON_CHILD` que a CLI usa. Registrar na Q-076 a escolha e a alternativa
          (`node` do `PATH`), e **medir** que o daemon subido assim grava o lock e que `seeya
          status` pela CLI o vê vivo.
-      4. **Decisão sobre notificação do SO com botão (D-034):** proposta do PO, a confirmar no
-         aval — **a D-034 fica como está**: as ações moram na faixa da janela; a notificação do
-         SO continua título e corpo em todo SO. Motivo: o `Notification` do Electron só tem ações
-         no macOS, e o toast com ação no Windows exige o handler de protocolo que a D-034 já
-         decidiu não pagar. Entra como parágrafo de fechamento na própria D-034, não decisão
-         nova.
+      4. **Decisão sobre notificação do SO com botão (D-034) — confirmada pelo mantenedor em
+         2026-09-17:** a D-034 fica como está: as ações moram na faixa da janela; a notificação
+         do SO continua título e corpo, sem botão, em todo SO. Entra como parágrafo de fechamento
+         na própria D-034, não decisão nova.
+      5. **O clique na notificação traz o seeya para frente (Windows nesta tarefa).** Pergunta
+         do mantenedor no mesmo dia: a faixa só é visível com a janela aberta; dá para o clique
+         no toast focar o seeya? Dá, pelo mecanismo que o Spike B já validou: o toast do Windows
+         carrega `launch="seeya://open"` com `activationType="protocol"` — **sem ação dentro do
+         toast** —, e quem responde a `seeya://` é a interface: no processo principal do Electron,
+         `app.setAsDefaultProtocolClient('seeya')` (em dev, com `process.execPath` e o caminho do
+         script, como a documentação do Electron manda) mais `app.requestSingleInstanceLock()` e
+         o evento `second-instance`, que foca a janela já aberta em vez de abrir outra; com a
+         interface fechada, a ativação a abre. **Quem manda o toast é o daemon**, então ele
+         precisa saber se a interface já registrou o protocolo — senão um clique abre a pergunta
+         do Windows "obtenha um app para abrir `seeya`": a interface grava um marcador em
+         `~/.seeya/` ao registrar (chave nova em disco, no glossário antes do código, D-027) e o
+         backend de toast só inclui o `launch` quando o marcador existe; a D-025 vale para o
+         marcador (sem marcador, toast como hoje). **Linux e macOS ficam explicitamente para a
+         tarefa do instalador:** o handler de `seeya://` vem do `.desktop` (Linux) e do
+         `Info.plist` (macOS) do pacote, e do checkout não há como registrar; no Linux o clique
+         ainda exige `notify-send` com ação padrão esperando o clique. Como o dia a dia do
+         mantenedor é Linux, isto puxa o instalador para mais cedo na fila. **Alternativa
+         descartada por ora:** a interface mandar o próprio toast (o `Notification` do Electron
+         tem clique em todo SO) — geraria toast em dobro com o do daemon, e coordenar os dois
+         exige IPC que não existe. Medição da tarefa: toast do daemon → clique → janela na
+         frente com a faixa, no Windows, de ponta a ponta.
 
       **O que não entra:** `end-day` de uma sessão só pela interface; instalador; projetos.
 
