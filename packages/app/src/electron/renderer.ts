@@ -13,6 +13,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { createTab, isRunning, markExited, withPid, type Tab } from '../tabs/tab-model.js';
 import { MESSAGES } from '../text/messages.js';
+import { TERMINAL_THEME } from '../state/terminal-theme.js';
 import type { SeeyaApi } from './preload.js';
 import type { SidebarRow } from '../sidebar/sidebar-data.js';
 import type {
@@ -70,7 +71,12 @@ function showTab(id: string): void {
   for (const button of buttons) {
     button.setAttribute('aria-current', String(button.dataset.tabId === id));
   }
-  openTabs.get(id)?.fitAddon.fit();
+  const shown = openTabs.get(id);
+  shown?.fitAddon.fit();
+  // Maintainer's request (2026-09-17): the tab that was just shown — by "+"/Open, by clicking
+  // its button, or by a resume — takes keyboard focus, so typing starts in the terminal
+  // without a second click on it.
+  shown?.terminal.focus();
 }
 
 function addTabButton(id: string, label: string): void {
@@ -159,7 +165,11 @@ function mountTerminalTab(tab: Tab, label: string): Terminal {
     convertEol: true,
     fontFamily: terminalFontConfig.fontFamily,
     fontSize: terminalFontConfig.fontSize,
+    theme: TERMINAL_THEME,
   });
+  // Same colour on the pane behind the terminal canvas, from the same constant, so the padding
+  // around the cell grid never shows a different shade (`state/terminal-theme.ts`).
+  container.style.backgroundColor = TERMINAL_THEME.background;
   const fitAddon = new FitAddon();
   terminal.loadAddon(fitAddon);
   terminal.open(container);
