@@ -5319,9 +5319,16 @@ texto, mas não são a fila.
       especificamente).
 
 - [~] **V2-T8 — O instalador: a interface instalável no Windows e no Linux, sem checkout (D-041,
-      D-042, D-034).** Especificada pelo PO em 2026-09-17; **aprovada e despachada pelo
-      mantenedor no mesmo dia**, com as duas decisões dele respondidas (abaixo: `electron-builder`
-      aprovado como dependência de desenvolvimento; Ubuntu, logo `.deb` + `AppImage`). Hoje a interface só
+      D-042, D-034).** Especificada pelo PO em 2026-09-17; aprovada e despachada pelo
+      mantenedor no mesmo dia, com as duas decisões dele respondidas (abaixo: `electron-builder`
+      aprovado como dependência de desenvolvimento; Ubuntu, logo `.deb` + `AppImage`);
+      **mesclada na `main` em 2026-09-17** (portão na worktree do PO: 1.851 passando, 4 pulados;
+      `verificar:linux` verde pelo agente). **Revisão do PO:** um ajuste, já aplicado — o guard
+      de termos locais reconhecia o falso positivo guardando o endereço de e-mail de terceiro que
+      o npm copia para o `package-lock.json`; passou a reconhecer a **origem** (o campo
+      `deprecated` do lockfile), sem o endereço entrar no repositório. Fica em `[~]` até o aceite
+      do mantenedor: instalar no Ubuntu e no Windows dele, abrir pelo menu, aba de `claude`,
+      daemon pela janela, clique no aviso prévio. Hoje a interface só
       roda de um clone (`npm run app`), e isso já custou duas vezes: o `npm ci` quebrou com a
       interface aberta do mesmo checkout (TESTES.md), e o clique no toast não existe no Linux
       porque o handler de `seeya://` só vem de um pacote instalado. É também o que deixa o seeya
