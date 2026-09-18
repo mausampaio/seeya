@@ -36,6 +36,14 @@ describe('buildDefaultBackends', () => {
     const [backend] = buildDefaultBackends('win32', () => Promise.resolve(true));
     expect(backend).toBeInstanceOf(WindowsToastBackend);
   });
+
+  // V2-T8 item 4: same shape as the Windows case above — the OPTION's own effect is exercised
+  // directly against LinuxNotifySendBackend (tests/unit/adapters/notification/
+  // linux-notify-send.test.ts's own "send with click action" describe block).
+  it('still picks LinuxNotifySendBackend on linux when isProtocolHandlerRegistered is passed', () => {
+    const [backend] = buildDefaultBackends('linux', () => Promise.resolve(true));
+    expect(backend).toBeInstanceOf(LinuxNotifySendBackend);
+  });
 });
 
 describe('notifier', () => {

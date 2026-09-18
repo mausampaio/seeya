@@ -1,0 +1,65 @@
+# Constrói o instalador da interface nos três sistemas (V2-T8 item 5). Manual só
+# (`workflow_dispatch`) — nunca em `push`/`pull_request`, e nunca publica: os artefatos ficam
+# anexados à execução do workflow (`actions/upload-artifact`), nunca como GitHub Release. A D-041
+# guarda a publicação de verdade para a fronteira da v2; este workflow é só "a CI constrói, a
+# pessoa baixa" (a própria entrada da V2-T8).
+#
+# O portão de sempre (`npm run verificar`) roda ANTES do empacotamento, no mesmo job — o mesmo
+# formato do job `verificar` de `ci.yml`, para nunca empacotar sobre um portão vermelho. Este
+# arquivo não substitui `ci.yml`: aquele continua rodando a cada push/PR; este só quando alguém
+# pedir um instalador.
+#
+# `actions/checkout`/`actions/setup-node` em @v7 e `node-version: 22`: mesma razão de `ci.yml`
+# (comentário lá).
+name: Build installers
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  dist:
+    name: dist (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    # Só lê o próprio código e escreve artefatos da EXECUÇÃO do workflow (não o repositório) —
+    # mesmo mínimo necessário do job `verificar` de `ci.yml`.
+    permissions:
+      contents: read
+    steps:
+      - name: Baixa o código
+        uses: actions/checkout@v7
+
+      - name: Configura o Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instala as dependências
+        run: npm ci
+
+      - name: Roda o portão de qualidade antes de empacotar (tipos + lint + dependency-cruiser + build + cobertura)
+        run: npm run verificar
+
+      - name: Constrói o instalador (electron-builder, sem assinatura, sem publicação)
+        # `packages/app/scripts/dist.mjs` já força CSC_IDENTITY_AUTO_DISCOVERY=false (nunca assina
+        # com o que estiver no chaveiro/repositório de certificados do runner) e
+        # `electron-builder.yml`'s own `publish: null` já impede qualquer tentativa de publicar —
+        # `--publish never` na linha de comando é só um segundo "não" explícito, nunca o único.
+        run: npm run build && npm run dist --workspace=@seeya-ai/app -- --publish never
+
+      - name: Sobe os artefatos desta execução (nunca um GitHub Release, D-041)
+        uses: actions/upload-artifact@v4
+        with:
+          name: seeya-installer-${{ matrix.os }}
+          if-no-files-found: error
+          path: |
+            packages/app/dist-installer/*.exe
+            packages/app/dist-installer/*.exe.blockmap
+            packages/app/dist-installer/*.deb
+            packages/app/dist-installer/*.AppImage
+            packages/app/dist-installer/*.dmg
+            packages/app/dist-installer/*.dmg.blockmap

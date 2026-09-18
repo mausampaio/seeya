@@ -63,6 +63,7 @@ import type { EndDayDeps } from '@seeya-ai/engine/application/types.js';
 import { NodePtyAdapter } from '../pty/node-pty-adapter.js';
 import { PtyManager, type PtyManagerCallbacks } from '../pty/pty-manager.js';
 import { defaultShellCommand, type ShellCommand } from '../pty/default-shell.js';
+import { readLoginShellPath } from './read-login-shell-path.js';
 
 export interface AppHome {
   readonly claudeHome: string;
@@ -140,6 +141,17 @@ export interface AppContext {
    */
   startDaemon(): Promise<string>;
   stopDaemon(): Promise<string>;
+  /**
+   * V2-T8 item 3: which `PATH` `resolveHarnessCommand`/`tabEnv` actually ended up using.
+   * `'login-shell'` — read via `$SHELL -lic` and used; `'inherited'` — read attempted (non-Windows)
+   * but failed/timed out/found no marker line, so this process's own inherited `process.env.PATH`
+   * was kept, exactly as documented in `login-shell-path.ts`; `'not-applicable'` — Windows, where
+   * this whole mechanism doesn't apply (see that module's own docstring). Exists so a caller can
+   * tell "the read worked" apart from "there was nothing to read" (D-025) — not surfaced in any UI
+   * yet (out of this task's scope), but a future status panel has something to read instead of
+   * silence.
+   */
+  readonly loginShellPathSource: 'login-shell' | 'inherited' | 'not-applicable';
 }
 
 /**
@@ -229,8 +241,22 @@ export async function buildAppContext(homeDir: string = os.homedir()): Promise<A
     relevanceHours: config.relevanceHours,
   });
   const platform = process.platform;
-  const pathEnv = process.env.PATH;
   const pathExtEnv = process.env.PATHEXT;
+  // V2-T8 item 3: on every platform BUT Windows, prefer the login shell's own PATH over this
+  // process's inherited one — see login-shell-path.ts's own docstring for why a graphical launcher
+  // needs this and a terminal launch never did. `defaultShellCommand` (below) is what already picks
+  // $SHELL/$COMSPEC per platform for a tab's own "system shell" entry; reused here so the shell
+  // asked for this PATH is the exact same one a tab would open.
+  const shellForLoginPath = defaultShellCommand(platform, process.env);
+  const loginShellPath =
+    platform === 'win32' ? undefined : await readLoginShellPath(shellForLoginPath.command);
+  const loginShellPathSource: AppContext['loginShellPathSource'] =
+    platform === 'win32'
+      ? 'not-applicable'
+      : loginShellPath === undefined
+        ? 'inherited'
+        : 'login-shell';
+  const pathEnv = loginShellPath ?? process.env.PATH;
   // V2-T5a item 5: same shape as cli/composition.ts#buildEndDayContext's own generatorOptions —
   // both generators are always built, never chosen here; captureSession (application/
   // capture-session.ts) picks between them per session (see EndDayDeps's own docstring on why).
@@ -238,7 +264,14 @@ export async function buildAppContext(homeDir: string = os.homedir()): Promise<A
     model: config.captureModel,
     budgetPerSessionUsd: config.budgetPerSessionUsd,
   };
-  const tabEnv = buildResumptionEnv(process.env);
+  // V2-T8 item 3: a tab's own spawn environment gets the same corrected PATH `resolveHarnessCommand`
+  // uses below — `buildResumptionEnv` already strips D-017's session variables; overriding PATH
+  // AFTER that call (never before) is what keeps this a pure override of one key, not a second,
+  // divergent cleaning pass.
+  const tabEnv: NodeJS.ProcessEnv = {
+    ...buildResumptionEnv(process.env),
+    ...(loginShellPath === undefined ? {} : { PATH: loginShellPath }),
+  };
   // V2-T5b item 3: "Subir" — the target this composition root's own `startDaemon` (below) spawns.
   // `nodePath` is THIS process's own runtime (`process.execPath`): under `npm run app`'s dev mode
   // that's a plain Node binary already; packaged under real Electron, `electron/main.ts`'s own
@@ -274,7 +307,7 @@ export async function buildAppContext(homeDir: string = os.homedir()): Promise<A
     home,
     homeDir,
     tabEnv,
-    defaultShell: defaultShellCommand(platform, process.env),
+    defaultShell: shellForLoginPath,
     // V2-T6: the bundled (Windows Terminal) ConPTY, Windows only — see NodePtyAdapterOptions.
     buildPtyManager: (callbacks) =>
       new PtyManager(new NodePtyAdapter({ useConptyDll: platform === 'win32' }), callbacks),
@@ -306,5 +339,6 @@ export async function buildAppContext(homeDir: string = os.homedir()): Promise<A
     notifier: realNotifier,
     startDaemon,
     stopDaemon,
+    loginShellPathSource,
   };
 }

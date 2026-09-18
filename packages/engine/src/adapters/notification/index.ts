@@ -28,6 +28,12 @@
  * include it depends on `Storage.readProtocolHandlerRegistered()` (D-025) — a fact this adapter
  * has no `Storage` of its own to read (D-020), so `buildNotifier` below is what a caller WITH a
  * `Storage` uses instead of the bare `notifier` singleton.
+ *
+ * **V2-T8 item 4: the Linux backend gets the same click, by a different mechanism.** `notify-send
+ * -A default=Open --wait`, detached (D-038) — same gate (`Storage.readProtocolHandlerRegistered()`)
+ * plus a `notify-send` version check (`linux-notify-send.ts`'s own docstring: 0.7.10+). Still the
+ * toast BODY, still no button — D-034 unchanged. macOS has no such mechanism this task adds:
+ * `osascript` cannot deliver a click back to the process that showed the notification.
  */
 import type { Notifier } from '../../core/ports.js';
 import type { NotificationBackend } from './backend.js';
@@ -44,10 +50,10 @@ import { LinuxNotifySendBackend } from './linux-notify-send.js';
  * unrecognized `platform` returns no native backend at all: `ChainNotifier` still works, falling
  * straight to its own built-in stderr fallback.
  *
- * `isProtocolHandlerRegistered` (V2-T5b item 5) is only ever read by the Windows branch — passed
- * straight through to `WindowsToastBackend`'s own option of the same name; every other platform's
- * backend has no toast-click mechanism this project wires up at all (this task's own "o que não
- * entra": Linux/macOS are the installer's job, see that module's own docstring).
+ * `isProtocolHandlerRegistered` is read by BOTH the Windows and the Linux branch (V2-T5b item 5;
+ * V2-T8 item 4) — passed straight through to each backend's own option of the same name. macOS has
+ * no toast-click mechanism this project wires up at all (V2-T8's own "o que não entra": `osascript`
+ * cannot deliver a click back, see that module's own docstring).
  */
 export function buildDefaultBackends(
   platform: NodeJS.Platform = process.platform,
@@ -64,7 +70,11 @@ export function buildDefaultBackends(
     return [new MacOsascriptBackend()];
   }
   if (platform === 'linux') {
-    return [new LinuxNotifySendBackend()];
+    return [
+      new LinuxNotifySendBackend(
+        isProtocolHandlerRegistered === undefined ? {} : { isProtocolHandlerRegistered },
+      ),
+    ];
   }
   return [];
 }

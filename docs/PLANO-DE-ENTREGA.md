@@ -5318,7 +5318,7 @@ texto, mas não são a fila.
       padrão em vez de pular, para reasons `promptTooLarge` — o despacho não falou desse caminho
       especificamente).
 
-- [ ] **V2-T8 — O instalador: a interface instalável no Windows e no Linux, sem checkout (D-041,
+- [~] **V2-T8 — O instalador: a interface instalável no Windows e no Linux, sem checkout (D-041,
       D-042, D-034).** Especificada pelo PO em 2026-09-17; **aprovada e despachada pelo
       mantenedor no mesmo dia**, com as duas decisões dele respondidas (abaixo: `electron-builder`
       aprovado como dependência de desenvolvimento; Ubuntu, logo `.deb` + `AppImage`). Hoje a interface só
@@ -5403,6 +5403,81 @@ texto, mas não são a fila.
       de `claude`, subir o daemon pela janela, e clicar num aviso prévio trazendo a janela para
       frente; no **Windows**, instalar pelo NSIS, abrir pelo menu Iniciar, e o mesmo clique no
       toast.
+
+      **Entregue pelo agente em 2026-09-17, worktree isolada (`agent-acce757b5545380ba`), quatro
+      commits para cinco itens** (itens 1 e 2 num commit só — a Q-078 item 1 explica por quê: a
+      medição do item 2 decide o próprio `asarUnpack` do item 1, então separar teria significado
+      commitar uma configuração que a própria tarefa já sabia estar errada), **mais três commits de
+      documentação e um oitavo commit do ajuste pedido na revisão** (abaixo). Portão local em
+      pedaços verde antes de cada commit no Windows (`tsc -p tsconfig.json --noEmit`, `npm run
+      lint`, `npm run build`, `npm run dependencias`, `npm run cobertura -- --maxWorkers 2`, cada
+      um com o código de saída lido).
+
+      1. **Item 3 (PATH do shell de login).** `login-shell-path.ts` (puro) +
+         `read-login-shell-path.ts` (a leitura, excluída da cobertura do Windows por ser
+         estruturalmente inalcançável fora do POSIX, mesmo padrão de `termination-posix.ts`) +
+         `AppContext.loginShellPathSource`. Testado por unidade; a integração real só roda de
+         verdade no Linux/macOS da CI.
+      2. **Item 4 (clique no toast no Linux).** `LinuxNotifySendBackend` ganha `--wait
+         --action=default=Open`, atrás do marcador de protocolo (estendido ao Linux por inferência,
+         `linux-protocol-marker.ts` — Q-078 item 7) e de uma checagem de versão do `notify-send`
+         (medida: 0.8.1 no contêiner, acima do piso de 0.7.10). `backend.ts#spawnDetachedListening`
+         é o novo mecanismo de processo destacado e invisível (D-038) que deixa `send()` retornar
+         sem esperar o clique.
+      3. **Itens 1+2 (empacotamento + o que só valia no dev).** `electron-builder.yml` (NSIS
+         win-x64; `.deb`+`AppImage` linux-x64; `.dmg` mac-x64 só CI), `scripts/dist.mjs` (força
+         `CSC_IDENTITY_AUTO_DISCOVERY=false`), `electron` movido para `devDependencies` (exigência
+         medida do `electron-builder`, não um pedido do despacho). **`@seeya-ai/cli` NÃO entrou no
+         `asarUnpack`** — medido contra a suposição inicial (Q-078 item 2): o fork do Electron para
+         o Node lê e executa de dentro do próprio asar, em qualquer modo de execução, e o daemon
+         sempre usa o binário do próprio Electron para se relançar. `node-pty` continua no
+         `asarUnpack` (o `.node` genuinamente não pode). Fuse `RunAsNode` confirmado ligado
+         (`@electron/fuses`), não só "não mexido".
+      4. **Item 5 (workflow manual).** `.github/workflows/dist.yml`, `workflow_dispatch`, matriz
+         de 3 SOs, portão antes do empacotamento, artefatos da execução (nunca release, D-041) —
+         não rodado de verdade (depende de push, que este agente não faz).
+
+      **Medido, número por número (Q-078 item 9 tem a lista completa):** Windows NSIS
+      `seeya-0.1.0-x64.exe` 116.965.798 bytes (~112MB), `NotSigned` confirmado; Linux `.deb`
+      `seeya-0.1.0-amd64.deb` 102.699.204 bytes (~98MB), inspecionado com `dpkg -x` (`.desktop` com
+      `MimeType=x-scheme-handler/seeya;`, `pty.node` fora do asar, nada de `@seeya-ai/cli` fora) e
+      **instalado de verdade com `apt-get install`** dentro de um contêiner Debian descartável, com
+      `ELECTRON_RUN_AS_NODE=1 ./seeya .../dist/index.js --version`/`sessions` confirmando o daemon
+      real funcionando a partir do pacote instalado; Linux `AppImage`
+      `seeya-0.1.0-x86_64.AppImage` 129.815.881 bytes (~124MB), não instalado (o formato não
+      instala nada). macOS `.dmg` não construído (sem runner macOS nesta máquina, como o próprio
+      despacho já previa).
+
+      **Achado à parte, registrado na Q-078 item 8:** o contêiner de teste (Debian mínimo) não
+      tinha `libasound2`, que o Electron precisa e a lista de dependências padrão do
+      `electron-builder`/`fpm` não declara — instalado à mão para o teste seguir. Uma Ubuntu
+      desktop real quase certamente já tem ALSA, mas isso não foi medido contra uma máquina real, só
+      registrado como diferença.
+
+      **`verificar:linux` rodado de verdade depois dos seis commits**, saída lida em arquivo, nunca
+      esperando notificação: verde, 180 arquivos de teste, 1.839 testes passando, 5 pulados,
+      agregado 96,37% statements / 92,85% branches / 95,15% funções / 96,78% linhas — acima do piso
+      em todo diretório, `tests/integration/app/daemon-launch.test.ts` (o spawn real do daemon)
+      incluído.
+
+      **Ajuste da revisão do PO, oitavo commit:** o primeiro commit havia resolvido o falso
+      positivo do e-mail de terceiro em `package-lock.json` (item 6) com uma lista de endereços
+      públicos (`EMAILS_PUBLICOS`) — o PO apontou que isso ainda escrevia o endereço de uma pessoa
+      real neste repositório, o que a regra de anonimizar contexto de fora (AGENTS.md) já proíbe
+      mesmo sendo público. Trocado por reconhecimento de ORIGEM
+      (`ehCampoDeprecatedDoLockfile`/`linhasAdicionadasPorArquivo`, novos em
+      `scripts/verificar-termos-locais.mjs`): o campo `"deprecated"` de `package-lock.json` é
+      ignorado por inteiro, nunca um valor específico — o mesmo endereço em qualquer outra linha
+      ou arquivo continua reprovando. `EMAILS_PUBLICOS` removida (ficou sem uso).
+      `tests/unit/scripts/verificar-termos-locais.test.ts` (novo, 11 testes) cobre os dois lados;
+      `scripts/verificar-termos-locais.d.mts` (novo) é só a assinatura de tipos que deixa o teste
+      importar o `.mjs` sob o programa raiz do TypeScript. Detalhe completo: Q-078 item 10.
+
+      **O que fica pendente do mantenedor (Q-078 tem a lista completa):** revisar e mesclar;
+      decidir sobre o e-mail placeholder (`noreply@seeya.invalid`) no `package.json`; rodar o
+      workflow manual uma vez; **o aceite real
+      da tarefa** — instalar de verdade no Linux e no Windows do mantenedor e repetir os passos que
+      só ele pode confirmar (menu, aba, daemon pela janela, clique no aviso prévio).
 
 ## Definição de pronto (vale para toda tarefa)
 

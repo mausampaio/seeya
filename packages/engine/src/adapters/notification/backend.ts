@@ -69,3 +69,58 @@ export const spawnCommand: CommandRunner = (command, args) =>
     child.on('error', reject);
     child.on('close', (exitCode) => resolve({ exitCode, stdout, stderr }));
   });
+
+/**
+ * V2-T8 item 4: the result of a `spawnDetachedListening` call — TWO independent promises from one
+ * spawn, because `linux-notify-send.ts`'s click listener needs to know two DIFFERENT things at two
+ * DIFFERENT times. `spawned` settles as soon as the OS confirms the process actually started
+ * (Node's own `'spawn'` event, which fires immediately — it does not wait for the command to do
+ * anything) — that is all `LinuxNotifySendBackend#send` needs before it can return, because
+ * `notify-send --wait` shows the toast right away and only delays ITS OWN exit, not the toast's
+ * appearance. `closed` settles only once the process actually exits (`'close'`), which for a
+ * `--wait`ed `notify-send` can be seconds to indefinitely later (whenever the person clicks or the
+ * notification server times it out) — nothing in this project's own `send()` call chain waits on
+ * this one; whoever reads `closed` does so as a background continuation (`.then`, never
+ * `await`ed inline in `send()`).
+ */
+export interface DetachedLaunch {
+  readonly spawned: Promise<boolean>;
+  readonly closed: Promise<SpawnResult>;
+}
+
+export type DetachedCommandRunner = (command: string, args: readonly string[]) => DetachedLaunch;
+
+/**
+ * `detached: true` + `.unref()` (D-038, same mechanism `adapters/process/daemon-launch.ts#
+ * spawnDetachedDaemon` already uses, for the identical reason: the CALLER — here, the daemon's own
+ * long-running loop — must never be kept alive or blocked by this child's own lifetime) on top of
+ * `spawnHidden`'s `windowsHide` (irrelevant on Linux, this backend's only real caller, but kept for
+ * the same reason every other spawn in this project goes through `spawnHidden` rather than a bare
+ * `node:child_process.spawn` — one place nobody can forget it). Stdio stays piped (`'pipe'`), not
+ * `'ignore'` like `spawnDetachedDaemon`'s own: THIS caller needs to read back the clicked action id
+ * from stdout, which is the entire reason this function exists instead of reusing `spawnCommand`.
+ */
+export const spawnDetachedListening: DetachedCommandRunner = (command, args) => {
+  const child = spawnHidden(command, [...args], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    shell: false,
+    detached: true,
+  });
+  child.unref();
+  const spawned = new Promise<boolean>((resolve) => {
+    child.once('spawn', () => resolve(true));
+    child.once('error', () => resolve(false));
+  });
+  const closed = new Promise<SpawnResult>((resolve) => {
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk: Buffer) => (stdout += chunk.toString('utf8')));
+    child.stderr.on('data', (chunk: Buffer) => (stderr += chunk.toString('utf8')));
+    // An 'error' here means the process never ran at all (ENOENT, permission) — `spawned` above
+    // already reports that as `false`; `closed` still needs to settle so nothing awaiting it hangs
+    // forever, with a `null` exit code (Node's own convention for "never actually exited").
+    child.on('error', () => resolve({ exitCode: null, stdout, stderr }));
+    child.on('close', (exitCode) => resolve({ exitCode, stdout, stderr }));
+  });
+  return { spawned, closed };
+};

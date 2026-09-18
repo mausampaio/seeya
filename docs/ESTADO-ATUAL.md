@@ -24,6 +24,14 @@ acima do teto, escolhendo "Resume without the plan"). **A V2-T5b (o daemon na ja
 horário, Snooze/Skip today, Start/Stop daemon, o clique no toast no Windows) está pronta numa
 worktree isolada**, portão local verde — falta a revisão do PO, a mesclagem, e o aceite manual do
 mantenedor (subir o daemon e dar Snooze pela janela num dia real, e o clique de verdade no toast).
+**A V2-T8 (o instalador: NSIS no Windows, `.deb`+`AppImage` no Linux, `.dmg` só CI no macOS) está
+pronta numa worktree isolada**, portão local verde no Windows e no contêiner Linux
+(`verificar:linux`: 180 arquivos, 1.839 testes passando), dois artefatos Linux construídos e
+inspecionados num contêiner Debian descartável (`.deb` **instalado de verdade** com `apt-get
+install`, com o daemon real confirmado funcionando a partir do pacote) — falta a revisão do PO, a
+mesclagem, o workflow manual, e o aceite do mantenedor (instalar de verdade no Linux e no Windows
+dele, abrir pelo menu, subir o daemon pela janela, clicar num aviso prévio). Ver
+`docs/QUESTOES.md` Q-078 para os números medidos e o que ficou pendente.
 
 ## Onde o código está
 

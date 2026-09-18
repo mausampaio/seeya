@@ -144,8 +144,29 @@ and launches the real Electron binary. **The first run downloads that binary (~1
 `node_modules/electron/path.txt` is missing. A window opens with the discovered-session list on the
 side, a status panel matching `seeya status`, and a "+" button that opens a command bar (command
 and working directory — never a native `prompt()`) for a tab backed by an embedded terminal
-(`@xterm/xterm` + `node-pty`). Distribution as an installer is future work (D-042); today this only
-runs from a checkout.
+(`@xterm/xterm` + `node-pty`).
+
+**Installing it, instead of running from a checkout (V2-T8).** `npm run dist` (root, or
+`packages/app`'s own `npm run dist`) builds an installer for the current OS with
+`electron-builder`: Windows gets a per-user NSIS installer (no admin, Start Menu shortcut,
+uninstaller); Linux gets a `.deb` (the everyday format — installing it also registers `seeya://`
+system-wide via the package's own `.desktop` file) and an `AppImage` (no install, no
+`seeya://` registration — nothing writes anything system-wide); macOS gets a `.dmg`, built by CI
+only, not covered by this task's own acceptance. **No code signing** — Windows SmartScreen and any
+future macOS Gatekeeper warning are the accepted cost (a certificate is a future decision).
+Installing/uninstalling never touches `~/.seeya/` — an installed app and a dev checkout share the
+same data directory and the same daemon lock, exactly like today. `.github/workflows/dist.yml`
+(`workflow_dispatch`, manual) builds all three from CI and attaches them to the run as workflow
+artifacts, never as a GitHub Release (that publication boundary is a v2-wide decision, not this
+task's).
+
+**The PATH a menu launch sees, on Linux/macOS (V2-T8).** An app opened from a graphical menu
+inherits the desktop session's own `PATH`, not a login shell's — usually missing `~/.local/bin`,
+`nvm`, or a global npm prefix, exactly where `claude`/`codex` tend to live (the same long-standing
+issue VS Code has under this name). The interface reads `$SHELL -lic`'s own `PATH` once at
+startup, with a short timeout, and uses it for resolving a harness command and for every tab's
+spawn environment; on any failure it keeps the inherited `PATH`, unchanged from before. Windows
+has no such split and isn't affected.
 
 **Not published, no framework in the renderer (D-041: minimum first).** See
 [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md) § "A segunda raiz de composição" for how the
@@ -207,14 +228,21 @@ stopping reuses the exact same stop sequence `seeya daemon --stop` runs. The int
 on the schedule by itself (D-039) — the daemon is still what closes the day when nobody clicks
 anything.
 
-**A toast click brings the window to front (Windows, V2-T5b).** The interface registers itself as
-the `seeya://` protocol handler on startup (`app.setAsDefaultProtocolClient`) and requests the
-single-instance lock, so a `seeya://` activation — including a click on the daemon's own toast —
-focuses the already-open window instead of starting a second one. The daemon's Windows toast only
-carries the clickable `launch="seeya://open"` attribute once the interface has registered itself
-at least once on the machine (a small marker file records this, D-025: no marker, plain toast as
-before). Linux and macOS get their own `seeya://` handler from the installer package (`.desktop`/
-`Info.plist`), not from a checkout — out of scope here.
+**A toast click brings the window to front (Windows, V2-T5b; Linux, V2-T8).** The interface
+registers itself as the `seeya://` protocol handler on startup (`app.setAsDefaultProtocolClient`)
+and requests the single-instance lock, so a `seeya://` activation — including a click on the
+daemon's own toast — focuses the already-open window instead of starting a second one. The
+daemon's Windows toast only carries the clickable `launch="seeya://open"` attribute once the
+interface has registered itself at least once on the machine (a small marker file records this,
+D-025: no marker, plain toast as before). On Linux, an installed (`.deb`) run infers the same
+marker from the package's own `.desktop` registration (there is no API to ask the OS directly, the
+way Windows' own `setAsDefaultProtocolClient` reports back); once marked, the daemon's
+`notify-send` toast offers `--action=default=Open` (still a click on the toast body, never a
+button — D-034), which a background process listens for and opens `seeya://open` via `xdg-open`
+without blocking the toast itself. An `AppImage` run never gets the marker — nothing registered
+`seeya://` for it to click into. macOS gets its own `seeya://` handler from the installer's
+`Info.plist`, but no click mechanism this task adds — `osascript` cannot deliver a click back to
+the process that showed the notification.
 
 ### Before writing code
 

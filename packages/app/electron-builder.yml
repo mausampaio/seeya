@@ -1,0 +1,229 @@
+# electron-builder config (V2-T8 item 1). YAML, not the package.json "build" field, so this can
+# carry comments — JSON can't, and this config has real reasoning behind choices a bare glob list
+# wouldn't explain on its own. electron-builder auto-discovers this file (same directory as
+# package.json), no reference from package.json needed.
+#
+# Run with `npm run dist` (packages/app/package.json's own script — builds this workspace's own
+# esbuild bundle first, then runs `electron-builder`), or from the repo root with `npm run dist`
+# there (builds `@seeya-ai/engine`/`@seeya-ai/cli` via `tsc -b`, then forwards to this workspace's
+# own `dist` script). Either way this config packages `dist/electron/**`, esbuild's own output,
+# never `src/` — measured the hard way once: a first attempt that ran only the root's `tsc -b`
+# build (never packages/app's own `npm run build`) produced an installer whose `app.asar` had no
+# `dist/electron/main.js` in it at all, and electron-builder's own sanity check caught it
+# immediately ("Application entry file ... was not found in this archive") rather than shipping a
+# broken package silently.
+#
+# `electron` had to move from "dependencies" to "devDependencies" in package.json for this task
+# (measured: electron-builder refuses outright — "Package electron is only allowed in
+# devDependencies" — when it isn't, since a packaged app never needs the `electron` npm package's
+# own copy of the Electron binaries; the OS installer's own seeya.exe/seeya IS that runtime). This
+# is the conventional placement every other Electron+electron-builder project uses; nothing in
+# scripts/build.mjs's own require.resolve('electron')/import('electron') calls (dev-only) cares
+# which dependency section listed it — `npm ci` installs both sections the same way.
+
+appId: ai.seeya.app
+productName: seeya
+copyright: seeya
+
+# Measured (Linux build, AppImage target): electron-builder derives a default `executableName`
+# from package.json's own "name" field when this isn't set — for a scoped package that comes out
+# as "@seeya-aiapp" (the "@"/"/" stripped, not replaced), which it then refuses outright:
+# "executableName contains characters that cannot be safely used in file paths". `productName`
+# above does NOT double as this — they are two different electron-builder fields (one is the
+# human-facing app name shown in window titles/Start Menu, the other is the actual binary/.desktop
+# `Exec=` name) — so this needs setting explicitly regardless of `productName`.
+executableName: seeya
+
+# Measured (Linux build, deb target): electron-builder's own default artifact filename template
+# uses package.json's raw "name" ("@seeya-ai/app") for some targets (deb, AppImage) but not others
+# (nsis already defaults to "${productName} Setup ${version}.${ext}") — the scoped name's literal
+# "/" made fpm try to write into a "dist-installer/@seeya-ai/" directory that doesn't exist
+# ("Parent directory does not exist"). One explicit template, used everywhere, replaces whatever
+# per-target default would otherwise disagree.
+artifactName: '${productName}-${version}-${arch}.${ext}'
+
+# electron-builder needs an EXACT Electron version to download the matching platform binaries —
+# package.json's own devDependencies.electron is a caret range ("^44.3.0"), which is otherwise the
+# right way to depend on it (npm resolves and locks the exact version in package-lock.json, same as
+# every other dependency here). Measured (electron-builder 26.15.3): it refuses a range outright
+# ("Electron version ... is a range, not a fixed version") rather than reading the resolved version
+# out of node_modules/electron/package.json itself, even though that file exists and is exactly
+# what this pins to by hand. Update this alongside package.json whenever electron's version bumps —
+# there is no way to derive one from the other automatically with this electron-builder version.
+electronVersion: 44.3.0
+
+# electron-builder's default step rebuilds every native module against Electron's own ABI via
+# @electron/rebuild — measured (this machine): it needs a Visual Studio C++ toolchain that isn't
+# installed here ("Could not find any Visual Studio installation to use"), the exact kind of
+# from-source build node-pty's own prebuilds exist to avoid (packages/app/scripts/build.mjs's own
+# docstring on locateSpawnHelper already documents node-pty shipping per-platform prebuilds).
+# `npm run app`'s dev workflow already loads these same prebuilt `.node` addons successfully inside
+# a real Electron process (V2-T2/V2-T3's own spikes), so they are already ABI-compatible — nothing
+# here needs rebuilding, only packaging as-is. `npmRebuild: false` skips that step entirely.
+npmRebuild: false
+
+directories:
+  output: dist-installer
+
+# No `electronFuses` block here — deliberately. electron-builder can "harden" a packaged app by
+# burning fuses into the Electron binary at package time, and `RunAsNode` is one of them: turning
+# it off would break `ELECTRON_RUN_AS_NODE=1` outright, which is exactly the mechanism the
+# daemon's own launcher depends on (`adapters/process/daemon-launch.ts#spawnDetachedDaemon`,
+# `composition/index.ts`'s own `daemonLaunchTarget`). Item 2's own instruction: "não desligar o
+# fuse RunAsNode". Measured (`@electron/fuses#getCurrentFuseWire` against this task's own packaged
+# `seeya.exe`): `RunAsNode` reads `'1'` (enabled) — the fuse's own untouched default, confirming
+# omitting this block is enough; there is no separate flag needed to "keep it on".
+
+# No auto-update / GitHub Releases publish target (D-041: publication is a v2-boundary decision,
+# not this task's). Without this, electron-builder infers a "github" publish provider from the
+# "repository" field the moment you ask it to build a target that supports auto-update (NSIS,
+# AppImage) — `publish: null` keeps `npm run dist` fully offline and never touches GitHub.
+publish: null
+
+# Replaces electron-builder's own default file set (which would otherwise ALSO sweep in src/,
+# scripts/, tests, tsconfig.json, docs, everything not git-ignored) with exactly the bundle
+# scripts/build.mjs produces, plus package.json (electron-builder always needs it for metadata —
+# name/version/main — regardless of what "files" says). node_modules is NOT listed here: it is
+# walked SEPARATELY by electron-builder's own dependency resolver, following "dependencies" in
+# package.json (now `@seeya-ai/cli`, `@seeya-ai/engine`, `@xterm/*`, `node-pty` —
+# `devDependencies`, including `electron` itself, are never walked) — this list only controls what
+# comes from the PACKAGE DIRECTORY ITSELF.
+files:
+  - dist/electron/**/*
+  - package.json
+  # Trims dev-only cruft the workspace symlink otherwise drags in whole: @seeya-ai/cli's own
+  # TypeScript source and per-file sourcemaps (only its compiled dist/*.js is ever spawned, by
+  # `composition/index.ts#resolveCliDaemonScriptPath`) and node-pty's own TS source (only the
+  # prebuilt `.node` addons and the third_party ConPTY binaries under asarUnpack are ever loaded).
+  # Measured: dropped app.asar.unpacked from ~9.0MB to ~8.6MB on this machine's Windows build —
+  # node-pty's own prebuilds/ (below) turned out to be the much bigger line item.
+  - '!**/node_modules/@seeya-ai/cli/src/**'
+  - '!**/node_modules/@seeya-ai/cli/**/*.map'
+  - '!**/node_modules/@seeya-ai/cli/tsconfig.build.tsbuildinfo'
+  - '!**/node_modules/node-pty/src/**'
+
+# V2-T8 item 1's own instruction: node-pty's native `.node` addons (and, on Windows, the bundled
+# conpty.dll/OpenConsole.exe from V2-T6; on macOS, spawn-helper) cannot live inside the asar
+# archive — a `.node` addon is loaded via dlopen/LoadLibrary, which cannot reach into an asar's
+# custom archive format, only a real file on disk.
+#
+# **`@seeya-ai/cli` does NOT need this — measured, not assumed (item 2's own instruction: "medir
+# se lê de dentro do asar; se não, a CLI vai para o asarUnpack").** Built the real Windows package
+# and ran, from a shell, exactly what `spawnDetachedDaemon` does in production —
+# `seeya.exe` with `ELECTRON_RUN_AS_NODE=1`, argv pointing at
+# `resources/app.asar/node_modules/@seeya-ai/cli/dist/index.js` (the PACKED, never-unpacked path,
+# no twin on disk) — and `seeya --help` ran correctly, including resolving its own
+# `@seeya-ai/engine` dependency, which also stays packed. Electron's own fork of Node has asar
+# awareness built into its module loader and `fs` internals regardless of run mode
+# (`ELECTRON_RUN_AS_NODE` does not turn it off) — the same mechanism that already lets `main.js`
+# itself run from inside this exact archive. The daemon's own launcher
+# (`adapters/process/daemon-launch.ts#spawnDetachedDaemon`) always spawns `process.execPath`
+# (Electron's own binary) as `nodePath`, never a plain, non-Electron `node.exe` — so this holds for
+# every real call site in this project, not just the manual repro. `node-pty`'s `.node` addons
+# remain the one asarUnpack has to cover; see this task's report and Q-078 for the full comparison
+# (including the one this replaced, which assumed the opposite without checking).
+asarUnpack:
+  - '**/node_modules/node-pty/**'
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  # No code signing this task (V2-T8's own "o que não entra") — SmartScreen will warn on first
+  # run. Cost/certificate is a future decision (Q-078).
+  #
+  # node-pty ships ALL platforms' prebuilt native addons in one npm package (measured:
+  # prebuilds/win32-x64 30MB, prebuilds/win32-arm64 28MB, prebuilds/darwin-{x64,arm64} ~200KB
+  # combined — Linux has none at all, see build.mjs's own docstring, it compiles from source into
+  # build/Release/ instead). A win-x64-only NSIS target (this task's own scope) needs exactly
+  # win32-x64; every other prebuild directory is 28MB+ of dead weight in this artifact specifically.
+  files:
+    - dist/electron/**/*
+    - package.json
+    - '!**/node_modules/@seeya-ai/cli/src/**'
+    - '!**/node_modules/@seeya-ai/cli/**/*.map'
+    - '!**/node_modules/@seeya-ai/cli/tsconfig.build.tsbuildinfo'
+    - '!**/node_modules/node-pty/src/**'
+    - '!**/node_modules/node-pty/prebuilds/darwin-*/**'
+    - '!**/node_modules/node-pty/prebuilds/win32-arm64/**'
+
+nsis:
+  # "NSIS por usuário" (the task's own wording): no admin elevation, installs under the current
+  # user's own AppData, matches how `npm run app`'s dev launch already behaves (no privilege
+  # requirement) and is the one NSIS mode that never prompts UAC.
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  # seeya:// registration on Windows is Electron's OWN job at runtime
+  # (electron/main.ts#registerSeeyaProtocolHandler, app.setAsDefaultProtocolClient) — V2-T5b,
+  # already shipped. NSIS needs no protocol config of its own for that to work once installed.
+
+linux:
+  target:
+    - deb
+    - AppImage
+  category: Utility
+  # Uses package.json's own "desktopName" (added this task, "seeya.desktop") for the installed
+  # `.desktop` filename instead of one derived from `executableName` — keeps the file itself
+  # named predictably regardless of what `executableName` above happens to be.
+  syncDesktopName: true
+  # electron-builder writes this into the generated .desktop file's own MimeType line
+  # (x-scheme-handler/seeya;) for BOTH linux targets — this is what a .deb install makes
+  # available to `xdg-open seeya://open` (linux-notify-send.ts's own click handler, item 4)
+  # system-wide; an AppImage run, with nothing installed system-wide, never gets this association
+  # at all (linux-protocol-marker.ts's own docstring covers that gap).
+  protocols:
+    - name: seeya
+      schemes:
+        - seeya
+  # Same trims as win's own "files" (see that block's own comment) plus dropping node-pty's
+  # Windows/macOS prebuilds entirely — Linux never has a use for either, and never has its own
+  # prebuilds/linux-* directory to keep in the first place (it compiles into build/Release/ at
+  # `npm ci` time instead, which this pattern leaves untouched).
+  files:
+    - dist/electron/**/*
+    - package.json
+    - '!**/node_modules/@seeya-ai/cli/src/**'
+    - '!**/node_modules/@seeya-ai/cli/**/*.map'
+    - '!**/node_modules/@seeya-ai/cli/tsconfig.build.tsbuildinfo'
+    - '!**/node_modules/node-pty/src/**'
+    - '!**/node_modules/node-pty/prebuilds/win32-*/**'
+    - '!**/node_modules/node-pty/prebuilds/darwin-*/**'
+    - '!**/node_modules/node-pty/third_party/**'
+
+deb:
+  # electron-builder derives the required Debian "Maintainer" control field from package.json's
+  # own "author" field (added this task) — measured: a bare string author is not enough, it
+  # insists on an object with BOTH "name" and "email" ("Please specify author 'email' in the
+  # application package.json"). `noreply@seeya.invalid` (package.json's own `author.email`) uses
+  # the `.invalid` TLD RFC 2606 reserves exactly for addresses that must never resolve — a
+  # placeholder that says so on its face, not a real inbox nor a guess at one. Registered in
+  # Q-078 for the maintainer to replace with a real one if they ever want the .deb's Maintainer
+  # field to mean something.
+  {}
+
+mac:
+  # CI-only this task (V2-T8's own scope: "macOS x64 só construído pela CI, sem aceite nesta
+  # tarefa") — no signing/notarization (same "o que não entra" as Windows).
+  target:
+    - target: dmg
+      arch: [x64]
+  protocols:
+    - name: seeya
+      schemes:
+        - seeya
+  # Same trims as linux's own "files" (see that block's own comment), for the same reason —
+  # macOS keeps its own darwin-* prebuilds and spawn-helper (build.mjs's own
+  # ensureSpawnHelperExecutable runs in DEV only; the installed app's own native-module handling
+  # here is untouched by that dev-only chmod fix).
+  files:
+    - dist/electron/**/*
+    - package.json
+    - '!**/node_modules/@seeya-ai/cli/src/**'
+    - '!**/node_modules/@seeya-ai/cli/**/*.map'
+    - '!**/node_modules/@seeya-ai/cli/tsconfig.build.tsbuildinfo'
+    - '!**/node_modules/node-pty/src/**'
+    - '!**/node_modules/node-pty/prebuilds/win32-*/**'
+    - '!**/node_modules/node-pty/third_party/**'
