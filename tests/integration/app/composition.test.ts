@@ -115,6 +115,24 @@ describe('buildAppContext', () => {
   });
 
   it(
+    "V2-T8 item 3: loginShellPathSource is 'not-applicable' on Windows, and either " +
+      "'login-shell' or 'inherited' elsewhere (never rejects/throws either way)",
+    async () => {
+      fixture = await createDiscoveryFixture();
+      const context = await buildAppContext(fixture.root);
+
+      if (process.platform === 'win32') {
+        expect(context.loginShellPathSource).toBe('not-applicable');
+      } else {
+        expect(['login-shell', 'inherited']).toContain(context.loginShellPathSource);
+      }
+      // Whichever source won, tabEnv.PATH is still a usable string — resolveHarnessCommand above
+      // already proves this end to end.
+      expect(typeof context.tabEnv.PATH).toBe('string');
+    },
+  );
+
+  it(
     'V2-T5a item 5: wires transcriptReader/gitReader/leanGenerator/deepGenerator/forkCleanup/' +
       'notifier — every port endDay needs beyond what this context already had',
     async () => {

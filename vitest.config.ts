@@ -44,7 +44,18 @@ const WINDOWS_ONLY_SOURCE = [
  * `WINDOWS_ONLY_SOURCE`, opposite direction, same fix: exclude it from the denominator of the
  * platform that structurally cannot run it, never from the platform that can.
  */
-const POSIX_ONLY_SOURCE = ['packages/engine/src/adapters/process/termination-posix.ts'];
+/**
+ * V2-T8 item 3: `packages/app/src/composition/read-login-shell-path.ts` is the mirror image of
+ * `termination-posix.ts` above, one composition root down — `composition/index.ts` only ever calls
+ * it for `platform !== 'win32'` (there is no login-shell/`PATH`-in-profile-script split on
+ * Windows, see that module's own docstring), so it's structurally unreachable on this Windows
+ * machine's own `npm run verificar`. `verificar:linux` exercises it for real, against the
+ * container's real `/bin/sh`.
+ */
+const POSIX_ONLY_SOURCE = [
+  'packages/engine/src/adapters/process/termination-posix.ts',
+  'packages/app/src/composition/read-login-shell-path.ts',
+];
 
 /**
  * V2-T2 (docs/PLANO-DE-ENTREGA.md, item 5): `packages/app/src/electron/**` is the main-process
