@@ -7929,25 +7929,25 @@ explicitamente no `electron-builder.yml`.
 - **`npm run verificar` (Windows, esta worktree, depois dos cinco itens):** tipos, lint,
   dependency-cruiser e build verdes; cobertura agregada e por-diretório dentro do piso (ver
   `docs/ESTADO-ATUAL.md` para os números exatos desta entrega).
-- **`verificar:linux`:** não rodado como comando único desta vez — o próprio contêiner de teste
-  dos artefatos Linux (`npm ci` + `npm run build` + `npm run build --workspace=@seeya-ai/app` +
-  `node scripts/dist.mjs --linux` dentro de `node:22-bookworm`) já cobriu a mesma superfície de
-  build que `verificar:linux` cobre, mas não o portão de testes/cobertura em si dentro do
-  contêiner — registrado como pendência abaixo, não como "feito".
+- **`verificar:linux`:** rodado de verdade depois dos seis commits (o comando dedicado, não só o
+  build manual dos artefatos), saída lida por este agente em arquivo, nunca esperando notificação.
+  Verde: **180 arquivos de teste, 1.839 testes passando, 5 pulados**, agregado **96,37%
+  statements / 92,85% branches / 95,15% funções / 96,78% linhas** — acima do piso de 80% em todo
+  diretório, sem `npm ERR!` nem erro de portão em nenhum trecho do log. Inclui
+  `tests/integration/app/daemon-launch.test.ts` passando dentro do contêiner (o mesmo teste que já
+  cobre `startDaemon`/`stopDaemon` reais no Linux).
 
 ### O que fica pendente do mantenedor
 
 1. Revisar e mesclar.
-2. Rodar `verificar:linux` (o comando dedicado, não só o build manual que este agente fez) antes
-   de mesclar, se quiser a mesma garantia que as outras tarefas V2 tiveram.
-3. Decidir se quer trocar `noreply@seeya.invalid` (item 6) por um e-mail de contato real.
-4. Rodar o workflow manual (`Build installers`, `workflow_dispatch`) pelo menos uma vez — depende
+2. Decidir se quer trocar `noreply@seeya.invalid` (item 6) por um e-mail de contato real.
+3. Rodar o workflow manual (`Build installers`, `workflow_dispatch`) pelo menos uma vez — depende
    de push, que este agente não faz.
-5. **O aceite real da tarefa** (da própria entrada do plano): no Linux, instalar o `.deb` de
+4. **O aceite real da tarefa** (da própria entrada do plano): no Linux, instalar o `.deb` de
    verdade, abrir pelo menu, abrir uma aba de `claude`, subir o daemon pela janela, e clicar num
    aviso prévio trazendo a janela para frente; no Windows, instalar pelo NSIS, abrir pelo menu
    Iniciar, e o mesmo clique no toast. Nenhum dos dois foi feito por este agente (Windows: só
    build e inspeção, nunca instalação de verdade no perfil da máquina; Linux: instalado dentro de
    um contêiner descartável, nunca numa máquina Ubuntu real).
-6. Se a instalação Ubuntu real também topar com `libasound.so.2` faltando (item 8), adicionar
+5. Se a instalação Ubuntu real também topar com `libasound.so.2` faltando (item 8), adicionar
    `libasound2` a `deb.depends` em `electron-builder.yml`.

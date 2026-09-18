@@ -5453,10 +5453,15 @@ texto, mas não são a fila.
       desktop real quase certamente já tem ALSA, mas isso não foi medido contra uma máquina real, só
       registrado como diferença.
 
-      **O que fica pendente do mantenedor (Q-078 tem a lista completa):** revisar e mesclar; rodar
-      `verificar:linux` de verdade antes de mesclar (este agente só rodou o build manual dentro do
-      contêiner, não o comando dedicado); decidir sobre o e-mail placeholder
-      (`noreply@seeya.invalid`) no `package.json`; rodar o workflow manual uma vez; **o aceite real
+      **`verificar:linux` rodado de verdade depois dos seis commits**, saída lida em arquivo, nunca
+      esperando notificação: verde, 180 arquivos de teste, 1.839 testes passando, 5 pulados,
+      agregado 96,37% statements / 92,85% branches / 95,15% funções / 96,78% linhas — acima do piso
+      em todo diretório, `tests/integration/app/daemon-launch.test.ts` (o spawn real do daemon)
+      incluído.
+
+      **O que fica pendente do mantenedor (Q-078 tem a lista completa):** revisar e mesclar;
+      decidir sobre o e-mail placeholder (`noreply@seeya.invalid`) no `package.json`; rodar o
+      workflow manual uma vez; **o aceite real
       da tarefa** — instalar de verdade no Linux e no Windows do mantenedor e repetir os passos que
       só ele pode confirmar (menu, aba, daemon pela janela, clique no aviso prévio).
 
