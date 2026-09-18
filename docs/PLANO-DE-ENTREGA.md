@@ -5319,16 +5319,17 @@ texto, mas não são a fila.
       especificamente).
 
 - [ ] **V2-T8 — O instalador: a interface instalável no Windows e no Linux, sem checkout (D-041,
-      D-042, D-034).** Especificada pelo PO em 2026-09-17; **aguarda aprovação do mantenedor
-      antes de qualquer despacho** — e carrega duas decisões dele (abaixo). Hoje a interface só
+      D-042, D-034).** Especificada pelo PO em 2026-09-17; **aprovada e despachada pelo
+      mantenedor no mesmo dia**, com as duas decisões dele respondidas (abaixo: `electron-builder`
+      aprovado como dependência de desenvolvimento; Ubuntu, logo `.deb` + `AppImage`). Hoje a interface só
       roda de um clone (`npm run app`), e isso já custou duas vezes: o `npm ci` quebrou com a
       interface aberta do mesmo checkout (TESTES.md), e o clique no toast não existe no Linux
       porque o handler de `seeya://` só vem de um pacote instalado. É também o que deixa o seeya
       ser usado todo dia sem o checkout de desenvolvimento embaixo.
 
       **Duas decisões do mantenedor antes do despacho:**
-      - **Dependência nova (AGENTS.md):** `electron-builder` como `devDependency` de
-        `packages/app`. Recomendação do PO: é o que resolve de uma vez os três pontos que
+      - **Dependência nova (AGENTS.md) — aprovada pelo mantenedor em 2026-09-17:**
+        `electron-builder` como `devDependency` de `packages/app`. Recomendação do PO: é o que resolve de uma vez os três pontos que
         dariam trabalho à mão — `asarUnpack` dos nativos do `node-pty` (e do `conpty.dll` da
         V2-T6), o registro do protocolo `seeya://` pelo próprio instalador em cada formato
         (entrada no registro no NSIS, `MimeType=x-scheme-handler/seeya` no `.desktop`,
