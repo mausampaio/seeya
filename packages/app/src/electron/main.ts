@@ -51,6 +51,7 @@ import { decideSchedule, emptyDayState } from '@seeya-ai/engine/core/schedule.js
 import { localDayString } from '@seeya-ai/engine/core/day.js';
 import type { Handoff } from '@seeya-ai/engine/core/types.js';
 import { buildAppContext, toEndDayDeps, type AppContext } from '../composition/index.js';
+import { shouldMarkLinuxProtocolRegistered } from '../composition/linux-protocol-marker.js';
 import { MESSAGES } from '../text/messages.js';
 import { buildEndDayCostCeiling } from '../state/end-day-preview.js';
 import { projectEndDayProgressEvent } from '../state/end-day-progress.js';
@@ -746,20 +747,33 @@ if (!gotSingleInstanceLock) {
     // uses it against a tmpdir fixture, never the real home). Never set by `npm run app`.
     const context = await buildAppContext(process.env.SEEYA_APP_HOME_OVERRIDE);
 
-    // V2-T5b item 5: Windows only this task — the `seeya://` handler on Linux comes from the
-    // package's own `.desktop` file and on macOS from its `Info.plist`, neither of which exists
-    // from a checkout (only the installer task can write them); attempting
-    // `setAsDefaultProtocolClient` there today would be a no-op at best (Electron's own docs: "this
-    // method is only implemented on macOS and Windows") and a false claim in the marker at worst.
-    // `process.platform` read directly here, not in `composition/index.ts`, matches this same
-    // file's own pre-existing `window-all-closed` handler below — an Electron-lifecycle branch, not
-    // a choice of which adapter to wire (composition/index.ts's own job).
-    if (process.platform === 'win32' && registerSeeyaProtocolHandler()) {
+    // V2-T5b item 5: Windows — the `seeya://` handler on Linux comes from the package's own
+    // `.desktop` file and on macOS from its `Info.plist`, neither of which exists from a checkout
+    // (only the installer task can write them); attempting `setAsDefaultProtocolClient` there
+    // today would be a no-op at best (Electron's own docs: "this method is only implemented on
+    // macOS and Windows") and a false claim in the marker at worst. `process.platform` read
+    // directly here, not in `composition/index.ts`, matches this same file's own pre-existing
+    // `window-all-closed` handler below — an Electron-lifecycle branch, not a choice of which
+    // adapter to wire (composition/index.ts's own job).
+    //
+    // V2-T8 item 4: Linux — no equivalent API to call at all (`shouldMarkLinuxProtocolRegistered`'s
+    // own docstring: the `.desktop` file's `MimeType` was already written, at INSTALL time, by the
+    // `.deb`; this process can only infer that it was, never confirm it the way Windows' own
+    // boolean return does). macOS still gets no marker at all this task (`o que não entra`: no
+    // click mechanism exists there to gate).
+    const markProtocolRegistered =
+      (process.platform === 'win32' && registerSeeyaProtocolHandler()) ||
+      shouldMarkLinuxProtocolRegistered({
+        platform: process.platform,
+        isPackaged: app.isPackaged,
+        appImageEnv: process.env.APPIMAGE,
+      });
+    if (markProtocolRegistered) {
       await context.storage.saveProtocolHandlerRegistered().catch(() => {
-        // Best-effort: a failed write here just means the daemon's own toast keeps omitting
-        // `launch` until a later run of the interface writes the marker successfully — the same
-        // "no marker, toast as before" fallback D-025 already gives a marker that was never
-        // written at all.
+        // Best-effort: a failed write here just means the daemon's own toast/click keeps omitting
+        // `launch`/`--action` until a later run of the interface writes the marker successfully —
+        // the same "no marker, toast as before" fallback D-025 already gives a marker that was
+        // never written at all.
       });
     }
 
