@@ -5407,7 +5407,8 @@ texto, mas não são a fila.
       **Entregue pelo agente em 2026-09-17, worktree isolada (`agent-acce757b5545380ba`), quatro
       commits para cinco itens** (itens 1 e 2 num commit só — a Q-078 item 1 explica por quê: a
       medição do item 2 decide o próprio `asarUnpack` do item 1, então separar teria significado
-      commitar uma configuração que a própria tarefa já sabia estar errada). Portão local em
+      commitar uma configuração que a própria tarefa já sabia estar errada), **mais três commits de
+      documentação e um oitavo commit do ajuste pedido na revisão** (abaixo). Portão local em
       pedaços verde antes de cada commit no Windows (`tsc -p tsconfig.json --noEmit`, `npm run
       lint`, `npm run build`, `npm run dependencias`, `npm run cobertura -- --maxWorkers 2`, cada
       um com o código de saída lido).
@@ -5458,6 +5459,19 @@ texto, mas não são a fila.
       agregado 96,37% statements / 92,85% branches / 95,15% funções / 96,78% linhas — acima do piso
       em todo diretório, `tests/integration/app/daemon-launch.test.ts` (o spawn real do daemon)
       incluído.
+
+      **Ajuste da revisão do PO, oitavo commit:** o primeiro commit havia resolvido o falso
+      positivo do e-mail de terceiro em `package-lock.json` (item 6) com uma lista de endereços
+      públicos (`EMAILS_PUBLICOS`) — o PO apontou que isso ainda escrevia o endereço de uma pessoa
+      real neste repositório, o que a regra de anonimizar contexto de fora (AGENTS.md) já proíbe
+      mesmo sendo público. Trocado por reconhecimento de ORIGEM
+      (`ehCampoDeprecatedDoLockfile`/`linhasAdicionadasPorArquivo`, novos em
+      `scripts/verificar-termos-locais.mjs`): o campo `"deprecated"` de `package-lock.json` é
+      ignorado por inteiro, nunca um valor específico — o mesmo endereço em qualquer outra linha
+      ou arquivo continua reprovando. `EMAILS_PUBLICOS` removida (ficou sem uso).
+      `tests/unit/scripts/verificar-termos-locais.test.ts` (novo, 11 testes) cobre os dois lados;
+      `scripts/verificar-termos-locais.d.mts` (novo) é só a assinatura de tipos que deixa o teste
+      importar o `.mjs` sob o programa raiz do TypeScript. Detalhe completo: Q-078 item 10.
 
       **O que fica pendente do mantenedor (Q-078 tem a lista completa):** revisar e mesclar;
       decidir sobre o e-mail placeholder (`noreply@seeya.invalid`) no `package.json`; rodar o

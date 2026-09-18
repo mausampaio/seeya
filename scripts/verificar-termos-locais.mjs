@@ -66,17 +66,64 @@ function conteudoEmStage() {
     process.exitCode = 1;
     return null;
   }
-  // O sinal de adição inicial é sintaxe de diff, não conteúdo — precisa sair antes de qualquer
-  // casamento. Mantê-lo produzia falso positivo real: uma linha adicionada contendo só um import
-  // no formato arroba-mais-nome-de-arquivo casava com o padrão de e-mail, porque o sinal de
-  // adição é caractere válido em local-part e a extensão parece um TLD. Isso recusou um commit
-  // legítimo, e guard que barra o certo é guard que alguém desliga.
-  const linhasAdicionadas = diff.stdout
+  return { diffStdout: diff.stdout, nomesStdout: nomes.stdout };
+}
+
+/**
+ * O texto de `.termos-locais` é comparado por substring simples contra tudo que foi adicionado —
+ * sem exceção por arquivo ou campo, ao contrário de `acharPadroesSuspeitosPorLinha` abaixo. É a
+ * lista de termos que já se sabe terem vazado uma vez; não faz sentido essa lista "esquecer" um
+ * deles por causa de onde ele aparece.
+ *
+ * O sinal de adição inicial é sintaxe de diff, não conteúdo — precisa sair antes de qualquer
+ * casamento. Mantê-lo produzia falso positivo real: uma linha adicionada contendo só um import
+ * no formato arroba-mais-nome-de-arquivo casava com o padrão de e-mail, porque o sinal de adição
+ * é caractere válido em local-part e a extensão parece um TLD. Isso recusou um commit legítimo,
+ * e guard que barra o certo é guard que alguém desliga.
+ * @param {{ diffStdout: string, nomesStdout: string }} stage
+ * @returns {string}
+ */
+function conteudoParaTermosLocais(stage) {
+  const linhasAdicionadas = stage.diffStdout
     .split(/\r?\n/)
     .filter((linha) => linha.startsWith('+') && !linha.startsWith('+++'))
     .map((linha) => linha.slice(1))
     .join('\n');
-  return `${linhasAdicionadas}\n${nomes.stdout}`;
+  return `${linhasAdicionadas}\n${stage.nomesStdout}`;
+}
+
+/**
+ * Uma linha adicionada, com o arquivo a que pertence — só assim dá para aplicar uma exceção por
+ * CAMPO de um arquivo específico (o campo `"deprecated"` de `package-lock.json`, ver
+ * `ehCampoDeprecatedDoLockfile`) sem afrouxar a checagem em nenhum outro lugar: mesma linha em
+ * outro arquivo, ou outra linha do mesmo arquivo, continuam passando por `acharPadroesSuspeitos`
+ * normalmente.
+ * @typedef {{ arquivo: string, linha: string }} LinhaAdicionada
+ */
+
+/**
+ * Percorre o diff unificado (`git diff --unified=0`) mantendo o arquivo atual — atualizado a cada
+ * cabeçalho `+++ b/<caminho>` — e devolve só as linhas adicionadas, cada uma já associada ao seu
+ * arquivo.
+ * @param {string} diffStdout
+ * @returns {LinhaAdicionada[]}
+ */
+export function linhasAdicionadasPorArquivo(diffStdout) {
+  /** @type {LinhaAdicionada[]} */
+  const linhas = [];
+  let arquivoAtual = '';
+  for (const linhaBruta of diffStdout.split(/\r?\n/)) {
+    if (linhaBruta.startsWith('+++ ')) {
+      // "+++ b/caminho/do/arquivo" — "+++ /dev/null" nunca carrega conteúdo adicionado depois.
+      const alvo = linhaBruta.slice(4);
+      arquivoAtual = alvo.startsWith('b/') ? alvo.slice(2) : alvo;
+      continue;
+    }
+    if (linhaBruta.startsWith('+') && !linhaBruta.startsWith('+++')) {
+      linhas.push({ arquivo: arquivoAtual, linha: linhaBruta.slice(1) });
+    }
+  }
+  return linhas;
 }
 
 /**
@@ -143,15 +190,33 @@ const UUIDS_PUBLICOS = new Set([
 ]);
 
 /**
- * E-mails que são constantes públicas conhecidas — texto do próprio registro do npm, nunca dado
- * de alguém deste projeto. Mesmo comentário-de-origem que `UUIDS_PUBLICOS` exige.
+ * `npm ci`/`npm install` copiam o campo `"deprecated"` da metadata de um pacote no registro do
+ * npm para dentro de `package-lock.json`, verbatim — é a mensagem de descontinuação que o próprio
+ * mantenedor do pacote escreveu (V2-T8: apareceu com `glob@7.2.3`, dependência transitiva de
+ * `electron-builder`, e citava o contato dele). Este projeto não escreve esse texto, não escolhe
+ * o que ele diz, e não tem como reescrevê-lo sem parar de refletir o que o `npm` realmente gravou
+ * — a exceção é do **campo**, não do endereço específico que apareceu uma vez: revisão do PO
+ * (V2-T8) apontou que uma lista de endereços (`EMAILS_PUBLICOS`, removida aqui) ainda escrevia o
+ * e-mail de uma pessoa real neste repositório, o que a regra de "anonimizar contexto de fora"
+ * (AGENTS.md) já proíbe mesmo quando o endereço é público. Reconhecer a ORIGEM em vez de listar
+ * VALORES cobre o próximo pacote descontinuado que citar outro contato, sem precisar prever qual.
+ *
+ * Só o próprio campo, só em `package-lock.json`: a mesma string aparecendo em qualquer outro
+ * campo do lockfile (um "resolved" ou um "integrity" nunca deveria conter um e-mail de verdade) ou
+ * em qualquer outro arquivo continua sendo pega — a exceção não é "este endereço nunca importa",
+ * é "este CAMPO, desta ORIGEM específica, não é texto deste projeto".
  */
-const EMAILS_PUBLICOS = new Set([
-  // package-lock.json copia o campo "deprecated" da metadata do pacote no registro do npm
-  // (V2-T8: apareceu ao instalar electron-builder, que traz glob@7.2.3 como dependência
-  // transitiva) — texto público do próprio mantenedor do pacote, não relacionado a este projeto.
-  'i@izs.me',
-]);
+const ARQUIVO_LOCKFILE = 'package-lock.json';
+const CAMPO_DEPRECATED_REGEX = /^\s*"deprecated"\s*:\s*".*"\s*,?\s*$/;
+
+/**
+ * @param {string} arquivo
+ * @param {string} linha
+ * @returns {boolean}
+ */
+export function ehCampoDeprecatedDoLockfile(arquivo, linha) {
+  return arquivo === ARQUIVO_LOCKFILE && CAMPO_DEPRECATED_REGEX.test(linha);
+}
 
 /**
  * Um UUID de exemplo é aceitável se for obviamente sintético: no máximo 4 símbolos distintos.
@@ -168,16 +233,13 @@ function pareceSintetico(uuid) {
  * @param {string} conteudo
  * @returns {{ nome: string, valor: string }[]}
  */
-function acharPadroesSuspeitos(conteudo) {
+export function acharPadroesSuspeitos(conteudo) {
   /** @type {{ nome: string, valor: string }[]} */
   const achados = [];
   for (const { nome, regex } of PADROES_SUSPEITOS) {
     for (const ocorrencia of conteudo.matchAll(regex)) {
       const valor = ocorrencia[0];
-      if (
-        nome === 'endereço de e-mail' &&
-        (ehDominioReservado(valor) || EMAILS_PUBLICOS.has(valor.toLowerCase()))
-      ) {
+      if (nome === 'endereço de e-mail' && ehDominioReservado(valor)) {
         continue;
       }
       if (nome === 'UUID de aparência real') {
@@ -187,6 +249,28 @@ function acharPadroesSuspeitos(conteudo) {
       }
       achados.push({ nome, valor });
     }
+  }
+  return achados;
+}
+
+/**
+ * A versão por linha de `acharPadroesSuspeitos` — o ponto em que `ehCampoDeprecatedDoLockfile`
+ * entra: uma linha que é o campo `"deprecated"` de `package-lock.json` não passa por checagem
+ * NENHUMA (não só a de e-mail) — é texto de origem externa por inteiro, e nenhum dos padrões
+ * desta lista tem como distinguir "forma de vazamento" de "citação exata de um terceiro" dentro
+ * dele. Qualquer outra linha, mesmo do mesmo arquivo, continua indo para `acharPadroesSuspeitos`
+ * normalmente.
+ * @param {LinhaAdicionada[]} linhas
+ * @returns {{ nome: string, valor: string }[]}
+ */
+export function acharPadroesSuspeitosPorLinha(linhas) {
+  /** @type {{ nome: string, valor: string }[]} */
+  const achados = [];
+  for (const { arquivo, linha } of linhas) {
+    if (ehCampoDeprecatedDoLockfile(arquivo, linha)) {
+      continue;
+    }
+    achados.push(...acharPadroesSuspeitos(linha));
   }
   return achados;
 }
@@ -209,13 +293,13 @@ function reportar(titulo, itens, orientacao) {
 }
 
 function main() {
-  const conteudo = conteudoEmStage();
-  if (conteudo === null) {
+  const stage = conteudoEmStage();
+  if (stage === null) {
     return;
   }
 
   const termos = lerTermos();
-  const conteudoMinusculo = conteudo.toLowerCase();
+  const conteudoMinusculo = conteudoParaTermosLocais(stage).toLowerCase();
   const termosEncontrados = termos.filter((termo) =>
     conteudoMinusculo.includes(termo.toLowerCase()),
   );
@@ -231,7 +315,13 @@ function main() {
     return;
   }
 
-  const suspeitos = acharPadroesSuspeitos(conteudo);
+  // Linhas de conteúdo passam pela exceção por campo (acharPadroesSuspeitosPorLinha); os nomes
+  // dos próprios arquivos em stage não têm campo nenhum para excepcionar, então continuam na
+  // checagem simples de sempre.
+  const suspeitos = [
+    ...acharPadroesSuspeitosPorLinha(linhasAdicionadasPorArquivo(stage.diffStdout)),
+    ...acharPadroesSuspeitos(stage.nomesStdout),
+  ];
   if (suspeitos.length > 0) {
     reportar(
       'o conteúdo em stage tem forma de dado que não deveria ser publicado.',

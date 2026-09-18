@@ -7937,6 +7937,43 @@ explicitamente no `electron-builder.yml`.
   `tests/integration/app/daemon-launch.test.ts` passando dentro do contêiner (o mesmo teste que já
   cobre `startDaemon`/`stopDaemon` reais no Linux).
 
+### 10) Correção da revisão: o guard de e-mail reconhece a ORIGEM, não lista ENDEREÇOS
+
+O primeiro commit desta tarefa resolveu o falso positivo do item 6 (o campo `"deprecated"` que o
+`npm` copia da metadata de `glob@7.2.3` para `package-lock.json`, citando o contato do mantenedor
+do pacote) guardando aquele endereço numa lista `EMAILS_PUBLICOS` em
+`scripts/verificar-termos-locais.mjs`. **O PO apontou, na revisão, que isso reintroduzia
+exatamente o problema que a regra de "anonimizar contexto de fora" (AGENTS.md § "Este projeto é de
+código aberto") existe para evitar**: o endereço de uma pessoa real, escrito por escolha nossa,
+neste repositório — o fato de ser público em outro lugar (o registro do npm) não muda isso.
+
+**A correção:** `EMAILS_PUBLICOS` foi removida. Em vez de listar valores, o guard agora reconhece
+a ORIGEM — `ehCampoDeprecatedDoLockfile(arquivo, linha)` ignora qualquer linha que seja o campo
+`"deprecated"` de `package-lock.json` especificamente, por INTEIRO (não só a forma de e-mail
+dentro dela), porque é texto de um registro que este projeto não escreve e não escolhe. A exceção
+é por **campo + arquivo**, nunca por valor: o mesmo endereço aparecendo em qualquer OUTRA linha de
+`package-lock.json`, ou em qualquer outro arquivo, continua sendo pego — provado por teste
+(`tests/unit/scripts/verificar-termos-locais.test.ts`, novo). Isso cobre o próximo pacote
+descontinuado que citar outro contato, sem precisar prever qual endereço será.
+
+**Mecanismo:** o diff (`git diff --cached --unified=0`) agora é percorrido linha a linha mantendo
+o arquivo atual (`linhasAdicionadasPorArquivo`, novo — lê os cabeçalhos `+++ b/<caminho>`), e cada
+linha passa por `acharPadroesSuspeitosPorLinha`, que pula inteiramente as linhas que
+`ehCampoDeprecatedDoLockfile` reconhece antes de aplicar `acharPadroesSuspeitos` (inalterada) ao
+resto. `UUIDS_PUBLICOS` **continua existindo** — nenhuma decisão de removê-la: é uma constante que
+o próprio código deste projeto ESCOLHE usar (o AppUserModelID do PowerShell, Spike B), não um dado
+de terceiro copiado por uma ferramenta; a distinção entre "constante que citamos por escolha" e
+"texto de origem externa que uma ferramenta grava" é exatamente o que motivou trocar o mecanismo
+só para e-mail, não para UUID.
+
+Teste novo cobre os dois lados pedidos na revisão: um e-mail (fictício, montado em duas partes no
+próprio arquivo de teste para não recriar o problema original) dentro do campo `"deprecated"` de
+`package-lock.json` passa; o mesmo e-mail em outra linha do mesmo arquivo, ou em qualquer outro
+arquivo, reprova. `scripts/verificar-termos-locais.d.mts` (novo) é só a assinatura de tipos que
+permite `tests/unit/scripts/verificar-termos-locais.test.ts` importar o `.mjs` sob o programa raiz
+do TypeScript (que não liga `allowJs` de propósito) — `scripts/tsconfig.json` continua sendo quem
+tipa o `.mjs` de verdade.
+
 ### O que fica pendente do mantenedor
 
 1. Revisar e mesclar.
