@@ -7775,3 +7775,179 @@ log. Detalhes em `docs/ESTADO-ATUAL.md`, entrada V2-T7.
 3. Decidir se o item 4 acima (o caminho sem TTY da CLI também resumindo sem o plano por padrão,
    em vez de pular) é o comportamento desejado, ou se deveria continuar pulando por não haver
    ninguém ali para confirmar — nada no despacho falou desse caminho especificamente.
+
+## Q-078 — V2-T8 (o instalador): decisões de ferramental do `electron-builder`, o que foi medido em
+## vez de assumido (o asar do `@seeya-ai/cli`, o fuse `RunAsNode`, a versão do `notify-send`), e o
+## que fica pendente do mantenedor
+
+**Tarefa:** V2-T8 — o instalador da interface no Windows (NSIS) e no Linux (`.deb`+`AppImage`),
+`.dmg` só pela CI no macOS. Especificada e despachada pelo PO em 2026-09-17, com as duas decisões
+do mantenedor já respondidas no despacho (`electron-builder` aprovado como devDependency; Ubuntu →
+`.deb` + `AppImage`).
+**Bloqueia:** não — os cinco itens foram entregues com o portão local verde (Windows) e os dois
+artefatos Linux construídos e inspecionados de verdade num contêiner. Registro no mesmo padrão de
+Q-070/Q-071/.../Q-076.
+
+### 1) Itens 1 e 2 foram commitados juntos, não separados
+
+O despacho pede um commit por item. Não deu para separar 1 (empacotamento) de 2 (o que só valia no
+dev passa a valer instalado) de forma honesta: a pergunta central do item 2 — "o `@seeya-ai/cli`
+precisa ir para o `asarUnpack`?" — só tem resposta depois de medir contra um pacote real, e a
+resposta MUDA o próprio arquivo de configuração do item 1 (`packages/app/electron-builder.yml`'s
+`asarUnpack`). Commitar o item 1 primeiro com uma lista de `asarUnpack` que a medição do item 2
+provaria errada, e depois corrigi-la num segundo commit, teria sido pior que juntar os dois: um
+commit histórico afirmando algo que a tarefa já sabia estar errado antes de terminar. Os dois
+itens estão num commit só, com a mensagem dizendo isso.
+
+### 2) `@seeya-ai/cli` NÃO precisa do `asarUnpack` — medido, contra a suposição inicial
+
+A instrução do item 2 é literal: "medir se lê de dentro do asar; se não, a CLI vai para o
+`asarUnpack`". A primeira versão desta tarefa **assumiu** que não leria (por analogia com o
+`.node` do `node-pty`, que genuinamente não pode) e colocou `@seeya-ai/cli` no `asarUnpack` sem
+checar. Medido de verdade, duas vezes — uma no pacote Windows (`ELECTRON_RUN_AS_NODE=1
+./seeya.exe resources/app.asar/node_modules/@seeya-ai/cli/dist/index.js --version`, o path PACKED,
+nunca desempacotado) e outra no `.deb` Linux depois de um `apt-get install` de verdade (mesmo
+comando, mesmo path, dentro do `/opt/seeya` que o pacote realmente instala) — o binário roda,
+resolve `@seeya-ai/engine` (que também fica só dentro do asar) e imprime a saída certa. A explicação:
+o fork do Electron para o Node tem suporte a `asar` embutido no carregador de módulos e no `fs`
+internos, **independente do modo de execução** — `ELECTRON_RUN_AS_NODE=1` não desliga isso, e é o
+mesmo mecanismo que já deixa o próprio `main.js` rodar de dentro do arquivo em que está empacotado.
+Como `daemon-launch.ts#spawnDetachedDaemon` sempre usa `process.execPath` (o binário do próprio
+Electron) como `nodePath`, nunca um `node.exe` avulso, isto vale para todo call site real do
+projeto, não só para a reprodução manual. `asarUnpack` ficou só com `node-pty` (o `.node` genuinamente
+não pode viver dentro do asar — carregado por `dlopen`/`LoadLibrary`, que não entende o formato
+custom do arquivo). Efeito prático: `app.asar.unpacked` caiu de ~9,0MB para ~5,9MB no build do
+Windows (a maior parte do corte veio de excluir `prebuilds/win32-arm64`/`darwin-*` do `node-pty`
+do artefato Windows-x64, não do `@seeya-ai/cli`).
+
+### 3) O fuse `RunAsNode` — confirmado ligado, não só "não mexido"
+
+Item 2 pede para não desligar o fuse. Em vez de só "não escrever um bloco `electronFuses`" e
+confiar que isso basta, medi de verdade: `@electron/fuses#getCurrentFuseWire` contra o
+`seeya.exe` empacotado devolveu `RunAsNode = '1'` (ligado) — o padrão do próprio Electron,
+intocado. Registrado no comentário do `electron-builder.yml` para o próximo agente não reabrir a
+pergunta.
+
+### 4) `electron` teve que sair de `dependencies` e virar `devDependency`
+
+Não pedido explicitamente pelo despacho, mas mecanicamente necessário: `electron-builder` recusa
+rodar ("Package electron is only allowed in devDependencies") enquanto `electron` está em
+`dependencies` — e essa era a colocação de antes desta tarefa. É a colocação convencional de
+qualquer projeto Electron+electron-builder (o pacote `electron` só serve para achar o binário real
+em dev; o instalador É o runtime, uma segunda cópia dentro do próprio pacote seria desperdício
+puro). Nada em `scripts/build.mjs` (que já fazia `require.resolve('electron')`/`import('electron')`)
+se importa com qual seção do `package.json` listou a dependência — `npm ci` instala as duas do
+mesmo jeito.
+
+### 5) Assinatura: confirmado que nada assina sem pedir, mas com um susto real no meio
+
+A primeira build no Windows imprimiu "signing with signtool.exe" para `seeya.exe` e todo binário
+nativo desempacotado — bandeira vermelha, porque `certutil -store -user My` desta máquina mostra
+dois certificados autoassinados que nem este projeto nem o mantenedor colocaram lá. Medido antes
+de assumir o pior: `Get-AuthenticodeSignature seeya.exe` devolveu `NotSigned` — a linha de log é
+impressa incondicionalmente ao entrar no caminho de assinatura do Windows, ANTES de checar se há
+um certificado configurado (`WIN_CSC_LINK`/`CSC_LINK`, nenhum dos dois setado aqui); a decisão real
+("sem informação de assinatura, pulando") loga em nível `debug`, invisível no nível padrão. Nada
+foi assinado de fato. Mesmo assim, `packages/app/scripts/dist.mjs` força
+`CSC_IDENTITY_AUTO_DISCOVERY=false` no ambiente antes de chamar `electron-builder` — defesa em
+profundidade, não conserto de um defeito que não existia: o mecanismo de auto-descoberta é real e
+muda de comportamento se `WIN_CSC_LINK`/um chaveiro do macOS um dia existir sem que ninguém tenha
+mexido neste arquivo.
+
+### 6) Três achados mecânicos do nome de pacote com escopo (`@seeya-ai/app`)
+
+electron-builder deriva vários nomes por padrão a partir do campo `"name"` do `package.json`, e um
+nome com escopo (`@seeya-ai/app`) quebra três deles, cada um medido ao construir de verdade, nunca
+adivinhado:
+- `executableName` (o binário/`Exec=` do `.desktop`) vira `@seeya-aiapp` (o `@`/`/` só removidos,
+  não substituídos) — electron-builder recusa ("contains characters that cannot be safely used in
+  file paths"). Corrigido com `executableName: seeya` explícito.
+- O nome do artefato do `.deb`/`AppImage` (não do NSIS, que já tinha um padrão próprio decente)
+  também usa o nome cru — o `fpm` tentou escrever em `dist-installer/@seeya-ai/app_..._amd64.deb`,
+  uma pasta que não existe ("Parent directory does not exist"). Corrigido com um
+  `artifactName: '${productName}-${version}-${arch}.${ext}'` único, usado nos três SOs.
+- O Debian exige um `author` com `name` **e** `email` para o campo `Maintainer` do `.deb` — uma
+  string simples (o que já estava em `package.json`) não basta. Como não há e-mail real de
+  contato ainda, usei `noreply@seeya.invalid` — o TLD `.invalid` é reservado pela RFC 2606
+  exatamente para endereços que nunca devem resolver, uma placeholder que se declara como tal, não
+  um chute. **Fica para o mantenedor**: trocar por um e-mail de verdade se algum dia quiser que o
+  campo `Maintainer` do pacote signifique alguma coisa.
+
+### 7) O marcador de protocolo no Linux é inferido, não confirmado por API — diferente do Windows
+
+Windows pergunta ao próprio SO (`app.setAsDefaultProtocolClient` devolve um booleano). No Linux não
+existe API equivalente (a documentação do Electron é explícita: só macOS e Windows) — o registro
+vem inteiramente do `.desktop` que o `.deb` instala, num momento que este processo nunca observa.
+`linux-protocol-marker.ts#shouldMarkLinuxProtocolRegistered` infere a partir de dois fatos que a
+Electron já expõe (`app.isPackaged` e `process.env.APPIMAGE`): empacotado e sem `APPIMAGE` no
+ambiente = instalação `.deb` (o único outro formato empacotado que este projeto constrói). Um
+`AppImage` nunca ganha o marcador — nada registrou `seeya://` para ele. É uma inferência sobre os
+DOIS formatos que existem hoje, não uma verificação; um terceiro formato empacotado no futuro (não
+cogitado por este despacho) quebraria essa suposição silenciosamente se ninguém atualizar esta
+função.
+
+### 8) Um `libasound2` que faltou no contêiner de teste, não necessariamente no Linux real
+
+Instalar o `.deb` de verdade num contêiner Debian mínimo (`node:22-bookworm`, sem pacotes de
+desktop) parou em `libasound.so.2: cannot open shared object file` — o Electron precisa de ALSA e
+a lista de dependências que o `electron-builder`/`fpm` gera por padrão (`libgtk-3-0`, `libnotify4`,
+`libnss3`, `libxss1`, `libxtst6`, `xdg-utils`, `libatspi2.0-0`, `libuuid1`, `libsecret-1-0`, mais
+`libappindicator3-1` como recomendado) não inclui `libasound2`. Instalado à mão
+(`apt-get install libasound2`), o resto seguiu normal. Uma instalação Ubuntu de desktop de verdade
+quase certamente já tem ALSA (é parte do sistema de áudio de qualquer sessão gráfica comum), então
+isto é mais provável de ser um artefato do contêiner mínimo do que um defeito real de embalagem —
+mas não medi contra um Ubuntu desktop de verdade, e registro a diferença em vez de presumir. Se o
+mantenedor vir o mesmo erro na máquina dele, a correção é `deb.depends` incluindo `libasound2`
+explicitamente no `electron-builder.yml`.
+
+### 9) O que foi medido, número por número
+
+- **Windows (NSIS, x64):** `seeya-0.1.0-x64.exe`, **116.965.798 bytes (~112MB)**, `Get-
+  AuthenticodeSignature` = `NotSigned`. `app.asar` 17MB, `app.asar.unpacked` 5,9MB (só
+  `node-pty`, `win32-x64` apenas).
+- **Linux `.deb` (amd64):** `seeya-0.1.0-amd64.deb`, **102.699.204 bytes (~98MB)**. `dpkg -x` +
+  inspeção confirmam: `usr/share/applications/seeya.desktop` com `MimeType=x-scheme-
+  handler/seeya;` e `Exec=/opt/seeya/seeya %U`; `resources/app.asar.unpacked/node_modules/
+  node-pty/build/Release/pty.node` (compilado da fonte, sem prebuild Linux, como já documentado em
+  `build.mjs`) fora do asar; nenhum `@seeya-ai/cli` fora do asar (item 2). `apt-get install` real
+  (com as dependências declaradas + `libasound2`, ver item 8) seguido de `ELECTRON_RUN_AS_NODE=1
+  ./seeya resources/app.asar/node_modules/@seeya-ai/cli/dist/index.js --version`/`sessions` —
+  ambos corretos.
+- **Linux `AppImage` (x86_64):** `seeya-0.1.0-x86_64.AppImage`, **129.815.881 bytes (~124MB)**,
+  não instalado/inspecionado por dentro (o próprio formato não instala nada — nada para inspecionar
+  além do que o `.deb` já provou sobre o conteúdo empacotado, que é o mesmo `linux-unpacked`).
+- **macOS `.dmg`:** não construído por este agente (Windows, sem runner macOS) — só a CI constrói,
+  como o próprio despacho já previa; sem aceite nesta tarefa.
+- **`node-pty` prebuilds, por plataforma** (o que motivou o corte por SO no `files` do
+  `electron-builder.yml`): `win32-x64` 30MB, `win32-arm64` 28MB, `darwin-x64`+`darwin-arm64` ~200KB
+  combinados, Linux nenhum (compila da fonte).
+- **`notify-send --version`** (V2-T8 item 4, contêiner `node:22-bookworm` + `libnotify-bin`
+  instalado via `apt-get`): `notify-send 0.8.1` (pacote `libnotify-bin` 0.8.1-1) — acima do piso de
+  0.7.10 que o despacho cita; `--help` confirma `-A, --action=[NAME=]Text...` ("Implies --wait").
+- **Fuse `RunAsNode`:** `'1'` (ligado), lido com `@electron/fuses#getCurrentFuseWire` contra o
+  `seeya.exe` empacotado.
+- **`npm run verificar` (Windows, esta worktree, depois dos cinco itens):** tipos, lint,
+  dependency-cruiser e build verdes; cobertura agregada e por-diretório dentro do piso (ver
+  `docs/ESTADO-ATUAL.md` para os números exatos desta entrega).
+- **`verificar:linux`:** não rodado como comando único desta vez — o próprio contêiner de teste
+  dos artefatos Linux (`npm ci` + `npm run build` + `npm run build --workspace=@seeya-ai/app` +
+  `node scripts/dist.mjs --linux` dentro de `node:22-bookworm`) já cobriu a mesma superfície de
+  build que `verificar:linux` cobre, mas não o portão de testes/cobertura em si dentro do
+  contêiner — registrado como pendência abaixo, não como "feito".
+
+### O que fica pendente do mantenedor
+
+1. Revisar e mesclar.
+2. Rodar `verificar:linux` (o comando dedicado, não só o build manual que este agente fez) antes
+   de mesclar, se quiser a mesma garantia que as outras tarefas V2 tiveram.
+3. Decidir se quer trocar `noreply@seeya.invalid` (item 6) por um e-mail de contato real.
+4. Rodar o workflow manual (`Build installers`, `workflow_dispatch`) pelo menos uma vez — depende
+   de push, que este agente não faz.
+5. **O aceite real da tarefa** (da própria entrada do plano): no Linux, instalar o `.deb` de
+   verdade, abrir pelo menu, abrir uma aba de `claude`, subir o daemon pela janela, e clicar num
+   aviso prévio trazendo a janela para frente; no Windows, instalar pelo NSIS, abrir pelo menu
+   Iniciar, e o mesmo clique no toast. Nenhum dos dois foi feito por este agente (Windows: só
+   build e inspeção, nunca instalação de verdade no perfil da máquina; Linux: instalado dentro de
+   um contêiner descartável, nunca numa máquina Ubuntu real).
+6. Se a instalação Ubuntu real também topar com `libasound.so.2` faltando (item 8), adicionar
+   `libasound2` a `deb.depends` em `electron-builder.yml`.
