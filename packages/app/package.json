@@ -8,19 +8,26 @@
     "node": ">=22"
   },
   "main": "dist/electron/main.js",
+  "author": {
+    "name": "mausampaio",
+    "email": "noreply@seeya.invalid"
+  },
+  "desktopName": "seeya.desktop",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "dev": "node scripts/build.mjs --dev"
+    "dev": "node scripts/build.mjs --dev",
+    "dist": "npm run build && node scripts/dist.mjs"
   },
   "dependencies": {
     "@seeya-ai/cli": "0.1.0",
     "@seeya-ai/engine": "0.1.0",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
-    "electron": "^44.3.0",
     "node-pty": "^1.1.0"
   },
   "devDependencies": {
+    "electron": "^44.3.0",
+    "electron-builder": "^26.15.3",
     "esbuild": "^0.27.2"
   },
   "repository": {

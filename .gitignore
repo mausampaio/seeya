@@ -2,6 +2,9 @@ node_modules/
 dist/
 # V2-T2: packages/app's own tsc output — never "dist" (packages/app/tsconfig.json explains why).
 dist-tsc/
+# V2-T8: electron-builder's own output directory (packages/app/electron-builder.yml's own
+# directories.output) — installers/artifacts, never committed.
+dist-installer/
 .claude/worktrees/
 .claude/settings.local.json
 

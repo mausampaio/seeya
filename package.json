@@ -12,6 +12,7 @@
   "scripts": {
     "build": "node scripts/clean-dist.mjs && tsc -b tsconfig.build.json",
     "app": "npm run build && npm run dev --workspace=@seeya-ai/app",
+    "dist": "npm run build && npm run dist --workspace=@seeya-ai/app",
     "test": "vitest run --project unit --project integration --project integration-process --project guards",
     "pretest:e2e": "npm run build",
     "test:e2e": "vitest run --project e2e",

@@ -143,6 +143,17 @@ const UUIDS_PUBLICOS = new Set([
 ]);
 
 /**
+ * E-mails que são constantes públicas conhecidas — texto do próprio registro do npm, nunca dado
+ * de alguém deste projeto. Mesmo comentário-de-origem que `UUIDS_PUBLICOS` exige.
+ */
+const EMAILS_PUBLICOS = new Set([
+  // package-lock.json copia o campo "deprecated" da metadata do pacote no registro do npm
+  // (V2-T8: apareceu ao instalar electron-builder, que traz glob@7.2.3 como dependência
+  // transitiva) — texto público do próprio mantenedor do pacote, não relacionado a este projeto.
+  'i@izs.me',
+]);
+
+/**
  * Um UUID de exemplo é aceitável se for obviamente sintético: no máximo 4 símbolos distintos.
  * Ex.: `11111111-1111-4111-8111-111111111111` tem 3 (`1`, `4`, `8`).
  * @param {string} uuid
@@ -163,7 +174,10 @@ function acharPadroesSuspeitos(conteudo) {
   for (const { nome, regex } of PADROES_SUSPEITOS) {
     for (const ocorrencia of conteudo.matchAll(regex)) {
       const valor = ocorrencia[0];
-      if (nome === 'endereço de e-mail' && ehDominioReservado(valor)) {
+      if (
+        nome === 'endereço de e-mail' &&
+        (ehDominioReservado(valor) || EMAILS_PUBLICOS.has(valor.toLowerCase()))
+      ) {
         continue;
       }
       if (nome === 'UUID de aparência real') {
