@@ -19,11 +19,6 @@ import type { Day } from '../core/types.js';
 import { localDayString, subtractLocalDays } from '../core/day.js';
 import { normalizeCwdForComparison, type PathPlatformHint } from '../core/cwd-normalization.js';
 
-/** Real environment read once, here — same reasoning `application/eligibility-assembly.ts`'s own
- * `PLATFORM_HINT` already documents: `process.platform` is a Node global, not an adapter, so
- * reading it directly in `application/` isn't the I/O D-020 bans. */
-const PLATFORM_HINT: PathPlatformHint = process.platform === 'win32' ? 'win32' : 'posix';
-
 /**
  * One distinct directory in a session's history — a run of consecutive days the session was
  * captured with the SAME (normalized) `cwd`, collapsed into a single entry. `firstDay`/`lastDay`
@@ -64,25 +59,44 @@ export interface CwdHistorySample {
  * what fills it in for real, per distinct directory, after this function has already decided how
  * many distinct directories there are to check.
  *
+ * **`platformHint` is a parameter, never read from `process.platform` here** — same reasoning
+ * `core/cwd-normalization.ts`'s own docstring already gives for why `normalizeCwdForComparison`
+ * takes it as a plain argument instead of reading the real OS: this keeps `collapseCwdRuns` pure
+ * and lets both platform branches (case-folded on `'win32'`, not on `'posix'`) be exercised from
+ * any CI runner, regardless of which OS actually runs the test (docs/QUESTOES.md Q-079: an
+ * earlier version of this module read `process.platform` directly, which is why its own test for
+ * "two spellings, different case" passed on Windows and failed on Linux — the module's real
+ * behavior depended on which OS ran it, exactly the class of bug `core/cwd-normalization.ts`
+ * exists to keep out of `core/`, now also kept out of this `application/` module). The two
+ * composition roots (`packages/cli/src/composition.ts#buildStartDayContext`,
+ * `packages/app/src/composition/index.ts#buildAppContext`) are what read `process.platform` for
+ * real and hand the resolved hint down through their own context.
+ *
  * @example
- * collapseCwdRuns([
- *   { day: '2026-09-12', cwd: 'C:\\code' },
- *   { day: '2026-09-14', cwd: 'C:\\code' },
- *   { day: '2026-09-16', cwd: 'C:\\code\\seeya' },
- * ])
+ * collapseCwdRuns(
+ *   [
+ *     { day: '2026-09-12', cwd: 'C:\\code' },
+ *     { day: '2026-09-14', cwd: 'C:\\code' },
+ *     { day: '2026-09-16', cwd: 'C:\\code\\seeya' },
+ *   ],
+ *   'win32',
+ * )
  * // [
  * //   { cwd: 'C:\\code', firstDay: '2026-09-12', lastDay: '2026-09-14', exists: false },
  * //   { cwd: 'C:\\code\\seeya', firstDay: '2026-09-16', lastDay: '2026-09-16', exists: false },
  * // ]
  */
-export function collapseCwdRuns(samples: readonly CwdHistorySample[]): readonly CwdHistoryEntry[] {
+export function collapseCwdRuns(
+  samples: readonly CwdHistorySample[],
+  platformHint: PathPlatformHint,
+): readonly CwdHistoryEntry[] {
   const runs: { cwd: string; firstDay: Day; lastDay: Day }[] = [];
   for (const sample of samples) {
-    const normalized = normalizeCwdForComparison(sample.cwd, PLATFORM_HINT);
+    const normalized = normalizeCwdForComparison(sample.cwd, platformHint);
     const current = runs[runs.length - 1];
     if (
       current !== undefined &&
-      normalizeCwdForComparison(current.cwd, PLATFORM_HINT) === normalized
+      normalizeCwdForComparison(current.cwd, platformHint) === normalized
     ) {
       current.lastDay = sample.day;
       continue;
@@ -116,9 +130,12 @@ function dayToLocalDate(day: Day): Date {
  * "the" cwd for this session today, and the history only ever ADDS earlier context, never
  * contradicts it.
  *
+ * `deps.platformHint` is threaded straight into `collapseCwdRuns` — this function itself never
+ * reads `process.platform` either, for the same reason that function's own docstring gives.
+ *
  * @example
  * const history = await readCwdHistory(
- *   { storage, directoryExistence },
+ *   { storage, directoryExistence, platformHint: context.platformHint },
  *   handoff.sessionId,
  *   briefing.day,
  *   config.maxBriefingScanDays,
@@ -126,7 +143,11 @@ function dayToLocalDate(day: Day): Date {
  * // history.length > 1 means the directory changed at some point — worth a note (V2-T9 item 2/3).
  */
 export async function readCwdHistory(
-  deps: { readonly storage: Storage; readonly directoryExistence: DirectoryExistence },
+  deps: {
+    readonly storage: Storage;
+    readonly directoryExistence: DirectoryExistence;
+    readonly platformHint: PathPlatformHint;
+  },
   sessionId: string,
   day: Day,
   maxScanDays: number,
@@ -140,7 +161,7 @@ export async function readCwdHistory(
       samplesNewestFirst.push({ day: scannedDay, cwd: handoff.cwd });
     }
   }
-  const runs = collapseCwdRuns([...samplesNewestFirst].reverse());
+  const runs = collapseCwdRuns([...samplesNewestFirst].reverse(), deps.platformHint);
   return Promise.all(
     runs.map(async (run) => ({ ...run, exists: await deps.directoryExistence.exists(run.cwd) })),
   );

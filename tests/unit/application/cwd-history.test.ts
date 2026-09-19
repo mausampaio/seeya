@@ -2,6 +2,12 @@
  * `collapseCwdRuns`/`readCwdHistory` (V2-T9 item 1). `FakeStorage`/`FakeDirectoryExistence` come
  * from `_fakes.ts`, same doubles the rest of `tests/unit/application` already uses
  * (docs/TESTES.md: "duplo de I/O é classe/objeto nomeado implementando a porta").
+ *
+ * `platformHint` is passed explicitly everywhere below, from BOTH `'win32'` and `'posix'` where it
+ * matters (Q-079's own correction: an earlier version of this module read `process.platform`
+ * directly, so its own case-folding example passed on Windows and failed on Linux —
+ * `verificar:linux` caught it). Same discipline `tests/unit/core/cwd-normalization.test.ts`
+ * already uses for the exact same reason.
  */
 import { describe, expect, it } from 'vitest';
 import { collapseCwdRuns, readCwdHistory } from '@seeya-ai/engine/application/cwd-history.js';
@@ -10,38 +16,49 @@ import { DEFAULT_TEST_CONFIG, FakeDirectoryExistence, FakeStorage } from './_fak
 
 describe('collapseCwdRuns — the pure recorte', () => {
   it('a single directory across every sample collapses into one run', () => {
-    const runs = collapseCwdRuns([
-      { day: '2026-09-12', cwd: 'C:\\code' },
-      { day: '2026-09-14', cwd: 'C:\\code' },
-    ]);
+    const runs = collapseCwdRuns(
+      [
+        { day: '2026-09-12', cwd: 'C:\\code' },
+        { day: '2026-09-14', cwd: 'C:\\code' },
+      ],
+      'win32',
+    );
     expect(runs).toEqual([
       { cwd: 'C:\\code', firstDay: '2026-09-12', lastDay: '2026-09-14', exists: false },
     ]);
   });
 
   it('a change in directory produces two runs, the first keeping its own last day', () => {
-    const runs = collapseCwdRuns([
-      { day: '2026-09-12', cwd: 'C:\\code' },
-      { day: '2026-09-14', cwd: 'C:\\code' },
-      { day: '2026-09-16', cwd: 'C:\\code\\seeya' },
-    ]);
+    const runs = collapseCwdRuns(
+      [
+        { day: '2026-09-12', cwd: 'C:\\code' },
+        { day: '2026-09-14', cwd: 'C:\\code' },
+        { day: '2026-09-16', cwd: 'C:\\code\\seeya' },
+      ],
+      'win32',
+    );
     expect(runs).toEqual([
       { cwd: 'C:\\code', firstDay: '2026-09-12', lastDay: '2026-09-14', exists: false },
       { cwd: 'C:\\code\\seeya', firstDay: '2026-09-16', lastDay: '2026-09-16', exists: false },
     ]);
   });
 
-  // Separator and trailing slash only — never case, which `core/cwd-normalization.ts` folds
-  // ONLY on the win32 hint (S3-T5's own docstring). `collapseCwdRuns` reads the real
-  // `process.platform` (same reasoning `application/eligibility-assembly.ts`'s own PLATFORM_HINT
-  // already documents), so a case-only difference would merge on Windows and NOT on Linux/macOS —
-  // exactly the platform-hidden-bug shape `cwd-normalization.test.ts` exists to rule out. This
-  // test only exercises what's true on every OS this suite runs on.
-  it('two spellings of the same directory (separator/trailing slash) are the same run, keeping the FIRST spelling', () => {
-    const runs = collapseCwdRuns([
-      { day: '2026-09-12', cwd: 'C:\\code\\project' },
-      { day: '2026-09-14', cwd: 'C:/code/project/' },
-    ]);
+  /**
+   * Two spellings of the same directory — separator AND case AND trailing slash all at once —
+   * run against BOTH platform hints explicitly (docs/QUESTOES.md Q-079): `core/cwd-normalization.ts`
+   * folds case only on `'win32'`, so the same pair of samples has to merge into one run on the
+   * `'win32'` hint and stay two SEPARATE runs on `'posix'`. Exercising both from whichever OS this
+   * suite happens to run on is what `cwd-normalization.test.ts` already does for the normalization
+   * function itself — this is the same discipline applied to its one caller in this module.
+   */
+  it('two spellings of the same directory (separator/case/trailing slash) merge on win32...', () => {
+    const runs = collapseCwdRuns(
+      [
+        { day: '2026-09-12', cwd: 'C:\\code\\project' },
+        { day: '2026-09-14', cwd: 'c:/code/project/' },
+      ],
+      'win32',
+    );
     expect(runs).toEqual([
       {
         cwd: 'C:\\code\\project',
@@ -52,17 +69,31 @@ describe('collapseCwdRuns — the pure recorte', () => {
     ]);
   });
 
+  it('...but stay two separate runs on posix, where case is never folded', () => {
+    const runs = collapseCwdRuns(
+      [
+        { day: '2026-09-12', cwd: 'C:\\code\\project' },
+        { day: '2026-09-14', cwd: 'c:/code/project/' },
+      ],
+      'posix',
+    );
+    expect(runs.map((run) => run.cwd)).toEqual(['C:\\code\\project', 'c:/code/project/']);
+  });
+
   it('a directory revisited after an intervening change is a THIRD, separate run, not merged back', () => {
-    const runs = collapseCwdRuns([
-      { day: '2026-09-10', cwd: 'C:\\code' },
-      { day: '2026-09-12', cwd: 'C:\\other' },
-      { day: '2026-09-14', cwd: 'C:\\code' },
-    ]);
+    const runs = collapseCwdRuns(
+      [
+        { day: '2026-09-10', cwd: 'C:\\code' },
+        { day: '2026-09-12', cwd: 'C:\\other' },
+        { day: '2026-09-14', cwd: 'C:\\code' },
+      ],
+      'win32',
+    );
     expect(runs.map((run) => run.cwd)).toEqual(['C:\\code', 'C:\\other', 'C:\\code']);
   });
 
   it('no samples at all is no runs, never a fabricated one', () => {
-    expect(collapseCwdRuns([])).toEqual([]);
+    expect(collapseCwdRuns([], 'win32')).toEqual([]);
   });
 });
 
@@ -74,7 +105,7 @@ describe('readCwdHistory — the I/O half', () => {
     const directoryExistence = new FakeDirectoryExistence(new Set(['C:\\code\\seeya']));
 
     const history = await readCwdHistory(
-      { storage, directoryExistence },
+      { storage, directoryExistence, platformHint: 'win32' },
       handoff.sessionId,
       '2026-09-16',
       5,
@@ -94,7 +125,7 @@ describe('readCwdHistory — the I/O half', () => {
     const directoryExistence = new FakeDirectoryExistence(new Set(['C:\\code']));
 
     const history = await readCwdHistory(
-      { storage, directoryExistence },
+      { storage, directoryExistence, platformHint: 'win32' },
       handoff.sessionId,
       '2026-09-16',
       2,
@@ -116,7 +147,7 @@ describe('readCwdHistory — the I/O half', () => {
     const directoryExistence = new FakeDirectoryExistence(new Set(['C:\\code\\seeya']));
 
     const history = await readCwdHistory(
-      { storage, directoryExistence },
+      { storage, directoryExistence, platformHint: 'win32' },
       sessionId,
       '2026-09-16',
       5,
@@ -134,7 +165,7 @@ describe('readCwdHistory — the I/O half', () => {
     await storage.saveHandoff('2026-09-01', handoff);
 
     const history = await readCwdHistory(
-      { storage, directoryExistence: new FakeDirectoryExistence() },
+      { storage, directoryExistence: new FakeDirectoryExistence(), platformHint: 'win32' },
       handoff.sessionId,
       '2026-09-16',
       2,
@@ -147,7 +178,7 @@ describe('readCwdHistory — the I/O half', () => {
     const storage = new FakeStorage(DEFAULT_TEST_CONFIG);
 
     const history = await readCwdHistory(
-      { storage, directoryExistence: new FakeDirectoryExistence() },
+      { storage, directoryExistence: new FakeDirectoryExistence(), platformHint: 'win32' },
       '99999999-9999-4999-8999-999999999999',
       '2026-09-16',
       5,

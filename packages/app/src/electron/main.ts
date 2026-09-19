@@ -475,7 +475,11 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
     const cwdHistoryEntries = await Promise.all(
       lookup.briefing.handoffs.map(async (handoff) => {
         const history = await readCwdHistory(
-          { storage: context.storage, directoryExistence: context.directoryExistence },
+          {
+            storage: context.storage,
+            directoryExistence: context.directoryExistence,
+            platformHint: context.platformHint,
+          },
           handoff.sessionId,
           lookup.briefing.day,
           context.config.maxBriefingScanDays,

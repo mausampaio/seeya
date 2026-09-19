@@ -18,6 +18,7 @@ import type {
   Storage,
 } from '@seeya-ai/engine/core/ports.js';
 import type { Config } from '@seeya-ai/engine/core/types.js';
+import type { PathPlatformHint } from '@seeya-ai/engine/core/cwd-normalization.js';
 import { processControl as realProcessControl } from '@seeya-ai/engine/adapters/process/index.js';
 import { systemClock } from '@seeya-ai/engine/adapters/clock/index.js';
 import { StorageAdapter } from '@seeya-ai/engine/adapters/storage/index.js';
@@ -204,6 +205,10 @@ export interface StartDayContext {
   readonly config: Config;
   /** V2-T9 item 3: the cwd-history note `start-day-command.ts` prints alongside the plan. */
   readonly directoryExistence: DirectoryExistence;
+  /** V2-T9 item 3 (Q-079's own correction): `process.platform`, resolved once here — the only
+   * place in this file allowed to read it (D-020) — and handed to
+   * `application/cwd-history.ts#readCwdHistory`, which never reads it itself. */
+  readonly platformHint: PathPlatformHint;
 }
 
 /**
@@ -226,7 +231,15 @@ export async function buildStartDayContext(
   const storage = buildStorage(home);
   const config = await storage.readConfig();
   const sessionResumer = new ClaudeSessionResumer({ seeyaHome: home.seeyaHome });
-  return { storage, clock, sessionResumer, config, directoryExistence: new FsDirectoryExistence() };
+  const platformHint: PathPlatformHint = process.platform === 'win32' ? 'win32' : 'posix';
+  return {
+    storage,
+    clock,
+    sessionResumer,
+    config,
+    directoryExistence: new FsDirectoryExistence(),
+    platformHint,
+  };
 }
 
 export interface SnoozeContext {

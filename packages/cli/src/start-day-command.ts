@@ -38,6 +38,7 @@ import type {
   Storage,
 } from '@seeya-ai/engine/core/ports.js';
 import type { Config, Day, Handoff, ResumeFallbackReason } from '@seeya-ai/engine/core/types.js';
+import type { PathPlatformHint } from '@seeya-ai/engine/core/cwd-normalization.js';
 import {
   findHandoffBySessionReference,
   parseInteractiveSelection,
@@ -79,6 +80,9 @@ export interface StartDayCommandContext {
   /** V2-T9 item 3 — whether an earlier directory a session ran in still exists, for the same
    * cwd-history note the interface shows (item 2). */
   readonly directoryExistence: DirectoryExistence;
+  /** V2-T9 item 3 (Q-079's own correction) — resolved once in `composition.ts`, the composition
+   * root; `readCwdHistory` itself never reads `process.platform`. */
+  readonly platformHint: PathPlatformHint;
 }
 
 type FoundLookup = Extract<PendingBriefingLookup, { found: true }>;
@@ -193,7 +197,11 @@ async function buildCwdHistoryNotes(
   const entries = await Promise.all(
     briefing.handoffs.map(async (handoff) => {
       const history = await readCwdHistory(
-        { storage: context.storage, directoryExistence: context.directoryExistence },
+        {
+          storage: context.storage,
+          directoryExistence: context.directoryExistence,
+          platformHint: context.platformHint,
+        },
         handoff.sessionId,
         briefing.day,
         context.config.maxBriefingScanDays,

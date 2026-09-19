@@ -61,6 +61,7 @@ import type {
   TranscriptReader,
 } from '@seeya-ai/engine/core/ports.js';
 import type { Config } from '@seeya-ai/engine/core/types.js';
+import type { PathPlatformHint } from '@seeya-ai/engine/core/cwd-normalization.js';
 import type { EndDayDeps } from '@seeya-ai/engine/application/types.js';
 import { NodePtyAdapter } from '../pty/node-pty-adapter.js';
 import { PtyManager, type PtyManagerCallbacks } from '../pty/pty-manager.js';
@@ -105,6 +106,10 @@ export interface AppContext {
   /** V2-T9 item 1/2 — whether a session's OLD `cwd` (from an earlier day's handoff) still exists,
    * before ever offering it in the "Resume in" selector (`application/cwd-history.ts`). */
   readonly directoryExistence: DirectoryExistence;
+  /** V2-T9 item 2 (Q-079's own correction): the same `process.platform` this function already
+   * resolves below (`platform`), reshaped into `application/cwd-history.ts#readCwdHistory`'s own
+   * `PathPlatformHint` — that module never reads `process.platform` itself. */
+  readonly platformHint: PathPlatformHint;
   /**
    * Resolves a harness command name (`claude`, `codex`) the same way the real OS's shell would —
    * `@seeya-ai/engine/adapters/process/resolve-command.js`, with the real `PATH`/`PATHEXT`/
@@ -246,6 +251,9 @@ export async function buildAppContext(homeDir: string = os.homedir()): Promise<A
     relevanceHours: config.relevanceHours,
   });
   const platform = process.platform;
+  // V2-T9 item 2 (Q-079's own correction): the same `platform` read above, reshaped into
+  // `PathPlatformHint` once, here — `application/cwd-history.ts` never reads `process.platform`.
+  const platformHint: PathPlatformHint = platform === 'win32' ? 'win32' : 'posix';
   const pathExtEnv = process.env.PATHEXT;
   // V2-T8 item 3: on every platform BUT Windows, prefer the login shell's own PATH over this
   // process's inherited one — see login-shell-path.ts's own docstring for why a graphical launcher
@@ -322,6 +330,7 @@ export async function buildAppContext(homeDir: string = os.homedir()): Promise<A
     autostart: buildAutostart(homeDir),
     config,
     directoryExistence: new FsDirectoryExistence(),
+    platformHint,
     resolveHarnessCommand: (command, args) =>
       resolveCommand(command, args, {
         platform,

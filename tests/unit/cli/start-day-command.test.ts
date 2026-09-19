@@ -63,6 +63,7 @@ function makeContext(overrides: Partial<StartDayCommandContext> = {}): StartDayC
     sessionResumer: cleanlyResumingResumer(),
     config: DEFAULT_TEST_CONFIG,
     directoryExistence: new FakeDirectoryExistence(),
+    platformHint: 'win32',
     ...overrides,
   };
 }
