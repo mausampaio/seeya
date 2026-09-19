@@ -5761,7 +5761,7 @@ texto, mas não são a fila.
       (Windows e Linux), abrir os dois mundos, e confirmar que o clique segue a última janela e que
       a desinstalação limpa a chave.
 
-- [ ] **V2-T11 — O ícone do seeya: instalador, janela e README a partir de `design/`.**
+- [~] **V2-T11 — O ícone do seeya: instalador, janela e README a partir de `design/`.**
       Especificada pelo PO em 2026-09-19 e aprovada pelo mantenedor no mesmo dia, logo depois de
       a identidade visual entrar no repositório (`design/`, commit `641f803`). Hoje o instalador,
       o atalho, a barra de tarefas e a janela mostram o ícone padrão do Electron.
@@ -5809,6 +5809,70 @@ texto, mas não são a fila.
       no atalho da área de trabalho, na barra de tarefas e na lista de aplicativos instalados;
       `npm run app` com o ícone na barra de tarefas; o README no GitHub com o logo nos dois temas.
       No Ubuntu, junto do aceite pendente da V2-T8.
+
+      **Relatório (agente, 2026-09-19).** Branch `tarefa/V2-T11-icone` a partir da `main` (que já
+      tinha o commit `eb91bdb` desta especificação); três commits, um por item.
+
+      **Item 1 — medido, não suposto.** `app-builder-lib` (26.15.3)
+      `platformPackager.js#getResource` resolve um `icon:` relativo em duas tentativas: primeiro
+      contra `buildResourcesDir` (`packages/app/build/`, que não existe neste repo), depois contra
+      `projectDir` (`packages/app`). `../../design/icons/icon.ico` erra a primeira e acerta a
+      segunda — `path.resolve('packages/app', '../../design/icons/icon.ico')` cai exatamente em
+      `design/icons/icon.ico` na raiz do repo. Nenhuma cópia foi necessária; `electron-builder.yml`
+      aponta `win.icon`/`linux.icon`/`mac.icon` direto para `design/icons/` (`.ico`, a pasta
+      `png/`, `.icns`, respectivamente — `mac`/`dmg` só constrói na CI, V2-T8, não medido nesta
+      máquina Windows). **Prova:** `node scripts/dist.mjs --win --dir` antes desta mudança
+      imprimia `default Electron icon is used  reason=application icon is not set`; depois, essa
+      linha desaparece. O ícone do `seeya.exe` empacotado (`dist-installer/win-unpacked/seeya.exe`)
+      foi extraído com `[System.Drawing.Icon]::ExtractAssociatedIcon` (PowerShell) e salvo fora do
+      repo — 32×32, idêntico ao símbolo `S` de `design/icons/png/32x32.png` (comparação visual dos
+      dois PNGs). `dist-installer/` nunca foi commitado (já ignorado pelo git) e o instalador nunca
+      foi executado.
+
+      **Item 2 — medido, não suposto.** O doc do Electron para `BrowserWindow`'s own `icon`
+      (`node_modules/electron/electron.d.ts`) não dá um tamanho em pixels. A fonte usada foi
+      `app-builder-lib`'s own conversor de ícone
+      (`node_modules/app-builder-lib/out/util/iconConverter.js#doConvertSingleFile`):
+      `const recommendedMin = format === "icns" ? 512 : 256` — 512 é específico do `.icns`
+      (grade @2x do macOS); para qualquer outro formato raster, incluindo um PNG solto como o da
+      janela, o mínimo recomendado é 256. `scripts/build.mjs` copia
+      `design/icons/png/256x256.png` para `dist/electron/` (mesmo padrão da fonte Nerd embutida,
+      V2-T3) e `electron/main.ts#createWindow` passa esse caminho em `icon` via o novo
+      `composition/window-icon.ts` (`resolveWindowIconPath`, função pura, testada em
+      `tests/unit/app/composition/window-icon.test.ts`). **Prova:** `npm run app`'s own instrumentação
+      (`SEEYA_APP_HOME_OVERRIDE` para uma pasta descartável, `SEEYA_APP_OFFSCREEN=1` — necessário
+      neste ambiente sem desktop interativo, o mesmo `UnknownVizError` que `main.ts`'s own
+      docstring já documenta —, `SEEYA_APP_SCREENSHOT_PATH`, `SEEYA_APP_QUIT_AFTER_MS`) rodou com o
+      bundle real; a screenshot confirma a janela carregando normalmente. Como a renderização
+      offscreen não tem moldura/barra de tarefas do SO para fotografar, a prova complementar foi
+      carregar o caminho exato que `resolveWindowIconPath(HERE)` calcula em tempo de execução
+      (`dist/electron/256x256.png`) com `nativeImage.createFromPath` dentro de um processo Electron
+      real: `isEmpty: false`, `size: 256x256` — o arquivo existe, é decodificável e é exatamente o
+      que `BrowserWindow` recebe.
+
+      **Item 3.** `README.md` ganhou um `<picture>` no topo: `seeya-logo-on-dark.svg` sob
+      `prefers-color-scheme: dark`, `seeya-logo.svg` como padrão, `alt="seeya"`, `width="280"`
+      (a spec não fixa um número — 280px é uma escolha de bom senso para um cabeçalho de README,
+      registrável como questão se o mantenedor quiser outro valor). Nada mais no README mudou.
+
+      **Portão (Windows, primeiro plano, em pedaços pela pouca memória da máquina):**
+      `format:check` verde; `tsc -p tsconfig.json --noEmit` verde; `lint` verde; `build` verde;
+      `dependencias` (`depcruise`) verde — "no dependency violations found (346 modules, 915
+      dependencies cruised)"; `npx vitest run --project unit --project integration --project
+      integration-process --project guards --maxWorkers 2` — 185 arquivos, 1.901 testes, 4
+      pulados, verde; `--coverage` no mesmo comando — 96,46% statements / 92,51% branches / 95,31%
+      funções / 96,85% linhas, acima dos pisos do `AGENTS.md` (95% em `core/`, 80% nos demais).
+      `verificar:linux` não rodado (opcional; CI cobre). Nenhum agente instalou o app nem tocou no
+      `~/.seeya` real, no `~/.claude` real ou nas chaves de registro `seeya`/`seeya-dev` — os
+      processos `electron.exe` soltos que ficaram de duas tentativas de captura de tela sem
+      `SEEYA_APP_OFFSCREEN` (erro `UnknownVizError`, corrigido na tentativa seguinte) foram
+      encerrados manualmente antes de rodar o portão.
+
+      Nenhuma questão nova aberta — a única decisão sem número fixo na spec (a largura do logo no
+      README) tem efeito pequeno e cosmético, resolvida com a solução mínima em vez de bloquear a
+      tarefa.
+
+      Fica em `[~]` até o review.
 
 ## Definição de pronto (vale para toda tarefa)
 
