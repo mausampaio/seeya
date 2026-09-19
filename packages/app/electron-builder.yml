@@ -158,7 +158,16 @@ nsis:
   createStartMenuShortcut: true
   # seeya:// registration on Windows is Electron's OWN job at runtime
   # (electron/main.ts#registerProtocolHandler, app.setAsDefaultProtocolClient) — V2-T5b,
-  # already shipped. NSIS needs no protocol config of its own for that to work once installed.
+  # already shipped. NSIS needs no protocol config of its own for the INSTALL side of that to
+  # work.
+  #
+  # V2-T10 item 4: NSIS's own UNINSTALL side is a different story, and this DOES need config —
+  # measured: electron-builder's NSIS target has no built-in protocol-registration/removal
+  # support at all (no `protocols:` handling anywhere in its own NsisTarget.js, unlike the
+  # mac/linux targets below), so without `build/installer.nsh`'s own `customUnInstall` macro,
+  # `HKCU\Software\Classes\seeya` would survive an uninstall untouched. `build/installer.nsh` is
+  # picked up by electron-builder's own documented default path for `nsis.include` — nothing to
+  # set here.
 
 linux:
   target:
