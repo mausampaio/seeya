@@ -21,8 +21,14 @@ import { fileURLToPath } from 'node:url';
 import * as esbuild from 'esbuild';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const repoRoot = path.resolve(packageRoot, '..', '..');
 const srcElectron = path.join(packageRoot, 'src', 'electron');
 const outElectron = path.join(packageRoot, 'dist', 'electron');
+
+// V2-T11 item 2: kept in sync by hand with composition/window-icon.ts's own constant of the same
+// name — see this script's own comment on the `cpSync` call below for why this can't be a shared
+// import instead.
+const WINDOW_ICON_FILE_NAME = '256x256.png';
 
 const isDev = process.argv.includes('--dev');
 
@@ -81,6 +87,18 @@ async function bundle() {
   // placed it.
   const xtermCssUrl = import.meta.resolve('@xterm/xterm/css/xterm.css');
   cpSync(fileURLToPath(xtermCssUrl), path.join(outElectron, 'xterm.css'));
+  // V2-T11 item 2: the `BrowserWindow` icon, copied from `design/icons/png/` (the single source,
+  // `design/IDENTIDADE_VISUAL.md` § 2.6 — never a versioned copy under packages/app), same
+  // "alongside the bundle" pattern as the Nerd Font above. The file name here MUST match
+  // `composition/window-icon.ts#WINDOW_ICON_FILE_NAME` — that module's own docstring has the
+  // 256-vs-512 measurement behind the choice; this script can't import that TypeScript module
+  // directly (it runs as a plain Node ESM script, no TS loader), so the name is repeated here the
+  // same way `assets/fonts` above is repeated in index.css's own @font-face rule, by convention,
+  // not by shared code.
+  cpSync(
+    path.join(repoRoot, 'design', 'icons', 'png', WINDOW_ICON_FILE_NAME),
+    path.join(outElectron, WINDOW_ICON_FILE_NAME),
+  );
 }
 
 /**
