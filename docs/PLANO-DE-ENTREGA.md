@@ -5547,6 +5547,74 @@ texto, mas não são a fila.
       portão e CI verdes. **Aceite do mantenedor:** na próxima manhã, a linha desta sessão do PO
       mostrando "`C:\code` até 14/09; `C:\code\seeya` desde 16/09".
 
+- [ ] **V2-T10 — O clique no toast abre a janela certa: um esquema por mundo (`seeya://` e
+      `seeya-dev://`), o toast segue a última janela aberta, e a desinstalação limpa o registro
+      (D-025, D-034, D-039).** Especificada pelo PO em 2026-09-19 a partir de um achado do
+      mantenedor no mesmo dia e de uma sugestão dele; **aguarda aprovação do mantenedor antes de
+      qualquer despacho.**
+
+      **O achado, medido.** Um clique num toast abriu a versão de desenvolvimento (o Electron do
+      checkout com o `main.js` de `C:\code\seeya`) e não o app instalado que estava aberto — uma
+      janela "do nada", que era o Windows executando o comando registrado para `seeya://`
+      (processo lançado com o argumento `seeya://open/`). **Causa:** as duas versões registram o
+      mesmo `seeya://` toda vez que sobem (`electron/main.ts#registerSeeyaProtocolHandler`), e o
+      último registro vence; como as duas têm travas de instância separadas, a de desenvolvimento
+      abriu uma janela nova em vez de focar a instalada.
+
+      **A sugestão do mantenedor, com o ajuste do PO.** Dois esquemas: `seeya://` só para o app
+      instalado e `seeya-dev://` só para o de desenvolvimento — cada mundo registra apenas o seu,
+      e um nunca mais sobrescreve o outro; o clique continua testável no desenvolvimento sem
+      instalar. **O esquema do toast não segue a origem do daemon** (quem manda o toast é o daemon,
+      só roda um por vez, e hoje o do mantenedor é o do checkout enquanto ele usa o app instalado —
+      seguir o daemon repetiria o defeito), **segue a última janela aberta**: cada janela, ao subir,
+      registra o próprio esquema e grava no marcador de `~/.seeya` qual é a janela ativa; o daemon
+      lê o marcador na hora de cada toast. Um daemon serve as duas, e o clique vai para a janela
+      que a pessoa está usando.
+
+      **O que entra:**
+      1. **O esquema por mundo.** A raiz de composição decide o esquema a partir de
+         `app.isPackaged` (instalado → `seeya`, desenvolvimento → `seeya-dev`) e a interface
+         registra só ele; o `second-instance`/foco continua como está. No Linux o
+         desenvolvimento não registra nada (não há `.desktop` de checkout, V2-T8); só o `.deb`
+         registra `seeya://`.
+      2. **O marcador passa a dizer qual é a janela ativa.** `protocol-handler.json` ganha o
+         esquema ativo (chave nova em disco: nome no glossário do `AGENTS.md` **antes** do código,
+         D-027; versão do esquema do arquivo sobe e o formato antigo `registered: true` é lido como
+         `seeya`, sem migração destrutiva). Cada janela grava ao subir; o backend de toast do
+         Windows e o do Linux usam o esquema ativo no lugar do `seeya` fixo de hoje. Sem marcador,
+         toast como hoje, sem clique (D-025).
+      3. **O toast confere que o esquema ainda existe.** No Windows, o próprio script de
+         PowerShell que mostra o toast testa se a chave do esquema existe no registro do usuário
+         antes de pôr o `launch` — sem processo a mais; se não existir (app desinstalado, marcador
+         velho), o toast sai sem clique e nada mais muda. No Linux, o `xdg-open` de um esquema sem
+         dono falha sem efeito, e isso fica registrado como o limite.
+      4. **A desinstalação limpa o registro.** O `seeya://` gravado em tempo de execução no Windows
+         sobrevive ao desinstalador do NSIS hoje. Conferir o suporte do `electron-builder` a
+         protocolos no NSIS (registro na instalação e remoção na desinstalação) e usá-lo; se não
+         cobrir a remoção, um trecho de desinstalação próprio no NSIS apaga só a chave do
+         `seeya`. **A desinstalação continua sem tocar em `~/.seeya/`** (V2-T8): o marcador velho
+         é tratado pelo item 3.
+
+      **O que não entra:** esquemas para mais de dois mundos (várias versões instaladas lado a
+      lado); o clique no macOS (D-034/V2-T8); reescrever toasts antigos da central de
+      notificações — um toast antigo guarda o esquema do momento em que saiu e, como os dois
+      esquemas continuam registrados, ainda abre um seeya, talvez o outro; isso fica documentado.
+
+      **Cuidados:** `app.isPackaged`/`process.platform` só na raiz de composição e no processo
+      principal; o marcador é gravado de forma atômica pelo `Storage`; toda lógica fora de
+      `electron/` com teste (a escolha do esquema, o parse do marcador nos dois formatos, a
+      decisão do `launch`); nenhuma dependência nova; um commit por item, portão em primeiro plano
+      em pedaços, `verificar:linux` lido em arquivo; nada de `npm ci` no checkout principal.
+      Questão: Q-080.
+
+      *Aceite:* testes de unidade da escolha do esquema, do marcador nos dois formatos e do XML do
+      toast com e sem `launch`; o script do toast conferido com uma chave de registro presente e
+      ausente num esquema de teste descartável (nunca o `seeya` real do mantenedor); o
+      desinstalador do NSIS inspecionado (a remoção da chave aparece no script gerado); portão e
+      CI verdes. **Aceite do mantenedor:** com o app instalado e o de desenvolvimento, o clique no
+      toast abre a janela que ele abriu por último; depois de desinstalar, a chave `seeya` some do
+      registro.
+
 ## Definição de pronto (vale para toda tarefa)
 
 1. Código implementa exatamente a spec; divergência virou questão, não improviso.
