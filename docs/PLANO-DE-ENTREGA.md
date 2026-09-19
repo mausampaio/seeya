@@ -5761,6 +5761,55 @@ texto, mas não são a fila.
       (Windows e Linux), abrir os dois mundos, e confirmar que o clique segue a última janela e que
       a desinstalação limpa a chave.
 
+- [ ] **V2-T11 — O ícone do seeya: instalador, janela e README a partir de `design/`.**
+      Especificada pelo PO em 2026-09-19 e aprovada pelo mantenedor no mesmo dia, logo depois de
+      a identidade visual entrar no repositório (`design/`, commit `641f803`). Hoje o instalador,
+      o atalho, a barra de tarefas e a janela mostram o ícone padrão do Electron.
+
+      **A fonte única é `design/`.** `design/IDENTIDADE_VISUAL.md` (seção 2.6) já descreve o
+      pacote de ícones: `design/icons/icon.ico` (Windows, 16 a 256 px), `design/icons/icon.icns`
+      (macOS, na grade da Apple), `design/icons/png/<n>x<n>.png` (Linux, com os nomes que o
+      `electron-builder` espera) e `design/icons/icon.png` (1024 px). **Nenhuma cópia versionada
+      dos ícones dentro de `packages/app`**: duas cópias divergem na primeira troca de arte.
+
+      **O que entra:**
+      1. **O ícone do pacote instalado.** `packages/app/electron-builder.yml` aponta o ícone de
+         cada alvo para `design/icons/` (`.ico` no Windows, que também serve ao instalador e ao
+         desinstalador do NSIS; `.icns` no macOS; a pasta `png/` no Linux, para o `.deb` e o
+         `AppImage`). Medir se o `electron-builder` aceita um caminho fora do diretório do pacote;
+         se não aceitar, o `scripts/dist.mjs` copia os ícones para uma pasta de build ignorada
+         pelo git antes de chamar o `electron-builder`, nunca uma cópia versionada. **Prova:** o
+         `npm run dist` no Windows deixa de avisar que usa o ícone padrão do Electron, e o ícone
+         do `seeya.exe` empacotado é o do seeya (conferir o recurso do executável, não só o
+         instalador).
+      2. **O ícone da janela.** `scripts/build.mjs` copia um PNG de `design/icons/png/` (o
+         tamanho que o Electron recomenda para `BrowserWindow`, a medir: 256 ou 512) para
+         `dist/electron/`, como já faz com as fontes (V2-T3), e `electron/main.ts` passa esse
+         arquivo em `icon` ao criar a janela. É o que muda a barra de tarefas no desenvolvimento
+         (`npm run app`) no Windows e a janela no Linux, onde o ícone do executável não vale.
+      3. **O logo no README.** No topo do `README.md`, o logo com `<picture>`: `seeya-logo.svg`
+         no tema claro e `seeya-logo-on-dark.svg` no escuro do GitHub (`prefers-color-scheme`),
+         com texto alternativo `seeya` e largura fixa. Nada mais no README muda.
+
+      **O que não entra:** a paleta, os temas e a fonte Geist na interface (tarefa própria de
+      visual; a Geist seria dependência nova); ícone nos toasts; ícone do Dock no macOS durante o
+      desenvolvimento (o `.icns` cobre o app empacotado); assinatura do instalador (Q-078);
+      favicon ou página web.
+
+      **Cuidados:** nenhuma dependência nova; nada em `design/` muda (a arte é do mantenedor —
+      se um arquivo não servir, vira questão); o `dist.yml` da CI (os três instaladores) continua
+      funcionando e é o único lugar onde o `.dmg` é construído; a lógica nova fora de
+      `electron/`, se houver (a escolha ou a cópia do PNG em `build.mjs`), tem teste. Nenhum
+      agente instala o app nem toca no `~/.seeya` real ou no registro (`seeya`/`seeya-dev`): o
+      `npm run dist` só constrói, e a janela é conferida com `SEEYA_APP_HOME_OVERRIDE` e a
+      captura de tela da instrumentação (`SEEYA_APP_SCREENSHOT_PATH`), como nas tarefas
+      anteriores.
+
+      **Aceite do mantenedor:** instalar a versão nova no Windows e ver o ícone no menu Iniciar,
+      no atalho da área de trabalho, na barra de tarefas e na lista de aplicativos instalados;
+      `npm run app` com o ícone na barra de tarefas; o README no GitHub com o logo nos dois temas.
+      No Ubuntu, junto do aceite pendente da V2-T8.
+
 ## Definição de pronto (vale para toda tarefa)
 
 1. Código implementa exatamente a spec; divergência virou questão, não improviso.
