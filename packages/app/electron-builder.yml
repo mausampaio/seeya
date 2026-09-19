@@ -129,6 +129,20 @@ win:
   target:
     - target: nsis
       arch: [x64]
+  # V2-T11 item 1: the icon lives in `design/icons/` (the single source, `design/IDENTIDADE_VISUAL.md`
+  # § 2.6), never copied into `packages/app` — two copies would drift on the first art change.
+  # Measured (app-builder-lib 26.15.3, `platformPackager.js#getResource`): a relative path here is
+  # tried first against `buildResourcesDir` (`<projectDir>/build`, which doesn't exist in this repo —
+  # there's no `packages/app/build/icon.ico`) and, when that misses, against `projectDir`
+  # (`packages/app`) — `path.resolve('packages/app', '../../design/icons/icon.ico')` lands exactly on
+  # the repo-root `design/icons/icon.ico`, one level above the workspace root. No copy step needed;
+  # confirmed by running `node scripts/dist.mjs --win --dir` before and after this line: before, the
+  # log read `default Electron icon is used  reason=application icon is not set`; after, that line is
+  # gone and `seeya.exe`'s own icon resource is the seeya `S` (verified by extracting it with
+  # `[System.Drawing.Icon]::ExtractAssociatedIcon`, V2-T11's own report has the byte comparison).
+  # `.ico` also covers the NSIS installer/uninstaller icon — electron-builder's own default reuses
+  # `win.icon` for both, no separate `nsis.installerIcon`/`uninstallerIcon` needed.
+  icon: ../../design/icons/icon.ico
   # No code signing this task (V2-T8's own "o que não entra") — SmartScreen will warn on first
   # run. Cost/certificate is a future decision (Q-078).
   #
@@ -174,6 +188,13 @@ linux:
     - deb
     - AppImage
   category: Utility
+  # V2-T11 item 1: same reasoning as win.icon above, resolved the same way by
+  # `platformPackager.js#getResource` — this path fails against `buildResourcesDir` and succeeds
+  # against `projectDir`, landing on the repo-root `design/icons/png/`. electron-builder expects a
+  # DIRECTORY here for Linux (one PNG per size, named `<n>x<n>.png`) rather than a single file — the
+  # exact naming `design/IDENTIDADE_VISUAL.md` § 2.6 already documents this folder using, so no
+  # renaming is needed on either side.
+  icon: ../../design/icons/png
   # Uses package.json's own "desktopName" (added this task, "seeya.desktop") for the installed
   # `.desktop` filename instead of one derived from `executableName` — keeps the file itself
   # named predictably regardless of what `executableName` above happens to be.
@@ -219,6 +240,12 @@ mac:
   target:
     - target: dmg
       arch: [x64]
+  # V2-T11 item 1: same reasoning and same `getResource` resolution order as win.icon above,
+  # pointing at the repo-root `design/icons/icon.icns` — not measured on this task's own machine
+  # (Windows; `dmg` only ever builds on macOS CI, V2-T8's own scope), so this is the same relative-
+  # path pattern the Windows measurement already confirmed `getResource` accepts, not a second,
+  # independent measurement. The CI `dist.yml` run is what will actually exercise it.
+  icon: ../../design/icons/icon.icns
   protocols:
     - name: seeya
       schemes:
