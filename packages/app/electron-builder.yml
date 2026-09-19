@@ -157,7 +157,7 @@ nsis:
   createDesktopShortcut: true
   createStartMenuShortcut: true
   # seeya:// registration on Windows is Electron's OWN job at runtime
-  # (electron/main.ts#registerSeeyaProtocolHandler, app.setAsDefaultProtocolClient) — V2-T5b,
+  # (electron/main.ts#registerProtocolHandler, app.setAsDefaultProtocolClient) — V2-T5b,
   # already shipped. NSIS needs no protocol config of its own for that to work once installed.
 
 linux:

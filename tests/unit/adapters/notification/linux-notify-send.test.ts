@@ -130,7 +130,7 @@ describe('LinuxNotifySendBackend — send with click action (V2-T8 item 4)', () 
     const backend = new LinuxNotifySendBackend({
       run: runner.run,
       spawnDetached: detached.run,
-      isProtocolHandlerRegistered: () => Promise.resolve(false),
+      activeProtocolScheme: () => Promise.resolve(null),
     });
 
     await backend.send(NOTICE);
@@ -145,7 +145,7 @@ describe('LinuxNotifySendBackend — send with click action (V2-T8 item 4)', () 
     const backend = new LinuxNotifySendBackend({
       run: runner.run,
       spawnDetached: detached.run,
-      isProtocolHandlerRegistered: () => Promise.resolve(true),
+      activeProtocolScheme: () => Promise.resolve('seeya'),
     });
 
     await backend.send(NOTICE);
@@ -164,7 +164,7 @@ describe('LinuxNotifySendBackend — send with click action (V2-T8 item 4)', () 
       command: 'fake-notify-send',
       run: runner.run,
       spawnDetached: detached.run,
-      isProtocolHandlerRegistered: () => Promise.resolve(true),
+      activeProtocolScheme: () => Promise.resolve('seeya'),
     });
 
     await backend.send(NOTICE);
@@ -183,7 +183,7 @@ describe('LinuxNotifySendBackend — send with click action (V2-T8 item 4)', () 
     const backend = new LinuxNotifySendBackend({
       run: runner.run,
       spawnDetached: detached.run,
-      isProtocolHandlerRegistered: () => Promise.resolve(true),
+      activeProtocolScheme: () => Promise.resolve('seeya'),
     });
 
     await expect(backend.send(NOTICE)).rejects.toThrow(/failed to start/);
@@ -200,7 +200,7 @@ describe('LinuxNotifySendBackend — send with click action (V2-T8 item 4)', () 
     const backend = new LinuxNotifySendBackend({
       run: runner.run,
       spawnDetached: detached.run,
-      isProtocolHandlerRegistered: () => Promise.resolve(true),
+      activeProtocolScheme: () => Promise.resolve('seeya'),
       openProtocolUrl,
     });
 
@@ -211,6 +211,29 @@ describe('LinuxNotifySendBackend — send with click action (V2-T8 item 4)', () 
     await Promise.resolve();
 
     expect(openProtocolUrl).toHaveBeenCalledWith('seeya://open');
+  });
+
+  // V2-T10 item 2: a marker naming the dev scheme opens the dev URL — never the packaged one.
+  it('opens seeya-dev://open when the active scheme is "seeya-dev"', async () => {
+    const runner = new RecordingCommandRunner({ exitCode: 0, stdout: '0.8.1', stderr: '' });
+    const detached = new RecordingDetachedCommandRunner(true, {
+      exitCode: 0,
+      stdout: 'default\n',
+      stderr: '',
+    });
+    const openProtocolUrl = vi.fn(() => Promise.resolve());
+    const backend = new LinuxNotifySendBackend({
+      run: runner.run,
+      spawnDetached: detached.run,
+      activeProtocolScheme: () => Promise.resolve('seeya-dev'),
+      openProtocolUrl,
+    });
+
+    await backend.send(NOTICE);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(openProtocolUrl).toHaveBeenCalledWith('seeya-dev://open');
   });
 
   it('never opens the URL when the notification was dismissed or timed out (empty stdout)', async () => {
@@ -224,7 +247,7 @@ describe('LinuxNotifySendBackend — send with click action (V2-T8 item 4)', () 
     const backend = new LinuxNotifySendBackend({
       run: runner.run,
       spawnDetached: detached.run,
-      isProtocolHandlerRegistered: () => Promise.resolve(true),
+      activeProtocolScheme: () => Promise.resolve('seeya'),
       openProtocolUrl,
     });
 
@@ -245,7 +268,7 @@ describe('LinuxNotifySendBackend — send with click action (V2-T8 item 4)', () 
     const backend = new LinuxNotifySendBackend({
       run: runner.run,
       spawnDetached: detached.run,
-      isProtocolHandlerRegistered: () => Promise.resolve(true),
+      activeProtocolScheme: () => Promise.resolve('seeya'),
       openProtocolUrl: () => Promise.reject(new Error('xdg-open missing')),
     });
 
@@ -254,13 +277,13 @@ describe('LinuxNotifySendBackend — send with click action (V2-T8 item 4)', () 
     await Promise.resolve();
   });
 
-  it('a throwing isProtocolHandlerRegistered reads as "not registered" (never crashes send)', async () => {
+  it('a throwing activeProtocolScheme reads as "no scheme" (never crashes send)', async () => {
     const runner = new RecordingCommandRunner({ exitCode: 0, stdout: '0.8.1', stderr: '' });
     const detached = new RecordingDetachedCommandRunner();
     const backend = new LinuxNotifySendBackend({
       run: runner.run,
       spawnDetached: detached.run,
-      isProtocolHandlerRegistered: () => Promise.reject(new Error('storage unavailable')),
+      activeProtocolScheme: () => Promise.reject(new Error('storage unavailable')),
     });
 
     await expect(backend.send(NOTICE)).resolves.toBeUndefined();

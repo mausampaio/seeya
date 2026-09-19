@@ -308,11 +308,12 @@ export function buildDaemonContext(homeDir: string = os.homedir()): Promise<Daem
     clock,
     storage,
     // V2-T5b item 5: "quem manda o toast é o daemon" — this is the one place that needs to know
-    // whether the interface has registered itself as the seeya:// handler
-    // (Storage.readProtocolHandlerRegistered) before a Windows toast can safely carry
-    // launch="seeya://open" (adapters/notification/index.ts#buildNotifier's own docstring). Every
-    // other caller of this package still imports the bare `notifier` singleton unchanged.
-    notifier: buildNotifier(() => storage.readProtocolHandlerRegistered()),
+    // WHICH scheme (core/types.ts#ProtocolScheme) the interface last registered as its protocol
+    // handler (Storage.readActiveProtocolScheme, reshaped from a boolean by V2-T10 item 2) before
+    // a toast can safely carry a `launch` attribute
+    // (adapters/notification/index.ts#buildNotifier's own docstring). Every other caller of this
+    // package still imports the bare `notifier` singleton unchanged.
+    notifier: buildNotifier(() => storage.readActiveProtocolScheme()),
     processControl: realProcessControl,
     transcriptReader: new TranscriptFileReader({ claudeHome: home.claudeHome }),
     gitReader: new GitAdapter({ clock }),

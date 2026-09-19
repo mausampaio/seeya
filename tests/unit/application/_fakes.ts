@@ -26,6 +26,7 @@ import type {
   GeneratedUnderstanding,
   Handoff,
   PrimaryResumeAttempt,
+  ProtocolScheme,
   ResumeFallbackReason,
   ResumeOutcome,
   SessionFacts,
@@ -300,15 +301,18 @@ export class FakeStorage implements Storage {
     return Promise.reject(new Error('FakeStorage.writeDaemonLock is not exercised by endDay'));
   }
 
-  readProtocolHandlerRegistered(): ReturnType<Storage['readProtocolHandlerRegistered']> {
+  readActiveProtocolScheme(): ReturnType<Storage['readActiveProtocolScheme']> {
     return Promise.reject(
-      new Error('FakeStorage.readProtocolHandlerRegistered is not exercised by endDay'),
+      new Error('FakeStorage.readActiveProtocolScheme is not exercised by endDay'),
     );
   }
 
-  saveProtocolHandlerRegistered(): ReturnType<Storage['saveProtocolHandlerRegistered']> {
+  saveActiveProtocolScheme(
+    scheme: ProtocolScheme,
+  ): ReturnType<Storage['saveActiveProtocolScheme']> {
+    void scheme;
     return Promise.reject(
-      new Error('FakeStorage.saveProtocolHandlerRegistered is not exercised by endDay'),
+      new Error('FakeStorage.saveActiveProtocolScheme is not exercised by endDay'),
     );
   }
 

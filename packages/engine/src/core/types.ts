@@ -992,3 +992,18 @@ export type ResolvedEndDayScope =
        */
       readonly consideredCount: number;
     };
+
+/**
+ * V2-T10 item 1: which `seeya://`-shaped protocol scheme a running instance of the interface
+ * registers with the OS — `'seeya'` for a packaged (installed) app, `'seeya-dev'` for an
+ * unpackaged dev launch (`npm run app`). Two schemes, not one, because before this task both
+ * worlds registered the identical `seeya://` every time either started, and Windows keeps only
+ * the LAST registration — whichever one launched most recently silently stole every toast click
+ * meant for the other. `packages/app/src/composition/protocol-scheme.ts#resolveProtocolScheme`
+ * is the pure decision (`app.isPackaged` in, a scheme out); `Storage.readActiveProtocolScheme`/
+ * `saveActiveProtocolScheme` (`core/ports.ts`) persist whichever scheme the most recently opened
+ * window registered, so a click always reaches the window the person is actually using rather
+ * than whichever world's daemon happens to be running (docs/DECISOES.md's own reasoning in the
+ * V2-T10 plan entry: the daemon serves both worlds and must not decide between them itself).
+ */
+export type ProtocolScheme = 'seeya' | 'seeya-dev';

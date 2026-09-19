@@ -8,7 +8,14 @@
 import { readFile, readdir, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import type { Briefing, RejectedDiscoveryRecord, Storage } from '../../core/ports.js';
-import type { Config, Day, DayState, EarlyWarningState, Handoff } from '../../core/types.js';
+import type {
+  Config,
+  Day,
+  DayState,
+  EarlyWarningState,
+  Handoff,
+  ProtocolScheme,
+} from '../../core/types.js';
 import type { DaemonLockInfo } from '../../core/daemon-lock.js';
 import { EMPTY_EARLY_WARNING_STATE } from '../../core/early-warnings.js';
 import { isEnoent } from './fs-errors.js';
@@ -41,6 +48,7 @@ import {
   serializeDaemonLock,
 } from './daemon-lock-schema.js';
 import {
+  PROTOCOL_HANDLER_SCHEMA_MIGRATIONS,
   PROTOCOL_HANDLER_SCHEMA_VERSION,
   parseProtocolHandlerDocument,
   serializeProtocolHandlerDocument,
@@ -356,22 +364,23 @@ export class StorageAdapter implements Storage {
     return path.join(this.seeyaHome, 'protocol-handler.json');
   }
 
-  async readProtocolHandlerRegistered(): Promise<boolean> {
+  async readActiveProtocolScheme(): Promise<ProtocolScheme | null> {
     const resolved = await readVersionedDocument(
       this.protocolHandlerPath(),
       PROTOCOL_HANDLER_SCHEMA_VERSION,
+      PROTOCOL_HANDLER_SCHEMA_MIGRATIONS,
     );
     if (resolved === null) {
       // Never registered on this machine yet (D-025), not an error.
-      return false;
+      return null;
     }
     return parseProtocolHandlerDocument(resolved);
   }
 
-  async saveProtocolHandlerRegistered(): Promise<void> {
+  async saveActiveProtocolScheme(scheme: ProtocolScheme): Promise<void> {
     await writeFileAtomic(
       this.protocolHandlerPath(),
-      JSON.stringify(serializeProtocolHandlerDocument()),
+      JSON.stringify(serializeProtocolHandlerDocument(scheme)),
     );
   }
 }

@@ -52,6 +52,7 @@ import { localDayString } from '@seeya-ai/engine/core/day.js';
 import type { Handoff } from '@seeya-ai/engine/core/types.js';
 import { buildAppContext, toEndDayDeps, type AppContext } from '../composition/index.js';
 import { shouldMarkLinuxProtocolRegistered } from '../composition/linux-protocol-marker.js';
+import { resolveProtocolScheme, type ProtocolScheme } from '../composition/protocol-scheme.js';
 import { MESSAGES } from '../text/messages.js';
 import { buildEndDayCostCeiling } from '../state/end-day-preview.js';
 import { projectEndDayProgressEvent } from '../state/end-day-progress.js';
@@ -701,25 +702,30 @@ function focusExistingWindow(): void {
 /**
  * V2-T5b item 5, Windows only this task (this file's own "o que não entra" for Linux/macOS — see
  * the module comment on the platform guard around this function's one call site below): registers
- * `seeya://` with `app.setAsDefaultProtocolClient`, exactly the way Electron's own documentation
+ * `scheme` with `app.setAsDefaultProtocolClient`, exactly the way Electron's own documentation
  * describes handling BOTH the packaged and the unpackaged (dev) case — `process.defaultApp` is
  * `true` only when running unpackaged (`npm run app`'s own `electron .` invocation), and that case
  * needs the runtime (`process.execPath`) and the script path passed explicitly, since there is no
  * single packaged `.exe` yet for Windows to associate the protocol with.
  *
+ * **V2-T10 item 1: `scheme` is no longer hardcoded to `'seeya'`.** The caller passes
+ * `resolveProtocolScheme(app.isPackaged)` — a packaged build still registers plain `seeya`, but a
+ * dev launch now registers `seeya-dev` instead, so the two worlds never overwrite each other's
+ * registration again (see `composition/protocol-scheme.ts`'s own docstring for the full "achado").
+ *
  * Returns whether registration actually succeeded — `false` on a dev launch with no script
  * argument to point at (defensive; `npm run app` always provides one) as well as whatever
  * `app.setAsDefaultProtocolClient` itself reports.
  */
-function registerSeeyaProtocolHandler(): boolean {
+function registerProtocolHandler(scheme: ProtocolScheme): boolean {
   if (process.defaultApp) {
     const scriptPath = process.argv[1];
     if (scriptPath === undefined) {
       return false;
     }
-    return app.setAsDefaultProtocolClient('seeya', process.execPath, [path.resolve(scriptPath)]);
+    return app.setAsDefaultProtocolClient(scheme, process.execPath, [path.resolve(scriptPath)]);
   }
-  return app.setAsDefaultProtocolClient('seeya');
+  return app.setAsDefaultProtocolClient(scheme);
 }
 
 // V2-T5b item 5: `requestSingleInstanceLock` has to run before `app.whenReady()` — Electron's own
@@ -747,7 +753,14 @@ if (!gotSingleInstanceLock) {
     // uses it against a tmpdir fixture, never the real home). Never set by `npm run app`.
     const context = await buildAppContext(process.env.SEEYA_APP_HOME_OVERRIDE);
 
-    // V2-T5b item 5: Windows — the `seeya://` handler on Linux comes from the package's own
+    // V2-T10 item 1: the scheme THIS window registers — packaged installs still claim plain
+    // `seeya`, a dev launch (`npm run app`) now claims `seeya-dev` instead, so the two worlds
+    // never overwrite each other's registration (composition/protocol-scheme.ts's own docstring
+    // has the full "achado" this replaces). Computed once, here, and reused by both the Windows
+    // registration call below and (once item 2 lands) the marker write.
+    const protocolScheme = resolveProtocolScheme(app.isPackaged);
+
+    // V2-T5b item 5: Windows — the `seeya://`-shaped handler on Linux comes from the package's own
     // `.desktop` file and on macOS from its `Info.plist`, neither of which exists from a checkout
     // (only the installer task can write them); attempting `setAsDefaultProtocolClient` there
     // today would be a no-op at best (Electron's own docs: "this method is only implemented on
@@ -760,16 +773,21 @@ if (!gotSingleInstanceLock) {
     // own docstring: the `.desktop` file's `MimeType` was already written, at INSTALL time, by the
     // `.deb`; this process can only infer that it was, never confirm it the way Windows' own
     // boolean return does). macOS still gets no marker at all this task (`o que não entra`: no
-    // click mechanism exists there to gate).
+    // click mechanism exists there to gate). Linux never registers `seeya-dev` at all (V2-T10 item
+    // 1's own "o que entra": no `.desktop` file exists from a checkout there either), so
+    // `shouldMarkLinuxProtocolRegistered` only ever implies the packaged `seeya` scheme.
     const markProtocolRegistered =
-      (process.platform === 'win32' && registerSeeyaProtocolHandler()) ||
+      (process.platform === 'win32' && registerProtocolHandler(protocolScheme)) ||
       shouldMarkLinuxProtocolRegistered({
         platform: process.platform,
         isPackaged: app.isPackaged,
         appImageEnv: process.env.APPIMAGE,
       });
     if (markProtocolRegistered) {
-      await context.storage.saveProtocolHandlerRegistered().catch(() => {
+      // V2-T10 item 2: the marker now records WHICH scheme this window registered (never just a
+      // boolean "registered on this machine") — the toast/click backends read it back through
+      // `Storage.readActiveProtocolScheme()` to pick the right URI.
+      await context.storage.saveActiveProtocolScheme(protocolScheme).catch(() => {
         // Best-effort: a failed write here just means the daemon's own toast/click keeps omitting
         // `launch`/`--action` until a later run of the interface writes the marker successfully —
         // the same "no marker, toast as before" fallback D-025 already gives a marker that was

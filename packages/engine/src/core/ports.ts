@@ -19,6 +19,7 @@ import type {
   EarlyWarningState,
   GeneratedUnderstanding,
   Handoff,
+  ProtocolScheme,
   SessionFacts,
 } from './types.js';
 
@@ -381,25 +382,35 @@ export interface Storage {
   clearDaemonLock(): Promise<void>;
 
   /**
-   * V2-T5b item 5: whether the interface has ever registered itself as the `seeya://` protocol
-   * handler on this machine (`app.setAsDefaultProtocolClient`, `packages/app/src/composition/
-   * index.ts`). `false` when the marker (`~/.seeya/protocol-handler.json`) doesn't exist —
-   * D-025: absence reads as "not registered", never as a guess either way. The daemon's own
+   * V2-T5b item 5, upgraded by V2-T10 item 2: which `seeya://`-shaped scheme
+   * (`core/types.ts#ProtocolScheme`) the most recently opened window of the interface registered
+   * as the `seeya`/`seeya-dev` protocol handler on this machine
+   * (`app.setAsDefaultProtocolClient`, `packages/app/src/composition/index.ts`/`electron/main.ts`).
+   * `null` when the marker (`~/.seeya/protocol-handler.json`) doesn't exist — D-025: absence reads
+   * as "no window has registered anything yet", never as a guess either way. The daemon's own
    * Windows toast backend (`adapters/notification/windows-toast.ts`) reads this BEFORE deciding
-   * whether to include `launch="seeya://open"` on a toast: without it, a click would surface
+   * whether to include a `launch` attribute on a toast: without it, a click would surface
    * Windows' own "how do you want to open seeya?" picker instead of focusing the window.
+   *
+   * **Why "the active scheme", not "is `seeya` registered"** (V2-T10's own plan entry, "o
+   * achado"). Two worlds — a packaged install and a dev checkout — can each be running, each
+   * registering its OWN scheme (`seeya`/`seeya-dev`); the daemon that sends every toast serves
+   * both. Reading back a single scheme (whichever window opened last) is what lets a toast click
+   * reach the window the person is actually using, instead of always the same hardcoded one.
    */
-  readProtocolHandlerRegistered(): Promise<boolean>;
+  readActiveProtocolScheme(): Promise<ProtocolScheme | null>;
 
   /**
-   * Persists that the registration above just happened — atomically, idempotent (calling this
-   * again when the marker already exists is a no-op in effect, same "overwrite the whole
-   * document" contract every other `save*` method on this port already has). Never CLEARED by
-   * this project: once the interface has registered the protocol on a machine, Windows itself
-   * keeps the association even across a `seeya` uninstall/reinstall, so there is no "unregister"
-   * event for this method's own caller to react to in v2's own scope.
+   * Persists that `scheme` was just registered as the active window's own protocol handler —
+   * atomically, idempotent for the same `scheme` (calling this again with an unchanged value is a
+   * no-op in effect, same "overwrite the whole document" contract every other `save*` method on
+   * this port already has) and OVERWRITING for a different one (the most recently opened window
+   * always wins, V2-T10's own "segue a última janela aberta"). Never CLEARED by this project: once
+   * a scheme has been registered on a machine, Windows itself keeps the association even across a
+   * `seeya` uninstall/reinstall, so there is no "unregister" event for this method's own caller to
+   * react to in v2's own scope.
    */
-  saveProtocolHandlerRegistered(): Promise<void>;
+  saveActiveProtocolScheme(scheme: ProtocolScheme): Promise<void>;
 }
 
 /**
