@@ -5486,6 +5486,67 @@ texto, mas não são a fila.
       da tarefa** — instalar de verdade no Linux e no Windows do mantenedor e repetir os passos que
       só ele pode confirmar (menu, aba, daemon pela janela, clique no aviso prévio).
 
+- [ ] **V2-T9 — A sessão que mudou de diretório: detectar, mostrar e deixar escolher onde
+      retomar (D-024, D-025, D-039).** Especificada pelo PO em 2026-09-19 a partir de um achado do
+      mantenedor no mesmo dia; **aguarda aprovação do mantenedor antes de qualquer despacho.**
+
+      **O achado.** A sessão do PO rodou em `C:\code` até 14/09 e, depois de ser retomada à mão a
+      partir de `C:\code\seeya` no dia 16, o seeya passou a retomá-la sempre lá: ele retoma onde a
+      sessão rodou por último (o `cwd` do registro do Claude Code, gravado no handoff). Ninguém foi
+      avisado, e o efeito foi real: a memória do Claude Code é guardada por diretório, então as
+      regras de trabalho gravadas em `C:\code` pararam de carregar (o mantenedor percebeu; a
+      memória foi copiada à mão em 19/09). O mesmo vale para as instruções e permissões de projeto,
+      que também dependem do diretório.
+
+      **A fonte, medida antes de especificar.** O campo `cwd` de cada linha do transcript **não
+      serve**: é o diretório atual do shell a cada comando, não onde a sessão foi aberta — a sessão
+      do PO tem 32 valores distintos lá, incluindo cada worktree de agente e pastas temporárias. O
+      slug da pasta do transcript também não serve (a codificação perde informação, e o diretório de
+      nascimento desta sessão nem existe mais). **A fonte é o histórico de capturas do próprio
+      seeya**: o handoff de cada dia grava o `cwd` do registro, e para esta sessão ele mudou de
+      `C:\code` (14/09) para `C:\code\seeya` (16/09) — limpo, sem ruído.
+
+      **O que entra:**
+      1. **O histórico de diretórios da sessão**, em `application/` (por exemplo
+         `application/cwd-history.ts`): dado um `sessionId` e o dia do briefing, percorre os
+         handoffs dos dias anteriores (`Storage.readHandoff`, limitado por `maxBriefingScanDays`
+         como o `findPendingBriefing`) e devolve a sequência de diretórios distintos em que a
+         sessão foi capturada, com o último dia de cada um, **e se cada diretório ainda existe**
+         (porta de sistema de arquivos, D-025: "não existe mais" é dito, nunca escondido). A
+         comparação de diretórios usa a normalização que o projeto já tem
+         (`core/cwd-normalization.ts`, D-S4-T12: `C:\code` e `c:\code\` são o mesmo). Função pura
+         para o recorte da sequência, com teste; a leitura na aplicação. **Nenhuma chave nova em
+         disco:** tudo sai dos handoffs que já existem.
+      2. **O painel "Hoje" mostra a mudança** na linha da sessão quando houve: "rodou em
+         `C:\code` até 14/09; em `C:\code\seeya` desde 16/09", e um seletor **Resume in**
+         com os diretórios que ainda existem, **o mais recente como padrão** (é o comportamento de
+         hoje; ninguém é surpreendido). Um diretório que não existe mais aparece na nota com
+         "(no longer exists)" e não entra no seletor. A escolha só vale para aquela retomada —
+         a interface passa o diretório escolhido no lugar do `cwd` do handoff para
+         `resumeSessions`, sem regravar nada em disco. Uma linha de texto explica por que
+         importa: o Claude Code guarda memória e configurações de projeto por diretório.
+      3. **A CLI avisa, sem perguntar:** o `seeya start-day` imprime a mesma nota ao listar a
+         sessão, e retoma no diretório mais recente como hoje; a escolha fica com a interface
+         (uma pergunta a mais no terminal para um caso raro não se paga).
+
+      **O que não entra:** mover ou copiar a memória do Claude Code automaticamente (é dado do
+      Claude Code, e o seeya não escreve em `~/.claude/`); detectar mudança de diretório de
+      sessões que o seeya nunca capturou; mudar o `cwd` gravado nos handoffs.
+
+      **Cuidados:** a interface não escolhe sozinha — o padrão é o de hoje, e trocar é um clique
+      (D-039); "sem histórico" é "sem nota", nunca "sem mudança" afirmado (D-025); toda lógica
+      fora de `electron/` com teste; texto em `text/messages.ts` e no módulo de texto da CLI;
+      nenhuma dependência nova; um commit por item, portão em primeiro plano em pedaços,
+      `verificar:linux` lido em arquivo; nada de `npm ci` no checkout principal. Questão: Q-079.
+
+      *Aceite:* num `homeDir` descartável com handoffs sintéticos da mesma sessão em três dias e
+      dois diretórios (um existente, um apagado): o painel "Hoje" mostra a nota com os dois e o
+      "(no longer exists)"; o seletor oferece só o existente além do mais recente; escolher o
+      anterior abre a aba no diretório escolhido (o `claude` falso registra o `cwd` do processo);
+      o `seeya start-day` imprime a mesma nota; testes de unidade do recorte e da normalização;
+      portão e CI verdes. **Aceite do mantenedor:** na próxima manhã, a linha desta sessão do PO
+      mostrando "`C:\code` até 14/09; `C:\code\seeya` desde 16/09".
+
 ## Definição de pronto (vale para toda tarefa)
 
 1. Código implementa exatamente a spec; divergência virou questão, não improviso.
