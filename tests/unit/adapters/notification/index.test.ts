@@ -28,20 +28,21 @@ describe('buildDefaultBackends', () => {
     expect(buildDefaultBackends('aix')).toEqual([]);
   });
 
-  // V2-T5b item 5: threading isProtocolHandlerRegistered still picks the same backend type —
-  // the OPTION's own effect on the toast is exercised directly against WindowsToastBackend
+  // V2-T5b item 5: threading activeProtocolScheme still picks the same backend type — the
+  // OPTION's own effect on the toast is exercised directly against WindowsToastBackend
   // (tests/unit/adapters/notification/windows-toast.test.ts), never by spawning a real
-  // powershell.exe from here.
-  it('still picks WindowsToastBackend on win32 when isProtocolHandlerRegistered is passed', () => {
-    const [backend] = buildDefaultBackends('win32', () => Promise.resolve(true));
+  // powershell.exe from here. Reshaped from a boolean to a `ProtocolScheme | null` by V2-T10
+  // item 2.
+  it('still picks WindowsToastBackend on win32 when activeProtocolScheme is passed', () => {
+    const [backend] = buildDefaultBackends('win32', () => Promise.resolve('seeya'));
     expect(backend).toBeInstanceOf(WindowsToastBackend);
   });
 
   // V2-T8 item 4: same shape as the Windows case above — the OPTION's own effect is exercised
   // directly against LinuxNotifySendBackend (tests/unit/adapters/notification/
   // linux-notify-send.test.ts's own "send with click action" describe block).
-  it('still picks LinuxNotifySendBackend on linux when isProtocolHandlerRegistered is passed', () => {
-    const [backend] = buildDefaultBackends('linux', () => Promise.resolve(true));
+  it('still picks LinuxNotifySendBackend on linux when activeProtocolScheme is passed', () => {
+    const [backend] = buildDefaultBackends('linux', () => Promise.resolve('seeya'));
     expect(backend).toBeInstanceOf(LinuxNotifySendBackend);
   });
 });
@@ -54,7 +55,7 @@ describe('notifier', () => {
 
 describe('buildNotifier', () => {
   it('returns a working Notifier, same shape as the bare singleton', () => {
-    const built = buildNotifier(() => Promise.resolve(true), 'win32');
+    const built = buildNotifier(() => Promise.resolve('seeya'), 'win32');
     expect(typeof built.notify).toBe('function');
   });
 });

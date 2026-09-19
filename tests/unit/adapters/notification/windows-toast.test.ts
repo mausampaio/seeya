@@ -35,14 +35,20 @@ describe('buildToastXml', () => {
 
   // V2-T5b item 5.
   it('omits launch/activationType by default (unchanged pre-V2-T5b toast shape)', () => {
-    expect(buildToastXml(NOTICE)).toBe(buildToastXml(NOTICE, false));
+    expect(buildToastXml(NOTICE)).toBe(buildToastXml(NOTICE, null));
     expect(buildToastXml(NOTICE)).not.toContain('launch=');
     expect(buildToastXml(NOTICE)).not.toContain('activationType');
   });
 
-  it('includeLaunch: true adds launch="seeya://open" activationType="protocol" on the <toast> root', () => {
-    const xml = buildToastXml(NOTICE, true);
+  // V2-T10 item 2: scheme replaces the old boolean includeLaunch.
+  it('scheme "seeya" adds launch="seeya://open" activationType="protocol" on the <toast> root', () => {
+    const xml = buildToastXml(NOTICE, 'seeya');
     expect(xml).toContain('<toast launch="seeya://open" activationType="protocol">');
+  });
+
+  it('scheme "seeya-dev" builds the dev scheme URI instead — never the packaged one', () => {
+    const xml = buildToastXml(NOTICE, 'seeya-dev');
+    expect(xml).toContain('<toast launch="seeya-dev://open" activationType="protocol">');
   });
 });
 
@@ -56,6 +62,37 @@ describe('buildToastScript', () => {
   it('embeds the exact toast XML for this notice', () => {
     const script = buildToastScript(NOTICE);
     expect(script).toContain(buildToastXml(NOTICE));
+  });
+
+  // V2-T10 item 3: no marker at all (scheme === null) — nothing to test, so no Test-Path either.
+  it('with no scheme, never emits a Test-Path check at all', () => {
+    const script = buildToastScript(NOTICE);
+    expect(script).not.toContain('Test-Path');
+  });
+
+  // V2-T10 item 3: the script itself confirms the scheme's registry key still exists — no
+  // separate process, no JS-side decision baked in ahead of time.
+  it('with a scheme, tests HKCU:\\Software\\Classes\\<scheme> before loading the launch XML', () => {
+    const script = buildToastScript(NOTICE, 'seeya');
+    expect(script).toContain("Test-Path 'HKCU:\\Software\\Classes\\seeya'");
+    expect(script).toContain(buildToastXml(NOTICE, 'seeya'));
+    expect(script).toContain(buildToastXml(NOTICE, null));
+  });
+
+  it('tests the dev scheme key, not the packaged one, when scheme is "seeya-dev"', () => {
+    const script = buildToastScript(NOTICE, 'seeya-dev');
+    expect(script).toContain("Test-Path 'HKCU:\\Software\\Classes\\seeya-dev'");
+    expect(script).not.toContain("Classes\\seeya'");
+  });
+
+  it('the conditional falls back to the plain XML in the else branch', () => {
+    const script = buildToastScript(NOTICE, 'seeya');
+    const elseIndex = script.indexOf('} else {');
+    const plainXmlIndex = script.indexOf(
+      escapeForPowerShellSingleQuotedString(buildToastXml(NOTICE, null)),
+    );
+    expect(elseIndex).toBeGreaterThan(-1);
+    expect(plainXmlIndex).toBeGreaterThan(elseIndex);
   });
 });
 
@@ -122,49 +159,63 @@ describe('WindowsToastBackend — send', () => {
     await expect(backend.send(NOTICE)).rejects.toThrow(/exited 1.*boom/s);
   });
 
-  // V2-T5b item 5.
-  it('with no isProtocolHandlerRegistered injected, never includes launch (D-025: no check, no marker)', async () => {
+  // V2-T5b item 5, reshaped by V2-T10 item 2.
+  it('with no activeProtocolScheme injected, never includes launch (D-025: no check, no marker)', async () => {
     const runner = new RecordingCommandRunner();
     const backend = new WindowsToastBackend({ run: runner.run });
 
     await backend.send(NOTICE);
 
-    expect(runner.calls[0]?.args).toEqual(buildPowerShellArgs(buildToastScript(NOTICE, false)));
+    expect(runner.calls[0]?.args).toEqual(buildPowerShellArgs(buildToastScript(NOTICE, null)));
   });
 
-  it('isProtocolHandlerRegistered resolving true includes launch on the sent toast', async () => {
+  it('activeProtocolScheme resolving "seeya" includes launch on the sent toast', async () => {
     const runner = new RecordingCommandRunner();
     const backend = new WindowsToastBackend({
       run: runner.run,
-      isProtocolHandlerRegistered: () => Promise.resolve(true),
+      activeProtocolScheme: () => Promise.resolve('seeya'),
     });
 
     await backend.send(NOTICE);
 
-    expect(runner.calls[0]?.args).toEqual(buildPowerShellArgs(buildToastScript(NOTICE, true)));
+    expect(runner.calls[0]?.args).toEqual(buildPowerShellArgs(buildToastScript(NOTICE, 'seeya')));
   });
 
-  it('isProtocolHandlerRegistered resolving false omits launch', async () => {
+  it('activeProtocolScheme resolving "seeya-dev" builds the dev scheme toast', async () => {
     const runner = new RecordingCommandRunner();
     const backend = new WindowsToastBackend({
       run: runner.run,
-      isProtocolHandlerRegistered: () => Promise.resolve(false),
+      activeProtocolScheme: () => Promise.resolve('seeya-dev'),
     });
 
     await backend.send(NOTICE);
 
-    expect(runner.calls[0]?.args).toEqual(buildPowerShellArgs(buildToastScript(NOTICE, false)));
+    expect(runner.calls[0]?.args).toEqual(
+      buildPowerShellArgs(buildToastScript(NOTICE, 'seeya-dev')),
+    );
   });
 
-  it('a throwing isProtocolHandlerRegistered reads as false, never derails the send itself', async () => {
+  it('activeProtocolScheme resolving null omits launch', async () => {
     const runner = new RecordingCommandRunner();
     const backend = new WindowsToastBackend({
       run: runner.run,
-      isProtocolHandlerRegistered: () => Promise.reject(new Error('boom')),
+      activeProtocolScheme: () => Promise.resolve(null),
     });
 
     await backend.send(NOTICE);
 
-    expect(runner.calls[0]?.args).toEqual(buildPowerShellArgs(buildToastScript(NOTICE, false)));
+    expect(runner.calls[0]?.args).toEqual(buildPowerShellArgs(buildToastScript(NOTICE, null)));
+  });
+
+  it('a throwing activeProtocolScheme reads as null, never derails the send itself', async () => {
+    const runner = new RecordingCommandRunner();
+    const backend = new WindowsToastBackend({
+      run: runner.run,
+      activeProtocolScheme: () => Promise.reject(new Error('boom')),
+    });
+
+    await backend.send(NOTICE);
+
+    expect(runner.calls[0]?.args).toEqual(buildPowerShellArgs(buildToastScript(NOTICE, null)));
   });
 });

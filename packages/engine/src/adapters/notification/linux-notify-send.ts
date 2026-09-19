@@ -8,17 +8,22 @@
  * it exactly once, for `default`, the same "click the body, not a button" semantics D-034 already
  * settled for Windows.
  *
- * **Only offered when there is somewhere for the click to go.** `isProtocolHandlerRegistered`
- * (constructor option, defaults to "always false" like `windows-toast.ts`'s own) mirrors
- * `Storage.readProtocolHandlerRegistered()` — no marker, no `-A`, exactly the toast this project
+ * **Only offered when there is somewhere for the click to go.** `activeProtocolScheme`
+ * (constructor option, defaults to "always null" like `windows-toast.ts`'s own) mirrors
+ * `Storage.readActiveProtocolScheme()` — no marker, no `-A`, exactly the toast this project
  * already sent before this task (D-025). And **only when the installed `notify-send` understands
  * `--action` at all**: measured inside the `verificar:linux` container (`node:22-bookworm` +
  * `libnotify-bin` 0.8.1-1 from Debian bookworm's own repository, 2026-09-17) — `notify-send
  * --version` prints `notify-send 0.8.1`, and `notify-send --help` documents `-A, --action=
  * [NAME=]Text...` ("Implies --wait"). The task's own instruction names 0.7.10 as the version that
  * introduced the flag; below that, this backend sends the exact same plain toast it always did.
+ * **V2-T10 item 2:** the URL a click ultimately opens is `<scheme>://open`, built from whichever
+ * scheme `activeProtocolScheme` resolves to — never a hardcoded `seeya://open`, even though in
+ * practice Linux only ever sees `null` or `'seeya'` today (item 1's own "o que entra": no
+ * `.desktop` file exists for a dev checkout there to register `seeya-dev` with).
  */
 import type { Notice } from '../../core/ports.js';
+import type { ProtocolScheme } from '../../core/types.js';
 import type { CommandRunner, DetachedCommandRunner, NotificationBackend } from './backend.js';
 import { spawnCommand, spawnDetachedListening } from './backend.js';
 
@@ -75,12 +80,15 @@ export interface LinuxNotifySendBackendOptions {
   readonly platform?: NodeJS.Platform;
   readonly command?: string;
   readonly run?: CommandRunner;
-  /** V2-T8 item 4: mirrors `WindowsToastBackendOptions`'s own field of the same name exactly —
-   * whoever builds this backend (`adapters/notification/index.ts#buildDefaultBackends`) injects
-   * `Storage.readProtocolHandlerRegistered()` when it has a `Storage` to read (D-020: this adapter
-   * has none of its own). Defaults to "always false", the same safe default the Windows backend
-   * uses. */
-  readonly isProtocolHandlerRegistered?: () => Promise<boolean>;
+  /** V2-T8 item 4, reshaped by V2-T10 item 2: mirrors `WindowsToastBackendOptions`'s own field of
+   * the same name exactly — whoever builds this backend
+   * (`adapters/notification/index.ts#buildDefaultBackends`) injects
+   * `Storage.readActiveProtocolScheme()` when it has a `Storage` to read (D-020: this adapter has
+   * none of its own). Defaults to "always null", the same safe default the Windows backend uses.
+   * In practice this is always `null` or `'seeya'` on Linux (V2-T10 item 1's own "o que entra": a
+   * dev checkout never registers `seeya-dev` there, no `.desktop` file exists to carry it), but
+   * this backend reads whatever scheme comes back rather than assuming which one. */
+  readonly activeProtocolScheme?: () => Promise<ProtocolScheme | null>;
   /** Test seam for the `--wait`ed, detached click listener `send()` spawns when it decides to offer
    * the click — never the same as `run` above, which AWAITS the process's exit; see
    * `backend.ts#DetachedLaunch`'s own docstring for why `send()` cannot use `run` for this. */
@@ -91,8 +99,13 @@ export interface LinuxNotifySendBackendOptions {
   readonly openProtocolUrl?: (url: string) => Promise<void>;
 }
 
-const PROTOCOL_LAUNCH_URL = 'seeya://open';
 const CLICKED_ACTION_ID = 'default';
+
+/** V2-T10 item 2: builds `<scheme>://open` from whichever scheme is active — never a hardcoded
+ * `seeya://open` any more (mirrors `windows-toast.ts#protocolLaunchUri`). */
+function protocolLaunchUrl(scheme: ProtocolScheme): string {
+  return `${scheme}://open`;
+}
 
 /** Real implementation of `openProtocolUrl` — `xdg-open <url>`, hidden (D-038) and awaited (this
  * one is short-lived: `xdg-open` itself forks its own long-running handler and exits quickly). Not
@@ -117,7 +130,7 @@ export class LinuxNotifySendBackend implements NotificationBackend {
   private readonly platform: NodeJS.Platform;
   private readonly command: string;
   private readonly run: CommandRunner;
-  private readonly isProtocolHandlerRegistered: () => Promise<boolean>;
+  private readonly activeProtocolScheme: () => Promise<ProtocolScheme | null>;
   private readonly spawnDetached: DetachedCommandRunner;
   private readonly openProtocolUrl: (url: string) => Promise<void>;
 
@@ -125,8 +138,7 @@ export class LinuxNotifySendBackend implements NotificationBackend {
     this.platform = options.platform ?? process.platform;
     this.command = options.command ?? 'notify-send';
     this.run = options.run ?? spawnCommand;
-    this.isProtocolHandlerRegistered =
-      options.isProtocolHandlerRegistered ?? (() => Promise.resolve(false));
+    this.activeProtocolScheme = options.activeProtocolScheme ?? (() => Promise.resolve(null));
     this.spawnDetached = options.spawnDetached ?? spawnDetachedListening;
     this.openProtocolUrl = options.openProtocolUrl ?? xdgOpen;
   }
@@ -149,26 +161,28 @@ export class LinuxNotifySendBackend implements NotificationBackend {
   }
 
   async send(notice: Notice): Promise<void> {
-    if (!(await this.shouldOfferClickAction())) {
+    const scheme = await this.resolveClickActionScheme();
+    if (scheme === null) {
       await this.sendPlain(notice);
       return;
     }
-    await this.sendWithClickAction(notice);
+    await this.sendWithClickAction(notice, scheme);
   }
 
-  /** V2-T8 item 4's own gate: a click has somewhere to go (the marker exists) AND the installed
-   * `notify-send` actually understands `--action`. Either `false` falls back to `sendPlain` —
-   * exactly the toast this project already sent before this task. */
-  private async shouldOfferClickAction(): Promise<boolean> {
-    const registered = await this.isProtocolHandlerRegistered().catch(() => false);
-    if (!registered) {
-      return false;
+  /** V2-T8 item 4's own gate, reshaped by V2-T10 item 2 to carry WHICH scheme to open: a click
+   * has somewhere to go (the marker names an active `ProtocolScheme`) AND the installed
+   * `notify-send` actually understands `--action`. `null` falls back to `sendPlain` — exactly the
+   * toast this project already sent before this task. */
+  private async resolveClickActionScheme(): Promise<ProtocolScheme | null> {
+    const scheme = await this.activeProtocolScheme().catch(() => null);
+    if (scheme === null) {
+      return null;
     }
     const probe = await this.run(this.command, ['--version']).catch(() => undefined);
     if (probe === undefined || probe.exitCode !== 0) {
-      return false;
+      return null;
     }
-    return versionSupportsActionFlag(parseNotifySendVersion(probe.stdout));
+    return versionSupportsActionFlag(parseNotifySendVersion(probe.stdout)) ? scheme : null;
   }
 
   private async sendPlain(notice: Notice): Promise<void> {
@@ -187,13 +201,13 @@ export class LinuxNotifySendBackend implements NotificationBackend {
    * eventual click (or timeout, or dismissal) is handled by `handleClickResult` as a background
    * continuation, never awaited here.
    */
-  private async sendWithClickAction(notice: Notice): Promise<void> {
+  private async sendWithClickAction(notice: Notice, scheme: ProtocolScheme): Promise<void> {
     const launch = this.spawnDetached(this.command, buildNotifySendArgs(notice, true));
     const started = await launch.spawned;
     if (!started) {
       throw new Error(`notify-send (with click action) failed to start — command: ${this.command}`);
     }
-    void launch.closed.then((result) => this.handleClickResult(result));
+    void launch.closed.then((result) => this.handleClickResult(result, scheme));
   }
 
   /** `result.stdout` is exactly the clicked action's NAME (`notify-send --help`'s own wording,
@@ -201,7 +215,10 @@ export class LinuxNotifySendBackend implements NotificationBackend {
    * other value (a different action id, empty, whitespace) is not the click this project cares
    * about and is silently ignored, not an error: a person dismissing a notification is normal, not
    * a defect to report. */
-  private async handleClickResult(result: { readonly stdout: string }): Promise<void> {
+  private async handleClickResult(
+    result: { readonly stdout: string },
+    scheme: ProtocolScheme,
+  ): Promise<void> {
     if (result.stdout.trim() !== CLICKED_ACTION_ID) {
       return;
     }
@@ -209,6 +226,6 @@ export class LinuxNotifySendBackend implements NotificationBackend {
     // just means the window never comes to front — no different from D-034's "notice, not a
     // decision" scope for this click, and nothing left in this project would be able to report a
     // failure this late anyway (the daemon has already moved on).
-    await this.openProtocolUrl(PROTOCOL_LAUNCH_URL).catch(() => {});
+    await this.openProtocolUrl(protocolLaunchUrl(scheme)).catch(() => {});
   }
 }

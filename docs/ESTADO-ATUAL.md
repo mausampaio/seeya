@@ -31,7 +31,22 @@ inspecionados num contêiner Debian descartável (`.deb` **instalado de verdade*
 install`, com o daemon real confirmado funcionando a partir do pacote) — falta a revisão do PO, a
 mesclagem, o workflow manual, e o aceite do mantenedor (instalar de verdade no Linux e no Windows
 dele, abrir pelo menu, subir o daemon pela janela, clicar num aviso prévio). Ver
-`docs/QUESTOES.md` Q-078 para os números medidos e o que ficou pendente.
+`docs/QUESTOES.md` Q-078 para os números medidos e o que ficou pendente. **A V2-T10 (o
+clique no toast abre a janela certa: um esquema por mundo, o marcador segue a última janela
+aberta, o `Test-Path` embutido no script do toast, a desinstalação do NSIS limpando a chave) está
+pronta numa worktree isolada**, em dois commits (não quatro — razão em Q-080), portão local verde
+no Windows (182 arquivos, 1.862 testes, 4 pulados; cobertura 96,54%/92,98%/95,45%/96,94%) e no
+contêiner Linux (`verificar:linux`: 182 arquivos, 1.861 testes, 5 pulados; cobertura
+96,38%/92,88%/95,18%/96,79%); o instalador NSIS real foi construído para inspecionar o script
+gerado (a linha `!include
+".../build/installer.nsh"` aparece em `dist-installer/builder-debug.yml`, os binários compilados
+não são grepáveis) e depois apagado — o app nunca foi instalado; o mecanismo `Test-Path` do toast
+foi medido contra uma chave de registro sintética e descartável (`seeya-test-017276cf`, criada e
+apagada nesta sessão), nunca contra `seeya`/`seeya-dev` reais. Falta a revisão do PO, a mesclagem,
+e o aceite manual do mantenedor (instalar o app empacotado e usar a versão de desenvolvimento ao
+mesmo tempo, clicar num toast de cada e confirmar que o clique segue a última janela aberta;
+depois desinstalar e confirmar que a chave `seeya` sumiu do registro). Ver `docs/QUESTOES.md`
+Q-080 para os detalhes.
 
 ## Onde o código está
 

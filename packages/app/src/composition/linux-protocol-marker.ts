@@ -1,10 +1,11 @@
 /**
  * V2-T8 item 4: whether this run of the packaged app has good reason to believe `seeya://` is
  * registered on Linux — the fact `linux-notify-send.ts`'s own click-action gate reads through
- * `Storage.readProtocolHandlerRegistered()` (D-025).
+ * `Storage.readActiveProtocolScheme()` (D-025, reshaped from a boolean by V2-T10 item 2 — always
+ * `'seeya'` on Linux, never `'seeya-dev'`, see this file's own docstring below).
  *
- * **Why this can't be the same mechanism as Windows.** `electron/main.ts#registerSeeyaProtocolHandler`
- * calls `app.setAsDefaultProtocolClient('seeya')` and trusts its own boolean return — Electron
+ * **Why this can't be the same mechanism as Windows.** `electron/main.ts#registerProtocolHandler`
+ * calls `app.setAsDefaultProtocolClient(scheme)` and trusts its own boolean return — Electron
  * itself performs the registration AND reports whether it worked. On Linux, Electron's own docs
  * are explicit that this method "is only implemented on macOS and Windows"; registration there
  * comes entirely from the package's own `.desktop` file (`MimeType=x-scheme-handler/seeya;`),
@@ -25,7 +26,7 @@
  * third one is added without updating this function.
  *
  * `platform !== 'linux'` and an unpackaged dev launch (`npm run app`) both return `false` outright
- * — dev has no `.desktop` file to begin with (same reasoning `registerSeeyaProtocolHandler`'s own
+ * — dev has no `.desktop` file to begin with (same reasoning `registerProtocolHandler`'s own
  * docstring gives for skipping Windows registration there).
  *
  * @example

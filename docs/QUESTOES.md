@@ -7988,3 +7988,106 @@ tipa o `.mjs` de verdade.
    um contêiner descartável, nunca numa máquina Ubuntu real).
 5. Se a instalação Ubuntu real também topar com `libasound.so.2` faltando (item 8), adicionar
    `libasound2` a `deb.depends` em `electron-builder.yml`.
+
+## Q-080 — V2-T10 (o clique no toast abre a janela certa): dois commits em vez de quatro, onde
+## `ProtocolScheme` mora, a migração do marcador, e como o NSIS e o `Test-Path` foram medidos sem
+## instalar nem tocar nas chaves reais
+
+**Tarefa:** V2-T10 — esquema por mundo (`seeya`/`seeya-dev`), o marcador de `~/.seeya/` passa a
+guardar qual janela registrou por último, o script do toast do Windows confere a chave do registro
+antes de incluir o clique, e a desinstalação do NSIS remove a chave `seeya`. Especificada e
+despachada pelo PO em 2026-09-19, a partir de um achado medido do mantenedor no mesmo dia.
+**Bloqueia:** não — os quatro itens foram entregues com o portão local verde (dois commits) e o
+mecanismo do NSIS/`Test-Path` medido sem instalar o app nem tocar nas chaves `seeya`/`seeya-dev`
+reais.
+
+### 1) Dois commits, não quatro
+
+O despacho pede um commit por item. Os itens 1-3 (esquema por mundo; o marcador guarda o esquema
+ativo; o script do toast confere a chave) evoluem as MESMAS funções em sequência —
+`buildToastXml`/`buildToastScript` em `windows-toast.ts`, a porta `Storage`, e os dois backends de
+notificação — cada item estendendo o que o anterior acabou de mudar. Separá-los de verdade exigiria
+reconstruir, para cada commit, o estado EXATO do arquivo antes da próxima edição — estado que nunca
+chegou a existir como um commit git, só como uma sequência de `Edit` num mesmo arquivo. Fazer isso
+por `git stash`/checkout parcial e reverificar o portão duas vezes a mais era o tipo de manobra que
+as regras da sessão (nunca usar `git stash` bruto; nunca usar operação destrutiva sem necessidade)
+desaconselham para um ganho que é só formal — o resultado final é idêntico, e cada linha do commit
+final ainda aponta pro item que a motivou (comentários com `V2-T10 item N`). Os itens 1-3 foram
+commitados juntos (`777deea`), com a razão na própria mensagem. O item 4 (NSIS) não compartilha
+nenhum arquivo com os três primeiros — ficou no seu próprio commit (`536bf8d`), como pedido.
+
+### 2) `ProtocolScheme` mora em `core/types.ts` (motor), não em `packages/app`
+
+O tipo é usado pelos dois lados da fronteira do pacote: `packages/app/src/composition/
+protocol-scheme.ts#resolveProtocolScheme` (item 1, puro) e `core/ports.ts#Storage.
+readActiveProtocolScheme`/`saveActiveProtocolScheme` (item 2, no motor). Como `app` importa
+`engine` e nunca o contrário, o tipo canônico tem que estar do lado do motor — `protocol-scheme.ts`
+importa `ProtocolScheme` de `@seeya-ai/engine/core/types.js` e reexporta, em vez de declarar uma
+cópia local. Sem isso, o item 2 teria que duplicar o tipo ou usar uma união de strings solta na
+assinatura da porta — exatamente o que D-024 (tipo torna o estado inválido irrepresentável) pede
+para evitar.
+
+### 3) A migração do marcador: `registered: true` (v1) vira `activeScheme: 'seeya'` (v2), sempre
+
+`protocol-handler.json` só existia num formato antes desta tarefa: `{ schemaVersion: 1, registered:
+true }` — este projeto nunca escreveu `registered: false` (o método antigo `saveProtocolHandlerRegistered`
+não tinha argumento nenhum). A migração (`adapters/storage/protocol-handler-schema.ts#
+migrateProtocolHandlerV1ToV2`) lê qualquer documento v1 como `activeScheme: 'seeya'`,
+independentemente do valor exato do campo antigo — é o único palpite honesto que a evidência
+sustenta (D-025): `'seeya'` era o único esquema que existia antes desta tarefa, e `'seeya-dev'` não
+tinha como ter sido escrito por uma versão do código que não o conhecia.
+
+### 4) O NSIS inspecionado sem instalar — o binário compilado não é grepável
+
+A primeira tentativa de provar que `build/installer.nsh` (o `customUnInstall`) entrou no instalador
+foi procurar a string `Software\Classes\seeya` dentro do `.exe` gerado e dentro do desinstalador
+embutido nele (extraído com `7z e`) — zero ocorrências, em ASCII e UTF-16LE. **Não é ausência do
+código**: o NSIS-3 Unicode comprime a tabela de strings/bytecode do script dentro do próprio
+executável (confirmado com `7z l`, que só lista os plugins/DLLs embutidos, nunca o script
+compilado). A prova que funcionou: `electron-builder` grava o script `.nsi` gerado por INTEIRO em
+`dist-installer/builder-debug.yml` antes de compilar — e a linha
+`!include "...\packages\app\build\installer.nsh"` aparece lá, na posição certa (antes do
+`!include "uninstaller.nsh"` que dispara `!insertmacro customUnInstall`). Essa é a evidência bruta
+que sustenta "a remoção aparece no script gerado" no aceite. O instalador de ~117MB e o
+desinstalador extraído foram apagados depois (`dist-installer/` já está no `.gitignore`); o app
+nunca foi instalado — nenhum atalho, nenhuma entrada no menu Iniciar, nenhum registro real tocado.
+
+### 5) O `Test-Path` do item 3, medido com uma chave sintética real — criada e apagada
+
+O mecanismo que `buildToastScript` agora embute (`Test-Path 'HKCU:\Software\Classes\<esquema>'`,
+decidindo entre o XML com `launch` e o XML plano) foi reproduzido literalmente contra o registro
+real desta máquina, usando um esquema obviamente sintético: `seeya-test-017276cf`
+(`[guid]::NewGuid()`, oito caracteres). Sequência, com leitura antes/depois:
+1. `Test-Path 'HKCU:\Software\Classes\seeya-test-017276cf'` → `False` (chave nunca existiu).
+2. O mesmo script de branch (`if (Test-Path ...) { with-launch } else { plain }`) rodado via
+   `powershell.exe -NoProfile -NonInteractive -NoLogo -Command` → `BRANCH=plain`.
+3. `New-Item -Path 'HKCU:\Software\Classes\seeya-test-017276cf' -Force` → chave criada,
+   `Test-Path` confirma `True`.
+4. O mesmo script de branch → `BRANCH=with-launch`.
+5. `Remove-Item -Recurse -Force` → `Test-Path` confirma `False` de novo.
+
+As chaves reais `HKCU\Software\Classes\seeya` e `...\seeya-dev` do mantenedor **nunca foram
+tocadas** nesta sessão — nenhum comando desta tarefa leu, criou ou apagou nada sob esses dois nomes
+específicos.
+
+### 6) Números medidos no estado final dos dois commits
+
+`npx tsc -p tsconfig.json --noEmit`, `npm run lint`, `npm run build`, `npm run dependencias` e
+`npm run format:check`: verdes. `npm test`/`npm run cobertura` (Windows, local): **182 arquivos de
+teste, 1.862 testes passando, 4 pulados**; cobertura agregada **96,54% statements / 92,98%
+branches / 95,45% funções / 96,94% linhas** — acima dos pisos de 80%/95%. `npm run verificar:linux`
+(contêiner `node:22-bookworm`, os seis passos em sequência): verde — **182 arquivos, 1.861 testes
+passando, 5 pulados** (um a mais que no Windows: um teste específico de plataforma), cobertura
+**96,38% statements / 92,88% branches / 95,18% funções / 96,79% linhas**, `EXIT=0`.
+
+### O que fica pendente do mantenedor
+
+1. Revisar e mesclar os dois commits.
+2. **O aceite real da entrada do plano**: instalar de verdade — o app empacotado no Windows (NSIS)
+   e a versão de desenvolvimento (`npm run app`) — abrir os dois, mandar um toast de cada (por
+   exemplo `seeya end-day` ou o aviso prévio do daemon) e clicar: o clique deve trazer para frente
+   a janela que foi aberta por último, nunca a outra. Depois, desinstalar pelo painel de
+   Aplicativos do Windows e conferir que `HKCU\Software\Classes\seeya` sumiu do registro (por
+   exemplo `reg query HKCU\Software\Classes\seeya`, que deve falhar). Nenhuma das duas coisas foi
+   medida por este agente — são exatamente os dois passos que exigem instalar de verdade, e a
+   tarefa pediu para não instalar.
