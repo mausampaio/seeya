@@ -5496,7 +5496,8 @@ texto, mas não são a fila.
 
 - [ ] **V2-T9 — A sessão que mudou de diretório: detectar, mostrar e deixar escolher onde
       retomar (D-024, D-025, D-039).** Especificada pelo PO em 2026-09-19 a partir de um achado do
-      mantenedor no mesmo dia; **aguarda aprovação do mantenedor antes de qualquer despacho.**
+      mantenedor no mesmo dia; **aprovada e despachada pelo mantenedor no mesmo dia, com o item 4
+      incluído** (um segundo achado dele, na mesma linha do painel).
 
       **O achado.** A sessão do PO rodou em `C:\code` até 14/09 e, depois de ser retomada à mão a
       partir de `C:\code\seeya` no dia 16, o seeya passou a retomá-la sempre lá: ele retoma onde a
@@ -5536,6 +5537,23 @@ texto, mas não são a fila.
       3. **A CLI avisa, sem perguntar:** o `seeya start-day` imprime a mesma nota ao listar a
          sessão, e retoma no diretório mais recente como hoje; a escolha fica com a interface
          (uma pergunta a mais no terminal para um caso raro não se paga).
+      4. **"Já retomada" deixa de bloquear; "rodando agora" passa a bloquear (só no painel).**
+         Achado do mantenedor em 2026-09-19: ele retomou a sessão do PO pelo painel de manhã,
+         reinstalou o app (o que fechou a aba e matou a sessão), e o painel passou a mostrar
+         "already resumed today" sem caixa — medido: o `resumed.json` do dia do briefing lista a
+         sessão, e o painel esconde a caixa de quem está nele (`state/today-panel.ts`
+         `alreadyResumed`). A regra veio da S3-T3 (o `start-day` não reabrir tudo se rodar duas
+         vezes) e confunde **"foi retomada"** com **"está rodando agora"**. Regra nova no painel,
+         a partir da descoberta de sessões que ele já faz a cada ciclo: sessão **viva** (numa aba
+         ou num terminal — a descoberta vê os dois) → sem caixa, "running now" (e a marca de aba,
+         se a correspondência por PID existir); sessão **que foi retomada mas não está viva** →
+         caixa de volta, com a nota "resumed earlier, not running now"; sessão nunca retomada →
+         como hoje. Isso protege melhor do que o registro, porque também pega a sessão retomada à
+         mão pelo terminal, que o `resumed.json` nunca viu. O `resumed.json` continua sendo
+         gravado e continua decidindo quando o briefing deixa de estar pendente — só deixa de
+         decidir a caixa. **A CLI não muda**: o `start-day` dela abre uma sessão por vez e espera
+         cada uma terminar, então ao fim todas estão mortas e a regra nova reabriria tudo numa
+         segunda execução; pela D-045 a CLI é ferramenta de apoio.
 
       **O que não entra:** mover ou copiar a memória do Claude Code automaticamente (é dado do
       Claude Code, e o seeya não escreve em `~/.claude/`); detectar mudança de diretório de
@@ -5552,8 +5570,12 @@ texto, mas não são a fila.
       "(no longer exists)"; o seletor oferece só o existente além do mais recente; escolher o
       anterior abre a aba no diretório escolhido (o `claude` falso registra o `cwd` do processo);
       o `seeya start-day` imprime a mesma nota; testes de unidade do recorte e da normalização;
-      portão e CI verdes. **Aceite do mantenedor:** na próxima manhã, a linha desta sessão do PO
-      mostrando "`C:\code` até 14/09; `C:\code\seeya` desde 16/09".
+      para o item 4, testes de unidade da regra (viva → sem caixa; retomada e morta → caixa com
+      a nota; nunca retomada → caixa) e uma captura do painel num `homeDir` descartável com uma
+      sessão sintética retomada e sem processo vivo, mostrando a caixa de volta; portão e CI
+      verdes. **Aceite do mantenedor:** na próxima manhã, a linha desta sessão do PO
+      mostrando "`C:\code` até 14/09; `C:\code\seeya` desde 16/09"; e, depois de fechar o app com uma sessão retomada
+      nele, a caixa dela de volta no painel ao reabrir.
 
 - [~] **V2-T10 — O clique no toast abre a janela certa: um esquema por mundo (`seeya://` e
       `seeya-dev://`), o toast segue a última janela aberta, e a desinstalação limpa o registro
