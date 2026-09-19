@@ -5550,8 +5550,8 @@ texto, mas não são a fila.
 - [ ] **V2-T10 — O clique no toast abre a janela certa: um esquema por mundo (`seeya://` e
       `seeya-dev://`), o toast segue a última janela aberta, e a desinstalação limpa o registro
       (D-025, D-034, D-039).** Especificada pelo PO em 2026-09-19 a partir de um achado do
-      mantenedor no mesmo dia e de uma sugestão dele; **aguarda aprovação do mantenedor antes de
-      qualquer despacho.**
+      mantenedor no mesmo dia e de uma sugestão dele; **aprovada e despachada pelo mantenedor no
+      mesmo dia, antes da V2-T9.**
 
       **O achado, medido.** Um clique num toast abriu a versão de desenvolvimento (o Electron do
       checkout com o `main.js` de `C:\code\seeya`) e não o app instalado que estava aberto — uma
