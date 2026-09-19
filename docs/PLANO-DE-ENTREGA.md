@@ -3836,8 +3836,12 @@ texto, mas não são a fila.
       "estou perdido entre vinte sessões" — a metade de **decidir** o que fazer com cada uma é a
       tela do v2. Interessa agora porque é a base que essa tela vai consumir.
 
-- [~] **S5-T9 — Plano longo não pode custar o histórico da sessão.** Achado em uso real em
-      2026-09-13, na primeira retomada depois do reinício.
+- [x] **S5-T9 — Plano longo não pode custar o histórico da sessão.** Achado em uso real em
+      2026-09-13, na primeira retomada depois do reinício. **Fechada pelo PO em 2026-09-19,
+      arrumação:** a pergunta antes do fallback e o teto de 16.384 foram usados de verdade desde
+      então, pela CLI e pela interface (V2-T4), e a V2-T7 acrescentou a terceira resposta
+      ("retomar sem o plano"), aceita pelo mantenedor em 2026-09-17 no caso real que motivou as
+      duas.
 
       **O que aconteceu, medido no terminal do mantenedor:** o `start-day` escolheu o briefing
       pendente de 06/09 e, para a sessão `code-6d`, imprimiu: *"yesterday's plan is too long to
@@ -3918,9 +3922,13 @@ texto, mas não são a fila.
 
 ## v2 — o projeto como unidade (rumo em `docs/V2-RUMO.md`)
 
-- [~] **V2-T0 — Spike M: o terminal embutido.** Aprovado pelo mantenedor em 2026-09-13. Medido no
+- [x] **V2-T0 — Spike M: o terminal embutido.** Aprovado pelo mantenedor em 2026-09-13. Medido no
       Windows em 2026-09-13 (registro completo em `docs/spikes/M-terminal-embutido.md`); Linux e
-      macOS ficam para o mantenedor, na máquina dele.
+      macOS ficam para o mantenedor, na máquina dele. **Fechado pelo PO em 2026-09-19,
+      arrumação:** a pergunta do spike (a pilha Electron + `xterm.js` + `node-pty` se sustenta?)
+      foi respondida pelo produto — Windows e Linux (o Ubuntu do mantenedor) aceitos na V2-T2, e a
+      interface virou o uso diário. O macOS segue como pendência da V2-T3 (o `posix_spawnp
+      failed`), não deste spike.
 
       **Resultado, item por item:** os seis itens do roteiro foram medidos no Windows e todos
       passaram. (1) Montagem: sobe sem compilar nada nesta máquina — `node-pty` 1.1.0 já vem com
