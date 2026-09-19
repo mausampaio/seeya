@@ -139,7 +139,8 @@ win:
   # confirmed by running `node scripts/dist.mjs --win --dir` before and after this line: before, the
   # log read `default Electron icon is used  reason=application icon is not set`; after, that line is
   # gone and `seeya.exe`'s own icon resource is the seeya `S` (verified by extracting it with
-  # `[System.Drawing.Icon]::ExtractAssociatedIcon`, V2-T11's own report has the byte comparison).
+  # `[System.Drawing.Icon]::ExtractAssociatedIcon` and compared visually with
+  # `design/icons/png/32x32.png`, V2-T11's own report).
   # `.ico` also covers the NSIS installer/uninstaller icon — electron-builder's own default reuses
   # `win.icon` for both, no separate `nsis.installerIcon`/`uninstallerIcon` needed.
   icon: ../../design/icons/icon.ico
