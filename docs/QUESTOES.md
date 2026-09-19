@@ -8091,3 +8091,170 @@ passando, 5 pulados** (um a mais que no Windows: um teste específico de platafo
    exemplo `reg query HKCU\Software\Classes\seeya`, que deve falhar). Nenhuma das duas coisas foi
    medida por este agente — são exatamente os dois passos que exigem instalar de verdade, e a
    tarefa pediu para não instalar.
+
+## Q-079 — V2-T9 (a sessão que mudou de diretório): a porta nova, o formato do "recorte", a
+## caixa por vivacidade, e o que fica pendente do mantenedor
+
+**Tarefa:** V2-T9 — histórico de diretórios da sessão: detectar, mostrar e deixar escolher onde
+retomar, mais o item 4 (a caixa do painel "Hoje" por vivacidade, não por `resumed.json`).
+Especificada pelo PO em 2026-09-19 a partir de um achado do mantenedor no mesmo dia (a sessão do
+PO retomada sempre em `C:\code\seeya`, perdendo a memória gravada em `C:\code`); aprovada e
+despachada pelo mantenedor no mesmo dia, com o item 4 incluído.
+**Bloqueia:** não — os quatro itens foram entregues em quatro commits de código separados (um por
+item, como o despacho pediu — nenhum precisou ser juntado, ao contrário de V2-T7/V2-T8), mais este
+de documentação, com o portão local completo verde a cada um.
+
+### 1) `DirectoryExistence` é uma porta nova, separada de `Storage` — decisão tomada, registrada
+### aqui por não estar em `docs/ARQUITETURA.md`'s § "Portas"
+
+O item 1 pede "se cada diretório ainda existe (porta de sistema de arquivos, D-025)". Não existia
+nenhuma porta genérica de "este caminho existe no disco" no projeto — `Storage` é inteiro sobre
+`~/.seeya/` (a raiz injetável, D-027), e um `cwd` de sessão antigo é um diretório que este projeto
+não é dono e nunca escreve. Em vez de esticar `Storage` para um método que não tem nada a ver com
+o resto do contrato dela, criei `core/ports.ts#DirectoryExistence` (`exists(cwd): Promise<boolean>`)
+nova, implementada em `adapters/filesystem/directory-existence.ts#FsDirectoryExistence` (um `fs.promises.stat`,
+nunca lança — path ausente, permissão negada ou "é arquivo, não diretório" colapsam no mesmo `false`
+honesto, D-025). `adapters/filesystem/` é uma pasta nova dentro de `adapters/` — não uma sexta
+camada da matriz (a matriz continua sobre as cinco camadas do motor + `cli`, D-043), só mais uma
+subpasta de `adapters/`, do mesmo jeito que `discovery/`/`git/`/`storage/` já são. `docs/ARQUITETURA.md`
+§ "Camadas" lista as subpastas de `adapters/` no diagrama ASCII e não foi editado (exige aprovação
+do PO) — fica aqui a nota para quem quiser dobrar a linha nova lá dentro.
+
+### 2) O "recorte" (`collapseCwdRuns`) e a leitura (`readCwdHistory`) ficaram no MESMO arquivo,
+### não core/ + application/ como `find-pending-briefing.ts`/`pending-briefing.ts` fazem
+
+O despacho diz "função pura para o recorte da sequência, com teste; a leitura na aplicação" — li
+isso como "as duas responsabilidades são distintas e testáveis separadamente", não necessariamente
+"em dois arquivos, um em `core/`". Testei: `collapseCwdRuns` é pura (sem I/O, sem `Storage`, sem
+`DirectoryExistence`) e tem os próprios testes, direto, sem precisar de nenhum duplo de porta —
+exatamente a garantia que a separação pede. Não a movi para `core/cwd-history.ts` porque nada além
+de `application/cwd-history.ts` precisa dela (diferente de `handoffStillPending`, que
+`state/today-panel.ts` também usaria se existisse essa necessidade) — um arquivo `core/` a mais só
+para uma função sem segundo consumidor teria sido a divisão prematura que este projeto evita em
+outros lugares (ex.: `core/consolidated-plan.ts`'s próprio texto sobre não duplicar
+`renderItemList`). Se o PO preferir a simetria com `find-pending-briefing.ts`, é um `git mv`
+pequeno — sinalizando aqui para não decidir sozinho contra um padrão já estabelecido sem avisar.
+
+### 3) `CwdHistoryEntry.exists` fica `false` dentro de `collapseCwdRuns` (nunca calculado ali) —
+### tipo honesto sobre quem faz I/O
+
+`collapseCwdRuns` não tem acesso a `DirectoryExistence` (é pura), então toda entrada que produz sai
+com `exists: false` — não porque o diretório não existe, mas porque a função não sabe. Cogitei um
+tipo à parte para o resultado do recorte (sem o campo `exists` nenhum) e só acrescentar o campo na
+saída de `readCwdHistory`, mas isso duplicaria `CwdHistoryEntry` em duas formas quase idênticas só
+para um campo — a mesma duplicação que `docs/DECISOES.md` D-024 pede para evitar com união
+discriminada, aplicada aqui ao contrário (um tipo extra evitável). A solução mínima: um único tipo,
+com a garantia de que **todo** `CwdHistoryEntry` que sai de `readCwdHistory` (o único caminho de
+produção real) tem `exists` de verdade — os testes de `collapseCwdRuns` documentam explicitamente
+que o `false` ali é um artefato da função pura, não uma afirmação sobre o mundo (D-025), no próprio
+comentário do teste.
+
+### 4) O texto da nota (`formatCwdHistoryNote`) é decisão minha, não do despacho — "ran in X
+### until D1; in Y since D2" — registrado porque é o tipo de escolha que vira formato
+
+O despacho dá o exemplo em português ("rodou em `C:\code` até 14/09; em `C:\code\seeya` desde
+16/09") mas não fixa a frase em inglês (D-028: CLI/interface nascem em inglês). Escolhi datas no
+formato `Day` já usado em todo o resto da interface/CLI (`YYYY-MM-DD`, o mesmo que
+`todayPlanTitle`/`formatNoPendingBriefing` já mostram) em vez de inventar uma segunda formatação de
+data (`DD/MM`, como o exemplo em português usa) só para esta nota — evita uma segunda lógica de
+data no projeto para um ganho estético pequeno. "(no longer exists)" fica só no diretório que
+sumiu, nunca no atual (testado explicitamente). A CLI (`format-start-day.ts`) e a interface
+(`text/messages.ts`) têm cada uma sua própria função com o mesmo texto — não compartilhada, mesmo
+padrão que Q-073 já registrou para `formatStartDaySummary`/o resumo em DOM: só o dado
+(`CwdHistoryEntry[]`) é compartilhado, a formatação final é de cada raiz de composição.
+
+### 5) O padrão do seletor "Resume in" quando o diretório mais recente NÃO existe mais
+
+O despacho diz "o mais recente como padrão (é o comportamento de hoje)" para o seletor, que só
+oferece diretórios existentes. Não ficou explícito o que fazer se o próprio diretório mais recente
+tiver sido apagado (cenário raro: alguém apaga o worktree ativo entre uma captura e a próxima
+abertura do painel). Decisão tomada com a solução mínima: o padrão é o **mais recente EXISTENTE**
+entre as opções oferecidas (`existing[existing.length - 1]`), nunca um valor fora da lista — um
+`<select>` teria uma opção inválida pré-selecionada do contrário. Se nenhum diretório existir mais
+(inclusive o do handoff do dia), o seletor simplesmente não aparece (`renderResumeInSelect`
+devolve `null`) e a retomada segue com o `cwd` do handoff sem escolha nenhuma, do jeito que já
+funcionava antes desta tarefa — nunca um erro, nunca uma retomada bloqueada. Não medido contra um
+caso real (é degenerado o bastante para não ter aparecido em uso).
+
+### 6) Item 4: "viva" vem da MESMA descoberta do ciclo de 10s, nunca uma segunda `SessionProvider.list()`
+
+O despacho já dizia "a partir da descoberta de sessões que ele já faz a cada ciclo" — a
+implementação segue isso literalmente: `electron/main.ts`'s próprio laço de atualização
+(`runRefreshLoop`) já calcula `buildSidebarRows` a cada 10s; `latestSidebarRows` guarda esse
+resultado num closure, e o handler `getTodayPanel` (chamado sob demanda, pelo clique/refresh do
+painel) lê esse cache em vez de rediscobrir. Consequência honesta, registrada: entre a abertura da
+janela e o primeiro ciclo de 10s (ou logo depois de fechar uma sessão), o painel pode mostrar
+"resumed earlier, not running now"/checkbox por até ~10s depois da sessão já ter morrido de
+verdade, ou o inverso — nunca mais que um ciclo de atraso. Isso é estritamente melhor que o
+`resumed.json` sozinho (que nunca atualiza sem uma nova retomada) e é o comportamento que o próprio
+despacho pede ("a caixa volta com a nota"), então não abri questão de produto sobre isso — só
+registro a janela de atraso para quem for medir.
+
+### 7) `TodayResumeStatus` substitui `alreadyResumed: boolean` — mudança de tipo em toda a cadeia,
+### não um campo a mais
+
+O despacho descreve três estados (`running now` / `resumed earlier, not running now` / como hoje) —
+uma união discriminada era a única forma de tornar "rodando E marcada como retomada" irrepresentável
+como um quarto estado ambíguo (D-024). Isso trocou `TodaySessionRow.alreadyResumed` inteiro, não
+acrescentou um campo — `renderer.ts`/`today-panel.test.ts` mudaram junto no mesmo commit do item 4,
+nunca deixando os dois formatos coexistirem.
+
+### O que foi medido, não só testado por unidade
+
+Testes de unidade cobrindo: `collapseCwdRuns` (única direção, mudança de diretório, revisita depois
+de mudar, normalização por separador/case/barra final reaproveitando `core/cwd-normalization.ts`,
+lista vazia); `readCwdHistory` (o caso real do mantenedor — diretório antigo apagado, atual
+existente —, teto de `maxScanDays` respeitado, dia sem captura pulado, sessão nunca capturada);
+`FsDirectoryExistence` contra um tmpdir real (existe, não existe, é arquivo, diretório aninhado);
+`buildTodayPanelData` com os três `TodayResumeStatus` e o histórico de `cwd` carregado/com fallback;
+`buildLiveSessionIndex` (vivo com/sem aba correspondente, `ended`, sem PID, lista vazia);
+`formatCwdHistoryNote(s)` na CLI, inclusive o `seeya start-day` de ponta a ponta com um handoff
+sintético de dois dias/dois diretórios, um deles inexistente.
+
+**Não medido por este agente — sem tela/teclado, mesmo limite que V2-T4/V2-T7/V2-T5b já
+registraram para `electron/renderer.ts`:** a captura do painel "Hoje" mostrando a nota, o
+"(no longer exists)" e o seletor de verdade; escolher o diretório anterior e ver a aba abrir nele
+(`electron/main.ts`'s própria lógica de troca de `cwd` está coberta só pela leitura de código e
+pelo teste da IPC `resumeSelected`, que hoje não tem handler de teste dedicado — mesmo padrão que
+o resto de `electron/main.ts` já tem, excluído do piso de cobertura por não rodar sem tela, D-042);
+e a captura pedida pelo item 4 (uma sessão sintética retomada e sem processo vivo mostrando a caixa
+de volta). Nenhuma instrumentação nova (`SEEYA_APP_AUTO_*`) foi escrita para essas duas capturas —
+teria exigido projetar um novo hook de verificação (escolher uma opção no `<select>`, ou simular
+"a sessão foi resumida e depois fechada" antes de reabrir o painel) sem precedente direto nos hooks
+existentes, e o tempo restante desta tarefa foi para os quatro itens de código e os testes de
+unidade em vez de um quinto artefato só de verificação. Registrado honestamente, não escondido
+(D-025) — mesmo padrão que Q-077 já aceitou para o diálogo de fallback.
+
+### `npm run verificar` completo, Windows
+
+`format:check`, `tsc -p tsconfig.json --noEmit`, `npm run lint`, `npm run build`, `npm run
+dependencias`: verdes. `npm run cobertura -- --maxWorkers 2`: **184 arquivos de teste, 1.898 testes
+passando, 4 pulados**; cobertura agregada **96,45% statements / 92,56% branches / 95,31% funções /
+96,85% linhas** — `core/` 100%/99,19%/100%/100%, todo o resto acima do piso de 80%.
+
+### `npm run verificar:linux`
+
+Contêiner `node:22-bookworm`, `EXIT=0`: **184 arquivos de teste, 1.897 testes passando, 5
+pulados** (um a mais que no Windows — a mesma variação plataforma-condicional já registrada em
+tarefas anteriores, não uma regressão desta); cobertura agregada **96,30% statements / 92,45%
+branches / 95,03% funções / 96,69% linhas**. Achado real no caminho: a primeira execução
+reprovou `tests/unit/application/cwd-history.test.ts` — o exemplo de "duas grafias do mesmo
+diretório" misturava separador **e case** (`C:\code\project` vs. `c:/code/project/`), e
+`collapseCwdRuns` lê o `process.platform` de verdade (mesmo raciocínio de
+`eligibility-assembly.ts`'s próprio `PLATFORM_HINT`) — o dobramento de case só acontece no
+`win32` (D-S3-T5/`core/cwd-normalization.ts`), então o teste passava no Windows e falhava no
+Linux. Corrigido para variar só separador/barra final (independente de plataforma, mesma
+disciplina que `cwd-normalization.test.ts` já usa testando os dois hints explicitamente) — commit
+próprio, `fix(tests): cwd-history's case-folding example was platform-dependent`. Reexecutado
+depois da correção: verde.
+
+### O que fica pendente do mantenedor
+
+1. Revisar e mesclar os quatro commits.
+2. **O aceite real da entrada do plano**: na manhã seguinte, ver a linha da sessão do PO no painel
+   "Hoje" mostrando "`C:\code` até 14/09; `C:\code\seeya` desde 16/09" (ou o texto em inglês
+   equivalente); escolher o diretório anterior no seletor "Resume in" e confirmar que a aba abre
+   lá; e, para o item 4, fechar o app com uma sessão retomada nele e ver a caixa dela de volta no
+   painel ao reabrir.
+3. Item 5 acima (o padrão do seletor quando o mais recente não existe mais) — confirmar que a
+   solução mínima é o comportamento desejado, ou decidir outra coisa.

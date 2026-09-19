@@ -5494,7 +5494,7 @@ texto, mas não são a fila.
       da tarefa** — instalar de verdade no Linux e no Windows do mantenedor e repetir os passos que
       só ele pode confirmar (menu, aba, daemon pela janela, clique no aviso prévio).
 
-- [ ] **V2-T9 — A sessão que mudou de diretório: detectar, mostrar e deixar escolher onde
+- [~] **V2-T9 — A sessão que mudou de diretório: detectar, mostrar e deixar escolher onde
       retomar (D-024, D-025, D-039).** Especificada pelo PO em 2026-09-19 a partir de um achado do
       mantenedor no mesmo dia; **aprovada e despachada pelo mantenedor no mesmo dia, com o item 4
       incluído** (um segundo achado dele, na mesma linha do painel).
@@ -5576,6 +5576,64 @@ texto, mas não são a fila.
       verdes. **Aceite do mantenedor:** na próxima manhã, a linha desta sessão do PO
       mostrando "`C:\code` até 14/09; `C:\code\seeya` desde 16/09"; e, depois de fechar o app com uma sessão retomada
       nele, a caixa dela de volta no painel ao reabrir.
+
+      **Relatório (worktree `agent-abfaa2a55b30f9562`, branch `tarefa/V2-T9-sessao-mudou-diretorio`),
+      medido pelo agente no Windows em 2026-09-19.**
+
+      Os quatro itens foram entregues em quatro commits de código separados, um por item (nenhum
+      precisou ser juntado), mais este de documentação:
+
+      1. **`application/cwd-history.ts`** — `CwdHistoryEntry`/`collapseCwdRuns` (o recorte puro,
+         testado direto) e `readCwdHistory` (a leitura, `Storage.readHandoff` dia a dia, limitada
+         por `maxBriefingScanDays`). Existência de diretório é uma porta nova,
+         `core/ports.ts#DirectoryExistence`, implementada por
+         `adapters/filesystem/directory-existence.ts#FsDirectoryExistence` — separada de `Storage`
+         porque o contrato dela é só sobre `~/.seeya/` (Q-079 item 1). Nenhuma chave nova em disco.
+      2. **`state/today-panel.ts#TodaySessionRow.cwdHistory`**, `electron/main.ts`'s próprio
+         `getTodayPanel` computando um `readCwdHistory` por handoff da lista encontrada, e o
+         renderer mostrando a nota ("ran in X until D1; in Y since D2", com "(no longer exists)" só
+         no diretório que sumiu) mais a linha de explicação, e o `<select>` "Resume in" com os
+         diretórios existentes, o mais recente entre eles como padrão. A escolha viaja pelo IPC
+         (`ResumeSelectedRequest.chosenCwdBySessionId`) e troca o `cwd` do handoff só para aquela
+         tentativa, dentro do `resumeSelected` handler — nada regravado em disco.
+      3. **`cli/format-start-day.ts#formatCwdHistoryNote(s)`**, impresso por
+         `start-day-command.ts` logo depois do plano consolidado — a mesma nota da interface, sem
+         perguntar; a CLI sempre retoma no `cwd` mais recente do handoff, como já fazia.
+      4. **`TodaySessionRow.alreadyResumed: boolean` virou `TodayResumeStatus`**, união
+         discriminada `runningNow`/`resumedEarlier`/`neverResumed` (D-024) —
+         `sidebar/sidebar-data.ts#buildLiveSessionIndex` calcula "vivo" a partir da MESMA
+         descoberta de sessões que o ciclo de 10s do `electron/main.ts` já faz (nunca uma segunda
+         `SessionProvider.list()`), nunca do `resumed.json`; este continua decidindo quando o
+         briefing deixa de estar pendente, só deixa de decidir a caixa. A CLI não muda (D-045: ela
+         abre uma sessão por vez e espera terminar, então uma segunda execução já veria tudo
+         morto de novo).
+
+      Decisões de ferramental (a porta nova, onde ficou o recorte puro, o texto da nota, o padrão
+      do seletor quando o mais recente não existe mais, a janela de atraso do item 4) na Q-079.
+
+      **Medido:** `npm run verificar` completo verde no Windows — `format:check`, `tsc -p
+      tsconfig.json --noEmit`, `npm run lint`, `npm run build`, `npm run dependencias` e `npm run
+      cobertura -- --maxWorkers 2`, cada pedaço rodado e lido em separado (184 arquivos de teste,
+      1.898 testes passando, 4 pulados; agregado 96,45% statements / 92,56% branches / 95,31%
+      funções / 96,85% linhas — `core/` 100%, todo o resto acima do piso de 80%). `npm run
+      verificar:linux` também verde (contêiner `node:22-bookworm`, `EXIT=0`): 184 arquivos de
+      teste, 1.897 testes passando, 5 pulados; cobertura agregada 96,30% statements / 92,45%
+      branches / 95,03% funções / 96,69% linhas. Achado real no caminho, corrigido num commit
+      próprio: o exemplo de normalização em `cwd-history.test.ts` misturava separador e case, e
+      o dobramento de case só existe no hint `win32` — passava no Windows, falhava no Linux; ver
+      Q-079.
+
+      **Não medido pelo agente (sem tela/teclado, mesmo limite já registrado para
+      `electron/renderer.ts` em V2-T4/V2-T5b/V2-T7):** a captura do painel "Hoje" mostrando a
+      nota/seletor de verdade e a aba abrindo no diretório escolhido; a captura do item 4 (sessão
+      retomada e sem processo vivo mostrando a caixa de volta). Nenhum hook `SEEYA_APP_AUTO_*` novo
+      foi escrito para essas duas verificações — decisão de tempo, registrada em Q-079, não um
+      limite técnico novo.
+
+      **O que fica pendente do mantenedor:** revisar e mesclar os quatro commits; o aceite real
+      descrito acima (a linha da sessão do PO, o seletor escolhendo o diretório anterior, e a caixa
+      voltando depois de fechar uma sessão retomada); e a decisão do item 5 da Q-079 (o padrão do
+      seletor quando o diretório mais recente já não existe).
 
 - [~] **V2-T10 — O clique no toast abre a janela certa: um esquema por mundo (`seeya://` e
       `seeya-dev://`), o toast segue a última janela aberta, e a desinstalação limpa o registro
