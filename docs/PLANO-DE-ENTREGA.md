@@ -5547,7 +5547,7 @@ texto, mas não são a fila.
       portão e CI verdes. **Aceite do mantenedor:** na próxima manhã, a linha desta sessão do PO
       mostrando "`C:\code` até 14/09; `C:\code\seeya` desde 16/09".
 
-- [ ] **V2-T10 — O clique no toast abre a janela certa: um esquema por mundo (`seeya://` e
+- [~] **V2-T10 — O clique no toast abre a janela certa: um esquema por mundo (`seeya://` e
       `seeya-dev://`), o toast segue a última janela aberta, e a desinstalação limpa o registro
       (D-025, D-034, D-039).** Especificada pelo PO em 2026-09-19 a partir de um achado do
       mantenedor no mesmo dia e de uma sugestão dele; **aprovada e despachada pelo mantenedor no
@@ -5614,6 +5614,37 @@ texto, mas não são a fila.
       CI verdes. **Aceite do mantenedor:** com o app instalado e o de desenvolvimento, o clique no
       toast abre a janela que ele abriu por último; depois de desinstalar, a chave `seeya` some do
       registro.
+
+      **Entregue em dois commits** (não quatro): os itens 1-3 (esquema por mundo, marcador guarda
+      o esquema ativo, o script do toast confere a chave) evoluem as mesmas funções
+      (`buildToastXml`/`buildToastScript`, a porta `Storage`, os dois backends de notificação)
+      incrementalmente — separá-los exigiria reconstruir estados intermediários do arquivo que
+      nunca chegaram a existir em disco, então foram commitados juntos, com a razão registrada no
+      próprio commit; o item 4 (NSIS) é independente (nenhum arquivo em comum) e ficou no seu
+      próprio commit. Detalhes em Q-080.
+
+      **O que foi medido, não só testado por unidade:** o instalador NSIS real foi construído
+      (`node scripts/dist.mjs --win nsis`) e o script gerado inspecionado — os binários
+      compilados (instalador/desinstalador) guardam a tabela de strings comprimida e não são
+      grepáveis diretamente, então a prova é `dist-installer/builder-debug.yml`'s own
+      `!include ".../packages/app/build/installer.nsh"`, capturado pelo próprio `electron-builder`
+      antes de compilar; os artefatos foram apagados depois (`dist-installer/` já é ignorado pelo
+      git), e o app **nunca foi instalado**. O mecanismo `Test-Path 'HKCU:\Software\Classes\
+      <esquema>'` que o script do toast agora embute foi conferido contra um esquema sintético
+      descartável (`seeya-test-017276cf`) criado e apagado por este agente — chave ausente → ramo
+      sem `launch`; chave presente → ramo com `launch`; apagada ao final. As chaves reais `seeya`/
+      `seeya-dev` nunca foram tocadas.
+
+      Portão local (tsc, eslint, build, dependency-cruiser, format) verde depois de cada commit;
+      `npm test` (182 arquivos, 1.862 testes, 4 pulados) e `npm run cobertura` (96,54%
+      statements / 92,98% branches / 95,45% funções / 96,94% linhas) verdes contra o estado final
+      dos dois commits, no Windows. `npm run verificar:linux` também verde (182 arquivos, 1.861
+      testes, 5 pulados; cobertura 96,38%/92,88%/95,18%/96,79%) — detalhes em Q-080.
+
+      **O que fica pendente do mantenedor:** revisar e mesclar; e o aceite real da entrada acima —
+      instalar de verdade
+      (Windows e Linux), abrir os dois mundos, e confirmar que o clique segue a última janela e que
+      a desinstalação limpa a chave.
 
 ## Definição de pronto (vale para toda tarefa)
 
