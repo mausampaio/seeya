@@ -154,10 +154,15 @@ interface Storage {
 interface ProcessControl {
   isAlive(pid: number, procStart?: string): Promise<boolean>;
   terminateGracefully(pid: number, deadlineMs: number): Promise<boolean>;
+  terminateAbruptly(pid: number): Promise<void>; // só para o próprio daemon do seeya (V2-T5b)
 }
 
 interface Clock {
   now(): Date;
+}
+
+interface DirectoryExistence { // V2-T9, adapters/filesystem/
+  exists(path: string): Promise<boolean>;
 }
 ```
 

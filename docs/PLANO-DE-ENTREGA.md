@@ -5496,8 +5496,15 @@ texto, mas não são a fila.
 
 - [~] **V2-T9 — A sessão que mudou de diretório: detectar, mostrar e deixar escolher onde
       retomar (D-024, D-025, D-039).** Especificada pelo PO em 2026-09-19 a partir de um achado do
-      mantenedor no mesmo dia; **aprovada e despachada pelo mantenedor no mesmo dia, com o item 4
-      incluído** (um segundo achado dele, na mesma linha do painel).
+      mantenedor no mesmo dia; aprovada e despachada pelo mantenedor no mesmo dia, com o item 4
+      incluído (um segundo achado dele, na mesma linha do painel); **mesclada na `main` em
+      2026-09-19** depois de uma rodada de revisão do PO (o módulo de histórico lia a plataforma
+      direto na camada de aplicação; passou a recebê-la das raízes de composição, e o teste que
+      tinha sido enfraquecido voltou, rodando as duas plataformas). Portão na worktree do PO:
+      1.899 passando, 4 pulados; `verificar:linux` verde pelo agente. A porta nova
+      `DirectoryExistence` entrou na lista de portas da ARQUITETURA, junto com o
+      `terminateAbruptly` que a V2-T5b tinha acrescentado ao `ProcessControl` sem atualizar o
+      diagrama. Fica em `[~]` até o aceite do mantenedor.
 
       **O achado.** A sessão do PO rodou em `C:\code` até 14/09 e, depois de ser retomada à mão a
       partir de `C:\code\seeya` no dia 16, o seeya passou a retomá-la sempre lá: ele retoma onde a
