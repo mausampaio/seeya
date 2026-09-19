@@ -328,14 +328,19 @@ mantenedor) e no Windows**.
    viva não depende do modelo de projeto): a lateral nasce com as **sessões descobertas** da
    v1, abas de terminal embutido e o painel de estado (V2-T2, esqueleto); depois `start-day`
    abrindo abas, `pause`/`end-day` e notificações com ações (V2-T3);
-3. `seeya project create`, `list`, `show` e `open`, com o template mínimo (`AGENTS.md`,
+3. **o app como dono do daemon e do autostart** (D-045): posse pelo registro de instalação do
+   sistema, a CLI como cliente, a pergunta única de transição, o `seeya` no `PATH` pelo instalador;
+4. `seeya project create`, `list`, `show` e `open`, com o template mínimo (`AGENTS.md`,
    `INDEX.md`, estado atual, `decisions/`) e a associação de repositórios — e a lateral passa a
-   agrupar as sessões por projeto;
-4. `checkpoint` e `pause`, com a camada de afirmações verificáveis do detector;
-5. `end-day` global, com `priority` e `status`;
-6. sincronização em níveis e continuidade entre dispositivos;
-7. trackers; detecção de sessões sem projeto; camada semântica do detector;
-8. jornada detalhada, depois de o `end-day` global rodar com frentes reais.
+   agrupar as sessões por projeto; **inclui adotar uma sessão existente** (D-045 item 4), com um
+   spike antes (acesso de escrita fora do diretório da sessão no `--resume`, e mensagem inicial
+   na retomada do Codex);
+5. `checkpoint` e `pause`, com a camada de afirmações verificáveis do detector — o `pause`
+   propõe a atualização dos arquivos do projeto no lugar do handoff (D-045 item 3);
+6. `end-day` global, com `priority` e `status` — é dele a visão da manhã;
+7. sincronização em níveis e continuidade entre dispositivos;
+8. trackers; detecção de sessões sem projeto; camada semântica do detector;
+9. jornada detalhada, depois de o `end-day` global rodar com frentes reais.
 
 ## Avaliação do PO (2026-09-10)
 
