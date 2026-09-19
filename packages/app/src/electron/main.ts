@@ -70,7 +70,11 @@ import {
   type TabCollection,
 } from '../tabs/tab-model.js';
 import { describeAutostartState } from '@seeya-ai/engine/application/autostart-state.js';
-import { buildSidebarRows } from '../sidebar/sidebar-data.js';
+import {
+  buildSidebarRows,
+  buildLiveSessionIndex,
+  type SidebarRow,
+} from '../sidebar/sidebar-data.js';
 import { buildStatusPanelText } from '../state/status-panel.js';
 import { runRefreshLoop } from '../state/refresh-loop.js';
 import { resolveTerminalFontOptions } from '../state/terminal-font.js';
@@ -309,6 +313,12 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // Same "closed-over, only this function touches it" reasoning as `tabs` above —
   // `state/autostart-cache.ts`'s own docstring has the caching rule and the measurement behind it.
   let autostartCache: AutostartCacheEntry | null = null;
+  // V2-T9 item 4: the sidebar's own rows from the MOST RECENT refresh tick (below) — "Today"'s
+  // own getTodayPanel handler reuses this instead of a second SessionProvider.list() call, per
+  // the plan entry's own "a partir da descoberta de sessões que ele já faz a cada ciclo". Empty
+  // until the first tick runs, which is fine (D-025): no session is "running now" before this
+  // window has ever discovered any.
+  let latestSidebarRows: readonly SidebarRow[] = [];
   // V2-T4 item 3: at most one truly pending in production (`resumeSessions`'s own sequential
   // loop), but keyed independently by requestId anyway — `PendingFallbackRequests`'s own docstring.
   const pendingFallbackRequests = new PendingFallbackRequests();
@@ -473,7 +483,10 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
         return [handoff.sessionId, history] as const;
       }),
     );
-    return buildTodayPanelData(lookup, new Map(cwdHistoryEntries));
+    // V2-T9 item 4: "running now" from THIS session's own most recent discovery, not from
+    // resumed.json — see buildLiveSessionIndex's own docstring for why the two disagree.
+    const liveSessionIds = buildLiveSessionIndex(latestSidebarRows);
+    return buildTodayPanelData(lookup, new Map(cwdHistoryEntries), liveSessionIds);
   });
 
   // V2-T4 items 1/2/3: "Resume selected" — the same resumeSessions the CLI's start-day-command.ts
@@ -643,6 +656,9 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
       const now = context.clock.now();
 
       const rows = buildSidebarRows(discovery, context.config, now, tabs);
+      // V2-T9 item 4: cached for getTodayPanel's own handler above — the same discovery this
+      // cycle already did, never a second SessionProvider.list() call just for "Today".
+      latestSidebarRows = rows;
       const sessionsEvent: SessionsUpdateEvent = { rows };
       window.webContents.send(CHANNELS.sessionsUpdate, sessionsEvent);
 

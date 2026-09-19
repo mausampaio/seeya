@@ -31,7 +31,10 @@ export const MESSAGES = {
     'resumed.',
   todayPlanTitle: (day: string, daysAgo: number): string =>
     daysAgo === 1 ? `Plan for ${day}` : `Plan for ${day} (${daysAgo} days ago)`,
-  todayAlreadyResumed: 'already resumed today',
+  // V2-T9 item 4: replaces the old todayAlreadyResumed — the checkbox rule now depends on
+  // liveness, not just resumed.json (state/today-panel.ts#TodayResumeStatus).
+  todayRunningNow: 'running now',
+  todayResumedEarlier: 'resumed earlier, not running now',
   todayNoPlanRecorded: 'no plan recorded',
 
   // V2-T9 item 2 — the directory-changed note and the "Resume in" selector

@@ -665,14 +665,21 @@ function renderResumeInSelect(
   return label;
 }
 
-/** One session row in the "Today" panel (V2-T4 item 1) — a checkbox for a still-unresumed
- * session, or a plain note for one already marked resumed today (D-024/D-025: the two are never
- * rendered the same way, same discipline `core/consolidated-plan.ts#renderSessionPlanLine`
- * already applies to the CLI's own plan text). */
+/** One session row in the "Today" panel (V2-T4 item 1, checkbox rule reshaped by V2-T9 item 4) —
+ * a checkbox for a session that isn't running right now, or a plain note for one that is (D-024/
+ * D-025: the three `TodayResumeStatus` forms are never rendered the same way, same discipline
+ * `core/consolidated-plan.ts#renderSessionPlanLine` already applies to the CLI's own plan text). */
 function renderTodaySessionRow(row: TodaySessionRow): HTMLLIElement {
   const item = document.createElement('li');
-  if (row.alreadyResumed) {
-    item.textContent = `${row.name} (${row.cwd}) — ${MESSAGES.todayAlreadyResumed}`;
+  if (row.resumeStatus.kind === 'runningNow') {
+    item.textContent = `${row.name} (${row.cwd}) — ${MESSAGES.todayRunningNow}`;
+    if (row.resumeStatus.matchedTabId !== null) {
+      item.classList.add('matched');
+    }
+    return item;
+  }
+  if (row.resumeStatus.kind === 'resumedEarlier') {
+    item.textContent = `${row.name} (${row.cwd}) — ${MESSAGES.todayResumedEarlier}`;
     return item;
   }
   const label = document.createElement('label');

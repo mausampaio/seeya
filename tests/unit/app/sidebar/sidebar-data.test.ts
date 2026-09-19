@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildSidebarRows } from '../../../../packages/app/src/sidebar/sidebar-data.js';
+import {
+  buildLiveSessionIndex,
+  buildSidebarRows,
+} from '../../../../packages/app/src/sidebar/sidebar-data.js';
 import {
   addTab,
   createTab,
@@ -56,5 +59,82 @@ describe('buildSidebarRows', () => {
     const rows = buildSidebarRows({ sessions: [], rejected: [] }, createConfig(), NOW, emptyTabs());
 
     expect(rows).toEqual([]);
+  });
+});
+
+describe('buildLiveSessionIndex (V2-T9 item 4)', () => {
+  it('a live (alive/idle) session is in the index, matched tab id carried through', () => {
+    const alive = createSessionWithPid({
+      sessionId: '11111111-1111-4111-8111-111111111111',
+      pid: 555,
+      lastTranscriptWrite: NOW,
+    });
+    const tab = withPid(createTab({ id: 'tab-1', command: '', args: [], cwd: '/x' }), 555);
+    const rows = buildSidebarRows(
+      { sessions: [alive], rejected: [] },
+      createConfig(),
+      NOW,
+      addTab(emptyTabs(), tab),
+    );
+
+    const live = buildLiveSessionIndex(rows);
+
+    expect(live.get(alive.sessionId)).toEqual({ matchedTabId: 'tab-1' });
+  });
+
+  it('a live session with no matching tab is still in the index, with matchedTabId: null (D-025)', () => {
+    const alive = createSessionWithPid({
+      sessionId: '11111111-1111-4111-8111-111111111111',
+      pid: 555,
+      lastTranscriptWrite: NOW,
+    });
+    const rows = buildSidebarRows(
+      { sessions: [alive], rejected: [] },
+      createConfig(),
+      NOW,
+      emptyTabs(),
+    );
+
+    const live = buildLiveSessionIndex(rows);
+
+    expect(live.get(alive.sessionId)).toEqual({ matchedTabId: null });
+  });
+
+  it('an ended session is NOT in the index — the panel falls back to resumed.json for it', () => {
+    const ended = createSessionWithPid({
+      sessionId: '11111111-1111-4111-8111-111111111111',
+      pid: 555,
+      processIsAlive: false,
+    });
+    const rows = buildSidebarRows(
+      { sessions: [ended], rejected: [] },
+      createConfig(),
+      NOW,
+      emptyTabs(),
+    );
+
+    const live = buildLiveSessionIndex(rows);
+
+    expect(live.has(ended.sessionId)).toBe(false);
+  });
+
+  it('a session with no pid (unknown state) is NOT in the index', () => {
+    const unknown = createSessionWithoutPid({
+      sessionId: '22222222-2222-4222-8222-222222222222',
+    });
+    const rows = buildSidebarRows(
+      { sessions: [unknown], rejected: [] },
+      createConfig(),
+      NOW,
+      emptyTabs(),
+    );
+
+    const live = buildLiveSessionIndex(rows);
+
+    expect(live.has(unknown.sessionId)).toBe(false);
+  });
+
+  it('an empty sidebar produces an empty index, never an error', () => {
+    expect(buildLiveSessionIndex([])).toEqual(new Map());
   });
 });

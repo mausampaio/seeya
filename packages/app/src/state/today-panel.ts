@@ -19,6 +19,27 @@ import type { PendingBriefingLookup } from '@seeya-ai/engine/application/find-pe
 import type { CwdHistoryEntry } from '@seeya-ai/engine/application/cwd-history.js';
 import type { Day, Handoff } from '@seeya-ai/engine/core/types.js';
 import { MESSAGES } from '../text/messages.js';
+import type { LiveSessionInfo } from '../sidebar/sidebar-data.js';
+
+/**
+ * V2-T9 item 4 — replaces `alreadyResumed: boolean`. A discriminated union (D-024), not a flag,
+ * because the panel's checkbox rule now depends on TWO independent facts (is it running right
+ * now, was it ever resumed) that a single boolean can't tell apart:
+ *
+ * - `runningNow` — the discovery this same refresh cycle already did found this session alive or
+ *   idle (`core/classification.ts`: both mean the process is running), in a tab or a bare
+ *   terminal. Blocks the checkbox; `matchedTabId` is the tab it corresponds to in THIS window, if
+ *   any (D-025: `null` when there's no correspondence, never a guess).
+ * - `resumedEarlier` — not running now, but `resumed.json` says it was resumed at some point
+ *   today. The checkbox comes back — the achado this item exists to fix: a session resumed this
+ *   morning and then closed (app restarted, tab closed by hand) must be offerable again, and
+ *   `resumed.json` alone can't tell "resumed" from "resumed and then closed" apart.
+ * - `neverResumed` — today's default: offer the checkbox, nothing to say about it yet.
+ */
+export type TodayResumeStatus =
+  | { readonly kind: 'runningNow'; readonly matchedTabId: string | null }
+  | { readonly kind: 'resumedEarlier' }
+  | { readonly kind: 'neverResumed' };
 
 export interface TodaySessionRow {
   readonly sessionId: string;
@@ -31,9 +52,7 @@ export interface TodaySessionRow {
    * `pendingItems` (nothing left to do). Never a fabricated placeholder string.
    */
   readonly firstPlanLine: string | null;
-  /** `Storage.readResumedSessionIds(day)` already told `findPendingBriefing` this — carried
-   * through so the panel can say "already resumed today" instead of offering a checkbox for it. */
-  readonly alreadyResumed: boolean;
+  readonly resumeStatus: TodayResumeStatus;
   /**
    * V2-T9 item 1/2 — this session's directory history, oldest run first, from
    * `application/cwd-history.ts#readCwdHistory`. Always at least the current day's own entry for a
@@ -66,17 +85,34 @@ function firstPlanLine(handoff: Handoff): string | null {
   return handoff.tomorrowPlan[0] ?? handoff.pendingItems[0] ?? null;
 }
 
+/** V2-T9 item 4's own rule, in one place: "viva" (in `liveSessionIds`) always wins over
+ * `resumed.json` — a session can be alive right now without `resumed.json` ever having heard of
+ * it (resumed by hand from a bare terminal, which the daemon's own discovery still sees), and
+ * that has to block the checkbox exactly the same as one the panel itself resumed. */
+function resolveResumeStatus(
+  sessionId: string,
+  resumedSessionIds: ReadonlySet<string>,
+  liveSessionIds: ReadonlyMap<string, LiveSessionInfo>,
+): TodayResumeStatus {
+  const live = liveSessionIds.get(sessionId);
+  if (live !== undefined) {
+    return { kind: 'runningNow', matchedTabId: live.matchedTabId };
+  }
+  return resumedSessionIds.has(sessionId) ? { kind: 'resumedEarlier' } : { kind: 'neverResumed' };
+}
+
 function buildRow(
   handoff: Handoff,
   resumedSessionIds: ReadonlySet<string>,
   cwdHistoryBySessionId: ReadonlyMap<string, readonly CwdHistoryEntry[]>,
+  liveSessionIds: ReadonlyMap<string, LiveSessionInfo>,
 ): TodaySessionRow {
   return {
     sessionId: handoff.sessionId,
     name: handoff.name,
     cwd: handoff.cwd,
     firstPlanLine: firstPlanLine(handoff),
-    alreadyResumed: resumedSessionIds.has(handoff.sessionId),
+    resumeStatus: resolveResumeStatus(handoff.sessionId, resumedSessionIds, liveSessionIds),
     // Defensive fallback (D-025): every real caller computes one entry per handoff in the
     // briefing (`electron/main.ts`'s own `getTodayPanel` handler), so this only ever triggers in
     // a test that hands in a partial map on purpose — an empty history is "no note", never an
@@ -88,12 +124,13 @@ function buildRow(
 /**
  * @example
  * const lookup = await findPendingBriefing(storage, clock, config.maxBriefingScanDays);
- * const panel = buildTodayPanelData(lookup, cwdHistoryBySessionId);
+ * const panel = buildTodayPanelData(lookup, cwdHistoryBySessionId, liveSessionIds);
  * // panel.kind === 'pending' ? panel.rows : panel.message
  */
 export function buildTodayPanelData(
   lookup: PendingBriefingLookup,
   cwdHistoryBySessionId: ReadonlyMap<string, readonly CwdHistoryEntry[]> = new Map(),
+  liveSessionIds: ReadonlyMap<string, LiveSessionInfo> = new Map(),
 ): TodayPanelData {
   if (!lookup.found) {
     return { kind: 'noBriefing', message: MESSAGES.todayNoBriefing(lookup.daysSearched) };
@@ -103,7 +140,7 @@ export function buildTodayPanelData(
     day: lookup.briefing.day,
     daysAgo: lookup.daysAgo,
     rows: lookup.briefing.handoffs.map((handoff) =>
-      buildRow(handoff, lookup.resumedSessionIds, cwdHistoryBySessionId),
+      buildRow(handoff, lookup.resumedSessionIds, cwdHistoryBySessionId, liveSessionIds),
     ),
   };
 }

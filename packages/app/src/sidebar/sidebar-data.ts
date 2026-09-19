@@ -41,3 +41,36 @@ export function buildSidebarRows(
     matchedTabId: matchedTabIdBySessionId.get(row.sessionId) ?? null,
   }));
 }
+
+/** One session's aliveness, as far as the "Today" panel's checkbox rule cares (V2-T9 item 4) —
+ * just the tab mark, since `buildLiveSessionIndex` below only ever puts a sessionId in the map at
+ * all when it's live. */
+export interface LiveSessionInfo {
+  readonly matchedTabId: string | null;
+}
+
+/**
+ * V2-T9 item 4 — "sessão viva (numa aba ou num terminal — a descoberta vê os dois) → sem caixa,
+ * 'running now'". `rows` is whatever this SAME cycle's `buildSidebarRows` already computed (the
+ * discovery it already does every 10s tick, `electron/main.ts`'s own `REFRESH_INTERVAL_MS`) —
+ * never a second `SessionProvider.list()` call just for the "Today" panel. `alive`/`idle` both
+ * mean the process is running right now (`core/classification.ts`'s own docstring: idle is a
+ * REFINEMENT of alive, not a different liveness); `ended`/`unknown` are not in this map at all —
+ * that "not found" is the honest answer the panel needs to fall back to `resumed.json` instead
+ * (D-025).
+ *
+ * @example
+ * const live = buildLiveSessionIndex(sidebarRows);
+ * live.has(handoff.sessionId) // true only for a session running right now
+ */
+export function buildLiveSessionIndex(
+  rows: readonly SidebarRow[],
+): ReadonlyMap<string, LiveSessionInfo> {
+  const map = new Map<string, LiveSessionInfo>();
+  for (const row of rows) {
+    if (row.state === 'alive' || row.state === 'idle') {
+      map.set(row.sessionId, { matchedTabId: row.matchedTabId });
+    }
+  }
+  return map;
+}
