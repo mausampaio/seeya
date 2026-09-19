@@ -1,4 +1,7 @@
-# seeya
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="design/seeya-logo-on-dark.svg">
+  <img src="design/seeya-logo.svg" alt="seeya" width="280">
+</picture>
 
 The day ends with several AI sessions in progress, across different projects. The next day, the
 expensive part isn't resuming the work — it's rebuilding the context for each one.

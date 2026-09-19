@@ -54,6 +54,7 @@ import type { Handoff } from '@seeya-ai/engine/core/types.js';
 import { buildAppContext, toEndDayDeps, type AppContext } from '../composition/index.js';
 import { shouldMarkLinuxProtocolRegistered } from '../composition/linux-protocol-marker.js';
 import { resolveProtocolScheme, type ProtocolScheme } from '../composition/protocol-scheme.js';
+import { resolveWindowIconPath } from '../composition/window-icon.js';
 import { MESSAGES } from '../text/messages.js';
 import { buildEndDayCostCeiling } from '../state/end-day-preview.js';
 import { projectEndDayProgressEvent } from '../state/end-day-progress.js';
@@ -169,6 +170,12 @@ function createWindow(clock: Clock): BrowserWindow {
     width: 1200,
     height: 800,
     title: MESSAGES.windowTitle,
+    // V2-T11 item 2: the taskbar icon in dev (`npm run app`, Windows) and the window icon on
+    // Linux, where the packaged executable's own icon resource (electron-builder.yml's own
+    // `linux.icon`) doesn't apply the way it does on Windows — `resolveWindowIconPath` points at
+    // the PNG `scripts/build.mjs` copies next to this same bundled `main.js`, from
+    // `design/icons/png/` (that module's own docstring has the size measurement).
+    icon: resolveWindowIconPath(HERE),
     webPreferences: {
       // D-042/V2-T2 item 1: contextIsolation on, nodeIntegration off, sandboxed — the preload
       // (preload.ts) is the only bridge, and it exposes only what the renderer needs.
