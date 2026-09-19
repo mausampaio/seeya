@@ -5763,7 +5763,12 @@ texto, mas não são a fila.
 
 - [~] **V2-T11 — O ícone do seeya: instalador, janela e README a partir de `design/`.**
       Especificada pelo PO em 2026-09-19 e aprovada pelo mantenedor no mesmo dia, logo depois de
-      a identidade visual entrar no repositório (`design/`, commit `641f803`). Hoje o instalador,
+      a identidade visual entrar no repositório (`design/`, commit `641f803`); **mesclada na
+      `main` em 2026-09-19** (portão na worktree do PO: 1.901 passando, 4 pulados; cobertura
+      96,46%/92,51%/95,31%/96,85%). Revisão com dois ajustes: o logo do README passou a ficar
+      dentro do `<h1>` (o agente tinha removido o título), e o comentário do
+      `electron-builder.yml` diz que a comparação do ícone extraído foi visual, que é o que foi
+      medido. Fica em `[~]` até o aceite do mantenedor. Hoje o instalador,
       o atalho, a barra de tarefas e a janela mostram o ícone padrão do Electron.
 
       **A fonte única é `design/`.** `design/IDENTIDADE_VISUAL.md` (seção 2.6) já descreve o
