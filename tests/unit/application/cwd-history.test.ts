@@ -31,10 +31,16 @@ describe('collapseCwdRuns — the pure recorte', () => {
     ]);
   });
 
-  it('two spellings of the same directory (separator/case/trailing slash) are the same run, keeping the FIRST spelling', () => {
+  // Separator and trailing slash only — never case, which `core/cwd-normalization.ts` folds
+  // ONLY on the win32 hint (S3-T5's own docstring). `collapseCwdRuns` reads the real
+  // `process.platform` (same reasoning `application/eligibility-assembly.ts`'s own PLATFORM_HINT
+  // already documents), so a case-only difference would merge on Windows and NOT on Linux/macOS —
+  // exactly the platform-hidden-bug shape `cwd-normalization.test.ts` exists to rule out. This
+  // test only exercises what's true on every OS this suite runs on.
+  it('two spellings of the same directory (separator/trailing slash) are the same run, keeping the FIRST spelling', () => {
     const runs = collapseCwdRuns([
       { day: '2026-09-12', cwd: 'C:\\code\\project' },
-      { day: '2026-09-14', cwd: 'c:/code/project/' },
+      { day: '2026-09-14', cwd: 'C:/code/project/' },
     ]);
     expect(runs).toEqual([
       {
