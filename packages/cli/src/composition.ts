@@ -10,6 +10,7 @@ import path from 'node:path';
 import type {
   Autostart,
   Clock,
+  DirectoryExistence,
   Notifier,
   ProcessControl,
   SessionProvider,
@@ -20,6 +21,7 @@ import type { Config } from '@seeya-ai/engine/core/types.js';
 import { processControl as realProcessControl } from '@seeya-ai/engine/adapters/process/index.js';
 import { systemClock } from '@seeya-ai/engine/adapters/clock/index.js';
 import { StorageAdapter } from '@seeya-ai/engine/adapters/storage/index.js';
+import { FsDirectoryExistence } from '@seeya-ai/engine/adapters/filesystem/index.js';
 import { buildAutostart } from '@seeya-ai/engine/adapters/autostart/index.js';
 import {
   DiscoverySessionProvider,
@@ -200,6 +202,8 @@ export interface StartDayContext {
    * docstring for what changed and why.
    */
   readonly config: Config;
+  /** V2-T9 item 3: the cwd-history note `start-day-command.ts` prints alongside the plan. */
+  readonly directoryExistence: DirectoryExistence;
 }
 
 /**
@@ -222,7 +226,7 @@ export async function buildStartDayContext(
   const storage = buildStorage(home);
   const config = await storage.readConfig();
   const sessionResumer = new ClaudeSessionResumer({ seeyaHome: home.seeyaHome });
-  return { storage, clock, sessionResumer, config };
+  return { storage, clock, sessionResumer, config, directoryExistence: new FsDirectoryExistence() };
 }
 
 export interface SnoozeContext {

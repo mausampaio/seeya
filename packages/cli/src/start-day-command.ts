@@ -26,10 +26,17 @@ import {
   type PendingBriefingLookup,
 } from '@seeya-ai/engine/application/find-pending-briefing.js';
 import { resumeSessions, type FallbackConfirmer } from '@seeya-ai/engine/application/start-day.js';
+import { readCwdHistory } from '@seeya-ai/engine/application/cwd-history.js';
 import { renderConsolidatedPlan } from '@seeya-ai/engine/core/consolidated-plan.js';
 import { unresumedHandoffs } from '@seeya-ai/engine/core/pending-briefing.js';
 import { parseFallbackAnswer } from '@seeya-ai/engine/core/resume-fallback-decision.js';
-import type { Clock, SessionResumer, Storage } from '@seeya-ai/engine/core/ports.js';
+import type {
+  Briefing,
+  Clock,
+  DirectoryExistence,
+  SessionResumer,
+  Storage,
+} from '@seeya-ai/engine/core/ports.js';
 import type { Config, Day, Handoff, ResumeFallbackReason } from '@seeya-ai/engine/core/types.js';
 import {
   findHandoffBySessionReference,
@@ -37,6 +44,7 @@ import {
   resolveSelectionMode,
 } from './start-day-selection.js';
 import {
+  formatCwdHistoryNotes,
   formatFallbackNoTty,
   formatInvalidSelection,
   formatNoPendingBriefing,
@@ -68,6 +76,9 @@ export interface StartDayCommandContext {
   readonly sessionResumer: SessionResumer;
   /** D-035: `findPendingBriefing`'s scan ceiling is now `config.maxBriefingScanDays`. */
   readonly config: Config;
+  /** V2-T9 item 3 — whether an earlier directory a session ran in still exists, for the same
+   * cwd-history note the interface shows (item 2). */
+  readonly directoryExistence: DirectoryExistence;
 }
 
 type FoundLookup = Extract<PendingBriefingLookup, { found: true }>;
@@ -169,6 +180,30 @@ async function resumeAndReport(
   return result.stoppedEarly === false ? 0 : 1;
 }
 
+/**
+ * V2-T9 item 3 — "avisa, sem perguntar": one `readCwdHistory` per handoff in the found briefing,
+ * over the same `maxBriefingScanDays` ceiling `findPendingBriefing` already used to find `day`
+ * itself, then rendered as plain text (`format-start-day.ts#formatCwdHistoryNotes`). `null` when
+ * nothing in the briefing ever changed directory — nothing to print.
+ */
+async function buildCwdHistoryNotes(
+  context: StartDayCommandContext,
+  briefing: Briefing,
+): Promise<string | null> {
+  const entries = await Promise.all(
+    briefing.handoffs.map(async (handoff) => {
+      const history = await readCwdHistory(
+        { storage: context.storage, directoryExistence: context.directoryExistence },
+        handoff.sessionId,
+        briefing.day,
+        context.config.maxBriefingScanDays,
+      );
+      return [handoff.sessionId, history] as const;
+    }),
+  );
+  return formatCwdHistoryNotes(briefing.handoffs, new Map(entries));
+}
+
 async function runWithPendingBriefing(
   context: StartDayCommandContext,
   lookup: FoundLookup,
@@ -178,6 +213,10 @@ async function runWithPendingBriefing(
   io.stdout.write(
     `${renderConsolidatedPlan(lookup.briefing, lookup.daysAgo, lookup.resumedSessionIds)}\n`,
   );
+  const cwdHistoryNotes = await buildCwdHistoryNotes(context, lookup.briefing);
+  if (cwdHistoryNotes !== null) {
+    io.stdout.write(`\n${cwdHistoryNotes}\n`);
+  }
   const selection = await pickSessions(lookup, options, io);
   if (selection.kind === 'blocked') {
     io.stdout.write(`\n${selection.message}\n`);

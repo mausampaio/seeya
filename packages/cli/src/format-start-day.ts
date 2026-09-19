@@ -10,6 +10,7 @@ import type {
   ResumeProgressEvent,
   ResumeSessionsResult,
 } from '@seeya-ai/engine/application/start-day.js';
+import type { CwdHistoryEntry } from '@seeya-ai/engine/application/cwd-history.js';
 
 /** Same shape as `format-end-day.ts`/`core/briefing.ts`'s own local helpers — user-facing
  * counts read as English, never as "day(s)". */
@@ -203,6 +204,55 @@ function formatInvalidFallbackAnswersSection(
     lines.push(`- ${handoff.sessionId} (${handoff.cwd}): ${reason}`);
   }
   return lines.join('\n');
+}
+
+/**
+ * V2-T9 item 3 — "the CLI warns, without asking": the same note the interface shows (item 2),
+ * as plain text. `null` when this handoff's own history shows no change (`history.length <= 1`,
+ * D-025: "sem histórico é sem nota" — never "sem mudança" affirmed) — the caller only prints a
+ * line for a session that actually has one.
+ */
+export function formatCwdHistoryNote(history: readonly CwdHistoryEntry[]): string | null {
+  if (history.length <= 1) {
+    return null;
+  }
+  const parts = history.map((entry, index) => {
+    const location = entry.exists ? entry.cwd : `${entry.cwd} (no longer exists)`;
+    if (index === history.length - 1) {
+      return `in ${location} since ${entry.firstDay}`;
+    }
+    return `${index === 0 ? 'ran in' : 'in'} ${location} until ${entry.lastDay}`;
+  });
+  return parts.join('; ');
+}
+
+/** Same explanation the interface shows next to its own "Resume in" selector (V2-T9 item 2) —
+ * the CLI always resumes in the most recent directory (item 3: "sem perguntar"), so this line is
+ * what tells a reader WHY the change is worth noticing at all, not just that it happened. */
+const CWD_HISTORY_EXPLANATION =
+  'Claude Code keeps memory and project settings per directory — resuming in a different one ' +
+  'starts without what was saved for the directory above.';
+
+/**
+ * Every handoff in `briefing.handoffs` whose OWN history shows a change, one line each, plus the
+ * explanation once — `null` when nothing in the whole briefing changed directory (nothing to
+ * print at all, same "no note" discipline `formatCwdHistoryNote` already applies per session).
+ */
+export function formatCwdHistoryNotes(
+  handoffs: readonly Handoff[],
+  historyBySessionId: ReadonlyMap<string, readonly CwdHistoryEntry[]>,
+): string | null {
+  const lines: string[] = [];
+  for (const handoff of handoffs) {
+    const note = formatCwdHistoryNote(historyBySessionId.get(handoff.sessionId) ?? []);
+    if (note !== null) {
+      lines.push(`- ${handoff.name} (${handoff.cwd}): ${note}`);
+    }
+  }
+  if (lines.length === 0) {
+    return null;
+  }
+  return [...lines, '', CWD_HISTORY_EXPLANATION].join('\n');
 }
 
 export function formatStartDaySummary(result: ResumeSessionsResult): string {

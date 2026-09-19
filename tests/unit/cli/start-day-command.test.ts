@@ -18,6 +18,7 @@ import { createHandoff } from '../core/_fixtures.js';
 import {
   DEFAULT_TEST_CONFIG,
   FakeClock,
+  FakeDirectoryExistence,
   FakeStorage,
   cleanlyResumingResumer,
   fallbackNeedingResumer,
@@ -61,6 +62,7 @@ function makeContext(overrides: Partial<StartDayCommandContext> = {}): StartDayC
     clock: new FakeClock(TODAY),
     sessionResumer: cleanlyResumingResumer(),
     config: DEFAULT_TEST_CONFIG,
+    directoryExistence: new FakeDirectoryExistence(),
     ...overrides,
   };
 }
@@ -164,6 +166,51 @@ describe('runStartDayCommand — --all', () => {
     expect(output()).toContain('stopped after');
     expect(output()).toContain('claude is not on PATH');
     expect([...(await storage.readResumedSessionIds('2026-08-15'))]).toEqual([]);
+  });
+});
+
+describe('runStartDayCommand — V2-T9 item 3: prints the cwd-history note, without asking', () => {
+  it('prints the note when a session ran in an earlier directory, resumes in the current one', async () => {
+    const storage = new FakeStorage(DEFAULT_TEST_CONFIG);
+    const alpha = createHandoff({
+      sessionId: 'alpha-id',
+      name: 'alpha',
+      cwd: 'c:\\code\\seeya',
+      pendingItems: ['finish alpha'],
+    });
+    await storage.saveHandoff(
+      '2026-08-14',
+      createHandoff({ sessionId: 'alpha-id', cwd: 'c:\\code' }),
+    );
+    await storage.saveHandoff('2026-08-16', alpha);
+    const resumer = cleanlyResumingResumer();
+    const context = makeContext({
+      storage,
+      sessionResumer: resumer,
+      clock: new FakeClock(TODAY),
+      directoryExistence: new FakeDirectoryExistence(new Set(['c:\\code\\seeya'])),
+    });
+    const { io, output } = makeIo({ isTTY: true });
+
+    const exitCode = await runStartDayCommand(context, { all: true }, io);
+
+    expect(exitCode).toBe(0);
+    expect(output()).toContain(
+      'alpha (c:\\code\\seeya): ran in c:\\code (no longer exists) until 2026-08-14',
+    );
+    expect(output()).toMatch(/keeps memory and project settings per directory/);
+    expect(resumer.calls.map((call) => call.cwd)).toEqual(['c:\\code\\seeya']);
+  });
+
+  it('no note at all when nobody in the briefing ever changed directory', async () => {
+    const storage = new FakeStorage(DEFAULT_TEST_CONFIG);
+    await storage.saveHandoff('2026-08-15', createHandoff({ name: 'alpha', pendingItems: ['x'] }));
+    const context = makeContext({ storage });
+    const { io, output } = makeIo({ isTTY: true, answer: '' });
+
+    await runStartDayCommand(context, { all: false }, io);
+
+    expect(output()).not.toMatch(/keeps memory and project settings per directory/);
   });
 });
 
