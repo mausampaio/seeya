@@ -2,6 +2,7 @@ import type { FallbackConfirmer } from '@seeya-ai/engine/application/start-day.j
 import type {
   Briefing,
   Clock,
+  DirectoryExistence,
   DiscoveryResult,
   ForkCleanup,
   ForkCleanupResult,
@@ -542,6 +543,17 @@ export class FakeProcessControl implements ProcessControl {
     return Promise.reject(
       new Error('FakeProcessControl.terminateAbruptly is not exercised by endDay'),
     );
+  }
+}
+
+/** `DirectoryExistence` double (V2-T9 item 1) — a fixed set of directories that "exist", by exact
+ * string (tests pass whatever spelling they expect `readCwdHistory` to check, so exactness catches
+ * a caller accidentally checking the wrong value instead of silently passing either way). */
+export class FakeDirectoryExistence implements DirectoryExistence {
+  constructor(private readonly existingCwds: ReadonlySet<string> = new Set()) {}
+
+  exists(cwd: string): Promise<boolean> {
+    return Promise.resolve(this.existingCwds.has(cwd));
   }
 }
 

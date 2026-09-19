@@ -147,6 +147,16 @@ describe('buildAppContext', () => {
       expect(typeof context.notifier.notify).toBe('function');
     },
   );
+
+  it('V2-T9 item 1/2: wires a real DirectoryExistence — proves against a directory that is really there', async () => {
+    fixture = await createDiscoveryFixture();
+    const context = await buildAppContext(fixture.root);
+
+    expect(await context.directoryExistence.exists(fixture.root)).toBe(true);
+    expect(await context.directoryExistence.exists(path.join(fixture.root, 'never-created'))).toBe(
+      false,
+    );
+  });
 });
 
 describe('toEndDayDeps', () => {

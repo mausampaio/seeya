@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  formatCwdHistoryNote,
+  formatCwdHistoryNotes,
   formatFallbackNoTty,
   formatInvalidSelection,
   formatNoPendingBriefing,
@@ -11,6 +13,7 @@ import {
   renderPickerQuestion,
 } from '../../../packages/cli/src/format-start-day.js';
 import type { ResumeSessionsResult } from '@seeya-ai/engine/application/start-day.js';
+import type { CwdHistoryEntry } from '@seeya-ai/engine/application/cwd-history.js';
 import type { ResumeFallbackReason } from '@seeya-ai/engine/core/types.js';
 import { createHandoff } from '../core/_fixtures.js';
 
@@ -270,5 +273,66 @@ describe('formatFallbackNoTty', () => {
     expect(text).toContain('too long to pass safely');
     expect(text).toMatch(/resuming it without yesterday's plan by default/i);
     expect(text).not.toContain('skipping it by default');
+  });
+});
+
+describe('formatCwdHistoryNote (V2-T9 item 3)', () => {
+  it('null when history has one entry or fewer — no change, no note (D-025)', () => {
+    expect(formatCwdHistoryNote([])).toBeNull();
+    expect(
+      formatCwdHistoryNote([
+        { cwd: 'C:\\code', firstDay: '2026-09-16', lastDay: '2026-09-16', exists: true },
+      ]),
+    ).toBeNull();
+  });
+
+  it('says "ran in ... until" for the earlier directory and "in ... since" for the current one', () => {
+    const history: CwdHistoryEntry[] = [
+      { cwd: 'C:\\code', firstDay: '2026-09-12', lastDay: '2026-09-14', exists: false },
+      { cwd: 'C:\\code\\seeya', firstDay: '2026-09-16', lastDay: '2026-09-16', exists: true },
+    ];
+    const note = formatCwdHistoryNote(history);
+    expect(note).toContain('ran in C:\\code (no longer exists) until 2026-09-14');
+    expect(note).toContain('in C:\\code\\seeya since 2026-09-16');
+  });
+
+  it('marks a directory that no longer exists, never the current one', () => {
+    const history: CwdHistoryEntry[] = [
+      { cwd: 'C:\\code', firstDay: '2026-09-12', lastDay: '2026-09-14', exists: false },
+      { cwd: 'C:\\code\\seeya', firstDay: '2026-09-16', lastDay: '2026-09-16', exists: true },
+    ];
+    const note = formatCwdHistoryNote(history);
+    expect(note).toContain('C:\\code (no longer exists)');
+    expect(note).not.toContain('C:\\code\\seeya (no longer exists)');
+  });
+});
+
+describe('formatCwdHistoryNotes (V2-T9 item 3)', () => {
+  it('null when nothing in the briefing changed directory', () => {
+    const alpha = createHandoff({ sessionId: 'alpha-id', name: 'alpha' });
+    const text = formatCwdHistoryNotes([alpha], new Map());
+    expect(text).toBeNull();
+  });
+
+  it('one line per session that changed, plus the explanation, never for a session that did not', () => {
+    const alpha = createHandoff({ sessionId: 'alpha-id', name: 'alpha', cwd: 'C:\\code\\seeya' });
+    const beta = createHandoff({ sessionId: 'beta-id', name: 'beta', cwd: 'C:\\code\\beta' });
+    const alphaHistory: CwdHistoryEntry[] = [
+      { cwd: 'C:\\code', firstDay: '2026-09-14', lastDay: '2026-09-14', exists: false },
+      { cwd: 'C:\\code\\seeya', firstDay: '2026-09-16', lastDay: '2026-09-16', exists: true },
+    ];
+    const betaHistory: CwdHistoryEntry[] = [
+      { cwd: 'C:\\code\\beta', firstDay: '2026-09-16', lastDay: '2026-09-16', exists: true },
+    ];
+    const text = formatCwdHistoryNotes(
+      [alpha, beta],
+      new Map([
+        ['alpha-id', alphaHistory],
+        ['beta-id', betaHistory],
+      ]),
+    );
+    expect(text).toContain('alpha (C:\\code\\seeya)');
+    expect(text).not.toContain('beta (C:\\code\\beta):');
+    expect(text).toMatch(/keeps memory and project settings per directory/);
   });
 });

@@ -196,6 +196,15 @@ export type TodayPanelResponse = TodayPanelData;
 export interface ResumeSelectedRequest {
   readonly day: string;
   readonly sessionIds: readonly string[];
+  /**
+   * V2-T9 item 2 — the directory chosen in the "Resume in" selector, keyed by `sessionId`, for a
+   * session whose row offered one (`state/today-panel.ts#TodaySessionRow.cwdHistory`, more than
+   * one directory). A `sessionId` with no entry here had no selector to choose from at all (a
+   * single-directory history) — `electron/main.ts`'s own handler falls back to the handoff's own
+   * `cwd` for those (D-025: never an invented choice where the interface never offered one). The
+   * choice only ever affects THIS resume attempt; nothing is rewritten to disk.
+   */
+  readonly chosenCwdBySessionId: Readonly<Record<string, string>>;
 }
 
 /** One session, named for display — the common shape every `ResumeSummaryResponse` list entry

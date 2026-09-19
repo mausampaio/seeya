@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildTodayPanelData } from '../../../../packages/app/src/state/today-panel.js';
 import type { PendingBriefingLookup } from '@seeya-ai/engine/application/find-pending-briefing.js';
+import type { CwdHistoryEntry } from '@seeya-ai/engine/application/cwd-history.js';
 import { buildHandoffFixture as modelHandoff } from '../_handoff-fixture.js';
 
 describe('buildTodayPanelData', () => {
@@ -34,13 +35,60 @@ describe('buildTodayPanelData', () => {
           name: 'alpha',
           cwd: '/projects/alpha',
           firstPlanLine: 'ship it',
-          alreadyResumed: false,
+          resumeStatus: { kind: 'neverResumed' },
+          cwdHistory: [],
         },
       ],
     });
   });
 
-  it('a session already resumed today is marked, not silently dropped', () => {
+  it('cwdHistory is empty (never an error) when the caller omits the map entirely', () => {
+    const handoff = modelHandoff();
+    const lookup: PendingBriefingLookup = {
+      found: true,
+      daysAgo: 1,
+      resumedSessionIds: new Set(),
+      briefing: { day: '2026-08-16', handoffs: [handoff], rejected: [] },
+    };
+
+    const data = buildTodayPanelData(lookup);
+
+    expect(data.kind === 'pending' && data.rows[0]?.cwdHistory).toEqual([]);
+  });
+
+  it('carries the precomputed cwd history through for the matching sessionId, untouched', () => {
+    const handoff = modelHandoff();
+    const history: readonly CwdHistoryEntry[] = [
+      { cwd: 'C:\\code', firstDay: '2026-08-14', lastDay: '2026-08-14', exists: false },
+      { cwd: 'C:\\code\\seeya', firstDay: '2026-08-16', lastDay: '2026-08-16', exists: true },
+    ];
+    const lookup: PendingBriefingLookup = {
+      found: true,
+      daysAgo: 0,
+      resumedSessionIds: new Set(),
+      briefing: { day: '2026-08-16', handoffs: [handoff], rejected: [] },
+    };
+
+    const data = buildTodayPanelData(lookup, new Map([[handoff.sessionId, history]]));
+
+    expect(data.kind === 'pending' && data.rows[0]?.cwdHistory).toEqual(history);
+  });
+
+  it('a sessionId with no entry in the map falls back to an empty history, never a guess (D-025)', () => {
+    const handoff = modelHandoff();
+    const lookup: PendingBriefingLookup = {
+      found: true,
+      daysAgo: 0,
+      resumedSessionIds: new Set(),
+      briefing: { day: '2026-08-16', handoffs: [handoff], rejected: [] },
+    };
+
+    const data = buildTodayPanelData(lookup, new Map([['some-other-session', []]]));
+
+    expect(data.kind === 'pending' && data.rows[0]?.cwdHistory).toEqual([]);
+  });
+
+  it('a session resumed today but not running now is marked "resumedEarlier", not silently dropped', () => {
     const handoff = modelHandoff({ tomorrowPlan: ['ship it'] });
     const lookup: PendingBriefingLookup = {
       found: true,
@@ -52,7 +100,105 @@ describe('buildTodayPanelData', () => {
     const data = buildTodayPanelData(lookup);
 
     expect(data.kind).toBe('pending');
-    expect(data.kind === 'pending' && data.rows[0]?.alreadyResumed).toBe(true);
+    expect(data.kind === 'pending' && data.rows[0]?.resumeStatus).toEqual({
+      kind: 'resumedEarlier',
+    });
+  });
+
+  it('a session never resumed is "neverResumed" by default', () => {
+    const handoff = modelHandoff();
+    const lookup: PendingBriefingLookup = {
+      found: true,
+      daysAgo: 0,
+      resumedSessionIds: new Set(),
+      briefing: { day: '2026-08-17', handoffs: [handoff], rejected: [] },
+    };
+
+    const data = buildTodayPanelData(lookup);
+
+    expect(data.kind === 'pending' && data.rows[0]?.resumeStatus).toEqual({
+      kind: 'neverResumed',
+    });
+  });
+
+  describe('V2-T9 item 4 — liveness wins over resumed.json', () => {
+    it('a session running now blocks the checkbox — "runningNow", with the matching tab id', () => {
+      const handoff = modelHandoff();
+      const lookup: PendingBriefingLookup = {
+        found: true,
+        daysAgo: 0,
+        resumedSessionIds: new Set(),
+        briefing: { day: '2026-08-17', handoffs: [handoff], rejected: [] },
+      };
+
+      const data = buildTodayPanelData(
+        lookup,
+        new Map(),
+        new Map([[handoff.sessionId, { matchedTabId: 'tab-1' }]]),
+      );
+
+      expect(data.kind === 'pending' && data.rows[0]?.resumeStatus).toEqual({
+        kind: 'runningNow',
+        matchedTabId: 'tab-1',
+      });
+    });
+
+    it('running now with no matching tab (resumed by hand in a bare terminal) still blocks the checkbox', () => {
+      const handoff = modelHandoff();
+      const lookup: PendingBriefingLookup = {
+        found: true,
+        daysAgo: 0,
+        resumedSessionIds: new Set(),
+        briefing: { day: '2026-08-17', handoffs: [handoff], rejected: [] },
+      };
+
+      const data = buildTodayPanelData(
+        lookup,
+        new Map(),
+        new Map([[handoff.sessionId, { matchedTabId: null }]]),
+      );
+
+      expect(data.kind === 'pending' && data.rows[0]?.resumeStatus).toEqual({
+        kind: 'runningNow',
+        matchedTabId: null,
+      });
+    });
+
+    it('resumed earlier but no longer running wins the checkbox BACK — the achado this item fixes', () => {
+      const handoff = modelHandoff();
+      const lookup: PendingBriefingLookup = {
+        found: true,
+        daysAgo: 0,
+        resumedSessionIds: new Set([handoff.sessionId]),
+        briefing: { day: '2026-08-17', handoffs: [handoff], rejected: [] },
+      };
+
+      // Not in the live index at all — the session isn't running any more (app restarted, tab
+      // closed by hand). resumed.json alone would still say "already resumed"; liveness overrules it.
+      const data = buildTodayPanelData(lookup, new Map(), new Map());
+
+      expect(data.kind === 'pending' && data.rows[0]?.resumeStatus).toEqual({
+        kind: 'resumedEarlier',
+      });
+    });
+
+    it('running now AND already in resumed.json still reports runningNow, never both', () => {
+      const handoff = modelHandoff();
+      const lookup: PendingBriefingLookup = {
+        found: true,
+        daysAgo: 0,
+        resumedSessionIds: new Set([handoff.sessionId]),
+        briefing: { day: '2026-08-17', handoffs: [handoff], rejected: [] },
+      };
+
+      const data = buildTodayPanelData(
+        lookup,
+        new Map(),
+        new Map([[handoff.sessionId, { matchedTabId: 'tab-2' }]]),
+      );
+
+      expect(data.kind === 'pending' && data.rows[0]?.resumeStatus.kind).toBe('runningNow');
+    });
   });
 
   it('firstPlanLine prefers tomorrowPlan[0] over pendingItems[0]', () => {

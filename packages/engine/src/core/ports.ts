@@ -862,3 +862,30 @@ export interface Autostart {
   disable(): Promise<AutostartDisableResult>;
   status(): Promise<AutostartStatus>;
 }
+
+// Own block at the end of the file on purpose (V2-T9 item 1), same pattern `Autostart`/`Notifier`
+// above already established: a new interface, appended rather than inserted mid-file.
+
+/**
+ * Whether a directory a session once ran in still exists on this machine right now — the one
+ * piece of "world" V2-T9's cwd history needs that isn't `~/.seeya/` itself (`Storage`'s own job,
+ * D-027) and isn't a discovered session's own liveness (`ProcessControl`'s job): a `cwd` recorded
+ * in an OLD handoff may have been renamed or deleted since (docs/PLANO-DE-ENTREGA.md V2-T9's own
+ * "achado" — the maintainer's own session moved from `C:\code` to `C:\code\seeya`), and D-025
+ * means that has to be checked, not assumed either way, before ever offering the directory as a
+ * place to resume into (`application/cwd-history.ts`). Implemented in `adapters/filesystem/`
+ * (`FsDirectoryExistence`, a plain `fs.promises.stat`).
+ *
+ * **Not part of `Storage`.** `Storage`'s whole contract is about `~/.seeya/`'s own documents
+ * (D-027's "raiz injetável"); a session's `cwd` is an arbitrary directory this project doesn't own
+ * and never writes to. Folding an unrelated existence check into `Storage` would blur that
+ * boundary for one caller's convenience.
+ *
+ * Never throws: a path that doesn't exist, isn't a directory, or can't be statted for any reason
+ * (permission denied, a component of the path removed mid-check) is `false` — same "no crash on an
+ * ordinary missing path" discipline `adapters/git/canonical-path.ts#canonicalPath` already applies
+ * to a comparable "is this real" question.
+ */
+export interface DirectoryExistence {
+  exists(cwd: string): Promise<boolean>;
+}

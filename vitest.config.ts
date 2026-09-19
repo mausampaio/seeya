@@ -259,6 +259,13 @@ const PRODUCTION_DIRECTORY_THRESHOLDS = {
     lines: 80,
   },
   'packages/engine/src/adapters/git/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
+  // V2-T9 item 1: FsDirectoryExistence, the one adapter behind core/ports.ts#DirectoryExistence.
+  'packages/engine/src/adapters/filesystem/**': {
+    statements: 80,
+    branches: 80,
+    functions: 80,
+    lines: 80,
+  },
   'packages/engine/src/adapters/notification/**': {
     statements: 80,
     branches: 80,

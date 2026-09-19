@@ -7,6 +7,12 @@ atrasado**: confie na evidência e atualize o arquivo. Isso já aconteceu: a pri
 escrita à mão no mesmo dia, tinha quatro afirmações falsas, e quem achou foi uma sessão limpa
 (spike K)._
 
+_**Nota de quem escreveu a entrada de V2-T9, 2026-09-19:** este arquivo já estava atrasado antes
+desta tarefa — `git log` mostra V2-T8, V2-T10 e a D-045 mescladas na `main` (a interface é dona do
+daemon/autostart quando instalada, D-045) sem entrada aqui. Não tentei reconciliar isso: é trabalho
+de outro agente/tarefa, e fazer pela metade teria o mesmo risco que o header acima já avisa. Só a
+seção de V2-T9, no fim do arquivo, é nova desta tarefa._
+
 ## Em uma frase
 
 O Sprint 5 mínimo, o monorepo (V2-T1), o esqueleto da interface (V2-T2), o terminal usável no dia
@@ -567,3 +573,49 @@ Não faz parte do projeto, mas afeta o trabalho:
   embora o `cwd` do registro seja `C:\code`. **`seeya start-day` a retoma normalmente**, porque
   retoma por identidade (`--resume <id>`) e acha o transcript em qualquer slug. Aconteceu em
   13/09, depois de apagar a pasta antiga; não é defeito do seeya — é argumento a favor dele.
+
+## V2-T9 — A sessão que mudou de diretório (pronta numa worktree isolada, pendente do aceite do
+## mantenedor, 2026-09-19)
+
+Especificada pelo PO em 19/09 a partir de um achado real: a sessão do PO rodou em `C:\code` até
+14/09 e, depois de uma retomada manual em `C:\code\seeya` no dia 16, o seeya passou a retomá-la
+sempre lá — sem avisar, e com um efeito real: a memória do Claude Code é por diretório, então as
+regras gravadas em `C:\code` pararam de carregar. Aprovada e despachada no mesmo dia, com o item 4
+incluído (um segundo achado, do mesmo dia: o painel escondia a caixa de uma sessão retomada e
+depois fechada — reinstalar o app tinha matado a sessão, e "já retomada" e "rodando agora" não são
+a mesma coisa).
+
+**Entregue pelo agente em 19/09, worktree isolada (`agent-abfaa2a55b30f9562`), branch
+`tarefa/V2-T9-sessao-mudou-diretorio`, quatro commits de código (um por item) mais este de
+documentação:**
+
+1. **`application/cwd-history.ts`** constrói o histórico de diretórios de uma sessão inteiramente
+   das próprias capturas do seeya (`Storage.readHandoff` dia a dia) — nunca do `cwd` por linha do
+   transcript, medido e descartado no próprio despacho (32 valores distintos numa sessão real).
+   Existência de diretório é uma porta nova, `core/ports.ts#DirectoryExistence`
+   (`adapters/filesystem/`), separada de `Storage` porque o contrato dela é só sobre `~/.seeya/`.
+2. O painel "Hoje" mostra a nota ("ran in `C:\code` until 2026-09-14; in `C:\code\seeya` since
+   2026-09-16", com "(no longer exists)" no diretório que sumiu) e um seletor **Resume in** com os
+   diretórios que ainda existem, o mais recente como padrão — trocar é um clique, a interface
+   nunca escolhe sozinha (D-039). A escolha vale só para aquela retomada, nunca regravada em disco.
+3. `seeya start-day` imprime a mesma nota, sem perguntar, e sempre retoma no diretório mais
+   recente do handoff.
+4. A caixa do painel agora depende de a sessão estar **rodando agora** (a mesma descoberta que o
+   ciclo de 10s já faz, `alive`/`idle`), não de `resumed.json` — uma sessão retomada e depois
+   fechada volta a mostrar a caixa, com a nota "resumed earlier, not running now".
+
+**Medido pelo agente no Windows:** `npm run verificar` completo verde — 184 arquivos de teste,
+1.898 testes passando, 4 pulados; cobertura agregada 96,45% statements / 92,56% branches / 95,31%
+funções / 96,85% linhas. `npm run verificar:linux` também verde (contêiner `node:22-bookworm`,
+`EXIT=0`): 184 arquivos, 1.897 testes passando, 5 pulados; cobertura agregada 96,30%/92,45%/
+95,03%/96,69% — achado real no caminho (um teste de normalização platform-dependente, corrigido
+num commit próprio; Q-079). **Não medido (sem
+tela/teclado):** a captura do painel de verdade (nota, seletor, aba abrindo no diretório escolhido)
+e a captura do item 4 (caixa voltando depois de fechar uma sessão retomada) — nenhum hook
+`SEEYA_APP_AUTO_*` novo foi escrito para isso nesta tarefa (decisão de tempo, não limite técnico,
+registrada na Q-079).
+
+**O que fica pendente do mantenedor:** revisar e mesclar; depois, na manhã seguinte, ver a linha
+da sessão dele no painel "Hoje" com a nota de mudança de diretório, escolher o diretório anterior
+no seletor e ver a aba abrir lá, e — fechando o app com uma sessão retomada nele — ver a caixa dela
+de volta ao reabrir. Detalhes, decisões de ferramental e o que ficou inferido na Q-079.

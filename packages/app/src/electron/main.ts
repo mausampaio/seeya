@@ -39,6 +39,7 @@ import type {
 import type { Clock } from '@seeya-ai/engine/core/ports.js';
 import { checkLiveLock } from '@seeya-ai/engine/scheduler/daemon-state.js';
 import { findPendingBriefing } from '@seeya-ai/engine/application/find-pending-briefing.js';
+import { readCwdHistory } from '@seeya-ai/engine/application/cwd-history.js';
 import { resumeSessions } from '@seeya-ai/engine/application/start-day.js';
 import { endDay } from '@seeya-ai/engine/application/end-day.js';
 import { formatEndDayReport } from '@seeya-ai/engine/application/format-end-day.js';
@@ -69,7 +70,11 @@ import {
   type TabCollection,
 } from '../tabs/tab-model.js';
 import { describeAutostartState } from '@seeya-ai/engine/application/autostart-state.js';
-import { buildSidebarRows } from '../sidebar/sidebar-data.js';
+import {
+  buildSidebarRows,
+  buildLiveSessionIndex,
+  type SidebarRow,
+} from '../sidebar/sidebar-data.js';
 import { buildStatusPanelText } from '../state/status-panel.js';
 import { runRefreshLoop } from '../state/refresh-loop.js';
 import { resolveTerminalFontOptions } from '../state/terminal-font.js';
@@ -308,6 +313,12 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // Same "closed-over, only this function touches it" reasoning as `tabs` above —
   // `state/autostart-cache.ts`'s own docstring has the caching rule and the measurement behind it.
   let autostartCache: AutostartCacheEntry | null = null;
+  // V2-T9 item 4: the sidebar's own rows from the MOST RECENT refresh tick (below) — "Today"'s
+  // own getTodayPanel handler reuses this instead of a second SessionProvider.list() call, per
+  // the plan entry's own "a partir da descoberta de sessões que ele já faz a cada ciclo". Empty
+  // until the first tick runs, which is fine (D-025): no session is "running now" before this
+  // window has ever discovered any.
+  let latestSidebarRows: readonly SidebarRow[] = [];
   // V2-T4 item 3: at most one truly pending in production (`resumeSessions`'s own sequential
   // loop), but keyed independently by requestId anyway — `PendingFallbackRequests`'s own docstring.
   const pendingFallbackRequests = new PendingFallbackRequests();
@@ -447,13 +458,39 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // V2-T4 item 1: the "Today" panel's own data — findPendingBriefing is the exact same lookup
   // `seeya start-day` does (application/find-pending-briefing.js), scanned over
   // config.maxBriefingScanDays like the CLI's own StartDayCommandContext.
+  //
+  // V2-T9 item 1/2: one readCwdHistory per handoff in the found briefing, over the SAME
+  // maxBriefingScanDays ceiling — a session's directory history never reaches further back than
+  // the scan that found `lookup.briefing.day` in the first place. Skipped entirely when nothing
+  // was found (nothing to build a history for).
   ipcMain.handle(CHANNELS.getTodayPanel, async (): Promise<TodayPanelResponse> => {
     const lookup = await findPendingBriefing(
       context.storage,
       context.clock,
       context.config.maxBriefingScanDays,
     );
-    return buildTodayPanelData(lookup);
+    if (!lookup.found) {
+      return buildTodayPanelData(lookup);
+    }
+    const cwdHistoryEntries = await Promise.all(
+      lookup.briefing.handoffs.map(async (handoff) => {
+        const history = await readCwdHistory(
+          {
+            storage: context.storage,
+            directoryExistence: context.directoryExistence,
+            platformHint: context.platformHint,
+          },
+          handoff.sessionId,
+          lookup.briefing.day,
+          context.config.maxBriefingScanDays,
+        );
+        return [handoff.sessionId, history] as const;
+      }),
+    );
+    // V2-T9 item 4: "running now" from THIS session's own most recent discovery, not from
+    // resumed.json — see buildLiveSessionIndex's own docstring for why the two disagree.
+    const liveSessionIds = buildLiveSessionIndex(latestSidebarRows);
+    return buildTodayPanelData(lookup, new Map(cwdHistoryEntries), liveSessionIds);
   });
 
   // V2-T4 items 1/2/3: "Resume selected" — the same resumeSessions the CLI's start-day-command.ts
@@ -466,8 +503,16 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
     async (_event, request: ResumeSelectedRequest): Promise<ResumeSummaryResponse> => {
       const briefing = await context.storage.readBriefing(request.day);
       const wanted = new Set(request.sessionIds);
-      const handoffs: readonly Handoff[] =
-        briefing?.handoffs.filter((handoff) => wanted.has(handoff.sessionId)) ?? [];
+      // V2-T9 item 2: a chosen directory overrides the handoff's own `cwd` for THIS resume
+      // attempt only — nothing is rewritten to `~/.seeya/` (the panel's own note, D-039). A
+      // sessionId absent from `chosenCwdBySessionId` had no selector to choose from at all (a
+      // single-directory history), so the handoff's own `cwd` is used unchanged.
+      const handoffs: readonly Handoff[] = (briefing?.handoffs ?? [])
+        .filter((handoff) => wanted.has(handoff.sessionId))
+        .map((handoff) => {
+          const chosenCwd = request.chosenCwdBySessionId[handoff.sessionId];
+          return chosenCwd === undefined ? handoff : { ...handoff, cwd: chosenCwd };
+        });
 
       const resolveLabel = (sessionId: string): string =>
         handoffs.find((handoff) => handoff.sessionId === sessionId)?.name ?? sessionId;
@@ -615,6 +660,9 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
       const now = context.clock.now();
 
       const rows = buildSidebarRows(discovery, context.config, now, tabs);
+      // V2-T9 item 4: cached for getTodayPanel's own handler above — the same discovery this
+      // cycle already did, never a second SessionProvider.list() call just for "Today".
+      latestSidebarRows = rows;
       const sessionsEvent: SessionsUpdateEvent = { rows };
       window.webContents.send(CHANNELS.sessionsUpdate, sessionsEvent);
 

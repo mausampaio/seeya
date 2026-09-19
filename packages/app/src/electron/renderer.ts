@@ -615,14 +615,71 @@ function todayPanel(): HTMLElement {
   return document.getElementById('today-panel') as HTMLElement;
 }
 
-/** One session row in the "Today" panel (V2-T4 item 1) — a checkbox for a still-unresumed
- * session, or a plain note for one already marked resumed today (D-024/D-025: the two are never
- * rendered the same way, same discipline `core/consolidated-plan.ts#renderSessionPlanLine`
- * already applies to the CLI's own plan text). */
+/** V2-T9 item 2: the directory-changed note + the explanatory line, shown only when the session's
+ * own history actually records a change — "sem histórico é sem nota" (D-025), a single-entry
+ * history says nothing extra rather than affirming "no change". */
+function renderCwdHistoryNote(history: TodaySessionRow['cwdHistory']): HTMLElement | null {
+  if (history.length <= 1) {
+    return null;
+  }
+  const container = document.createElement('div');
+  const note = document.createElement('p');
+  note.textContent = MESSAGES.todayCwdHistoryNote(history);
+  container.appendChild(note);
+  const explanation = document.createElement('p');
+  explanation.textContent = MESSAGES.todayCwdHistoryExplanation;
+  container.appendChild(explanation);
+  return container;
+}
+
+/** V2-T9 item 2: "Resume in" — offered only when there's something to choose (more than one
+ * directory recorded, and at least one still exists), the most recent EXISTING one preselected —
+ * "é o comportamento de hoje" (the plan's own wording): a directory nobody touches here resumes
+ * exactly where it already would have. The interface never picks silently otherwise (D-039):
+ * every other option stays one click away. */
+function renderResumeInSelect(
+  sessionId: string,
+  history: TodaySessionRow['cwdHistory'],
+): HTMLElement | null {
+  if (history.length <= 1) {
+    return null;
+  }
+  const existing = history.filter((entry) => entry.exists);
+  if (existing.length === 0) {
+    return null;
+  }
+  const label = document.createElement('label');
+  label.className = 'today-resume-in-label';
+  label.append(`${MESSAGES.todayResumeInLabel}: `);
+  const select = document.createElement('select');
+  select.className = 'today-session-resume-in';
+  select.dataset.sessionId = sessionId;
+  for (const entry of existing) {
+    const option = document.createElement('option');
+    option.value = entry.cwd;
+    option.textContent = entry.cwd;
+    select.appendChild(option);
+  }
+  select.value = existing[existing.length - 1]?.cwd ?? '';
+  label.appendChild(select);
+  return label;
+}
+
+/** One session row in the "Today" panel (V2-T4 item 1, checkbox rule reshaped by V2-T9 item 4) —
+ * a checkbox for a session that isn't running right now, or a plain note for one that is (D-024/
+ * D-025: the three `TodayResumeStatus` forms are never rendered the same way, same discipline
+ * `core/consolidated-plan.ts#renderSessionPlanLine` already applies to the CLI's own plan text). */
 function renderTodaySessionRow(row: TodaySessionRow): HTMLLIElement {
   const item = document.createElement('li');
-  if (row.alreadyResumed) {
-    item.textContent = `${row.name} (${row.cwd}) — ${MESSAGES.todayAlreadyResumed}`;
+  if (row.resumeStatus.kind === 'runningNow') {
+    item.textContent = `${row.name} (${row.cwd}) — ${MESSAGES.todayRunningNow}`;
+    if (row.resumeStatus.matchedTabId !== null) {
+      item.classList.add('matched');
+    }
+    return item;
+  }
+  if (row.resumeStatus.kind === 'resumedEarlier') {
+    item.textContent = `${row.name} (${row.cwd}) — ${MESSAGES.todayResumedEarlier}`;
     return item;
   }
   const label = document.createElement('label');
@@ -633,6 +690,14 @@ function renderTodaySessionRow(row: TodaySessionRow): HTMLLIElement {
   label.appendChild(checkbox);
   label.append(` ${row.name} (${row.cwd}) — ${row.firstPlanLine ?? MESSAGES.todayNoPlanRecorded}`);
   item.appendChild(label);
+  const cwdHistoryNote = renderCwdHistoryNote(row.cwdHistory);
+  if (cwdHistoryNote !== null) {
+    item.appendChild(cwdHistoryNote);
+  }
+  const resumeInSelect = renderResumeInSelect(row.sessionId, row.cwdHistory);
+  if (resumeInSelect !== null) {
+    item.appendChild(resumeInSelect);
+  }
   return item;
 }
 
@@ -796,7 +861,19 @@ async function handleResumeSelected(day: string): Promise<void> {
     }
     return;
   }
-  const response = await window.seeya.resumeSelected({ day, sessionIds });
+  // V2-T9 item 2: whatever "Resume in" currently shows for each session that has one — read
+  // straight from the DOM, same "the panel's own render is the single source of truth" reasoning
+  // this function's own docstring already gives the checkboxes above.
+  const chosenCwdBySessionId: Record<string, string> = {};
+  for (const select of todayPanel().querySelectorAll<HTMLSelectElement>(
+    '.today-session-resume-in',
+  )) {
+    const sessionId = select.dataset.sessionId;
+    if (sessionId !== undefined) {
+      chosenCwdBySessionId[sessionId] = select.value;
+    }
+  }
+  const response = await window.seeya.resumeSelected({ day, sessionIds, chosenCwdBySessionId });
   // Refresh FIRST: renderTodayPanel rebuilds #today-panel from scratch (including a fresh, empty
   // #today-result), so the summary has to be painted AFTER it — painting it before would just get
   // wiped out by the refresh immediately following.
