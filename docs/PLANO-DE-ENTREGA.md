@@ -5635,6 +5635,22 @@ texto, mas não são a fila.
       voltando depois de fechar uma sessão retomada); e a decisão do item 5 da Q-079 (o padrão do
       seletor quando o diretório mais recente já não existe).
 
+      **Ajuste da revisão do PO (2026-09-19), commit próprio.** `application/cwd-history.ts` lia
+      `process.platform` direto — contra a regra de plataforma só na raiz de composição, e a causa
+      raiz do defeito plataforma-dependente que o `verificar:linux` já tinha achado (a primeira
+      correção só tinha ajustado o exemplo do teste, sem tocar a causa). `collapseCwdRuns`/
+      `readCwdHistory` passaram a receber `PathPlatformHint` por parâmetro, nunca lido dentro do
+      módulo; as duas raízes de composição (`packages/cli/src/composition.ts#buildStartDayContext`,
+      `packages/app/src/composition/index.ts#buildAppContext`) resolvem o hint e passam pelo
+      `StartDayContext`/`AppContext`. O teste original (separador + case + barra final juntos) foi
+      restaurado, agora rodando os dois hints explicitamente — prova o ramo `win32` mesmo dentro do
+      contêiner Linux. **Medido:** `npm run verificar` completo verde no Windows — 184 arquivos de
+      teste, 1.899 testes passando, 4 pulados; agregado 96,46% statements / 92,51% branches /
+      95,31% funções / 96,85% linhas. `npm run verificar:linux` também verde (contêiner
+      `node:22-bookworm`, `EXIT=0`): 184 arquivos de teste, 1.898 testes passando, 5 pulados;
+      agregado 96,30% statements / 92,41% branches / 95,03% funções / 96,70% linhas — o teste
+      restaurado provou o ramo `win32` de verdade dentro do contêiner Linux. Detalhes na Q-079.
+
 - [~] **V2-T10 — O clique no toast abre a janela certa: um esquema por mundo (`seeya://` e
       `seeya-dev://`), o toast segue a última janela aberta, e a desinstalação limpa o registro
       (D-025, D-034, D-039).** Especificada pelo PO em 2026-09-19 a partir de um achado do

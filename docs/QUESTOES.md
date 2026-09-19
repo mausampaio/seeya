@@ -8232,7 +8232,7 @@ dependencias`: verdes. `npm run cobertura -- --maxWorkers 2`: **184 arquivos de 
 passando, 4 pulados**; cobertura agregada **96,45% statements / 92,56% branches / 95,31% funções /
 96,85% linhas** — `core/` 100%/99,19%/100%/100%, todo o resto acima do piso de 80%.
 
-### `npm run verificar:linux`
+### `npm run verificar:linux` (antes do ajuste da revisão)
 
 Contêiner `node:22-bookworm`, `EXIT=0`: **184 arquivos de teste, 1.897 testes passando, 5
 pulados** (um a mais que no Windows — a mesma variação plataforma-condicional já registrada em
@@ -8240,21 +8240,55 @@ tarefas anteriores, não uma regressão desta); cobertura agregada **96,30% stat
 branches / 95,03% funções / 96,69% linhas**. Achado real no caminho: a primeira execução
 reprovou `tests/unit/application/cwd-history.test.ts` — o exemplo de "duas grafias do mesmo
 diretório" misturava separador **e case** (`C:\code\project` vs. `c:/code/project/`), e
-`collapseCwdRuns` lê o `process.platform` de verdade (mesmo raciocínio de
+`collapseCwdRuns` lia o `process.platform` de verdade (mesmo padrão de
 `eligibility-assembly.ts`'s próprio `PLATFORM_HINT`) — o dobramento de case só acontece no
 `win32` (D-S3-T5/`core/cwd-normalization.ts`), então o teste passava no Windows e falhava no
-Linux. Corrigido para variar só separador/barra final (independente de plataforma, mesma
-disciplina que `cwd-normalization.test.ts` já usa testando os dois hints explicitamente) — commit
-próprio, `fix(tests): cwd-history's case-folding example was platform-dependent`. Reexecutado
-depois da correção: verde.
+Linux. Primeira correção, insuficiente: só ajustei o exemplo do teste para não misturar
+separador e case, sem tocar na causa (o módulo continuava lendo `process.platform` direto).
+Reexecutado depois dessa correção: verde — mas a causa raiz ficou registrada aqui, e o PO pediu
+o ajuste correto na revisão (abaixo).
+
+### Ajuste da revisão do PO (2026-09-19): plataforma só na raiz de composição
+
+**O achado do PO, correto:** o defeito acima não era só um teste malformado — era `application/cwd-history.ts`
+lendo `process.platform` direto, contra a regra do projeto ("plataforma só na raiz de composição e
+nos adapters"; `core/cwd-normalization.ts`'s própria razão de ser é justamente essa — ver seu
+docstring). O teste ter passado no Windows e falhado no Linux era o SINTOMA, não algo que um teste
+melhor sozinho resolvesse: enquanto o módulo lesse a plataforma real, o comportamento dele
+continuaria dependente de qual SO roda o processo.
+
+**Correção aplicada, num commit próprio:**
+- `collapseCwdRuns(samples, platformHint: PathPlatformHint)` e `readCwdHistory(deps, sessionId,
+  day, maxScanDays)` — `deps` ganhou `platformHint: PathPlatformHint` — não leem mais
+  `process.platform`; o parâmetro entra e sai, igual `core/cwd-normalization.ts#normalizeCwdForComparison`
+  já fazia.
+- As duas raízes de composição resolvem o hint uma vez, onde já sabem o SO:
+  `packages/cli/src/composition.ts#buildStartDayContext` (novo cálculo, `StartDayContext` ganhou
+  `platformHint`) e `packages/app/src/composition/index.ts#buildAppContext` (reaproveitando o
+  `platform` que a função já lia para `resolveHarnessCommand`/`defaultShellCommand` — `AppContext`
+  ganhou `platformHint`, derivado dele). `start-day-command.ts` e `electron/main.ts` passam
+  `context.platformHint` para `readCwdHistory` sem recalcular nada.
+- **O teste original foi restaurado**, agora rodando os dois hints explicitamente — o exemplo que
+  mistura separador, case E barra final roda uma vez com `'win32'` (funde num run só) e uma vez
+  com `'posix'` (fica em dois runs separados), a mesma disciplina que
+  `tests/unit/core/cwd-normalization.test.ts` já usa. Isso prova o ramo do `win32` mesmo rodando
+  só no contêiner Linux — o próprio motivo do teste existir.
+
+**Medido depois do ajuste, no Windows:** `format:check`, `tsc -p tsconfig.json --noEmit`, `npm run
+lint`, `npm run build`, `npm run dependencias`: verdes. `npm run cobertura -- --maxWorkers 2`:
+**184 arquivos de teste, 1.899 testes passando, 4 pulados** (um a mais que antes do ajuste — o
+teste restaurado virou dois casos, um por hint); cobertura agregada **96,46% statements / 92,51%
+branches / 95,31% funções / 96,85% linhas**. `npm run verificar:linux` também verde (contêiner
+`node:22-bookworm`, `EXIT=0`): **184 arquivos de teste, 1.898 testes passando, 5 pulados**;
+cobertura agregada **96,30% statements / 92,41% branches / 95,03% funções / 96,70% linhas** — o
+teste restaurado (os dois hints explícitos) passou de verdade dentro do contêiner, provando o
+ramo `win32` mesmo rodando em Linux, que era o ponto do ajuste.
 
 ### O que fica pendente do mantenedor
 
-1. Revisar e mesclar os quatro commits.
+1. Revisar e mesclar os cinco commits (quatro itens + o ajuste da revisão).
 2. **O aceite real da entrada do plano**: na manhã seguinte, ver a linha da sessão do PO no painel
    "Hoje" mostrando "`C:\code` até 14/09; `C:\code\seeya` desde 16/09" (ou o texto em inglês
    equivalente); escolher o diretório anterior no seletor "Resume in" e confirmar que a aba abre
    lá; e, para o item 4, fechar o app com uma sessão retomada nele e ver a caixa dela de volta no
    painel ao reabrir.
-3. Item 5 acima (o padrão do seletor quando o mais recente não existe mais) — confirmar que a
-   solução mínima é o comportamento desejado, ou decidir outra coisa.
