@@ -39,6 +39,7 @@ import type {
 import type { Clock } from '@seeya-ai/engine/core/ports.js';
 import { checkLiveLock } from '@seeya-ai/engine/scheduler/daemon-state.js';
 import { findPendingBriefing } from '@seeya-ai/engine/application/find-pending-briefing.js';
+import { readCwdHistory } from '@seeya-ai/engine/application/cwd-history.js';
 import { resumeSessions } from '@seeya-ai/engine/application/start-day.js';
 import { endDay } from '@seeya-ai/engine/application/end-day.js';
 import { formatEndDayReport } from '@seeya-ai/engine/application/format-end-day.js';
@@ -447,13 +448,32 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // V2-T4 item 1: the "Today" panel's own data — findPendingBriefing is the exact same lookup
   // `seeya start-day` does (application/find-pending-briefing.js), scanned over
   // config.maxBriefingScanDays like the CLI's own StartDayCommandContext.
+  //
+  // V2-T9 item 1/2: one readCwdHistory per handoff in the found briefing, over the SAME
+  // maxBriefingScanDays ceiling — a session's directory history never reaches further back than
+  // the scan that found `lookup.briefing.day` in the first place. Skipped entirely when nothing
+  // was found (nothing to build a history for).
   ipcMain.handle(CHANNELS.getTodayPanel, async (): Promise<TodayPanelResponse> => {
     const lookup = await findPendingBriefing(
       context.storage,
       context.clock,
       context.config.maxBriefingScanDays,
     );
-    return buildTodayPanelData(lookup);
+    if (!lookup.found) {
+      return buildTodayPanelData(lookup);
+    }
+    const cwdHistoryEntries = await Promise.all(
+      lookup.briefing.handoffs.map(async (handoff) => {
+        const history = await readCwdHistory(
+          { storage: context.storage, directoryExistence: context.directoryExistence },
+          handoff.sessionId,
+          lookup.briefing.day,
+          context.config.maxBriefingScanDays,
+        );
+        return [handoff.sessionId, history] as const;
+      }),
+    );
+    return buildTodayPanelData(lookup, new Map(cwdHistoryEntries));
   });
 
   // V2-T4 items 1/2/3: "Resume selected" — the same resumeSessions the CLI's start-day-command.ts
@@ -466,8 +486,16 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
     async (_event, request: ResumeSelectedRequest): Promise<ResumeSummaryResponse> => {
       const briefing = await context.storage.readBriefing(request.day);
       const wanted = new Set(request.sessionIds);
-      const handoffs: readonly Handoff[] =
-        briefing?.handoffs.filter((handoff) => wanted.has(handoff.sessionId)) ?? [];
+      // V2-T9 item 2: a chosen directory overrides the handoff's own `cwd` for THIS resume
+      // attempt only — nothing is rewritten to `~/.seeya/` (the panel's own note, D-039). A
+      // sessionId absent from `chosenCwdBySessionId` had no selector to choose from at all (a
+      // single-directory history), so the handoff's own `cwd` is used unchanged.
+      const handoffs: readonly Handoff[] = (briefing?.handoffs ?? [])
+        .filter((handoff) => wanted.has(handoff.sessionId))
+        .map((handoff) => {
+          const chosenCwd = request.chosenCwdBySessionId[handoff.sessionId];
+          return chosenCwd === undefined ? handoff : { ...handoff, cwd: chosenCwd };
+        });
 
       const resolveLabel = (sessionId: string): string =>
         handoffs.find((handoff) => handoff.sessionId === sessionId)?.name ?? sessionId;

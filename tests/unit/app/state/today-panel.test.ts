@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildTodayPanelData } from '../../../../packages/app/src/state/today-panel.js';
 import type { PendingBriefingLookup } from '@seeya-ai/engine/application/find-pending-briefing.js';
+import type { CwdHistoryEntry } from '@seeya-ai/engine/application/cwd-history.js';
 import { buildHandoffFixture as modelHandoff } from '../_handoff-fixture.js';
 
 describe('buildTodayPanelData', () => {
@@ -35,9 +36,56 @@ describe('buildTodayPanelData', () => {
           cwd: '/projects/alpha',
           firstPlanLine: 'ship it',
           alreadyResumed: false,
+          cwdHistory: [],
         },
       ],
     });
+  });
+
+  it('cwdHistory is empty (never an error) when the caller omits the map entirely', () => {
+    const handoff = modelHandoff();
+    const lookup: PendingBriefingLookup = {
+      found: true,
+      daysAgo: 1,
+      resumedSessionIds: new Set(),
+      briefing: { day: '2026-08-16', handoffs: [handoff], rejected: [] },
+    };
+
+    const data = buildTodayPanelData(lookup);
+
+    expect(data.kind === 'pending' && data.rows[0]?.cwdHistory).toEqual([]);
+  });
+
+  it('carries the precomputed cwd history through for the matching sessionId, untouched', () => {
+    const handoff = modelHandoff();
+    const history: readonly CwdHistoryEntry[] = [
+      { cwd: 'C:\\code', firstDay: '2026-08-14', lastDay: '2026-08-14', exists: false },
+      { cwd: 'C:\\code\\seeya', firstDay: '2026-08-16', lastDay: '2026-08-16', exists: true },
+    ];
+    const lookup: PendingBriefingLookup = {
+      found: true,
+      daysAgo: 0,
+      resumedSessionIds: new Set(),
+      briefing: { day: '2026-08-16', handoffs: [handoff], rejected: [] },
+    };
+
+    const data = buildTodayPanelData(lookup, new Map([[handoff.sessionId, history]]));
+
+    expect(data.kind === 'pending' && data.rows[0]?.cwdHistory).toEqual(history);
+  });
+
+  it('a sessionId with no entry in the map falls back to an empty history, never a guess (D-025)', () => {
+    const handoff = modelHandoff();
+    const lookup: PendingBriefingLookup = {
+      found: true,
+      daysAgo: 0,
+      resumedSessionIds: new Set(),
+      briefing: { day: '2026-08-16', handoffs: [handoff], rejected: [] },
+    };
+
+    const data = buildTodayPanelData(lookup, new Map([['some-other-session', []]]));
+
+    expect(data.kind === 'pending' && data.rows[0]?.cwdHistory).toEqual([]);
   });
 
   it('a session already resumed today is marked, not silently dropped', () => {

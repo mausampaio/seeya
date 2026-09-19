@@ -16,6 +16,7 @@
  * — that's new, interface-only presentation this task introduces — so there is no CLI code to move.
  */
 import type { PendingBriefingLookup } from '@seeya-ai/engine/application/find-pending-briefing.js';
+import type { CwdHistoryEntry } from '@seeya-ai/engine/application/cwd-history.js';
 import type { Day, Handoff } from '@seeya-ai/engine/core/types.js';
 import { MESSAGES } from '../text/messages.js';
 
@@ -33,6 +34,14 @@ export interface TodaySessionRow {
   /** `Storage.readResumedSessionIds(day)` already told `findPendingBriefing` this — carried
    * through so the panel can say "already resumed today" instead of offering a checkbox for it. */
   readonly alreadyResumed: boolean;
+  /**
+   * V2-T9 item 1/2 — this session's directory history, oldest run first, from
+   * `application/cwd-history.ts#readCwdHistory`. Always at least the current day's own entry for a
+   * session that reached this row at all (it came from a real handoff); `length <= 1` means no
+   * change was ever observed, which is "no note" (D-025: absence of a change is never itself
+   * asserted — the panel just has nothing extra worth saying).
+   */
+  readonly cwdHistory: readonly CwdHistoryEntry[];
 }
 
 export type TodayPanelData =
@@ -57,23 +66,35 @@ function firstPlanLine(handoff: Handoff): string | null {
   return handoff.tomorrowPlan[0] ?? handoff.pendingItems[0] ?? null;
 }
 
-function buildRow(handoff: Handoff, resumedSessionIds: ReadonlySet<string>): TodaySessionRow {
+function buildRow(
+  handoff: Handoff,
+  resumedSessionIds: ReadonlySet<string>,
+  cwdHistoryBySessionId: ReadonlyMap<string, readonly CwdHistoryEntry[]>,
+): TodaySessionRow {
   return {
     sessionId: handoff.sessionId,
     name: handoff.name,
     cwd: handoff.cwd,
     firstPlanLine: firstPlanLine(handoff),
     alreadyResumed: resumedSessionIds.has(handoff.sessionId),
+    // Defensive fallback (D-025): every real caller computes one entry per handoff in the
+    // briefing (`electron/main.ts`'s own `getTodayPanel` handler), so this only ever triggers in
+    // a test that hands in a partial map on purpose — an empty history is "no note", never an
+    // invented one.
+    cwdHistory: cwdHistoryBySessionId.get(handoff.sessionId) ?? [],
   };
 }
 
 /**
  * @example
  * const lookup = await findPendingBriefing(storage, clock, config.maxBriefingScanDays);
- * const panel = buildTodayPanelData(lookup);
+ * const panel = buildTodayPanelData(lookup, cwdHistoryBySessionId);
  * // panel.kind === 'pending' ? panel.rows : panel.message
  */
-export function buildTodayPanelData(lookup: PendingBriefingLookup): TodayPanelData {
+export function buildTodayPanelData(
+  lookup: PendingBriefingLookup,
+  cwdHistoryBySessionId: ReadonlyMap<string, readonly CwdHistoryEntry[]> = new Map(),
+): TodayPanelData {
   if (!lookup.found) {
     return { kind: 'noBriefing', message: MESSAGES.todayNoBriefing(lookup.daysSearched) };
   }
@@ -81,6 +102,8 @@ export function buildTodayPanelData(lookup: PendingBriefingLookup): TodayPanelDa
     kind: 'pending',
     day: lookup.briefing.day,
     daysAgo: lookup.daysAgo,
-    rows: lookup.briefing.handoffs.map((handoff) => buildRow(handoff, lookup.resumedSessionIds)),
+    rows: lookup.briefing.handoffs.map((handoff) =>
+      buildRow(handoff, lookup.resumedSessionIds, cwdHistoryBySessionId),
+    ),
   };
 }

@@ -36,6 +36,7 @@ import {
   DiscoveryForkCleanup,
 } from '@seeya-ai/engine/adapters/discovery/index.js';
 import { StorageAdapter } from '@seeya-ai/engine/adapters/storage/index.js';
+import { FsDirectoryExistence } from '@seeya-ai/engine/adapters/filesystem/index.js';
 import { buildAutostart } from '@seeya-ai/engine/adapters/autostart/index.js';
 import { TranscriptFileReader } from '@seeya-ai/engine/adapters/transcript/index.js';
 import { GitAdapter } from '@seeya-ai/engine/adapters/git/index.js';
@@ -49,6 +50,7 @@ import { runDaemonStop } from '@seeya-ai/engine/scheduler/daemon-control.js';
 import type {
   Autostart,
   Clock,
+  DirectoryExistence,
   ForkCleanup,
   GitReader,
   HandoffGenerator,
@@ -100,6 +102,9 @@ export interface AppContext {
   readonly processControl: ProcessControl;
   readonly autostart: Autostart;
   readonly config: Config;
+  /** V2-T9 item 1/2 — whether a session's OLD `cwd` (from an earlier day's handoff) still exists,
+   * before ever offering it in the "Resume in" selector (`application/cwd-history.ts`). */
+  readonly directoryExistence: DirectoryExistence;
   /**
    * Resolves a harness command name (`claude`, `codex`) the same way the real OS's shell would —
    * `@seeya-ai/engine/adapters/process/resolve-command.js`, with the real `PATH`/`PATHEXT`/
@@ -316,6 +321,7 @@ export async function buildAppContext(homeDir: string = os.homedir()): Promise<A
     processControl: realProcessControl,
     autostart: buildAutostart(homeDir),
     config,
+    directoryExistence: new FsDirectoryExistence(),
     resolveHarnessCommand: (command, args) =>
       resolveCommand(command, args, {
         platform,

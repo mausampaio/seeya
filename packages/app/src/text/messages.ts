@@ -33,6 +33,32 @@ export const MESSAGES = {
     daysAgo === 1 ? `Plan for ${day}` : `Plan for ${day} (${daysAgo} days ago)`,
   todayAlreadyResumed: 'already resumed today',
   todayNoPlanRecorded: 'no plan recorded',
+
+  // V2-T9 item 2 — the directory-changed note and the "Resume in" selector
+  // (`state/today-panel.ts#TodaySessionRow.cwdHistory`). Structural parameter (not
+  // `CwdHistoryEntry` imported from the engine) — this module's own top comment: no imports here
+  // on purpose, so `text/` never depends on `application/`.
+  todayCwdHistoryNote: (
+    history: readonly {
+      readonly cwd: string;
+      readonly firstDay: string;
+      readonly lastDay: string;
+      readonly exists: boolean;
+    }[],
+  ): string =>
+    history
+      .map((entry, index) => {
+        const location = entry.exists ? entry.cwd : `${entry.cwd} (no longer exists)`;
+        if (index === history.length - 1) {
+          return `in ${location} since ${entry.firstDay}`;
+        }
+        return `${index === 0 ? 'ran in' : 'in'} ${location} until ${entry.lastDay}`;
+      })
+      .join('; '),
+  todayCwdHistoryExplanation:
+    'Claude Code keeps memory and project settings per directory — resuming in a different one ' +
+    'starts without what was saved for the directory above.',
+  todayResumeInLabel: 'Resume in',
   todayResumeSelected: 'Resume selected',
   todayResumeProgress: (index: number, total: number, name: string): string =>
     `Resuming ${index} of ${total}: ${name}...`,
