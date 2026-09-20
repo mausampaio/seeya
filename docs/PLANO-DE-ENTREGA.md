@@ -6044,9 +6044,59 @@ texto, mas não são a fila.
       cima da versão anterior (sem desinstalar) e o ícone aparece no atalho e na barra de tarefas.
       A conferência no Linux anda junto com o aceite pendente da V2-T8.
 
-- [ ] **V2-T15 (candidato, NÃO agendado) — Instalador: o `seeya` no `PATH`, a desinstalação
-      removendo o autostart, e o daemon parado e religado na atualização.** Três itens de
-      instalador que se acumularam; **depende da V2-T13**, que é quem define de quem é o daemon.
+- [ ] **V2-T15 — Instalador: o daemon parado e religado, e o macOS que não abre aba nenhuma.**
+      Especificada pelo PO em 2026-09-20 e aprovada pelo mantenedor no mesmo dia, depois de quatro
+      achados dele em dois sistemas. **Depende da V2-T13**, já mesclada, que define de quem é o
+      daemon. Os itens de arrumação que não são defeito — o `seeya` no `PATH`, a desinstalação
+      removendo o autostart, e a revisão do que muda na instalação por máquina — saem daqui e
+      viram a **V2-T20**, para esta tarefa ficar só com o que hoje quebra ou irrita.
+
+      **O que entra:**
+
+      1. **Instalar e desinstalar param o daemon, e instalar religa se ele estava de pé.** Sem
+         pergunta na tela (ver a decisão de desenho do PO abaixo). O desinstalador não religa nada.
+         **Medir antes de escolher o mecanismo:** o que o NSIS do `electron-builder` já oferece
+         para encontrar e encerrar um processo, e o que sobra para os ganchos `customInit`/
+         `customInstall`/`customUnInstall`. Encerrar o daemon do próprio seeya é permitido
+         (`ProcessControl.terminateAbruptly`, D-002 — a proibição é sobre as sessões descobertas,
+         nunca sobre o nosso daemon). **Saber se ele estava de pé** vem do lock em `~/.seeya/`,
+         que já existe; nada de chave nova em disco.
+      2. **O macOS instalado volta a abrir aba.** Causa medida ponta a ponta pelo mantenedor no
+         Mac dele, em 2026-09-20 — três `ls -l`, nesta ordem:
+         - `node_modules/node-pty/prebuilds/darwin-arm64/spawn-helper` → `-rw-r--r--`;
+           `darwin-x64/spawn-helper` → `-rwxr-xr-x`. **Só o prebuild `arm64` vem sem o bit de
+           execução**, e é do próprio tarball do node-pty, não do `npm`.
+         - depois de `npm run dist:mac`, o mesmo arquivo no `node_modules` **continuava** `644`:
+           `ensureSpawnHelperExecutable` só é chamada por `launchElectron()` (`build.mjs`), ou
+           seja, **só no `npm run app`** — o caminho do empacotamento nunca passa por ela.
+         - dentro do app instalado,
+           `seeya.app/Contents/Resources/app.asar.unpacked/.../darwin-arm64/spawn-helper` também
+           `644`.
+         Portanto **dois pontos**: a correção não roda no caminho do `dist`, e o empacotamento não
+         preserva o bit. Corrigir os dois, com o segundo garantido **depois** de empacotar (gancho
+         do próprio `electron-builder`) — é o único que protege o artefato que chega a quem instala.
+         O sintoma que isso encerra: `Error invoking remote method 'seeya:create-tab': Error:
+         posix_spawnp failed` em toda aba do app instalado num Mac Apple Silicon.
+      3. **Teste que prova o item 2 sem um Mac.** O modo do arquivo dentro do pacote é verificável
+         em qualquer sistema — inclusive no CI, que constrói o `.dmg`. Um teste de guard confere o
+         bit de execução no artefato empacotado, para que isto não volte calado.
+
+      **O que não entra:** assinatura (Q-078); o `seeya` no `PATH`, a remoção do autostart e a
+      revisão da instalação por máquina (V2-T20); qualquer mudança no comportamento do daemon fora
+      do momento de instalar e desinstalar.
+
+      **Cuidados:** nenhuma dependência nova; **nenhum agente instala, desinstala ou roda o
+      instalador na máquina do mantenedor** — o item 1 se prova pelo script gerado e por teste, e o
+      aceite real é dele; o item 2 se prova pelo modo do arquivo dentro do pacote construído, sem
+      instalar. Nada do `~/.seeya` real, do `~/.claude` real, do registro ou do autostart real é
+      tocado.
+
+      **Aceite do mantenedor:** no Windows, instalar por cima com o daemon de pé, sem precisar
+      matar processo nenhum à mão, e o daemon de volta ao fim; desinstalar e a pasta ficar vazia.
+      No Mac, instalar e abrir uma aba.
+
+      **Histórico dos achados que originaram esta tarefa** (medições do mantenedor, mantidas aqui
+      porque é delas que a spec acima vive):
 
       **O achado do terceiro item, do mantenedor em 2026-09-20.** Instalando por cima da versão
       anterior, o instalador avisou que o seeya estava rodando — mesmo com a janela já fechada. Era
