@@ -6361,6 +6361,13 @@ texto, mas não são a fila.
       do mantenedor sobre instalação por máquina, e o que ainda não foi medido em Linux/macOS).
       Nenhuma outra questão nova — a spec e a D-045 cobriram o resto.
 
+      **Mesclada na `main` em 2026-09-20** (portão na worktree do PO: 197 arquivos, 2.008 testes
+      passando, 4 pulados; cobertura 96,39%/92,56%/94,93%/96,75%). Revisão com um ajuste, no texto
+      do diálogo da transição: ele afirmava que o daemon encontrado era "da CLI", coisa que a trava
+      não permite saber (ela não guarda dono), e o botão de recusar dizia "Not now" embora a
+      pergunta nunca mais volte. O texto passou a dizer só o que sabe, e que a pergunta é feita uma
+      vez só. Fica em `[~]` até o aceite do mantenedor.
+
 - [ ] **V2-T16 — Correção: a janela responde com a configuração da subida, não com a que está em
       disco.** Especificada pelo PO em 2026-09-20 a partir de um achado do mantenedor no mesmo dia,
       no aceite da V2-T14. **Depende da V2-T13** só por ordem de fila: as duas mexem em
