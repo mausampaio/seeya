@@ -5930,6 +5930,54 @@ texto, mas não são a fila.
       **Aceite do mantenedor:** instalar a versão nova e ver o ícone do seeya na barra de tarefas
       com o app aberto, e no atalho do menu Iniciar.
 
+- [ ] **V2-T14 — Configurações na janela: o que está valendo, de onde vem, e dá para mudar ali.**
+      Especificada pelo PO em 2026-09-20 a pedido do mantenedor no mesmo dia, e **entra antes da
+      V2-T13**. Pedido dele, nas palavras dele: *"eu quero mudar o horário do fechamento do daemon
+      por exemplo e eu não lembro o comando do cli, sei que posso te perguntar e fazer mas daqui a
+      1h eu já esqueci novamente"*.
+
+      **O problema.** Toda a configuração existe só na CLI (`seeya config get/set`, S4-T12). Quem
+      usa a janela não tem como ver o horário de encerramento, muito menos mudá-lo, e a única
+      forma de descobrir o nome de uma chave é abrir a documentação ou perguntar. **Ver também
+      importa:** hoje nada distingue "este valor eu escolhi" de "este valor é o padrão" — e é
+      justamente essa diferença que faz alguém entender por que o dia fecha às 11:00.
+
+      **O que entra:**
+
+      1. **A lista, com a origem de cada valor.** Uma linha por chave de `EDITABLE_CONFIG_KEYS`
+         (`adapters/storage/config-schema.ts` — as dezesseis de hoje, sem lista nova paralela que
+         possa divergir), mostrando o nome, o valor em vigor, e **de onde ele vem: padrão do seeya
+         ou escolhido em `config.json`** (D-025 — um padrão nunca aparece como se alguém o tivesse
+         escolhido). Módulo puro `state/settings-panel.ts` (`buildSettingsRows`/`SettingsRow`),
+         testado por unidade, comparando o `config.json` lido com `DEFAULT_CONFIG`. O texto de
+         cada chave (uma linha dizendo para que serve) fica concentrado em `text/messages.ts`,
+         nunca espalhado no DOM (`AGENTS.md` § "Texto voltado ao usuário").
+      2. **Mudar ali mesmo.** Cada linha tem um campo de texto com o valor em vigor; salvar aplica
+         pelo **mesmo caminho da CLI** (`parseConfigFieldUpdate`/`applyConfigFieldUpdate` +
+         `Storage.saveConfig`), nunca uma segunda validação própria. Valor recusado mostra o erro
+         como ele vem — o valor bruto e a forma esperada, com o caminho do campo (`AGENTS.md` §
+         "Mensagens de erro") — e **nada é gravado**. Gravação atômica, como todo o resto.
+      3. **O efeito aparece na hora.** Depois de salvar, a janela relê a configuração e recomputa
+         a faixa de horário pelo mesmo `decideSchedule` de sempre (V2-T5b), sem esperar o próximo
+         ciclo: mudar o horário de encerramento e ver a faixa mudar é a prova de que valeu. O
+         daemon relê `config.json` no topo de cada ciclo dele, então não precisa ser reiniciado —
+         dizer isso na tela, em uma linha, evita a dúvida.
+
+      **O que não entra:** editar `projectPolicy` (a única categoria que não é escalar — aparece
+      **só para leitura**, uma linha por `cwd`, e continua sendo editada pela CLI); tema, cores e
+      fonte da interface (a paleta de `design/IDENTIDADE_VISUAL.md` é tarefa própria de visual —
+      `terminalFontFamily`/`terminalFontSize` entram aqui por serem chaves de configuração como as
+      outras, não como um editor de aparência); qualquer chave nova em `config.json`.
+
+      **Cuidados:** nenhuma dependência nova; a janela não ganha uma cópia da validação nem dos
+      padrões — os dois vêm do motor; `core/` e `application/` não mudam; a IPC nova segue o
+      formato de `ipc/channels.ts`; nenhum agente toca no `~/.seeya` real (a verificação manual
+      usa `SEEYA_APP_HOME_OVERRIDE`, como nas tarefas anteriores).
+
+      **Aceite do mantenedor:** abrir as configurações, ver as dezesseis chaves com valor e
+      origem, trocar o horário de encerramento e ver a faixa de horário mudar sem reiniciar nada;
+      e um valor inválido ser recusado com uma mensagem que diz o que se esperava.
+
 - [ ] **V2-T13 — O app é dono do daemon e do autostart; a CLI vira cliente (D-045).**
       Especificada pelo PO em 2026-09-20; terceiro passo do recorte da v2 (`docs/V2-RUMO.md`).
       Implementa os itens 1 e 2 da D-045 — os itens 3 e 4 dela (o handoff sair do centro, adotar
