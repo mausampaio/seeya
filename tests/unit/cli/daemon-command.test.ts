@@ -6,6 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  resolveDaemonInvocationMode,
   runDaemonWorker,
   runDaemonLauncher,
   runDaemonStatus,
@@ -16,7 +17,7 @@ import type { DaemonDeps } from '@seeya-ai/engine/scheduler/index.js';
 import { NOTIFY_AFTER_CONSECUTIVE_CYCLE_FAILURES } from '@seeya-ai/engine/core/daemon-health.js';
 import type { DaemonLockInfo } from '@seeya-ai/engine/core/daemon-lock.js';
 import type { ProcessControl, Storage } from '@seeya-ai/engine/core/ports.js';
-import type { DayState } from '@seeya-ai/engine/core/types.js';
+import type { DaemonOwner, DayState } from '@seeya-ai/engine/core/types.js';
 import { emptyDayState } from '@seeya-ai/engine/core/schedule.js';
 import { createConfig } from '../core/_fixtures.js';
 import { InMemoryDaemonStorage } from '../scheduler/_fakes.js';
@@ -66,6 +67,32 @@ class FixedAliveness implements ProcessControl {
   }
 }
 
+/** V2-T13: proves `runDaemonLauncher` refuses the moment it sees `daemonOwner.kind === 'app'`,
+ * BEFORE ever reading the lock — every `readDaemonLock` call rejects loudly instead of a scripted
+ * flag a test would have to remember to assert on. */
+class NeverReadStorage extends FakeStorage {
+  override readDaemonLock(): Promise<DaemonLockInfo | null> {
+    return Promise.reject(new Error('NeverReadStorage.readDaemonLock should not have been called'));
+  }
+}
+
+/** Same reasoning as `NeverReadStorage` above, for the `ProcessControl` side of the same check. */
+class NeverCalledProcessControl implements ProcessControl {
+  isAlive(): Promise<boolean> {
+    return Promise.reject(
+      new Error('NeverCalledProcessControl.isAlive should not have been called'),
+    );
+  }
+  terminateGracefully(): Promise<boolean> {
+    return Promise.reject(new Error('not exercised'));
+  }
+  terminateAbruptly(): Promise<void> {
+    return Promise.reject(new Error('not exercised'));
+  }
+}
+
+const CLI_OWNER: DaemonOwner = { kind: 'cli' };
+
 describe('runDaemonLauncher — refuse path (no spawn)', () => {
   it('reports the pid already holding the lock and never spawns anything', async () => {
     const storage: Storage = new LockOnlyStorage(DEFAULT_TEST_CONFIG);
@@ -76,14 +103,96 @@ describe('runDaemonLauncher — refuse path (no spawn)', () => {
     });
     const processControl = new FixedAliveness(true);
 
-    const message = await runDaemonLauncher(storage, processControl, {
-      nodePath: process.execPath,
-      scriptPath: '/nonexistent/should-not-be-spawned.js',
-      args: ['daemon'],
-    });
+    const message = await runDaemonLauncher(
+      storage,
+      processControl,
+      {
+        nodePath: process.execPath,
+        scriptPath: '/nonexistent/should-not-be-spawned.js',
+        args: ['daemon'],
+      },
+      CLI_OWNER,
+    );
 
     expect(message).toContain('already running');
     expect(message).toContain('4242');
+  });
+});
+
+// V2-T13, D-045 item 3.
+describe('runDaemonLauncher — the app owns the daemon (no lock check, no spawn)', () => {
+  it('refuses outright, names the app path, and never even checks the lock', async () => {
+    const storage = new NeverReadStorage(DEFAULT_TEST_CONFIG);
+    const processControl = new NeverCalledProcessControl();
+    const owner: DaemonOwner = { kind: 'app', launchPath: 'C:\\seeya\\seeya.exe' };
+
+    const message = await runDaemonLauncher(
+      storage,
+      processControl,
+      {
+        nodePath: process.execPath,
+        scriptPath: '/nonexistent/should-not-be-spawned.js',
+        args: ['daemon'],
+      },
+      owner,
+    );
+
+    expect(message).toContain('the app is installed');
+    expect(message).toContain('C:\\seeya\\seeya.exe');
+    expect(message).toContain('seeya daemon');
+  });
+});
+
+// V2-T13's own "cuidado central" (D-045 item 3): the WORKER path never even has a DaemonOwner
+// parameter to check — proven by exercising it directly the way cli/index.ts's own "mode ===
+// 'worker'" branch does (never through runDaemonLauncher, which is the only function that
+// refuses).
+describe("resolveDaemonInvocationMode — the app's own detached child always reaches the worker", () => {
+  it('DAEMON_CHILD_ENV_VAR set → "worker", regardless of --stop/--status being unset', () => {
+    expect(resolveDaemonInvocationMode({}, true)).toBe('worker');
+  });
+
+  it('--stop wins over the env var — an explicit human flag is never shadowed', () => {
+    expect(resolveDaemonInvocationMode({ stop: true }, true)).toBe('stop');
+  });
+
+  it('--status wins over the env var, for the same reason', () => {
+    expect(resolveDaemonInvocationMode({ status: true }, true)).toBe('status');
+  });
+
+  it('no flags, no env var → "launcher" (a human just typed "seeya daemon")', () => {
+    expect(resolveDaemonInvocationMode({}, false)).toBe('launcher');
+  });
+
+  it("the app's own detached child (the worker) reaching runDaemonWorker never touches ownership: it succeeds even where runDaemonLauncher would have refused for the same machine", async () => {
+    // Same LockOnlyStorage/FixedAliveness class this file already uses for runDaemonLauncher's own
+    // refusal test above — the point here is that runDaemonWorker's signature has no DaemonOwner
+    // parameter at all, so nothing here COULD refuse it (see this function's own docstring).
+    const storage = new LockOnlyStorage(DEFAULT_TEST_CONFIG);
+    const deps: DaemonDeps = {
+      clock: { now: () => new Date('2026-09-05T10:00:00.000Z'), sleep: () => Promise.resolve() },
+      storage,
+      notifier: { notify: () => Promise.resolve() },
+      processControl: new FixedAliveness(false),
+      transcriptReader: new FakeTranscriptReader(),
+      gitReader: new FakeGitReader(),
+      forkCleanup: new FakeForkCleanup(),
+      buildSessionProvider: () => ({ list: () => Promise.reject(new Error('not exercised')) }),
+      buildGenerators: () => ({
+        leanGenerator: failingGenerator('not exercised by this test'),
+        deepGenerator: failingGenerator('not exercised by this test'),
+      }),
+      discoverEarlyWarnings: () =>
+        Promise.reject(new Error('not exercised — the lock check must win first')),
+    };
+
+    // A SIGTERM right after starting stops the loop before any poll runs (same technique the
+    // existing runDaemonWorker describe block below already uses) — this test only cares that the
+    // worker actually STARTED (exit code 0, no refusal), not that it polled anything.
+    const resultPromise = runDaemonWorker(deps, 555, undefined);
+    process.emit('SIGTERM');
+    const exitCode = await resultPromise;
+    expect(exitCode).toBe(0);
   });
 });
 

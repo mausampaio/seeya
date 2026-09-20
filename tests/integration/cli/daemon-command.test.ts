@@ -84,6 +84,7 @@ describe('runDaemonLauncher — real spawn path', () => {
           scriptPath: FIXTURE_PATH,
           args: [shutdownMarker, readyMarker],
         },
+        { kind: 'cli' },
       );
 
       expect(message).toContain('seeya daemon started');

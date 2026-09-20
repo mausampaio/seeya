@@ -13,6 +13,16 @@
  *
  * `runDaemonStop` itself now lives in `@seeya-ai/engine/scheduler/daemon-control.js` (V2-T5b item
  * 3) — re-exported below so every existing caller/test of this module keeps working unchanged.
+ *
+ * **V2-T13, D-045 item 3: the CLI is a client when the app owns the daemon.** Only
+ * `runDaemonLauncher` — the HUMAN's own invocation — checks `DaemonOwner` and refuses. The worker
+ * branch (`cli/index.ts`'s own `DAEMON_CHILD_ENV_VAR` check, which calls `runDaemonWorker`
+ * directly, never `runDaemonLauncher`) is untouched by this task: the window's own "Start daemon"
+ * button spawns exactly this same compiled binary with that env var set
+ * (`packages/app/src/composition/index.ts#startDaemon`, mirroring this file's launcher, not
+ * calling it), so the ownership refusal would otherwise block the very thing the app is trying to
+ * do (`tests/unit/cli/daemon-command.test.ts`'s own "the app's own worker still starts" test
+ * proves this).
  */
 import {
   spawnDetachedDaemon,
@@ -22,22 +32,44 @@ import { checkDaemonLock } from '@seeya-ai/engine/scheduler/index.js';
 import { runDaemon } from '@seeya-ai/engine/scheduler/index.js';
 import type { DaemonDeps } from '@seeya-ai/engine/scheduler/index.js';
 import type { ProcessControl, Storage } from '@seeya-ai/engine/core/ports.js';
+import type { DaemonOwner } from '@seeya-ai/engine/core/types.js';
 import {
   describeDaemonState,
   type DaemonStateDeps,
 } from '@seeya-ai/engine/scheduler/daemon-state.js';
+
+/** The exact refusal line D-045 item 3 asks for: says why (the app owns it) and what to do
+ * (open the app). Shared by `runDaemonLauncher` below and
+ * `cli/autostart-command.ts#runAutostartEnableCommand`'s own analogous refusal shares the same
+ * shape, not this exact text — the two commands refuse two different things. */
+function daemonOwnedByAppMessage(owner: Extract<DaemonOwner, { kind: 'app' }>): string {
+  return (
+    `seeya: the app is installed (${owner.launchPath}) and now owns the daemon. Open seeya and ` +
+    'use the daemon control there (Start daemon / Stop daemon) — "seeya daemon" no longer starts ' +
+    'one here.'
+  );
+}
 
 /**
  * Pre-flight only — `scheduler/lock.ts#checkDaemonLock` never writes. Refusing here BEFORE
  * spawning saves the cost of a child that would immediately find itself refused anyway (the
  * worker's own `runDaemon` call is the authoritative check; see that file's module comment for
  * why both exist).
+ *
+ * `daemonOwner` (V2-T13, D-045 item 3) is checked FIRST, before the lock: `'app'` refuses outright
+ * with `daemonOwnedByAppMessage`; `'cli'` and `'unknown'` behave identically to each other and to
+ * this function's own pre-V2-T13 behavior (D-025 — a query that couldn't determine ownership is
+ * never treated as "the app owns it").
  */
 export async function runDaemonLauncher(
   storage: Storage,
   processControl: ProcessControl,
   target: DaemonLaunchTarget,
+  daemonOwner: DaemonOwner,
 ): Promise<string> {
+  if (daemonOwner.kind === 'app') {
+    return daemonOwnedByAppMessage(daemonOwner);
+  }
   const decision = await checkDaemonLock(storage, processControl);
   if (decision.kind === 'refuse') {
     return `seeya daemon is already running (pid ${decision.heldByPid}). Nothing started.`;
@@ -85,6 +117,34 @@ export async function runDaemonWorker(
     process.off('SIGINT', requestStop);
     process.off('SIGTERM', requestStop);
   }
+}
+
+/**
+ * V2-T13's "cuidado central" (D-045 item 3): which of `seeya daemon`'s four branches `cli/index.ts`
+ * takes, decided PURELY from the two flags a human can type (`--stop`/`--status`) and the one
+ * thing only the process's own environment carries (`isDaemonChildEnv`,
+ * `adapters/process/daemon-launch.ts#DAEMON_CHILD_ENV_VAR`) — never from `DaemonOwner`.
+ * `'worker'` wins over `'launcher'` whenever `isDaemonChildEnv` is true, with NO other condition:
+ * the window's own "Start daemon" button spawns this exact binary with that env var set
+ * (`packages/app/src/composition/index.ts#startDaemon`), so this is what a real installed app's
+ * own child process hits on its way in — `runDaemonWorker` (the function `'worker'` dispatches to)
+ * has no `daemonOwner` parameter AT ALL (its own signature, above), so there is nothing here that
+ * COULD refuse it even by accident. Only `'launcher'` ever reaches `runDaemonLauncher`, the one
+ * function that checks ownership.
+ */
+export type DaemonInvocationMode = 'stop' | 'status' | 'worker' | 'launcher';
+
+export function resolveDaemonInvocationMode(
+  options: { readonly stop?: boolean; readonly status?: boolean },
+  isDaemonChildEnv: boolean,
+): DaemonInvocationMode {
+  if (options.stop === true) {
+    return 'stop';
+  }
+  if (options.status === true) {
+    return 'status';
+  }
+  return isDaemonChildEnv ? 'worker' : 'launcher';
 }
 
 // ---------------------------------------------------------------------------------------------
