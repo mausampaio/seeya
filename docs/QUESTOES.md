@@ -8388,6 +8388,14 @@ daemon. Open seeya and use the daemon control there (Start daemon / Stop daemon)
 no longer starts one here.
 ```
 
+**Risco registrado pelo PO em 2026-09-20 (V2-T21):** `tests/integration/app/composition.test.ts`
+consulta o registro real do Windows para exercitar esta detecção, e sob instrumentação de cobertura
+numa máquina carregada quatro casos estouraram o limite de 5.000ms — reproduzido na `main` sem
+mudança nenhuma, e ausente no portão do PO logo depois. Não é defeito de tarefa, é um teste de
+integração que depende de I/O do sistema e do humor da máquina. Candidato a correção pequena
+(prazo próprio para esses casos, ou dublê no que não precisa do registro de verdade) antes que
+alguém aprenda a ignorar vermelho.
+
 Primeira medição real do adaptador de macOS: a procura em `/Applications` acha o `.app` e o
 `launchPath` aponta para o executável de verdade, não para a pasta do bundle. **Linux segue sem
 medição.**

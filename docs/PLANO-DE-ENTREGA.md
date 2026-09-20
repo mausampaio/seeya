@@ -7196,6 +7196,13 @@ texto, mas não são a fila.
       registrada antes: o autostart do logout/login anterior não "recuou por causa da trava viva",
       foi recusado do mesmo jeito; o daemon que estava lá era o sobrevivente do logout.
 
+      **Mesclada na `main` em 2026-09-20** (portão na worktree do PO: 200 arquivos, 2.057 testes
+      passando, 4 pulados; cobertura 96,41%/92,68%/94,97%/96,77% — e **sem** o estouro de tempo que
+      o agente viu). Revisão sem ajustes; o agente acrescentou, por conta própria e com razão, o
+      ajuste que faltava na spec: além do rótulo, o botão precisava **aceitar um clique novo logo
+      após o anterior** — sem isso o texto se corrigiria na hora e o clique seguinte seria engolido
+      até o próximo ciclo. Fica em `[~]` até o aceite do mantenedor.
+
 - [ ] **V2-T23 — Correção: o autostart congela o ambiente inteiro do app, inclusive coisas que só
       valem naquele login.** Especificada pelo PO em 2026-09-20 a partir de uma medição do
       mantenedor no Mac dele, no mesmo dia — o primeiro `cat` que alguém deu no arquivo de
