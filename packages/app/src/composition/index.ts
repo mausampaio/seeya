@@ -67,16 +67,13 @@ import type {
   Storage,
   TranscriptReader,
 } from '@seeya-ai/engine/core/ports.js';
-import type {
-  Config,
-  DaemonOwner,
-  DaemonOwnershipTransitionAnswer,
-} from '@seeya-ai/engine/core/types.js';
+import type { DaemonOwner, DaemonOwnershipTransitionAnswer } from '@seeya-ai/engine/core/types.js';
 import type { PathPlatformHint } from '@seeya-ai/engine/core/cwd-normalization.js';
 import type { EndDayDeps } from '@seeya-ai/engine/application/types.js';
 import { NodePtyAdapter } from '../pty/node-pty-adapter.js';
 import { PtyManager, type PtyManagerCallbacks } from '../pty/pty-manager.js';
 import { defaultShellCommand, type ShellCommand } from '../pty/default-shell.js';
+import { resolveTerminalFontOptions, type TerminalFontOptions } from '../state/terminal-font.js';
 import { readLoginShellPath } from './read-login-shell-path.js';
 import { applyDaemonOwnershipTransition as applyDaemonOwnershipTransitionOrchestration } from './daemon-ownership-transition.js';
 
@@ -149,7 +146,22 @@ export interface AppContext {
    * `checkDaemonOwnershipTransitionOffer` never offers again.
    */
   applyDaemonOwnershipTransition(answer: DaemonOwnershipTransitionAnswer): Promise<void>;
-  readonly config: Config;
+  /**
+   * V2-T16 item 2: the ONE config-derived value this context still hands out — everything else
+   * that used to live on a general-purpose `AppContext.config` field (read once, here, at window
+   * startup) was removed; every other reader now calls `context.storage.readConfig()` itself, at
+   * the moment it actually needs the value (`electron/main.ts`'s own IPC handlers,
+   * `state/schedule-actions.ts`). This field alone is exempt, by name and by design: the
+   * renderer's very first `new Terminal({...})` (`electron/main.ts`'s own
+   * `CHANNELS.getTerminalFontConfig` handler) needs SOME font before it exists, and once that
+   * terminal exists its font is never live-updated (docs/PLANO-DE-ENTREGA.md V2-T16's own "o que
+   * não entra": "mudar a fonte do terminal já aplicada numa aba aberta") — so, unlike every value
+   * this task removed, there is no live counterpart this one could ever fall back to being stale
+   * against. A field whose own name says "read once, at startup, for one purpose" is exactly
+   * D-024's "o tipo torna o estado inválido irrepresentável": nothing here reads like a general
+   * config a caller could reach for by mistake.
+   */
+  readonly initialTerminalFontOptions: TerminalFontOptions;
   /** V2-T9 item 1/2 — whether a session's OLD `cwd` (from an earlier day's handoff) still exists,
    * before ever offering it in the "Resume in" selector (`application/cwd-history.ts`). */
   readonly directoryExistence: DirectoryExistence;
@@ -428,7 +440,10 @@ export async function buildAppContext(homeDir: string = os.homedir()): Promise<A
     enableAppAutostart,
     checkDaemonOwnershipTransitionOffer,
     applyDaemonOwnershipTransition,
-    config,
+    // V2-T16 item 2: the ONE snapshot of `config` this context still exposes — see
+    // `AppContext#initialTerminalFontOptions`'s own docstring for why this one field is exempt
+    // from "read fresh every time".
+    initialTerminalFontOptions: resolveTerminalFontOptions(config),
     directoryExistence: new FsDirectoryExistence(),
     platformHint,
     resolveHarnessCommand: (command, args) =>
