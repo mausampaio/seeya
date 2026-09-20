@@ -6656,7 +6656,11 @@ texto, mas não são a fila.
 
       **Aceite do macOS em 2026-09-20:** o mantenedor instalou o `.dmg` construído pela CI a partir
       desta tarefa e **as abas abrem** — shell e `claude`, no mesmo Mac Apple Silicon onde toda aba
-      falhava com `posix_spawnp failed`. O item 2 está fechado na plataforma onde o defeito existia,
+      falhava com `posix_spawnp failed`. Na mesma sessão ele mediu, pela primeira vez num Mac, mais
+      duas coisas que só tinham medição no Windows: a **detecção de instalação** (Q-081, a CLI do
+      checkout recusou e o caminho resolveu para dentro do bundle) e os botões **Start daemon**/
+      **Stop daemon** da janela, que se comportaram igual ao Windows — inclusive no atraso do
+      rótulo, que é o defeito da V2-T21. O item 2 está fechado na plataforma onde o defeito existia,
       e a versão de macOS deixou de sair quebrada.
 
 - [~] **V2-T16 — Correção: a janela responde com a configuração da subida, não com a que está em
