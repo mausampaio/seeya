@@ -158,6 +158,26 @@ export const MESSAGES = {
   daemonControlUnknown: 'Daemon: cannot verify — see the status panel.',
   daemonControlRunning: 'Working…',
 
+  // V2-T13 item 4 — the autostart control button (state/autostart-control-panel.ts). Only shown
+  // when the app owns autostart (D-045 item 3); `resultText` is whatever
+  // cli/autostart-command.ts#runAutostartEnableCommand/runAutostartDisableCommand already prints
+  // for "seeya autostart enable"/"disable" (D-039).
+  autostartControlEnable: 'Enable autostart',
+  autostartControlDisable: 'Disable autostart',
+  autostartControlUnknown: 'Autostart: cannot verify — see the status panel.',
+  autostartControlRunning: 'Working…',
+
+  // V2-T13 item 5 — the ownership-transition dialog (D-045 item 1), shown once per machine.
+  daemonOwnershipTransitionTitle: 'seeya found an existing daemon/autostart set up by the CLI',
+  daemonOwnershipTransitionBody: (launchPath: string): string =>
+    `seeya is installed (${launchPath}) and can now own the daemon and autostart on this machine. ` +
+    'Accepting stops the CLI-managed daemon (if running), points autostart at this app, and ' +
+    'starts its own daemon. Declining changes nothing — the CLI keeps running its own daemon and ' +
+    'autostart, and you can enable this later from the button next to Autostart in this window.',
+  daemonOwnershipTransitionAccept: 'Let seeya take over',
+  daemonOwnershipTransitionDecline: 'Not now',
+  daemonOwnershipTransitionApplying: 'Working…',
+
   // V2-T14 — the "Settings" dialog (state/settings-panel.ts). One row per
   // `EDITABLE_CONFIG_KEYS` (@seeya-ai/engine/adapters/storage/config-schema.js), same sixteen keys
   // `seeya config get` already walks. Deliberately NOT typed against `EditableConfigKey` here

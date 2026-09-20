@@ -9,7 +9,11 @@
  */
 import type { Autostart } from '@seeya-ai/engine/core/ports.js';
 import type { DaemonOwner } from '@seeya-ai/engine/core/types.js';
-import { describeAutostartState } from '@seeya-ai/engine/application/autostart-state.js';
+import {
+  describeAutostartState,
+  formatAutostartDisableResult,
+  formatAutostartEnableResult,
+} from '@seeya-ai/engine/application/autostart-state.js';
 
 /** The exact refusal line D-045 item 3 asks for, mirroring
  * `cli/daemon-command.ts#daemonOwnedByAppMessage`'s own shape for the analogous "the app owns the
@@ -29,25 +33,11 @@ export async function runAutostartEnableCommand(
   if (daemonOwner.kind === 'app') {
     return autostartOwnedByAppMessage(daemonOwner);
   }
-  const result = await autostart.enable(binaryPath);
-  switch (result.kind) {
-    case 'registered':
-      return `Autostart enabled: seeya daemon will now start on login, from ${result.path}.`;
-    case 'alreadyRegistered':
-      return `Autostart was already enabled, pointing at ${result.path}. Nothing changed.`;
-    case 'updated':
-      return (
-        `Autostart was already enabled, pointing at ${result.previousPath}. Updated it to the ` +
-        `binary currently in use: ${result.newPath}.`
-      );
-  }
+  return formatAutostartEnableResult(await autostart.enable(binaryPath));
 }
 
 export async function runAutostartDisableCommand(autostart: Autostart): Promise<string> {
-  const result = await autostart.disable();
-  return result.kind === 'removed'
-    ? 'Autostart disabled: seeya daemon will no longer start on login.'
-    : 'Autostart was already disabled. Nothing changed.';
+  return formatAutostartDisableResult(await autostart.disable());
 }
 
 export function runAutostartStatusCommand(autostart: Autostart): Promise<string> {

@@ -38,6 +38,11 @@ import type {
   SettingsPanelResponse,
   SaveSettingRequest,
   SaveSettingResponse,
+  AutostartAvailabilityUpdateEvent,
+  AutostartControlRequest,
+  AutostartControlResponse,
+  DaemonOwnershipTransitionOfferResponse,
+  AnswerDaemonOwnershipTransitionRequest,
 } from '../ipc/channels.js';
 import type { Clock } from '@seeya-ai/engine/core/ports.js';
 import {
@@ -67,6 +72,7 @@ import { buildEndDayCostCeiling } from '../state/end-day-preview.js';
 import { projectEndDayProgressEvent } from '../state/end-day-progress.js';
 import { buildScheduleStripData } from '../state/schedule-strip.js';
 import { resolveDaemonControlAvailability } from '../state/daemon-control-panel.js';
+import { resolveAutostartControlAvailability } from '../state/autostart-control-panel.js';
 import { buildSettingsRows, buildProjectPolicyLines } from '../state/settings-panel.js';
 import {
   addTab,
@@ -78,7 +84,10 @@ import {
   withPid,
   type TabCollection,
 } from '../tabs/tab-model.js';
-import { describeAutostartState } from '@seeya-ai/engine/application/autostart-state.js';
+import {
+  formatAutostartDisableResult,
+  formatAutostartEnableResult,
+} from '@seeya-ai/engine/application/autostart-state.js';
 import {
   buildSidebarRows,
   buildLiveSessionIndex,
@@ -733,6 +742,40 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
     },
   );
 
+  // V2-T13 item 4: "Enable autostart"/"Disable autostart" — the button only ever shows when
+  // `context.daemonOwner.kind === 'app'` (the renderer's own availability decides which action to
+  // send, same D-041 discipline `daemonControl` above already follows); `enableAppAutostart`
+  // registers the app's own daemon target (Electron's binary + ELECTRON_RUN_AS_NODE=1), never the
+  // bare CLI-style `Autostart.enable(binaryPath)` call.
+  ipcMain.handle(
+    CHANNELS.autostartControl,
+    async (_event, request: AutostartControlRequest): Promise<AutostartControlResponse> => {
+      if (request.action === 'enable') {
+        return { resultText: formatAutostartEnableResult(await context.enableAppAutostart()) };
+      }
+      return { resultText: formatAutostartDisableResult(await context.autostart.disable()) };
+    },
+  );
+
+  // V2-T13 item 5 (D-045 item 1): fetched once at startup — see `renderer.ts`'s own `main()`.
+  ipcMain.handle(
+    CHANNELS.getDaemonOwnershipTransitionOffer,
+    async (): Promise<DaemonOwnershipTransitionOfferResponse> => {
+      const shouldOffer = await context.checkDaemonOwnershipTransitionOffer();
+      return {
+        shouldOffer,
+        launchPath: context.daemonOwner.kind === 'app' ? context.daemonOwner.launchPath : '',
+      };
+    },
+  );
+
+  ipcMain.handle(
+    CHANNELS.answerDaemonOwnershipTransition,
+    async (_event, request: AnswerDaemonOwnershipTransitionRequest): Promise<void> => {
+      await context.applyDaemonOwnershipTransition(request.answer);
+    },
+  );
+
   void runRefreshLoop({
     clock: context.clock,
     intervalMs: REFRESH_INTERVAL_MS,
@@ -765,7 +808,7 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
         autostartCache,
         now,
         DEFAULT_AUTOSTART_REFRESH_INTERVAL_MS,
-        () => describeAutostartState(context.autostart),
+        () => context.autostart.status(),
       );
 
       const text = await buildStatusPanelText({
@@ -804,6 +847,12 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
       const daemonAvailabilityEvent: DaemonAvailabilityUpdateEvent =
         resolveDaemonControlAvailability(liveLockCheck);
       window.webContents.send(CHANNELS.daemonAvailabilityUpdate, daemonAvailabilityEvent);
+
+      // V2-T13 item 4: from the SAME cached status `autostartReport` above already reads (never a
+      // second Autostart.status() call, Q-071's own measurement).
+      const autostartAvailabilityEvent: AutostartAvailabilityUpdateEvent =
+        resolveAutostartControlAvailability(context.daemonOwner, autostartCache.status);
+      window.webContents.send(CHANNELS.autostartAvailabilityUpdate, autostartAvailabilityEvent);
     },
   });
 }
