@@ -205,7 +205,7 @@ export const MESSAGES = {
     budgetPerSessionUsd: 'The dollar ceiling end-day capture enforces per session.',
     captureConcurrency: 'How many sessions end-day captures at the same time.',
     ignore: 'Comma-separated directory prefixes end-day never captures.',
-    forkCleanupDays: 'Days a seeya-created fork is kept on disk before it gets deleted (D-012).',
+    forkCleanupDays: 'Days a seeya-created fork is kept on disk before it gets deleted.',
     maxGitRootsToVisit:
       'The ceiling on how many git roots one capture visits looking for evidence.',
     maxCaptureAttemptsPerSessionPerDay:
