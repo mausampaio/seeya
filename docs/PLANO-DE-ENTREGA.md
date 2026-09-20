@@ -5039,7 +5039,7 @@ texto, mas não são a fila.
       caracteres órfãos sumiram, com a comparação já feita no Windows Terminal (limpo) como
       referência. Detalhes de ferramental completos na Q-075.
 
-- [~] **V2-T5b — O daemon na janela: faixa de horário com Snooze e Skip today, subir e parar o
+- [x] **V2-T5b — O daemon na janela: faixa de horário com Snooze e Skip today, subir e parar o
       daemon (D-036, D-039, D-042, D-043).** Especificada pelo PO em 2026-09-17; aprovada pelo
       mantenedor no mesmo dia, com o recorte do item 5, e despachada logo depois da V2-T7;
       **mesclada na `main` em 2026-09-17** (portão na worktree do PO: 1.811 passando, 4 pulados;
@@ -5658,7 +5658,7 @@ texto, mas não são a fila.
       agregado 96,30% statements / 92,41% branches / 95,03% funções / 96,70% linhas — o teste
       restaurado provou o ramo `win32` de verdade dentro do contêiner Linux. Detalhes na Q-079.
 
-- [~] **V2-T10 — O clique no toast abre a janela certa: um esquema por mundo (`seeya://` e
+- [x] **V2-T10 — O clique no toast abre a janela certa: um esquema por mundo (`seeya://` e
       `seeya-dev://`), o toast segue a última janela aberta, e a desinstalação limpa o registro
       (D-025, D-034, D-039).** Especificada pelo PO em 2026-09-19 a partir de um achado do
       mantenedor no mesmo dia e de uma sugestão dele; aprovada e despachada pelo mantenedor no
@@ -5756,10 +5756,12 @@ texto, mas não são a fila.
       dos dois commits, no Windows. `npm run verificar:linux` também verde (182 arquivos, 1.861
       testes, 5 pulados; cobertura 96,38%/92,88%/95,18%/96,79%) — detalhes em Q-080.
 
-      **O que fica pendente do mantenedor:** revisar e mesclar; e o aceite real da entrada acima —
-      instalar de verdade
-      (Windows e Linux), abrir os dois mundos, e confirmar que o clique segue a última janela e que
-      a desinstalação limpa a chave.
+      **Aceita pelo mantenedor em 2026-09-20, no Windows.** Ele mudou o horário de encerramento
+      para 09:30 para provocar uma notificação nova, com o app instalado aberto por último: o
+      clique no toast trouxe **o seeya instalado** para a frente, e não a versão de
+      desenvolvimento — o defeito que originou esta tarefa. Isso fecha junto o item pendente da
+      V2-T5b (o clique no toast). Continua pendente só a conferência no Linux, que anda com o
+      aceite da V2-T8, e a limpeza da chave na desinstalação, que só se observa desinstalando.
 
 - [x] **V2-T11 — O ícone do seeya: instalador, janela e README a partir de `design/`.**
       Especificada pelo PO em 2026-09-19 e aprovada pelo mantenedor no mesmo dia, logo depois de
