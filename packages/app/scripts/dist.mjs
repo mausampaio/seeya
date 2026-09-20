@@ -39,12 +39,36 @@ import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { checkPlatformSupport } from './dist-platform-check.mjs';
+import { checkDescriptionLength } from './check-package-description.mjs';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
 const electronBuilderBin = require.resolve('electron-builder/cli.js');
+const packageJson = require(path.join(packageRoot, 'package.json'));
 
-const result = spawnSync(process.execPath, [electronBuilderBin, ...process.argv.slice(2)], {
+const forwardedArgs = process.argv.slice(2);
+
+// V2-T12 item 3: fail fast, one line, before spending minutes downloading Electron and packaging
+// only to hit electron-builder's own raw error partway through — see dist-platform-check.mjs's
+// own docstring for the measurement behind each case.
+const platformSupport = checkPlatformSupport(forwardedArgs, process.platform);
+if (!platformSupport.ok) {
+  console.error(platformSupport.message);
+  process.exit(1);
+}
+
+// V2-T12 item 2: same guard as the regression test in
+// tests/unit/app/scripts/check-package-description.test.ts, run again here so a bad description
+// never reaches an actual installer even if someone edits package.json without running the test
+// suite — see check-package-description.mjs's own docstring for the measurement behind the limit.
+const descriptionCheck = checkDescriptionLength(packageJson.description);
+if (!descriptionCheck.ok) {
+  console.error(descriptionCheck.reason);
+  process.exit(1);
+}
+
+const result = spawnSync(process.execPath, [electronBuilderBin, ...forwardedArgs], {
   cwd: packageRoot,
   stdio: 'inherit',
   shell: false,

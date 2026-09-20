@@ -5879,7 +5879,7 @@ texto, mas não são a fila.
 
       Fica em `[~]` até o review.
 
-- [ ] **V2-T12 — Correção: o atalho do Windows nasce com o ícone quebrado; e um `dist` por
+- [~] **V2-T12 — Correção: o atalho do Windows nasce com o ícone quebrado; e um `dist` por
       plataforma.** Especificada pelo PO em 2026-09-20 a partir de um defeito medido na máquina do
       mantenedor durante o aceite da V2-T11, e de um pedido dele no mesmo dia. Aprovada e
       despachada no mesmo dia.
@@ -5929,6 +5929,87 @@ texto, mas não são a fila.
 
       **Aceite do mantenedor:** instalar a versão nova e ver o ícone do seeya na barra de tarefas
       com o app aberto, e no atalho do menu Iniciar.
+
+      **Relatório (agente, 2026-09-20).** Branch `tarefa/V2-T12-atalho-dist` a partir da `main`
+      (`origin/main` no commit `79a9b7f`, esta própria especificação). Dois commits: `23d1bea`
+      (descrição curta + scripts `dist:*`) e `9288cc2` (o guard de item 2 e seus testes).
+
+      **Item 2 — o campo e o limite, medidos antes de tudo o mais.** O campo é `description` de
+      `packages/app/package.json`: `app-builder-lib` (26.15.3) grava esse valor, sem alteração,
+      tanto no atalho NSIS (`templates/nsis/include/installer.nsh`:
+      `CreateShortCut "$newStartMenuLink" "$appExe" "" "$appExe" 0 "" "" "${APP_DESCRIPTION}"`,
+      `APP_DESCRIPTION` vindo de `NsisTarget.js#appInfo.description`) quanto no campo
+      `Description:` do `.deb` — um único campo guarda os dois alvos. Reprodução isolada: um
+      `.lnk` descartável em `$env:TEMP` (nunca o atalho instalado do mantenedor), criado e lido de
+      volta com `WScript.Shell` — o mesmo objeto COM que o mantenedor usou para ler o campo
+      corrompido de verdade. Saída bruta (script `v2t12-lnk-repro.ps1` na pasta de scratchpad do
+      agente, fora deste repositório inteiramente — nunca commitado):
+      ```
+      len= 260 okIcon=True  readIcon='C:\WINDOWS\System32\notepad.exe,0'
+      len= 261 okIcon=False readIcon=',0'
+      len= 285 okIcon=False readIcon='??e,0'
+      len= 300 okIcon=False readIcon='???????,0'
+      ```
+      Uma `Description` de 260 caracteres sobrevive intacta; em 261, `WshShortcut.Description`
+      trunca silenciosamente para 260 caracteres **e** apaga o campo `IconLocation` (lido de volta
+      como `',0'`, sem caminho algum) — exatamente o sintoma que o mantenedor relatou ("final do
+      texto da descrição, seguido de um caminho truncado"). A `description` antiga tinha ~500
+      caracteres, bem acima do limite. O guard (`checkDescriptionLength`,
+      `packages/app/scripts/check-package-description.mjs`) usa `DESCRIPTION_LENGTH_LIMIT = 200`
+      — margem de ~60 caracteres sob o limite duro medido — e roda em dois lugares: o teste de
+      regressão (`tests/unit/app/scripts/check-package-description.test.ts`, que reprova
+      explicitamente a string de ~500 caracteres removida nesta tarefa, provando que o teste
+      reprovava antes da correção) e um preflight dentro de `dist.mjs`, para que uma `description`
+      ruim nunca chegue a gerar um instalador de verdade mesmo sem rodar a suíte.
+
+      **Item 1 — a descrição nova, e para onde foi a nota antiga.** `description` passou a ser
+      `"Desktop interface for seeya: an embedded terminal for reviewing and resuming discovered
+      Claude Code sessions."` (109 caracteres). O parágrafo antigo (arquitetura, D-042/D-043,
+      V2-T5b) foi para `packages/app/README.md`, novo — nenhum outro pacote deste monorepo tinha
+      um README próprio; a escolha (README em vez de comentário em código) está justificada no
+      próprio arquivo, na seção "Why this note isn't in package.json's description".
+
+      **Item 3 — os três `dist` por plataforma, e o que cada um exige de verdade.** `dist:windows`
+      /`dist:linux`/`dist:mac` (raiz e `packages/app`) encaminham `--win`/`--linux`/`--mac` para
+      `scripts/dist.mjs`, que já repassa argumentos. `npm run dist` continua igual. Medido nesta
+      máquina Windows: `node scripts/dist.mjs --linux` baixa o Electron, empacota o app
+      descompactado e só falha ao montar o AppImage —
+      `EPERM: operation not permitted, symlink 'usr\share\icons\hicolor\1024x1024\apps\seeya.png'
+      -> '...\dist-installer\__appImage-x64\seeya.png'` — o Windows recusa o link simbólico que o
+      empacotamento do AppImage precisa (o `.deb` nunca chega a rodar depois). Isso confirma o que
+      a spec já sabia por precedente (`verificar:linux`): alvo Linux a partir do Windows precisa
+      de contêiner — este agente não reimplementou esse contêiner dentro de `dist.mjs` (mudança
+      maior que o escopo desta tarefa), só um guard (`checkPlatformSupport`,
+      `packages/app/scripts/dist-platform-check.mjs`) que detecta a combinação host=Windows +
+      alvo Linux **antes** de gastar minutos baixando o Electron, e imprime uma linha apontando
+      para o mesmo padrão de contêiner. Para `.mac`, o guard bloqueia qualquer host que não seja
+      `darwin` (fato já documentado em `electron-builder.yml`'s own comentário sobre `.dmg`, não
+      medido de novo aqui — esta máquina é Windows). Prova das três linhas, rodadas nesta máquina:
+      `dist:linux` → `"dist:linux cannot build the Linux target from a Windows host (measured:
+      EPERM creating a symlink while packaging AppImage) — run it inside a Linux container
+      instead, the same way npm run verificar:linux already does."`; `dist:mac` → `"dist:mac
+      cannot build the macOS .dmg target outside macOS (it needs hdiutil, which only ships there)
+      — build it on macOS, or let the CI macOS job do it."`; `dist:windows` roda normalmente (não
+      testado até o fim — o alvo real é o instalador NSIS, e a spec proíbe instalar/rodar o
+      instalador; confirmado que passa do preflight e chega a chamar o `electron-builder`).
+      Nenhum diretório `dist-installer/` gerado nas medições ficou no repositório (já ignorado
+      pelo git, e removido manualmente entre as tentativas por precaução).
+
+      **Portão (Windows, primeiro plano, em pedaços pela pouca memória da máquina):**
+      `format:check` verde; `tsc -p tsconfig.json --noEmit` verde; `lint` (`eslint .`) verde;
+      `build` (`tsc -b`) verde; `dependencias` (`depcruise`) verde — "no dependency violations
+      found (346 modules, 915 dependencies cruised)"; `npx vitest run --project unit --project
+      integration --project integration-process --project guards --maxWorkers 2` — 187 arquivos,
+      1.914 testes, 4 pulados, verde; o mesmo comando com `--coverage` — 96,46% statements /
+      92,51% branches / 95,31% funções / 96,85% linhas, acima dos pisos do `AGENTS.md`.
+      `verificar:linux` não rodado (opcional; CI cobre — e esta tarefa já mediu, por outra via, o
+      mesmo limite de host que ele existe para contornar). Nenhum agente instalou o app, rodou o
+      instalador nem tocou no `~/.seeya` real, no `~/.claude` real ou nas chaves de registro
+      `seeya`/`seeya-dev`.
+
+      Nenhuma questão nova aberta.
+
+      Fica em `[~]` até o review.
 
 - [ ] **V2-T14 — Configurações na janela: o que está valendo, de onde vem, e dá para mudar ali.**
       Especificada pelo PO em 2026-09-20 a pedido do mantenedor no mesmo dia, e **entra antes da
