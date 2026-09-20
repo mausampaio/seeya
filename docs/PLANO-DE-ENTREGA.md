@@ -5761,7 +5761,9 @@ texto, mas não são a fila.
       clique no toast trouxe **o seeya instalado** para a frente, e não a versão de
       desenvolvimento — o defeito que originou esta tarefa. Isso fecha junto o item pendente da
       V2-T5b (o clique no toast). Continua pendente só a conferência no Linux, que anda com o
-      aceite da V2-T8, e a limpeza da chave na desinstalação, que só se observa desinstalando.
+      aceite da V2-T8. **A limpeza da chave foi conferida no mesmo dia**, depois de o mantenedor
+      desinstalar: `HKCU\Software\Classes\seeya` não existe mais, e o atalho e a entrada de
+      desinstalação também saíram.
 
 - [x] **V2-T11 — O ícone do seeya: instalador, janela e README a partir de `design/`.**
       Especificada pelo PO em 2026-09-19 e aprovada pelo mantenedor no mesmo dia, logo depois de
@@ -6028,6 +6030,13 @@ texto, mas não são a fila.
       o daemon, lançado pela própria janela: ele é **o mesmo executável** do app rodando como
       processo de apoio, então fechar a janela não o encerra e não há como a pessoa adivinhar isso.
       Instalar por cima funcionou depois de encerrá-lo, mas o aviso não diz o que encerrar.
+
+      **Segundo achado, medido na desinstalação de 2026-09-20.** O desinstalador **também não
+      encerra o daemon**: depois de desinstalar, `seeya.exe` (246 MB) e `resources/app.asar`
+      (17 MB) continuaram em disco porque o processo do daemon, lançado pela janela às 08:57, ainda
+      os mantinha abertos — ele seguia rodando o código de um app que já não está instalado. A
+      pasta só fica vazia depois de encerrá-lo. Ou seja: o mesmo item vale para os dois lados,
+      instalar **e** desinstalar.
 
       **Decisão de desenho do PO, a confirmar na especificação: sem pergunta na tela.** O
       instalador para o daemon antes de instalar e, **se ele estava de pé**, sobe de novo no fim,
