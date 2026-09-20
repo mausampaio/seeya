@@ -7307,6 +7307,18 @@ texto, mas não são a fila.
       **Aceite do mantenedor:** com o app instalado e o autostart dele ligado, sair da conta,
       entrar de novo e abrir o app **sem** ver a pergunta.
 
+      **Medição vizinha, do mesmo teste (2026-09-20, macOS):** o daemon **sobrevive ao logout**.
+      Depois de sair da conta e entrar de novo, `~/.seeya/daemon.lock` continuava com o mesmo `pid`
+      e o mesmo `startedAt`, e `ps -p <pid>` mostrou o processo vivo, iniciado antes do logout,
+      rodando `/Applications/seeya.app/Contents/MacOS/seeya`. É consequência direta de o daemon ser
+      lançado destacado da sessão (D-005/`spawnDetachedDaemon`) — a mesma decisão que o faz
+      sobreviver ao fechamento do terminal. **Duas consequências, nenhuma delas resolvida aqui:**
+      (a) o autostart continua **sem prova de ponta a ponta**, porque no login ele encontra a trava
+      viva e recua (comportamento correto, mas silencioso — o teste que fecha isso é parar o daemon
+      ANTES de sair da conta); (b) um daemon que roda com ninguém logado pode disparar o
+      encerramento do dia sem haver sessão nenhuma para capturar — **questão em aberto, para quando
+      o `end-day` global for desenhado**, não para esta tarefa.
+
 ## Definição de pronto (vale para toda tarefa)
 
 1. Código implementa exatamente a spec; divergência virou questão, não improviso.
