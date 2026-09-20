@@ -71,8 +71,18 @@
 ; -----------------------------------------------------------------------------------------------
 
 Var SeeyaDaemonLockPath
-Var SeeyaDaemonWasRunning
 Var SeeyaCliScriptPath
+; Measured (a real `npm run dist:windows` run, V2-T15): NSIS's own compiler treats "unreferenced
+; variable" as a fatal warning (`warning 6001 ... wasting memory!`, `electron-builder`'s own
+; `makensis` wrapper turns any compiler warning into a hard build failure). `$SeeyaDaemonWasRunning`
+; is read/written only by `customInit`/`customInstall` — the INSTALLER half — never by
+; `customUnInstall`, so declaring it unconditionally broke the UNINSTALLER compile pass
+; (`BUILD_UNINSTALLER` defined), which never references it. `installer.nsi`'s own top-level `Var
+; appExe`/`Var launchLink` (installer-only state) use the exact same `!ifndef BUILD_UNINSTALLER`
+; guard for the same reason.
+!ifndef BUILD_UNINSTALLER
+  Var SeeyaDaemonWasRunning
+!endif
 
 ; Sets/clears ELECTRON_RUN_AS_NODE in the INSTALLER'S OWN process environment (System.dll — a
 ; stock NSIS plugin, already used throughout these templates for e.g. process enumeration, never a
