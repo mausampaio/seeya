@@ -5879,6 +5879,57 @@ texto, mas não são a fila.
 
       Fica em `[~]` até o review.
 
+- [ ] **V2-T12 — Correção: o atalho do Windows nasce com o ícone quebrado; e um `dist` por
+      plataforma.** Especificada pelo PO em 2026-09-20 a partir de um defeito medido na máquina do
+      mantenedor durante o aceite da V2-T11, e de um pedido dele no mesmo dia. Aprovada e
+      despachada no mesmo dia.
+
+      **O defeito, medido.** Depois de instalar, o ícone aparece no instalador e na janela, mas a
+      barra de tarefas mostra o ícone genérico de arquivo. O atalho do menu Iniciar
+      (`%APPDATA%\...\Start Menu\Programs\seeya.lnk`) tem o campo de ícone corrompido — lido
+      com `WScript.Shell`, ele vem assim: o **final do texto da descrição do atalho**, seguido de
+      um caminho relativo truncado (`...\Programs\seeya.` em vez de `seeya.exe`) e do índice
+      `,0`. O caminho não existe, e o Windows cai no ícone genérico. O ícone do próprio
+      `seeya.exe` está correto, e é por isso que o instalador e a janela mostram a marca.
+      **Causa provável, a confirmar:** o `electron-builder` usa o campo `description` do
+      `packages/app/package.json` como descrição do atalho, e essa descrição tem hoje ~500
+      caracteres — uma nota técnica interna, com aspas e crases — bem acima do que o campo de um
+      atalho do Windows comporta; o excesso passou por cima do campo vizinho. **Isto não é defeito
+      da V2-T11:** o atalho já nascia assim desde a V2-T8, e os ícones apenas tornaram visível.
+
+      **O que entra:**
+      1. **A descrição curta.** `packages/app/package.json` passa a ter uma `description` de uma
+         linha, voltada a quem lê o atalho e a descrição do pacote `.deb` (é o mesmo campo nos
+         dois), em inglês. A nota técnica atual não se perde: ela descreve a arquitetura do pacote
+         e vai para onde sobrevive a um `npm install` — comentário no código ou README do pacote,
+         a escolha do agente, justificada em comentário.
+      2. **O limite, medido e guardado.** Descobrir o limite real (qual campo o
+         `electron-builder`/NSIS escreve e onde ele estoura) e **reproduzir a corrupção de forma
+         isolada**, criando um `.lnk` descartável fora do repositório com uma descrição longa e
+         lendo o campo de ícone de volta — sem tocar no atalho instalado do mantenedor. Um teste
+         de guard novo recusa uma `description` acima do limite medido, com margem, e a mensagem
+         diz o tamanho encontrado e o esperado. **O teste falha antes da correção** — é o que
+         prova a regressão.
+      3. **Um `dist` por plataforma.** Hoje só existe `npm run dist`, que constrói para a
+         plataforma atual. Entram `dist:windows`, `dist:linux` e `dist:mac` (raiz e
+         `packages/app`), cada um passando a flag de plataforma ao `scripts/dist.mjs`, que já
+         encaminha argumento. **Documentar o que cada um exige de verdade**, medido: construir
+         alvo Linux a partir do Windows precisa de contêiner (o projeto já tem precedente em
+         `verificar:linux`), e o `.dmg` só se constrói no macOS. Se um combinação não funcionar,
+         o script diz isso em uma linha em vez de falhar com erro do `electron-builder`. O
+         `npm run dist` continua como está.
+
+      **O que não entra:** assinatura do instalador (Q-078); qualquer outra mudança no atalho
+      (nome, pasta, atalho extra); instalar ou desinstalar o app na máquina do mantenedor — a
+      prova final do ícone na barra de tarefas é do aceite dele.
+
+      **Cuidados:** nenhuma dependência nova; nada em `design/` muda; não tocar no `~/.seeya`
+      real, no `~/.claude` real, nas chaves `seeya`/`seeya-dev` do registro nem no atalho
+      instalado; o `dist.yml` da CI continua funcionando.
+
+      **Aceite do mantenedor:** instalar a versão nova e ver o ícone do seeya na barra de tarefas
+      com o app aberto, e no atalho do menu Iniciar.
+
 ## Definição de pronto (vale para toda tarefa)
 
 1. Código implementa exatamente a spec; divergência virou questão, não improviso.
