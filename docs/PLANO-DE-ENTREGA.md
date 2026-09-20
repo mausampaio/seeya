@@ -6660,7 +6660,11 @@ texto, mas não são a fila.
       duas coisas que só tinham medição no Windows: a **detecção de instalação** (Q-081, a CLI do
       checkout recusou e o caminho resolveu para dentro do bundle) e os botões **Start daemon**/
       **Stop daemon** da janela, que se comportaram igual ao Windows — inclusive no atraso do
-      rótulo, que é o defeito da V2-T21. O item 2 está fechado na plataforma onde o defeito existia,
+      rótulo, que é o defeito da V2-T21. E, ainda no mesmo dia, **a primeira notificação do seeya
+      vista num Mac**: com o encerramento marcado para as 15:00, o aviso prévio apareceu na hora
+      certa, com o texto de sempre (`adapters/notification/macos-osascript.ts`). O sistema também
+      avisou, por conta própria, que "seeya" virou item de início de sessão — confirmação de fora
+      de que o registro de autostart da V2-T13 chegou ao lugar certo. O item 2 está fechado na plataforma onde o defeito existia,
       e a versão de macOS deixou de sair quebrada.
 
 - [~] **V2-T16 — Correção: a janela responde com a configuração da subida, não com a que está em
