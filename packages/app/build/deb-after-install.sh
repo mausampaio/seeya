@@ -11,7 +11,7 @@
 # deliberate difference is the `/usr/bin/${executable}` section right below.
 #
 # `${executable}`/`${sanitizedProductName}` are substituted at BUILD time by electron-builder's
-# own `writeConfigFile` (a plain `${name}` regex replace, `FpmTarget.js`) -- both come out "seeya"
+# own `writeConfigFile` (`FpmTarget.js`, a regex over dollar-brace tokens) -- both come out "seeya"
 # today (`package.json`'s own `productName`/`executableName`), kept as two separate template
 # variables for the same reason `windows-installation-scripts.ts`'s own top comment gives: they
 # answer two different questions that happen to share a value now.

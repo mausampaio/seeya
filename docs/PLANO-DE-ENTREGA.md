@@ -7738,6 +7738,16 @@ texto, mas não são a fila.
       ficaram de fora, os dois registrados na Q-083 com o motivo — é o que a própria spec mandava
       fazer quando um caminho não se sustentasse.
 
+      **Regressão pega pela CI logo depois da mesclagem, corrigida pelo PO no mesmo dia:** a
+      construção do `.deb` morreu com `Error: Macro name is not defined`
+      (`app-builder-lib/out/targets/FpmTarget.js#writeConfigFile`). O `electron-builder` substitui
+      todo token `${...}` desses scripts e aborta num que não conhece — **inclusive dentro de
+      comentário de shell**, e era exatamente ali que estava: num comentário que explicava esse
+      mesmo mecanismo, usando um marcador de exemplo. Nenhum portão local pegaria (Windows não
+      constrói alvo Linux, V2-T12). Corrigido o comentário e acrescentado teste de guard que recusa
+      marcador fora da lista conhecida — roda em qualquer sistema, então o defeito deixa de depender
+      de alguém construir para Linux para aparecer.
+
       **Custo de manutenção que o PO registra junto:** os ganchos do pacote `.deb` agora
       **substituem por inteiro** os scripts que o `electron-builder` gera. O agente preservou tudo
       o que eles faziam (sandbox do Chrome, bancos de mime e de atalhos, AppArmor) e conferiu isso

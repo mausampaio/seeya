@@ -69,3 +69,29 @@ describe('packages/app/build/deb-after-remove.sh', () => {
     expect(afterRemove).toContain('apparmor_parser --remove');
   });
 });
+
+describe('deb script macros (V2-T20 review fix)', () => {
+  // Measured on CI (2026-09-20, the `Build installers` run right after V2-T20 merged): the Linux
+  // job died with `Error: Macro name is not defined`, thrown by
+  // `app-builder-lib/out/targets/FpmTarget.js#writeConfigFile`. electron-builder substitutes every
+  // dollar-brace token in these files and throws on one it does not know -- **including tokens
+  // inside shell comments**, which is exactly where the offending `${name}` sat: a comment
+  // explaining the substitution mechanism itself. Windows cannot build the Linux target
+  // (V2-T12's own `checkPlatformSupport`), so no local gate could have caught it; this test can,
+  // on any OS.
+  const KNOWN_MACROS = ['executable', 'sanitizedProductName'];
+
+  for (const [name, script] of [
+    ['deb-after-install.sh', afterInstall],
+    ['deb-after-remove.sh', afterRemove],
+  ] as const) {
+    it(`${name} uses only macros electron-builder defines`, () => {
+      const used = [...script.matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g)].flatMap(
+        (match) => match[1] ?? [],
+      );
+      const unknown = [...new Set(used)].filter((macro) => !KNOWN_MACROS.includes(macro));
+
+      expect(unknown, `unknown macros in ${name}: ${unknown.join(', ')}`).toEqual([]);
+    });
+  }
+});
