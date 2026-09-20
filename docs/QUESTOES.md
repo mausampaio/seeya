@@ -8377,3 +8377,17 @@ nenhuma de caminho, nunca o oposto (recusar por engano).
 **Linux/macOS continuam sem medição real** (mesma ressalva já registrada nos comentários dos
 próprios adaptadores) — a tarefa não tinha como criar um `.deb` instalado ou um `.app` real dentro
 do escopo permitido.
+
+**macOS medido pelo mantenedor em 2026-09-20 — funciona.** Com o `.dmg` da CI instalado, a CLI do
+checkout (`node packages/cli/dist/index.js daemon`, um binário diferente do app) recusou como
+deveria, e resolveu o caminho do executável **dentro do bundle**:
+
+```
+seeya: the app is installed (/Applications/seeya.app/Contents/MacOS/seeya) and now owns the
+daemon. Open seeya and use the daemon control there (Start daemon / Stop daemon) — "seeya daemon"
+no longer starts one here.
+```
+
+Primeira medição real do adaptador de macOS: a procura em `/Applications` acha o `.app` e o
+`launchPath` aponta para o executável de verdade, não para a pasta do bundle. **Linux segue sem
+medição.**
