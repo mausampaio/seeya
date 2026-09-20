@@ -25,6 +25,7 @@ import {
   decideAutostartEnable,
   type AutostartRawQuery,
 } from '../../core/autostart.js';
+import { AUTOSTART_OUTPUT_LOG_FILE_NAME, buildAutostartEnv } from './env.js';
 import type { CommandRunner } from '../notification/backend.js';
 import { spawnCommand } from '../notification/backend.js';
 
@@ -39,10 +40,22 @@ function buildEnvironmentLines(env: Readonly<Record<string, string>> | undefined
     : Object.entries(env).map(([key, value]) => `Environment=${key}=${value}`);
 }
 
+/** V2-T23 item 5: `append:` is systemd's own file-descriptor store type for `StandardOutput=`/
+ * `StandardError=` (systemd >= 240) — the daemon's stdout/stderr land in one file inside
+ * `~/.seeya/` across every run, on top of (not instead of) whatever `journalctl --user -u
+ * seeya-daemon.service` already keeps, so a login failure leaves a trace this project's own root
+ * can show without asking the person to know `journalctl` exists. Same "not measured against a
+ * real system" disclaimer this file's own top comment already carries for the rest of the unit
+ * (docs/QUESTOES.md Q-067). */
+function buildOutputCaptureLines(outputLogPath: string): string[] {
+  return [`StandardOutput=append:${outputLogPath}`, `StandardError=append:${outputLogPath}`];
+}
+
 function buildUnitContent(
   execPath: string,
   binaryPath: string,
   env: Readonly<Record<string, string>> | undefined,
+  outputLogPath: string,
 ): string {
   return [
     '[Unit]',
@@ -51,6 +64,7 @@ function buildUnitContent(
     '',
     '[Service]',
     ...buildEnvironmentLines(env),
+    ...buildOutputCaptureLines(outputLogPath),
     `ExecStart=${execPath} ${binaryPath} daemon`,
     'Restart=no',
     '',
@@ -93,6 +107,11 @@ function commandFailure(action: string, exitCode: number | null, stderr: string)
 
 export interface LinuxAutostartOptions {
   readonly homeDir?: string;
+  /** V2-T23: the injectable `~/.seeya/` root (D-027) — separate from `homeDir` above, which is
+   * only ever used for `~/.config/systemd/user/`. Defaults to `''` the same way `homeDir` falls
+   * back to `process.env.HOME ?? ''`: a real value always comes from `buildAutostart`'s own
+   * caller, this is only ever hit by a test that doesn't care about the output log path. */
+  readonly seeyaHome?: string;
   readonly run?: CommandRunner;
   readonly readFile?: (path: string) => string | null;
   readonly writeFile?: (path: string, content: string) => void;
@@ -102,6 +121,7 @@ export interface LinuxAutostartOptions {
 
 export class LinuxAutostart implements Autostart {
   private readonly unitPath: string;
+  private readonly outputLogPath: string;
   private readonly run: CommandRunner;
   private readonly readFile: (path: string) => string | null;
   private readonly writeFile: (path: string, content: string) => void;
@@ -111,6 +131,7 @@ export class LinuxAutostart implements Autostart {
   constructor(options: LinuxAutostartOptions = {}) {
     const homeDir = options.homeDir ?? process.env.HOME ?? '';
     this.unitPath = path.join(homeDir, '.config', 'systemd', 'user', UNIT_NAME);
+    this.outputLogPath = path.join(options.seeyaHome ?? '', AUTOSTART_OUTPUT_LOG_FILE_NAME);
     this.run = options.run ?? spawnCommand;
     this.readFile = options.readFile ?? defaultReadFile;
     this.writeFile = options.writeFile ?? defaultWriteFile;
@@ -140,7 +161,10 @@ export class LinuxAutostart implements Autostart {
     const query = this.query();
     const decision = decideAutostartEnable(query, binaryPath);
     const execPath = options.execPath ?? process.execPath;
-    this.writeFile(this.unitPath, buildUnitContent(execPath, binaryPath, options.env));
+    // V2-T23: only the allowlisted vars ever reach the unit file — see env.ts's own docstring for
+    // why `options.env` (which could be anything a caller hands in) is never trusted verbatim.
+    const env = buildAutostartEnv(options.env ?? {});
+    this.writeFile(this.unitPath, buildUnitContent(execPath, binaryPath, env, this.outputLogPath));
     await this.runSystemctl('daemon-reload', ['daemon-reload']);
     await this.runSystemctl(`enable ${UNIT_NAME}`, ['enable', UNIT_NAME]);
     return decision;

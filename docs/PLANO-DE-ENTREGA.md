@@ -7267,7 +7267,7 @@ texto, mas não são a fila.
       após o anterior** — sem isso o texto se corrigiria na hora e o clique seguinte seria engolido
       até o próximo ciclo. Fica em `[~]` até o aceite do mantenedor.
 
-- [ ] **V2-T23 — Correção: o autostart congela o ambiente inteiro do app, inclusive coisas que só
+- [~] **V2-T23 — Correção: o autostart congela o ambiente inteiro do app, inclusive coisas que só
       valem naquele login.** Especificada pelo PO em 2026-09-20 a partir de uma medição do
       mantenedor no Mac dele, no mesmo dia — o primeiro `cat` que alguém deu no arquivo de
       autostart gerado.
@@ -7329,6 +7329,68 @@ texto, mas não são a fila.
 
       **Aceite do mantenedor:** desligar e ligar o autostart, e o arquivo gerado conter só as
       variáveis da lista.
+
+      **Relatório (agente, 2026-09-20).** Branch `tarefa/V2-T23-ambiente-do-autostart` a partir da
+      `main` (commit `bfa644b`). Um commit: `b8631b9`.
+
+      **Item 1 (a lista explícita).** `AUTOSTART_ENV_VAR_ALLOWLIST` e `buildAutostartEnv`
+      (`packages/engine/src/adapters/autostart/env.ts`, novo) — `ELECTRON_RUN_AS_NODE`/`PATH`, com
+      o porquê de cada um no próprio docstring (a mesma explicação que já estava na spec). Vive em
+      `adapters/`, não em `core/`, seguindo o precedente de `adapters/resumption/env.ts#buildResumptionEnv`/
+      `adapters/generation/env.ts#buildGenerationEnv` — funções puras de ambiente que já moram ao
+      lado de quem as usa, não em `core/`, porque `NodeJS.ProcessEnv` é um tipo de processo, não um
+      conceito de domínio.
+
+      **Item 2 (vale para os três adaptadores).** `buildAutostartEnv` é chamada duas vezes no
+      caminho de um clique até o arquivo escrito: uma vez em
+      `packages/app/src/composition/index.ts#enableAppAutostart` (a causa medida, agora corrigida —
+      não passa mais `daemonLaunchTarget.env` inteiro) e de novo dentro do `enable()` de cada um dos
+      três adaptadores (`macos.ts`/`linux.ts`/`windows.ts`), como defesa em profundidade: um
+      chamador futuro que esquecer de filtrar (a CLI, por exemplo, se um dia passar `env`) não
+      consegue escrever mais que a lista de qualquer forma. Testado nos dois pontos: `env.test.ts`
+      (a função pura, isolada) e um teste por adaptador (`macos.test.ts`/`linux.test.ts`/
+      `windows.test.ts`) que passa uma fotografia realista de login (`SSH_AUTH_SOCK`, `TMPDIR`,
+      `XPC_*`, `USER`/`HOME`/`SHELL`) e confere que só `ELECTRON_RUN_AS_NODE`/`PATH` chegam ao
+      arquivo/unit/script gerado — o item 4 da spec.
+
+      **Item 3 (o `PATH` congelado como limite conhecido).** Registrado no próprio docstring de
+      `buildAutostartEnv` (o remédio: desligar e ligar o autostart de novo, que relê o ambiente do
+      chamador na hora) e, com mais contexto, na entrada do glossário de `AGENTS.md` §
+      "Identificadores que vão para disco" (linha nova para `autostart.log`, que também documenta
+      o mecanismo por SO). Nenhuma releitura de `PATH` em tempo de login foi inventada.
+
+      **Item 5 (saída sem falhar em silêncio).** `AUTOSTART_OUTPUT_LOG_FILE_NAME = 'autostart.log'`
+      (mesmo módulo `env.ts`) — um arquivo, raiz de `~/.seeya/`, `seeyaHome` injetado (novo
+      parâmetro obrigatório de `buildAutostart`, D-027, threaded pelos dois composition roots).
+      Mecanismo nativo de cada SO, nunca um logger novo (`AGENTS.md` § "Registro e saída"):
+      - **macOS**: `StandardOutPath`/`StandardErrorPath` no plist, os dois apontando para o mesmo
+        arquivo (launchd não trunca entre execuções).
+      - **Linux**: `StandardOutput=append:`/`StandardError=append:` no `[Service]` do unit —
+        `append:` existe desde o systemd 240; ver Q-082 para o que isso implica numa distro mais
+        velha.
+      - **Windows**: o `cmd.exe /c "..."` que já envolvia o lançamento quando havia `env` passa a
+        envolver **sempre**, para acrescentar `>> "<caminho>" 2>&1` ao fim do comando —
+        `New-ScheduledTaskAction` não tem parâmetro de redirecionamento próprio, mesma razão que já
+        valia para o `env`.
+
+      Nenhum dos três mecanismos de saída foi reexecutado contra o sistema real (proibido nesta
+      tarefa); Q-082 registra o que ficou sem medir e o nome escolhido para o arquivo, que a spec
+      não fixava.
+
+      **Portão (Windows, primeiro plano):** `format:check` verde; `tsc -p tsconfig.json --noEmit`
+      verde; `lint` verde; `build` verde; `dependencias` verde (366 módulos, 998 dependências, sem
+      violação); `cobertura` verde na primeira tentativa completa (201 arquivos de teste, 2.083
+      testes passando, 4 pulados; 96,46%/92,59%/95,09%/96,83% geral;
+      `packages/engine/src/adapters/autostart` 91,82%/90,90%/84,44%/92,35%, acima do piso de 80%
+      dos três arquivos por SO). `tests/integration/app/composition.test.ts` flacou uma vez sob
+      `--coverage` em paralelo com o resto da suíte (Q-081, instabilidade já conhecida — dois casos
+      estouraram 5000ms; passam sozinhos, e passaram também na segunda rodada completa do
+      `npm run verificar`) — não reproduzido no `npm run verificar` que fechou a tarefa.
+      `verificar:linux` não rodado (mesmo limite de memória do host já registrado em tarefas
+      anteriores; CI cobre).
+
+      **Questão aberta:** Q-082 (o nome do arquivo de saída, escolhido sem espec explícita, e o que
+      ficou sem medir contra um sistema real em cada SO).
 
 - [ ] **V2-T24 (precisa de decisão do mantenedor antes de virar tarefa) — No macOS a notificação
       se apresenta como "Editor de Scripts", e clicar nela abre o editor.** Medido pelo mantenedor

@@ -8399,3 +8399,44 @@ alguém aprenda a ignorar vermelho.
 Primeira medição real do adaptador de macOS: a procura em `/Applications` acha o `.app` e o
 `launchPath` aponta para o executável de verdade, não para a pasta do bundle. **Linux segue sem
 medição.**
+
+## Q-082 — V2-T23 (correção: o autostart congela o ambiente inteiro do app): o nome do arquivo de
+saída, e o que ficou sem medir contra um sistema real
+
+**Contexto.** A tarefa pede (item 5) que o registro de autostart guarde a saída do processo que
+lança, dentro de `~/.seeya/`, "com o mesmo cuidado nos três sistemas" — sem nomear o arquivo nem
+detalhar o mecanismo por SO. Registrado aqui, antes de fechar a tarefa, o que foi decidido sem
+espec explícita e o que segue sem verificação contra um sistema real (agente sandboxed: proibido
+tocar `~/Library/LaunchAgents`, Task Scheduler ou `systemd --user` de verdade).
+
+**Nome escolhido: `autostart.log`, raiz de `~/.seeya/`** (`AUTOSTART_OUTPUT_LOG_FILE_NAME`,
+`packages/engine/src/adapters/autostart/env.ts`), já registrado no glossário do `AGENTS.md`. Um
+arquivo só, compartilhado pelos três SOs — nenhum motivo para nomes diferentes por plataforma, já
+que o layout de `~/.seeya/` não é por SO em nenhum outro lugar do projeto.
+
+**Mecanismo por SO, e o que está medido:**
+
+- **macOS**: `StandardOutPath`/`StandardErrorPath` no plist, apontando os dois para o mesmo
+  arquivo. Mecanismo documentado do `launchd`; este adaptador inteiro já carrega o aviso "não
+  medido" desde S5-T1/Q-067 (só Windows foi medido contra sistema real naquela tarefa) — esta
+  tarefa não muda esse quadro, só adiciona duas chaves à mesma lista de campos nunca exercitados
+  contra um `launchctl` de verdade.
+- **Linux**: `StandardOutput=append:`/`StandardError=append:` no `[Service]` do unit — `append:` é
+  o tipo de `FileDescriptorStore` do systemd disponível **a partir da versão 240** (2018); uma
+  distro mais velha rejeitaria o unit no `daemon-reload`, o que faria `enable()` lançar (nunca
+  falhar em silêncio — é exatamente o comportamento já esperado quando `systemctl` recusa algo).
+  Mesma disciplina "não medido" de Q-067 para este adaptador.
+- **Windows**: antes desta tarefa, o `conhost.exe --headless` só era envolto em `cmd.exe /c "..."`
+  quando havia `env` — a partir de agora é **sempre**, para acrescentar `>> "<caminho>" 2>&1` ao
+  fim do comando. O mecanismo de registro em si (`Register-ScheduledTask`/`conhost.exe --headless`)
+  **foi** medido contra o Task Scheduler real em Q-067 — mas o redirecionamento de saída que esta
+  tarefa acrescenta **não foi reexecutado contra uma tarefa agendada real**: só contra o dublê de
+  `CommandRunner` que os testes já usavam. O risco mais plausível, não observado: o aninhamento de
+  aspas dentro de `cmd.exe /c "..."` já é delicado (o comando anterior a esta tarefa já tinha esse
+  mesmo padrão para os caminhos de `execPath`/`scriptPath`, então o risco não é novo, só cresceu em
+  uma cláusula).
+
+**O que fica para quem for verificar de verdade** (mantenedor, ou uma tarefa futura de verificação
+funcional): ligar o autostart nos três sistemas, forçar uma falha de login (ex.: renomear o
+binário registrado) e conferir que `~/.seeya/autostart.log` realmente carrega o erro — o mesmo
+"aceite do mantenedor" que V2-T23 já pede para a lista de variáveis, estendido à captura de saída.

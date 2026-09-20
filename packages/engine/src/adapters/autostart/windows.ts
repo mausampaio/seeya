@@ -7,6 +7,7 @@
  * `powershell.exe` with these args, get back exit code + stdout + stderr".
  */
 import fs from 'node:fs';
+import path from 'node:path';
 import { z } from 'zod';
 import type {
   Autostart,
@@ -20,6 +21,7 @@ import {
   decideAutostartEnable,
   type AutostartRawQuery,
 } from '../../core/autostart.js';
+import { AUTOSTART_OUTPUT_LOG_FILE_NAME, buildAutostartEnv } from './env.js';
 import type { CommandRunner } from '../notification/backend.js';
 import { spawnCommand } from '../notification/backend.js';
 import { buildPowerShellArgs } from '../notification/windows-toast.js';
@@ -36,6 +38,12 @@ export interface WindowsAutostartOptions {
   /** Defaults to `'powershell.exe'`. Overridable so a test points this at a fake executable
    * instead of ever spawning the real one — same seam `WindowsToastBackend` already uses. */
   readonly command?: string;
+  /** V2-T23: the injectable `~/.seeya/` root (D-027), unlike the other two OS adapters never used
+   * for the registration itself (Task Scheduler carries no filesystem root of its own) — only for
+   * where the launched process's stdout/stderr land. Defaults to `''`: a real value always comes
+   * from `buildAutostart`'s own caller, this is only ever hit by a test that doesn't care about
+   * the output log path. */
+  readonly seeyaHome?: string;
   readonly run?: CommandRunner;
   readonly pathExists?: (path: string) => boolean;
 }
@@ -48,11 +56,13 @@ function commandFailure(action: string, exitCode: number | null, stderr: string)
 
 export class WindowsAutostart implements Autostart {
   private readonly command: string;
+  private readonly outputLogPath: string;
   private readonly run: CommandRunner;
   private readonly pathExists: (path: string) => boolean;
 
   constructor(options: WindowsAutostartOptions = {}) {
     this.command = options.command ?? 'powershell.exe';
+    this.outputLogPath = path.join(options.seeyaHome ?? '', AUTOSTART_OUTPUT_LOG_FILE_NAME);
     this.run = options.run ?? spawnCommand;
     this.pathExists = options.pathExists ?? fs.existsSync;
   }
@@ -85,7 +95,11 @@ export class WindowsAutostart implements Autostart {
     const query = await this.query();
     const decision = decideAutostartEnable(query, binaryPath);
     const execPath = options.execPath ?? process.execPath;
-    const script = buildRegisterScript(execPath, binaryPath, options.env);
+    // V2-T23: only the allowlisted vars ever reach the registered task — see env.ts's own
+    // docstring for why `options.env` (which could be anything a caller hands in) is never
+    // trusted verbatim.
+    const env = buildAutostartEnv(options.env ?? {});
+    const script = buildRegisterScript(execPath, binaryPath, this.outputLogPath, env);
     const result = await this.run(this.command, buildPowerShellArgs(script));
     if (result.exitCode !== 0) {
       throw commandFailure('registration of the autostart task', result.exitCode, result.stderr);

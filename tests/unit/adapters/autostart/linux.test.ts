@@ -9,11 +9,13 @@ import { LinuxAutostart } from '@seeya-ai/engine/adapters/autostart/linux.js';
 import { RecordingCommandRunner } from './_command-runner-fakes.js';
 
 const HOME_DIR = '/home/<usuario>';
+const SEEYA_HOME = '/home/<usuario>/.seeya';
 const BINARY_PATH = '/home/<usuario>/code/seeya/dist/cli/index.js';
 // Built with `path.join`, same as `LinuxAutostart` itself — never a hardcoded `/`-joined
 // literal, which would only match on a POSIX test runner (this suite also runs inside
 // `npm run verificar:linux`'s container, but is authored to be host-independent regardless).
 const UNIT_PATH = path.join(HOME_DIR, '.config', 'systemd', 'user', 'seeya-daemon.service');
+const OUTPUT_LOG_PATH = path.join(SEEYA_HOME, 'autostart.log');
 
 function buildFakeFiles(initial: Map<string, string> = new Map()) {
   const files = initial;
@@ -93,6 +95,7 @@ describe('LinuxAutostart#enable', () => {
       removeFile,
       run: runner.run,
       homeDir: HOME_DIR,
+      seeyaHome: SEEYA_HOME,
     });
 
     await expect(autostart.enable(BINARY_PATH)).resolves.toEqual({
@@ -104,6 +107,29 @@ describe('LinuxAutostart#enable', () => {
       { command: 'systemctl', args: ['--user', 'daemon-reload'] },
       { command: 'systemctl', args: ['--user', 'enable', 'seeya-daemon.service'] },
     ]);
+  });
+
+  // V2-T23 item 5: systemd's own native StandardOutput=/StandardError= append: lines, pointing
+  // inside ~/.seeya/ — never left out, so a login that fails to start the daemon leaves a trace.
+  it('always writes StandardOutput=/StandardError= append: lines, pointing at ~/.seeya/autostart.log', async () => {
+    const { files, readFile, writeFile, removeFile } = buildFakeFiles();
+    const runner = new RecordingCommandRunner([
+      { exitCode: 0, stdout: '', stderr: '' },
+      { exitCode: 0, stdout: '', stderr: '' },
+    ]);
+    const autostart = new LinuxAutostart({
+      readFile,
+      writeFile,
+      removeFile,
+      run: runner.run,
+      homeDir: HOME_DIR,
+      seeyaHome: SEEYA_HOME,
+    });
+
+    await autostart.enable(BINARY_PATH);
+    const unit = files.get(UNIT_PATH) ?? '';
+    expect(unit).toContain(`StandardOutput=append:${OUTPUT_LOG_PATH}`);
+    expect(unit).toContain(`StandardError=append:${OUTPUT_LOG_PATH}`);
   });
 
   it('already registered at a different path → updated', async () => {
@@ -144,6 +170,41 @@ describe('LinuxAutostart#enable', () => {
 
     await autostart.enable(BINARY_PATH, { env: { ELECTRON_RUN_AS_NODE: '1' } });
     expect(files.get(UNIT_PATH)).toContain('Environment=ELECTRON_RUN_AS_NODE=1');
+  });
+
+  // V2-T23 items 1/2/4: same measured Mac defect as macos.test.ts's own equivalent case — a
+  // caller handing in a live-spawn's WHOLE environment must never see anything but the allowlist
+  // land in the unit file.
+  it('with a candidate env far beyond the allowlist: only ELECTRON_RUN_AS_NODE/PATH ever reach the unit file', async () => {
+    const { files, readFile, writeFile, removeFile } = buildFakeFiles();
+    const runner = new RecordingCommandRunner([
+      { exitCode: 0, stdout: '', stderr: '' },
+      { exitCode: 0, stdout: '', stderr: '' },
+    ]);
+    const autostart = new LinuxAutostart({
+      readFile,
+      writeFile,
+      removeFile,
+      run: runner.run,
+      homeDir: HOME_DIR,
+      seeyaHome: SEEYA_HOME,
+    });
+
+    await autostart.enable(BINARY_PATH, {
+      env: {
+        ELECTRON_RUN_AS_NODE: '1',
+        PATH: '/usr/bin:/bin',
+        SSH_AUTH_SOCK: '/tmp/ssh-deadSocket/agent.1',
+        USER: '<usuario>',
+        HOME: '/home/<usuario>',
+      },
+    });
+    const unit = files.get(UNIT_PATH) ?? '';
+    expect(unit).toContain('Environment=ELECTRON_RUN_AS_NODE=1');
+    expect(unit).toContain('Environment=PATH=/usr/bin:/bin');
+    expect(unit).not.toContain('SSH_AUTH_SOCK');
+    expect(unit).not.toContain('Environment=USER=');
+    expect(unit).not.toContain('Environment=HOME=');
   });
 
   it('without options.env: no Environment= line at all — same unit as before this task', async () => {
