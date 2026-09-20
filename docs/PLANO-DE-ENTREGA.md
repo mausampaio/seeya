@@ -6446,6 +6446,10 @@ texto, mas não são a fila.
       **Nenhuma questão nova aberta** — a spec cobriu os quatro lugares e a forma do tipo sem
       ambiguidade; nenhuma premissa técnica se mostrou errada.
 
+      **Mesclada na `main` em 2026-09-20** (portão na worktree do PO: 198 arquivos, 2.012 testes
+      passando, 4 pulados; cobertura 96,39%/92,61%/94,94%/96,76%). Revisão sem ajustes. Fica em
+      `[~]` até o aceite do mantenedor.
+
 - [ ] **V2-T17 — Orçamento de desempenho: quatro números medidos, e a regra de como usá-los.**
       Especificada pelo PO em 2026-09-20 a pedido do mantenedor no mesmo dia; **entra depois da
       V2-T16**.
