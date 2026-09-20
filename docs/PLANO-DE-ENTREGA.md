@@ -6047,6 +6047,24 @@ texto, mas não são a fila.
       formas (e então dizer isso no comentário, e conferir tudo que depende do local — autostart,
       caminho do daemon, remoção na desinstalação) ou esconder a opção. **A V2-T13 já foi avisada**
       do efeito imediato: a detecção de instalação no Windows tem de olhar HKCU e HKLM.
+      **Decisão do mantenedor, 2026-09-20: manter as duas formas de instalação**, com o cuidado que
+      ele mesmo levantou — "dois daemon rodando em dois users ao mesmo tempo". O que já protege
+      hoje, e o que a tarefa precisa **conferir**:
+
+      - **Já isolado por construção:** cada usuário tem o próprio `~/.seeya` (raiz injetável,
+        D-027), e dentro dele o próprio `daemon.lock`, a própria config e o próprio estado do dia.
+        Dois usuários com daemon de pé ao mesmo tempo é o caso normal, não um conflito: cada um
+        captura as sessões do próprio `~/.claude`. Autostart e a chave do protocolo também são por
+        usuário (HKCU), mesmo com o app instalado em `Program Files`.
+      - **A conferir, e é onde pode doer:** o `pid` é global da máquina, e o lock guarda `pid` +
+        `procStart`. Se o processo do lock de um usuário tiver o mesmo `pid` de um processo **de
+        outro usuário**, a checagem de vivacidade pode não conseguir ler o `procStart` alheio
+        (permissão negada no Windows) e, sem o desempate, tratar um `EPERM` como "está vivo"
+        (`adapters/process/liveness.ts`, decisão correta e deliberada para o caso de um processo
+        protegido). O efeito seria um daemon recusando subir por achar que já existe outro. Medir
+        antes de mudar qualquer coisa: reproduzir com dois usuários, e só então decidir se o lock
+        precisa de mais um campo (dono do processo) ou se a chance de reuso de `pid` torna isto
+        teórico demais para pagar.
 
       **Decisão de desenho do PO, a confirmar na especificação: sem pergunta na tela.** O
       instalador para o daemon antes de instalar e, **se ele estava de pé**, sobe de novo no fim,
