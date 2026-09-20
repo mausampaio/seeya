@@ -6038,6 +6038,16 @@ texto, mas não são a fila.
       pasta só fica vazia depois de encerrá-lo. Ou seja: o mesmo item vale para os dois lados,
       instalar **e** desinstalar.
 
+      **Terceiro achado, medido em 2026-09-20: a instalação por máquina existe e não estava
+      prevista.** O `electron-builder.yml` documenta a escolha "NSIS por usuário... a que nunca
+      pede UAC" (V2-T8), mas o instalador **oferece a opção "para todos os usuários"**, e o
+      mantenedor a escolheu: o app foi para `C:\Program Files\seeya`, com elevação, e a entrada
+      de desinstalação foi criada em **HKLM** (`InstallLocation` vazio), não em HKCU. A realidade
+      diverge do que o comentário afirma. Esta tarefa decide qual das duas vale: manter as duas
+      formas (e então dizer isso no comentário, e conferir tudo que depende do local — autostart,
+      caminho do daemon, remoção na desinstalação) ou esconder a opção. **A V2-T13 já foi avisada**
+      do efeito imediato: a detecção de instalação no Windows tem de olhar HKCU e HKLM.
+
       **Decisão de desenho do PO, a confirmar na especificação: sem pergunta na tela.** O
       instalador para o daemon antes de instalar e, **se ele estava de pé**, sobe de novo no fim,
       avisando numa linha. Perguntar no meio de uma instalação sobre um processo que a pessoa não
