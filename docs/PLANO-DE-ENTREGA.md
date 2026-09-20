@@ -6648,6 +6648,12 @@ texto, mas não são a fila.
       `[~]` até o aceite do mantenedor — que é instalar por cima com o daemon de pé, no Windows, e
       abrir uma aba no app instalado no Mac.
 
+      **Aceite parcial do mantenedor em 2026-09-20 (Windows):** instalou por cima **com o daemon
+      rodando** e o instalador não pediu para fechar nada — a metade que mais o incomodava está
+      resolvida. **Mas o daemon não voltou**, e o diagnóstico do PO no mesmo dia achou a causa: a
+      chamada de religar é recusada pela própria CLI desde a V2-T13. Vira a **V2-T22**; esta
+      entrada segue em `[~]` até ela fechar e o ciclo completo passar.
+
 - [~] **V2-T16 — Correção: a janela responde com a configuração da subida, não com a que está em
       disco.** Especificada pelo PO em 2026-09-20 a partir de um achado do mantenedor no mesmo dia,
       no aceite da V2-T14. **Depende da V2-T13** só por ordem de fila: as duas mexem em
@@ -7016,6 +7022,59 @@ texto, mas não são a fila.
 
       **Aceite do mantenedor:** desligar o autostart e o botão virar "Enable autostart" na hora;
       com todas as sessões do plano abertas, a janela dizer isso em vez de parecer quebrada.
+
+- [ ] **V2-T22 — Correção: o instalador para o daemon e não consegue religar, porque a própria
+      CLI o recusa.** Especificada pelo PO em 2026-09-20 a partir do aceite da V2-T15 pelo
+      mantenedor e de um diagnóstico do PO na máquina dele, no mesmo dia. Pequena, e com a causa
+      medida.
+
+      **O defeito, medido.** Instalar por cima com o daemon de pé funcionou e **não pediu para
+      fechar nada** (V2-T15 item 1, primeira metade, aceita) — mas o daemon **não voltou**: depois
+      da instalação não havia `daemon.lock` nenhum, e a janela subiu com o daemon parado. O PO
+      reproduziu à mão exatamente a chamada que o `installer.nsh` faz para religar
+      (`seeya.exe` + `ELECTRON_RUN_AS_NODE=1` + o `index.js` da CLI dentro do `app.asar`, com o
+      subcomando `daemon`) e recebeu, palavra por palavra:
+
+      ```
+      seeya: the app is installed (C:\Program Files\seeya\seeya.exe) and now owns the daemon.
+      Open seeya and use the daemon control there (Start daemon / Stop daemon) —
+      "seeya daemon" no longer starts one here.
+      ```
+
+      **Causa: duas tarefas do mesmo dia se cruzando.** A V2-T13 (D-045 item 3) fez `seeya daemon`
+      recusar quando o app está instalado; a V2-T15 fez o instalador religar o daemon chamando
+      exatamente esse comando. O `--stop` não é recusado, então a primeira metade funciona e a
+      segunda morre calada — o instalador nem olha o código de saída.
+
+      **A correção, e por que ela é a regra certa e não um contorno.** A recusa existe para uma
+      **CLI instalada à parte** não assumir o daemon de um app que é o dono. Quando quem chama é o
+      **próprio binário do app instalado** — o mesmo `process.execPath` que a detecção de instalação
+      já devolve como `launchPath` —, o chamador **é** o dono, e recusar é recusar a si mesmo. A
+      regra passa a ser: a recusa vale para qualquer outro binário, nunca para o do próprio app.
+      Isso conserta o instalador sem inventar flag nova e sem afrouxar o que a D-045 decidiu.
+
+      **O que entra:**
+      1. A comparação entre o executável em uso e o `launchPath` da instalação detectada, em módulo
+         puro e testado (inclusive o caso de caminhos que diferem só por maiúsculas/minúsculas ou
+         separador, no Windows — reusar a normalização que já existe em
+         `core/cwd-normalization.ts` se ela servir, nunca uma segunda).
+      2. `runDaemonLauncher` deixa de recusar quando é o próprio app chamando; a mensagem e o
+         comportamento para todo o resto ficam exatamente como estão.
+      3. **O instalador deixa de falhar calado:** se o religar não funcionar, isso aparece no
+         registro do instalador (`DetailPrint`) em vez de sumir — um `ExecWait` cujo código de
+         saída ninguém olha foi o que escondeu este defeito.
+      4. Teste de regressão: a chamada vinda do binário do app sobe o daemon; a de qualquer outro
+         binário continua recusada.
+
+      **O que não entra:** mudar a D-045 (a CLI continua cliente); mexer no `--stop`, que já
+      funciona para qualquer chamador.
+
+      **Cuidados:** nenhuma dependência nova; nenhum agente instala, desinstala ou roda o
+      instalador; nada do `~/.seeya` real, do registro ou do autostart real é tocado — a
+      comparação de caminhos é testada com dublê.
+
+      **Aceite do mantenedor:** instalar por cima com o daemon de pé e, ao fim, o daemon estar de
+      pé de novo, sem clicar em nada.
 
 ## Definição de pronto (vale para toda tarefa)
 
