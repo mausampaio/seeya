@@ -6070,7 +6070,19 @@ texto, mas não são a fila.
       formas (e então dizer isso no comentário, e conferir tudo que depende do local — autostart,
       caminho do daemon, remoção na desinstalação) ou esconder a opção. **A V2-T13 já foi avisada**
       do efeito imediato: a detecção de instalação no Windows tem de olhar HKCU e HKLM.
-      **Quarto achado, medido pelo mantenedor no Mac em 2026-09-20 (ver V2-T3).** O
+      **Quarto achado — CONFIRMADO no mesmo dia, com o app instalado:** o mantenedor rodou
+      `npm run dist:mac`, instalou, e a primeira aba falhou com
+      `Error invoking remote method 'seeya:create-tab': Error: posix_spawnp failed`. O
+      desenvolvimento funciona no mesmo Mac; o app instalado, não. **A versão do macOS que o CI
+      publica hoje está quebrada para qualquer aba**, e isto deixa de ser arrumação de instalador
+      para ser o defeito mais grave da fila. Detalhe que a investigação precisa resolver: o
+      `dist` roda o `build.mjs` **antes** de empacotar, e ele corrige a permissão no
+      `node_modules` — então a permissão se perde **no empacotamento**, não antes. A suspeita a
+      medir é o `asar`: arquivo extraído para `app.asar.unpacked` pode sair sem bit de execução,
+      e nesse caso a correção é garantir o modo depois do empacotamento (gancho do próprio
+      `electron-builder`), nunca só antes.
+
+      **Quarto achado, origem (medido pelo mantenedor no Mac em 2026-09-20, ver V2-T3).** O
       `spawn-helper` do node-pty vem **sem bit de execução no prebuild `arm64`** (e com ele no
       `x64`). No desenvolvimento, `build.mjs` corrige antes de subir; o app **instalado** nunca
       roda esse script, então o `.dmg` leva o arquivo como está e um Mac Apple Silicon instalado
