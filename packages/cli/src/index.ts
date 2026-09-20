@@ -51,10 +51,17 @@ import {
 import { DAEMON_CHILD_ENV_VAR } from '@seeya-ai/engine/adapters/process/daemon-launch.js';
 import { captureObservedProcStart } from '@seeya-ai/engine/adapters/process/proc-start.js';
 import { processExists } from '@seeya-ai/engine/adapters/process/existence.js';
+import type { PathPlatformHint } from '@seeya-ai/engine/core/cwd-normalization.js';
 
 const PackageJsonSchema = z.object({
   version: z.string(),
 });
+
+// V2-T22: `runDaemonLauncher`'s own `isCallerTheOwningApp` check (D-045 item 3's exception for the
+// app's own binary calling itself) needs a platform hint to tolerate a Windows separator/case
+// difference — read once here, the same `process.platform === 'win32'` convention
+// `composition.ts#buildStartDayContext`/`end-day-command.ts` already use.
+const PLATFORM_HINT: PathPlatformHint = process.platform === 'win32' ? 'win32' : 'posix';
 
 const { version } = PackageJsonSchema.parse(packageJson);
 
@@ -205,6 +212,7 @@ program
         processControl,
         { nodePath: process.execPath, scriptPath, args: ['daemon'] },
         daemonOwner,
+        PLATFORM_HINT,
       ),
     );
   });

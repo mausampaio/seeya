@@ -112,6 +112,7 @@ describe('runDaemonLauncher — refuse path (no spawn)', () => {
         args: ['daemon'],
       },
       CLI_OWNER,
+      'win32',
     );
 
     expect(message).toContain('already running');
@@ -121,7 +122,7 @@ describe('runDaemonLauncher — refuse path (no spawn)', () => {
 
 // V2-T13, D-045 item 3.
 describe('runDaemonLauncher — the app owns the daemon (no lock check, no spawn)', () => {
-  it('refuses outright, names the app path, and never even checks the lock', async () => {
+  it('a SEPARATE binary is refused outright, names the app path, and never even checks the lock (V2-T22 regression: still refused)', async () => {
     const storage = new NeverReadStorage(DEFAULT_TEST_CONFIG);
     const processControl = new NeverCalledProcessControl();
     const owner: DaemonOwner = { kind: 'app', launchPath: 'C:\\seeya\\seeya.exe' };
@@ -130,16 +131,57 @@ describe('runDaemonLauncher — the app owns the daemon (no lock check, no spawn
       storage,
       processControl,
       {
+        // A different binary than owner.launchPath — the ordinary, unrelated-CLI case.
         nodePath: process.execPath,
         scriptPath: '/nonexistent/should-not-be-spawned.js',
         args: ['daemon'],
       },
       owner,
+      'win32',
     );
 
     expect(message).toContain('the app is installed');
     expect(message).toContain('C:\\seeya\\seeya.exe');
     expect(message).toContain('seeya daemon');
+  });
+});
+
+// V2-T22: the installer restarts the daemon by re-running the app's own binary — that call must
+// NOT hit the refusal above, or the daemon never comes back after an upgrade (the defect this task
+// fixes, measured on the maintainer's machine).
+describe('runDaemonLauncher — the caller IS the owning app (V2-T22)', () => {
+  it("proceeds past the ownership check when target.nodePath equals the app's own launchPath", async () => {
+    const storage: Storage = new LockOnlyStorage(DEFAULT_TEST_CONFIG);
+    // Seeded lock makes the outcome deterministic without spawning a real process: reaching the
+    // "already running" message proves the ownership refusal did NOT fire, since that refusal
+    // returns before `checkDaemonLock` is ever called (the test above proves that ordering via
+    // `NeverReadStorage`).
+    (storage as LockOnlyStorage).seedLock({
+      pid: 9999,
+      startedAt: new Date('2026-09-20T00:00:00.000Z'),
+      procStart: undefined,
+    });
+    const processControl = new FixedAliveness(true);
+    const ownExecutable = 'C:\\Program Files\\seeya\\seeya.exe';
+    const owner: DaemonOwner = { kind: 'app', launchPath: ownExecutable };
+
+    const message = await runDaemonLauncher(
+      storage,
+      processControl,
+      {
+        // Same spelling as owner.launchPath (case/separator differences are the pure comparison's
+        // own job, covered by tests/unit/application/daemon-ownership.test.ts).
+        nodePath: ownExecutable,
+        scriptPath: '/nonexistent/should-not-be-spawned.js',
+        args: ['daemon'],
+      },
+      owner,
+      'win32',
+    );
+
+    expect(message).not.toContain('the app is installed');
+    expect(message).toContain('already running');
+    expect(message).toContain('9999');
   });
 });
 

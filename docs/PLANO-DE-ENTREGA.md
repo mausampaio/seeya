@@ -7056,7 +7056,7 @@ texto, mas não são a fila.
       **Aceite do mantenedor:** desligar o autostart e o botão virar "Enable autostart" na hora;
       com todas as sessões do plano abertas, a janela dizer isso em vez de parecer quebrada.
 
-- [ ] **V2-T22 — Correção: o instalador para o daemon e não consegue religar, porque a própria
+- [~] **V2-T22 — Correção: o instalador para o daemon e não consegue religar, porque a própria
       CLI o recusa.** Especificada pelo PO em 2026-09-20 a partir do aceite da V2-T15 pelo
       mantenedor e de um diagnóstico do PO na máquina dele, no mesmo dia. Pequena, e com a causa
       medida.
@@ -7109,6 +7109,7 @@ texto, mas não são a fila.
       **Aceite do mantenedor:** instalar por cima com o daemon de pé e, ao fim, o daemon estar de
       pé de novo, sem clicar em nada.
 
+<<<<<<< HEAD
 - [ ] **V2-T23 — Correção: o autostart congela o ambiente inteiro do app, inclusive coisas que só
       valem naquele login.** Especificada pelo PO em 2026-09-20 a partir de uma medição do
       mantenedor no Mac dele, no mesmo dia — o primeiro `cat` que alguém deu no arquivo de
@@ -7192,6 +7193,115 @@ texto, mas não são a fila.
       notificação virar assunto de novo — provavelmente junto do `end-day` global, que muda o que
       os avisos dizem. O que não vale é (3): trocar uma marca errada por uma dependência que a
       pessoa tem de instalar.
+=======
+      **Relatório (agente, 2026-09-20).** Branch `tarefa/V2-T22-religar-daemon` a partir da
+      `main` (commit `7f2b4a7`). Três commits: `b0f1f73` (item 1, a comparação pura),
+      `33342b1` (item 2, `runDaemonLauncher`) e `c1e05ec` (item 3, `installer.nsh`).
+
+      **Item 1.** `isCallerTheOwningApp(daemonOwner, callerExecutablePath, platform)`
+      (`packages/engine/src/application/daemon-ownership.ts`) — reusa
+      `core/cwd-normalization.ts#normalizeCwdForComparison` (nenhuma normalização nova): um
+      caminho de executável e um `cwd` são a mesma forma de caminho de arquivo, e a mesma
+      diferença de separador/maiúsculas do Windows se aplica a ambos. `platform` é parâmetro, não
+      lido de `process.platform` ali dentro, para que o caso Windows seja testável em qualquer
+      executor de CI (mesma razão que `normalizeCwdForComparison` já documenta). Sete testes novos
+      em `tests/unit/application/daemon-ownership.test.ts`, incluindo separador+maiúsculas do
+      Windows, separador à direita, POSIX sensível a maiúsculas, e os casos `cli`/`unknown` (sem
+      `launchPath` para comparar).
+
+      **Item 2.** `runDaemonLauncher` (`packages/cli/src/daemon-command.ts`) ganhou um quinto
+      parâmetro, `platform: PathPlatformHint`, e a recusa virou
+      `daemonOwner.kind === 'app' && !isCallerTheOwningApp(daemonOwner, target.nodePath, platform)`.
+      `target.nodePath` já era `process.execPath` em todo call site existente (a mesma plumbing
+      que `spawnDetachedDaemon` usaria para religar o worker) — não precisou de um parâmetro novo
+      só para o caminho do chamador. `cli/index.ts` passa `PLATFORM_HINT`, uma constante de módulo
+      computada uma vez de `process.platform`, no mesmo padrão que `end-day-command.ts`/
+      `session-reference.ts` já usam. Mensagem e comportamento para `cli`/`unknown`/binário
+      diferente ficaram exatamente como estavam — só o `app` chamando a si mesmo mudou.
+
+      **Item 3.** `packages/app/build/installer.nsh`'s own `customInstall`: a chamada de religar
+      trocou de `ExecWait` (só devolve código de saída) para `nsExec::ExecToLog` (plugin já usado
+      em `allowOnlyOneInstallerInstance.nsh`, nenhuma dependência nova) — o texto que a própria CLI
+      imprime (sucesso ou recusa) passa a aparecer no registro do instalador linha a linha, em vez
+      de sumir. Medido durante a tarefa: o ramo "launcher" de `cli/index.ts` (a chamada humana,
+      sem `--stop`/`--status`) nunca marcou `process.exitCode` diferente de zero, nem na recusa
+      nem no sucesso — só o ramo "worker" marca. Ou seja, checar só o código de saída NÃO teria
+      revelado o defeito original; por isso o `ExecToLog` (que expõe o texto) é a correção
+      principal, e a checagem de código de saída (`$SeeyaDaemonRestartExitCode != 0`, com
+      `DetailPrint` próprio) ficou como cinto de segurança para um futuro modo de falha que já
+      saia com código diferente de zero (ex.: `spawnDetachedDaemon` falhando ao spawnar). Dois
+      testes novos em `tests/unit/app/build/installer-nsh.test.ts` — os quatro já existentes
+      continuam verdes (`daemon'` sem `--stop` no `customInstall` ainda bate, já que
+      `nsExec::ExecToLog '"..." daemon'` preserva o mesmo sufixo).
+
+      **Item 4.** Coberto pelos dois commits acima: `tests/unit/cli/daemon-command.test.ts` ganhou
+      um describe novo (`runDaemonLauncher — the caller IS the owning app`) provando que
+      `target.nodePath` igual a `daemonOwner.launchPath` não é mais recusado (chega ao
+      `checkDaemonLock`, sem spawn real); o teste existente de recusa foi anotado como a prova de
+      regressão do outro lado (binário diferente continua recusado).
+
+      **Portão (Windows, primeiro plano, em pedaços — a máquina derrubou por memória a primeira
+      tentativa combinada com `--coverage`):** `format:check` verde; `tsc -p tsconfig.json
+      --noEmit` verde; `lint` (`eslint .`) verde; `build` (`tsc -b`) verde; `dependencias`
+      (`depcruise`) verde — "no dependency violations found (364 modules, 983 dependencies
+      cruised)"; `npx vitest run --project unit --project integration --project
+      integration-process --project guards --maxWorkers 2` — 200 arquivos, 2.038 testes, 4
+      pulados (pré-existentes), verde; o mesmo comando com `--coverage` — 96,4% statements /
+      92,63% branches / 94,96% funções / 96,76% linhas (`src/core/` em 100%), acima dos pisos do
+      `AGENTS.md`, saída de `$?` conferida como 0. `verificar:linux` não rodado (CI cobre).
+      Nenhum agente instalou, desinstalou ou rodou o instalador; nada do `~/.seeya` real, do
+      `~/.claude` real, do registro ou de processos `seeya.exe` reais foi tocado.
+
+      Nenhuma questão nova aberta (Q-082 não foi necessária — a spec cobriu o caso sem ambiguidade;
+      a única descoberta de execução, o exit code sempre zero do ramo "launcher", está registrada
+      acima, no item 3, como comentário no próprio `installer.nsh`, não como questão separada).
+>>>>>>> tarefa/V2-T22-religar-daemon
+
+- [ ] **V2-T25 — Correção: a pergunta de transição não sabe de quem é o daemon, e acaba pedindo
+      para o app assumir o que já é dele.** Especificada pelo PO em 2026-09-20 a partir de um
+      achado do mantenedor no Mac, com captura — o terceiro do dia com a mesma raiz.
+
+      **O defeito, medido.** No Mac, com o app instalado e o autostart **já ligado pela própria
+      janela**, o mantenedor saiu da conta e entrou de novo. Ao abrir o app, apareceu o diálogo
+      *"seeya found a daemon or autostart already set up on this machine"* — pedindo para assumir o
+      daemon e o autostart que **são do próprio app**.
+
+      **Causa: a evidência é achatada antes de chegar à decisão.** `shouldOfferDaemonOwnershipTransition`
+      recebe dois booleanos (`cliDaemonAlive`, `cliAutostartEnabled`), e quem os monta
+      (`packages/app/src/composition/index.ts`) os deriva de "existe um lock vivo" e "existe
+      autostart registrado" — nenhum dos dois carrega **de quem**. O nome da variável afirma "cli",
+      o dado não sustenta isso (D-025). A V2-T13 documentou a premissa ("um lock encontrado antes
+      de o app rodar o próprio daemon só pode ser da CLI"), e ela é falsa justamente no caso que a
+      própria V2-T13 criou: o autostart do app sobe o daemon **antes** de a janela abrir.
+
+      **Mesma raiz da V2-T22**, vista de outro ângulo: lá, o app recusava a si mesmo; aqui, o app
+      pede para assumir a si mesmo. As duas vêm de não haver como dizer "este daemon é meu".
+
+      **O que entra:**
+      1. **O autostart deixa de ser um booleano.** `Autostart.status()` já devolve
+         `registeredPath` — basta não jogá-lo fora: o autostart só conta como "de outro" quando o
+         caminho registrado **não** é o binário do próprio app (`isCallerTheOwningApp`, que a
+         V2-T22 acabou de criar, serve exatamente para esta comparação).
+      2. **O lock do daemon passa a dizer quem o criou.** Um campo novo em `daemon.lock` com o
+         executável que subiu o daemon (nome no glossário do `AGENTS.md` **antes** do código,
+         D-027; `schemaVersion` sobe e um lock sem o campo é lido como "não sei", nunca como "é de
+         outro"). Sem isso não há como distinguir o daemon do app do daemon de uma CLI — e o
+         formato em disco é o único lugar onde essa informação pode viver, porque quem pergunta é
+         um processo diferente do que subiu.
+      3. **A pergunta só aparece com evidência positiva de dono diferente.** Na dúvida, não
+         pergunta (D-025) — e não perguntar é seguro: se não há nada de outro para assumir, não há
+         o que a pergunta resolva.
+      4. **Testes**: autostart apontando para o próprio app não oferece; apontando para outro
+         binário oferece; lock sem o campo novo não oferece; lock de outro executável oferece.
+
+      **O que não entra:** mudar a D-045 (quem é dono continua sendo decidido pelo registro de
+      instalação); reabrir a pergunta para quem já respondeu.
+
+      **Cuidados:** nenhuma dependência nova; chave nova em disco entra no glossário antes do
+      código; nada do `~/.seeya` real, do autostart real ou do registro é tocado — tudo com dublê.
+
+      **Aceite do mantenedor:** com o app instalado e o autostart dele ligado, sair da conta,
+      entrar de novo e abrir o app **sem** ver a pergunta.
 
 ## Definição de pronto (vale para toda tarefa)
 

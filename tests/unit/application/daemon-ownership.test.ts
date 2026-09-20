@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  isCallerTheOwningApp,
   resolveDaemonOwner,
   shouldOfferDaemonOwnershipTransition,
 } from '@seeya-ai/engine/application/daemon-ownership.js';
@@ -97,6 +98,73 @@ describe('shouldOfferDaemonOwnershipTransition', () => {
         cliDaemonAlive: true,
         cliAutostartEnabled: true,
       }),
+    ).toBe(false);
+  });
+});
+
+// V2-T22: the installer's own `daemon` re-launch call is made BY the app's own binary — this is
+// the pure comparison that tells `runDaemonLauncher` apart the one case where D-045 item 3's
+// refusal must not apply.
+describe('isCallerTheOwningApp', () => {
+  it('exact same string on both sides → true', () => {
+    expect(
+      isCallerTheOwningApp(
+        { kind: 'app', launchPath: 'C:\\Program Files\\seeya\\seeya.exe' },
+        'C:\\Program Files\\seeya\\seeya.exe',
+        'win32',
+      ),
+    ).toBe(true);
+  });
+
+  it('Windows: differs only by drive-letter case and separator → still true', () => {
+    expect(
+      isCallerTheOwningApp(
+        { kind: 'app', launchPath: 'C:\\Program Files\\seeya\\seeya.exe' },
+        'c:/program files/seeya/seeya.exe',
+        'win32',
+      ),
+    ).toBe(true);
+  });
+
+  it('Windows: differs only by a trailing separator → still true', () => {
+    expect(
+      isCallerTheOwningApp(
+        { kind: 'app', launchPath: 'C:\\Program Files\\seeya\\seeya.exe\\' },
+        'C:\\Program Files\\seeya\\seeya.exe',
+        'win32',
+      ),
+    ).toBe(true);
+  });
+
+  it('a genuinely different binary → false, the ordinary D-045 item 3 refusal still applies', () => {
+    expect(
+      isCallerTheOwningApp(
+        { kind: 'app', launchPath: 'C:\\Program Files\\seeya\\seeya.exe' },
+        'C:\\Users\\dev\\node.exe',
+        'win32',
+      ),
+    ).toBe(false);
+  });
+
+  it('POSIX: case is significant, unlike win32 → a case-only difference is a different path', () => {
+    expect(
+      isCallerTheOwningApp(
+        { kind: 'app', launchPath: '/opt/Seeya/seeya' },
+        '/opt/seeya/seeya',
+        'posix',
+      ),
+    ).toBe(false);
+  });
+
+  it('owner is cli → false, there is no launchPath to compare against at all', () => {
+    expect(
+      isCallerTheOwningApp({ kind: 'cli' }, 'C:\\Program Files\\seeya\\seeya.exe', 'win32'),
+    ).toBe(false);
+  });
+
+  it('owner is unknown → false, same reasoning as cli', () => {
+    expect(
+      isCallerTheOwningApp({ kind: 'unknown' }, 'C:\\Program Files\\seeya\\seeya.exe', 'win32'),
     ).toBe(false);
   });
 });

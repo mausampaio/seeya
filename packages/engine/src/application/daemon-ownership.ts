@@ -7,6 +7,7 @@
  */
 import type { AppInstallationStatus } from '../core/ports.js';
 import type { DaemonOwner, DaemonOwnershipTransitionAnswer } from '../core/types.js';
+import { normalizeCwdForComparison, type PathPlatformHint } from '../core/cwd-normalization.js';
 
 /**
  * Everything `shouldOfferDaemonOwnershipTransition` needs, all pre-gathered plain facts —
@@ -68,4 +69,51 @@ export function resolveDaemonOwner(status: AppInstallationStatus): DaemonOwner {
     case 'unknown':
       return { kind: 'unknown' };
   }
+}
+
+/**
+ * V2-T22: whether `daemonOwner` names an installed app AND the executable making THIS call is that
+ * same app's own binary — the one case D-045 item 3's refusal must not apply to. Measured on the
+ * maintainer's machine: the installer restarts the daemon after an upgrade by re-running the
+ * packaged `seeya.exe` itself with the `daemon` subcommand (`packages/app/build/installer.nsh`'s
+ * own `customInstall` macro), which used to hit the exact same refusal a human typing `seeya
+ * daemon` from an unrelated, separately-installed CLI gets — the app was recusing itself.
+ *
+ * `callerExecutablePath` is `process.execPath` as the composition root already has it in hand
+ * (`cli/daemon-command.ts#runDaemonLauncher`'s own `target.nodePath`, the very value it would
+ * otherwise hand `spawnDetachedDaemon` to re-run itself as the worker) — never read here, so this
+ * stays a plain value comparison, testable for the Windows case (separator/case) from any CI
+ * runner, the same reasoning `core/cwd-normalization.ts`'s own docstring gives for taking
+ * `platform` as a parameter instead of reading `process.platform` itself.
+ *
+ * **Reuses `normalizeCwdForComparison`, never a second path normalizer** (the spec's own
+ * instruction): an executable path and a `cwd` are both just filesystem paths, and the same
+ * separator/case/trailing-slash differences apply to either — the OS's own installation record
+ * (`AppInstallationStatus.executablePath`) and `process.execPath` can spell the identical file
+ * differently (Windows: drive-letter case, `\` vs. `/`).
+ *
+ * @example
+ * isCallerTheOwningApp(
+ *   { kind: 'app', launchPath: 'C:\\Program Files\\seeya\\seeya.exe' },
+ *   'c:/program files/seeya/seeya.exe',
+ *   'win32',
+ * ); // -> true — same executable, different spelling
+ *
+ * @example
+ * isCallerTheOwningApp(
+ *   { kind: 'app', launchPath: 'C:\\Program Files\\seeya\\seeya.exe' },
+ *   'C:\\Users\\dev\\node.exe',
+ *   'win32',
+ * ); // -> false — a separately-installed CLI, still refused (D-045 item 3 unchanged for it)
+ */
+export function isCallerTheOwningApp(
+  daemonOwner: DaemonOwner,
+  callerExecutablePath: string,
+  platform: PathPlatformHint,
+): boolean {
+  return (
+    daemonOwner.kind === 'app' &&
+    normalizeCwdForComparison(daemonOwner.launchPath, platform) ===
+      normalizeCwdForComparison(callerExecutablePath, platform)
+  );
 }

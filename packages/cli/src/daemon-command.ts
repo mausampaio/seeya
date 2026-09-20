@@ -23,6 +23,16 @@
  * calling it), so the ownership refusal would otherwise block the very thing the app is trying to
  * do (`tests/unit/cli/daemon-command.test.ts`'s own "the app's own worker still starts" test
  * proves this).
+ *
+ * **V2-T22: the refusal is only for a genuinely SEPARATE binary.** Measured on the maintainer's
+ * machine: the installer's own post-install restart (`packages/app/build/installer.nsh`'s
+ * `customInstall` macro) re-runs the freshly installed `seeya.exe` itself with the `daemon`
+ * subcommand — that call used to hit the exact same "the app owns the daemon" refusal a human
+ * typing `seeya daemon` from an unrelated, separately-installed CLI gets, because
+ * `runDaemonLauncher` only ever checked `daemonOwner.kind`. It now also checks
+ * `isCallerTheOwningApp` (`application/daemon-ownership.ts`): when the executable making this call
+ * (`target.nodePath`, already `process.execPath` at every call site) IS the app's own
+ * `launchPath`, the caller is the owner, and refusing would be refusing itself.
  */
 import {
   spawnDetachedDaemon,
@@ -33,6 +43,8 @@ import { runDaemon } from '@seeya-ai/engine/scheduler/index.js';
 import type { DaemonDeps } from '@seeya-ai/engine/scheduler/index.js';
 import type { ProcessControl, Storage } from '@seeya-ai/engine/core/ports.js';
 import type { DaemonOwner } from '@seeya-ai/engine/core/types.js';
+import type { PathPlatformHint } from '@seeya-ai/engine/core/cwd-normalization.js';
+import { isCallerTheOwningApp } from '@seeya-ai/engine/application/daemon-ownership.js';
 import {
   describeDaemonState,
   type DaemonStateDeps,
@@ -57,17 +69,24 @@ function daemonOwnedByAppMessage(owner: Extract<DaemonOwner, { kind: 'app' }>): 
  * why both exist).
  *
  * `daemonOwner` (V2-T13, D-045 item 3) is checked FIRST, before the lock: `'app'` refuses outright
- * with `daemonOwnedByAppMessage`; `'cli'` and `'unknown'` behave identically to each other and to
- * this function's own pre-V2-T13 behavior (D-025 — a query that couldn't determine ownership is
- * never treated as "the app owns it").
+ * with `daemonOwnedByAppMessage` — UNLESS `target.nodePath` (the executable making this very call)
+ * IS that app's own `launchPath` (V2-T22, `isCallerTheOwningApp`), in which case the call proceeds
+ * exactly like `'cli'`/`'unknown'` already did. `platform` is what lets that comparison tolerate a
+ * Windows separator/case difference between the two spellings — threaded in by the caller
+ * (`cli/index.ts`, the composition root that already reads `process.platform`) rather than read
+ * here, so this function stays as easy to unit-test as it always has been (no real `process` read
+ * of its own). `'cli'` and `'unknown'` behave identically to each other and to this function's own
+ * pre-V2-T13 behavior (D-025 — a query that couldn't determine ownership is never treated as "the
+ * app owns it").
  */
 export async function runDaemonLauncher(
   storage: Storage,
   processControl: ProcessControl,
   target: DaemonLaunchTarget,
   daemonOwner: DaemonOwner,
+  platform: PathPlatformHint,
 ): Promise<string> {
-  if (daemonOwner.kind === 'app') {
+  if (daemonOwner.kind === 'app' && !isCallerTheOwningApp(daemonOwner, target.nodePath, platform)) {
     return daemonOwnedByAppMessage(daemonOwner);
   }
   const decision = await checkDaemonLock(storage, processControl);
