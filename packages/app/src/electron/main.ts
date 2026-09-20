@@ -56,10 +56,6 @@ import { resumeSessions } from '@seeya-ai/engine/application/start-day.js';
 import { endDay } from '@seeya-ai/engine/application/end-day.js';
 import { formatEndDayReport } from '@seeya-ai/engine/application/format-end-day.js';
 import { buildEndDayNotice } from '@seeya-ai/engine/application/end-day-notice.js';
-import {
-  skipToday as skipTodayInEngine,
-  snoozeToday as snoozeTodayInEngine,
-} from '@seeya-ai/engine/application/schedule-adjustments.js';
 import { decideSchedule, emptyDayState } from '@seeya-ai/engine/core/schedule.js';
 import { localDayString } from '@seeya-ai/engine/core/day.js';
 import type { Handoff } from '@seeya-ai/engine/core/types.js';
@@ -74,6 +70,7 @@ import { buildScheduleStripData } from '../state/schedule-strip.js';
 import { resolveDaemonControlAvailability } from '../state/daemon-control-panel.js';
 import { resolveAutostartControlAvailability } from '../state/autostart-control-panel.js';
 import { buildSettingsRows, buildProjectPolicyLines } from '../state/settings-panel.js';
+import { snoozeTodayNow, skipTodayNow } from '../state/schedule-actions.js';
 import {
   addTab,
   createTab,
@@ -95,7 +92,6 @@ import {
 } from '../sidebar/sidebar-data.js';
 import { buildStatusPanelText } from '../state/status-panel.js';
 import { runRefreshLoop } from '../state/refresh-loop.js';
-import { resolveTerminalFontOptions } from '../state/terminal-font.js';
 import {
   resolveAutostartReport,
   DEFAULT_AUTOSTART_REFRESH_INTERVAL_MS,
@@ -449,9 +445,12 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
 
   // V2-T3: fetched once by `renderer.ts#main`, before any `new Terminal({...})` is constructed —
   // the two-way handshake (`invoke`, not `send`) matches `createTab` below, the only other channel
-  // the renderer needs a value back from.
-  ipcMain.handle(CHANNELS.getTerminalFontConfig, (): TerminalFontConfigResponse =>
-    resolveTerminalFontOptions(context.config),
+  // the renderer needs a value back from. V2-T16: `AppContext.initialTerminalFontOptions` is
+  // already the resolved shape (read once, at startup, on purpose — see that field's own
+  // docstring), so this handler needs no `Config` read of its own.
+  ipcMain.handle(
+    CHANNELS.getTerminalFontConfig,
+    (): TerminalFontConfigResponse => context.initialTerminalFontOptions,
   );
 
   ipcMain.handle(
@@ -524,11 +523,16 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // maxBriefingScanDays ceiling — a session's directory history never reaches further back than
   // the scan that found `lookup.briefing.day` in the first place. Skipped entirely when nothing
   // was found (nothing to build a history for).
+  //
+  // V2-T16: `maxBriefingScanDays` is read fresh from `config.json` every time this panel is
+  // opened, never a value cached from window startup — same discipline `getSettingsPanel` below
+  // already follows.
   ipcMain.handle(CHANNELS.getTodayPanel, async (): Promise<TodayPanelResponse> => {
+    const config = await context.storage.readConfig();
     const lookup = await findPendingBriefing(
       context.storage,
       context.clock,
-      context.config.maxBriefingScanDays,
+      config.maxBriefingScanDays,
     );
     if (!lookup.found) {
       return buildTodayPanelData(lookup);
@@ -543,7 +547,7 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
           },
           handoff.sessionId,
           lookup.briefing.day,
-          context.config.maxBriefingScanDays,
+          config.maxBriefingScanDays,
         );
         return [handoff.sessionId, history] as const;
       }),
@@ -617,15 +621,21 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // sessions never had the model actually called — so its CONTENT differs from
   // `seeya end-day --dry-run` for lean sessions specifically, honestly (D-025): no "understanding"
   // this preview never produced. The cost ceiling has no CLI equivalent, so it's computed here.
+  //
+  // V2-T16: `config` is read fresh, right here, for the report/cost-ceiling rendering — `endDay`
+  // itself already reads its own fresh copy internally (`application/end-day.ts`'s own
+  // `storage.readConfig()` call), so this was never about `endDay`'s behavior; it was `main.ts`
+  // formatting the RESULT against a config snapshot taken at window startup.
   ipcMain.handle(CHANNELS.endDayPreview, async (): Promise<EndDayPreviewResponse> => {
     const result = await endDay(toEndDayDeps(context), {
       dryRun: true,
       skipGeneration: true,
       scope: { kind: 'fullDay' },
     });
+    const config = await context.storage.readConfig();
     return {
-      reportText: formatEndDayReport(result, context.config),
-      costCeiling: buildEndDayCostCeiling(result.sessionsInScope, context.config),
+      reportText: formatEndDayReport(result, config),
+      costCeiling: buildEndDayCostCeiling(result.sessionsInScope, config),
     };
   });
 
@@ -661,7 +671,9 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
           // never derail the day's own ending.
         }
       }
-      return { reportText: formatEndDayReport(result, context.config) };
+      // V2-T16: fresh read, same reasoning as `endDayPreview` above.
+      const config = await context.storage.readConfig();
+      return { reportText: formatEndDayReport(result, config) };
     } finally {
       endDayRunInProgress = false;
     }
@@ -672,25 +684,19 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // (item 2), and return the freshly recomputed strip so the faixa updates immediately instead of
   // waiting for the next ambient `onTick` below (which will also reflect it, harmlessly, at most
   // REFRESH_INTERVAL_MS later).
+  //
+  // V2-T16: `snoozeTodayNow`/`skipTodayNow` (`state/schedule-actions.ts`) read `config.json`
+  // fresh themselves — this used to pass `context.config` (a snapshot from window startup)
+  // straight through, which is the bug this task fixes; see that module's own docstring.
   ipcMain.handle(
     CHANNELS.snoozeToday,
-    async (_event, request: SnoozeTodayRequest): Promise<ScheduleUpdateEvent> => {
-      const now = context.clock.now();
-      const result = await snoozeTodayInEngine(
-        context.storage,
-        context.clock,
-        context.config,
-        request.minutes,
-      );
-      return buildScheduleStripData(result.decision, now);
-    },
+    async (_event, request: SnoozeTodayRequest): Promise<ScheduleUpdateEvent> =>
+      snoozeTodayNow(context.storage, context.clock, request.minutes),
   );
 
-  ipcMain.handle(CHANNELS.skipToday, async (): Promise<ScheduleUpdateEvent> => {
-    const now = context.clock.now();
-    const result = await skipTodayInEngine(context.storage, context.clock, context.config);
-    return buildScheduleStripData(result.decision, now);
-  });
+  ipcMain.handle(CHANNELS.skipToday, async (): Promise<ScheduleUpdateEvent> =>
+    skipTodayNow(context.storage, context.clock),
+  );
 
   // V2-T5b item 3: "Start daemon"/"Stop daemon" — the renderer decides WHICH action from its own
   // last-known `DaemonControlAvailability` (never re-derived here, D-041); this handler just runs
@@ -789,10 +795,11 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
     onTick: async () => {
       const discovery = await context.sessionProvider.list();
       const now = context.clock.now();
-      // V2-T14 item 3: read fresh every tick, like `dayState` below already is — never
-      // `context.config` (read once at startup) alone, or a settings-panel save would show
-      // correctly for one tick and then flip back to the stale startup value on the next ambient
-      // refresh (at most REFRESH_INTERVAL_MS later). Reused for the sidebar/status text too, so
+      // V2-T14 item 3 (V2-T16: `AppContext` no longer even HAS a startup config snapshot to reach
+      // for by mistake): read fresh every tick, like `dayState` below already is — a
+      // settings-panel save must never show correctly for one tick and then flip back to a stale
+      // value on the next ambient refresh (at most REFRESH_INTERVAL_MS later). Reused for the
+      // sidebar/status text too, so
       // the whole window agrees with itself about what's currently in config.json, not just the
       // faixa de horário the plan entry calls out by name.
       const liveConfig = await context.storage.readConfig();
