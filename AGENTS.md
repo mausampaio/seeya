@@ -329,6 +329,7 @@ aqui antes de entrar no código.**
 | seletor "Resume in" (V2-T9 item 2) | `state/today-panel.ts`'s own `TodaySessionRow.cwdHistory` — a nota ("ran in X until ...; in Y since ...", com "(no longer exists)" para quem sumiu) e o `<select>` só com os diretórios que ainda existem, o mais recente como padrão, renderizados por `electron/renderer.ts#renderCwdHistoryNote`/`renderResumeInSelect`; a escolha viaja pelo IPC em `ResumeSelectedRequest.chosenCwdBySessionId` (`ipc/channels.ts`) e `electron/main.ts`'s own `resumeSelected` handler troca o `cwd` do handoff só para aquela tentativa, sem regravar `~/.seeya/` |
 | aviso da CLI sobre o `cwd` (V2-T9 item 3) | `cli/format-start-day.ts#formatCwdHistoryNote`/`formatCwdHistoryNotes` — o mesmo texto que a interface mostra (item 2), impresso por `start-day-command.ts` logo depois do plano consolidado; a CLI nunca pergunta, sempre retoma no `cwd` mais recente do handoff (D-045: ela é cliente, uma pergunta a mais para um caso raro não se paga) |
 | caixa por vivacidade, não por registro (V2-T9 item 4) | `TodayResumeStatus` (`state/today-panel.ts`, união discriminada `runningNow`/`resumedEarlier`/`neverResumed`, D-024) — `runningNow` vem de `sidebar/sidebar-data.ts#buildLiveSessionIndex`, a partir da MESMA descoberta de sessões que o ciclo de atualização de 10s já faz (`alive`/`idle`, nunca uma segunda `SessionProvider.list()`), não do `resumed.json`; `resumed.json` continua decidindo quando o briefing deixa de estar pendente, só deixa de decidir a caixa. A CLI não muda |
+| painel de configurações (V2-T14) | `state/settings-panel.ts` (`buildSettingsRows`/`SettingsRow`, `buildProjectPolicyLines`/`ProjectPolicyLine`) — uma linha por `EDITABLE_CONFIG_KEYS` (`@seeya-ai/engine/adapters/storage/config-schema.js`, as mesmas dezesseis chaves de `seeya config get`), com valor e origem (`'default'`/`'chosen'`, por comparação com `DEFAULT_CONFIG`, D-025) mais o `projectPolicy` só para leitura; salvar passa pelo MESMO `parseConfigFieldUpdate`/`applyConfigFieldUpdate` + `Storage.saveConfig` que `seeya config set` usa (IPC `getSettingsPanel`/`saveSetting`, `ipc/channels.ts`), e a faixa de horário é recomputada na hora com o `Config` recém-gravado; `electron/main.ts`'s own ciclo de atualização de 10s também passou a reler `config.json` a cada tick (não mais o `context.config` fixo do início), senão um valor salvo aqui voltaria ao antigo no ciclo seguinte |
 | sessão descoberta | `DiscoveredSession` |
 | sessão com PID / sem PID | `SessionWithPid` / `SessionWithoutPid` |
 | estado da sessão | `SessionState` |
@@ -442,7 +443,7 @@ Variável de ambiente interna: `SEEYA_DAEMON_CHILD` (S4-T3) distingue o lançado
 daemon. Atravessa um `spawn`, nunca vai para disco, e ninguém digita.
 
 Variáveis de ambiente só de instrumentação de verificação (`packages/app/src/electron/main.ts`,
-V2-T2, V2-T4, V2-T5a, V2-T5b): `SEEYA_APP_OFFSCREEN`, `SEEYA_APP_SCREENSHOT_PATH`, `SEEYA_APP_QUIT_AFTER_MS`,
+V2-T2, V2-T4, V2-T5a, V2-T5b, V2-T14): `SEEYA_APP_OFFSCREEN`, `SEEYA_APP_SCREENSHOT_PATH`, `SEEYA_APP_QUIT_AFTER_MS`,
 `SEEYA_APP_AUTO_OPEN_SHELL_TAB`, `SEEYA_APP_HOME_OVERRIDE`, `SEEYA_APP_AUTO_RESUME_ALL` (V2-T4:
 marca toda caixa de seleção do painel "Hoje" e clica **Resume selected**, respondendo **Skip** se
 o diálogo de fallback aparecer), `SEEYA_APP_AUTO_END_DAY` (V2-T5a: clica o botão real "End day…",
@@ -451,7 +452,11 @@ now**; também estende a janela de `captureVerificationScreenshot` de 2.500ms pa
 esta é a única instrumentação que espera por DOIS `endDay` reais antes da captura valer a pena),
 `SEEYA_APP_AUTO_SNOOZE_15` (V2-T5b: clica o botão real **Snooze +15m** da faixa de horário, para
 provar que o clique persiste `snoozeMinutesTotal` em `estado.json` e que a faixa atualiza sem
-esperar o próximo ciclo ambiente) —
+esperar o próximo ciclo ambiente), `SEEYA_APP_AUTO_EDIT_SETTINGS` (V2-T14: abre o diálogo real de
+**Settings…**, tenta um valor inválido em `relevanceHours` — prova a recusa do item 2, a mensagem
+de erro da própria linha fica visível e nada é gravado — e então um valor válido em `endOfDayTime`
+— prova os itens 1 e 3 juntos: a origem daquela linha vira "set in config.json" e a faixa de
+horário na barra lateral atualiza na hora, sem reiniciar nada) —
 mesma categoria de `SEEYA_DAEMON_CHILD`
 acima (nunca vão para disco, ninguém digita), mas nenhuma delas é lida por `npm run app` nem
 documentada no `README.md`: existem só para um agente sem tela/teclado próprios provar a janela

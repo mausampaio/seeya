@@ -310,6 +310,43 @@ function createWindow(clock: Clock): BrowserWindow {
         );
     });
   }
+  // SEEYA_APP_AUTO_EDIT_SETTINGS: same "instrumentação só do spike" class as the five above —
+  // opens the real Settings dialog (V2-T14), saves a valid `endOfDayTime` value first (proving
+  // items 1 and 3 together: that row's own origin flips from "seeya default" to "set in
+  // config.json", and the faixa de horário in the sidebar updates immediately — no restart of the
+  // window or the daemon) and only THEN tries an invalid `relevanceHours` value (proving item 2's
+  // refusal: the row's own error text stays put, nothing is written). The invalid attempt has to
+  // come LAST — a successful save re-renders every row (so no OTHER row's `origin` goes stale next
+  // to the one that changed, this file's own `saveSetting` handler docstring), which would wipe an
+  // earlier row's error text right back off screen before the screenshot below ever fires. Never
+  // set by `npm run app` or the README.
+  if (process.env.SEEYA_APP_AUTO_EDIT_SETTINGS === '1') {
+    window.webContents.once('did-finish-load', () => {
+      void clock
+        .sleep(500)
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('settings-button').click();",
+          ),
+        )
+        .then(() => clock.sleep(500))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            'const validRow = document.querySelector(\'.settings-row[data-key="endOfDayTime"]\'); ' +
+              "validRow.querySelector('.settings-row-input').value = '09:15'; " +
+              "validRow.querySelector('.settings-row-save').click();",
+          ),
+        )
+        .then(() => clock.sleep(300))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            'const invalidRow = document.querySelector(\'.settings-row[data-key="relevanceHours"]\'); ' +
+              "invalidRow.querySelector('.settings-row-input').value = '-5'; " +
+              "invalidRow.querySelector('.settings-row-save').click();",
+          ),
+        );
+    });
+  }
   return window;
 }
 
