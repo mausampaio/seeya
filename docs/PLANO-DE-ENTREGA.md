@@ -6153,7 +6153,7 @@ texto, mas não são a fila.
       descrições mostradas na tela citava o número de uma decisão interna, que não diz nada a quem
       lê o diálogo. Fica em `[~]` até o aceite do mantenedor.
 
-- [ ] **V2-T13 — O app é dono do daemon e do autostart; a CLI vira cliente (D-045).**
+- [~] **V2-T13 — O app é dono do daemon e do autostart; a CLI vira cliente (D-045).**
       Especificada pelo PO em 2026-09-20; terceiro passo do recorte da v2 (`docs/V2-RUMO.md`).
       Implementa os itens 1 e 2 da D-045 — os itens 3 e 4 dela (o handoff sair do centro, adotar
       uma sessão) são das tarefas de projetos, não desta.
@@ -6216,6 +6216,108 @@ texto, mas não são a fila.
       **Aceite do mantenedor:** com o app instalado, `seeya daemon` recusa e explica; a janela
       liga o autostart e, depois de reiniciar a máquina, o daemon está de pé sem ninguém abrir
       nada; a pergunta da transição aparece uma vez só.
+
+      **Relatório do agente (2026-09-20).**
+
+      **O que entrou, na ordem da spec, cada item num commit próprio (mais o achado do
+      mantenedor num commit à parte):**
+
+      1. **`AppInstallation`** (`core/ports.ts`) + `adapters/installation/` — um adaptador por SO.
+         Windows: três raízes de registro (`HKCU`, `HKLM`, `HKLM\...\WOW6432Node`), procurando
+         `DisplayName` batendo em `^seeya(\s|$)`; caminho do executável por `InstallLocation` →
+         diretório de `UninstallString` → `DisplayIcon`, nessa ordem — todos os três medidos contra
+         instalações reais (a própria e a do mantenedor, ver achado abaixo). Linux: `dpkg-query`
+         pelo pacote `seeya`; um `AppImage` nunca aparece nesse banco, então "não instalado" sai da
+         própria consulta. macOS: `seeya.app` em `/Applications`. Falha da consulta (qualquer SO)
+         → `unknown`, nunca `installed`/`notInstalled` inventado.
+      2. **`application/daemon-ownership.ts#resolveDaemonOwner`** — puro, `AppInstallationStatus` →
+         `DaemonOwner` (`app`/`cli`/`unknown`). `shouldOfferDaemonOwnershipTransition` no mesmo
+         arquivo decide a pergunta única do item 5.
+      3. **A CLI vira cliente** — `runDaemonLauncher`/`runAutostartEnableCommand` ganharam
+         `daemonOwner`; recusam só quando `kind === 'app'`. `--stop`/`status`/`autostart
+         status`/`disable` continuam sem checagem (o item explícito da spec: "um cliente pode
+         olhar e pode parar"). O **cuidado central**: `cli/index.ts` agora decide o modo da
+         invocação (`daemon-command.ts#resolveDaemonInvocationMode`, puro: `'stop'`/`'status'`/
+         `'worker'`/`'launcher'`) só a partir de `--stop`/`--status`/`SEEYA_DAEMON_CHILD` — nunca de
+         `DaemonOwner`. Só o modo `'launcher'` chega a `runDaemonLauncher`; o modo `'worker'` (o
+         filho que a janela lança) vai direto a `runDaemonWorker`, cuja assinatura nem tem
+         parâmetro de posse — não tem como recusar por engano. `tests/unit/cli/daemon-command.test.ts`
+         prova isso rodando `runDaemonWorker` até o fim, com sucesso, no mesmo cenário em que
+         `runDaemonLauncher` teria recusado.
+      4. **Autostart do app** — `Autostart.enable` ganhou um segundo argumento opcional,
+         `AutostartLaunchOptions` (`execPath`/`env`), sem mudar o comportamento de quem não o
+         passa. No Windows, `env` é injetado envolvendo o lançamento em `cmd.exe /c "set VAR=...&&
+         ..."` (`New-ScheduledTaskAction` não tem parâmetro de ambiente); Linux ganha uma linha
+         `Environment=` no `[Service]`; macOS ganha um `EnvironmentVariables` no plist — os dois
+         últimos são o mecanismo nativo de cada um, sem embrulho. `AppContext.enableAppAutostart`
+         chama isso com o mesmo `execPath`/`env` que `startDaemon` já monta (o binário do Electron
+         + `ELECTRON_RUN_AS_NODE=1`). Botão novo na janela (`state/autostart-control-panel.ts`,
+         mesmo formato idle→running→result do botão do daemon), escondido inteiro quando
+         `daemonOwner.kind !== 'app'`.
+      5. **A pergunta única** — `DaemonOwnershipTransitionAnswer` (`accepted`/`declined`) em
+         `~/.seeya/daemon-ownership-transition.json`, lido/gravado por
+         `Storage.read/saveDaemonOwnershipTransitionAnswer`. `AppContext.
+         checkDaemonOwnershipTransitionOffer` junta `previousAnswer` + `checkLiveLock` + `Autostart.
+         status()`; `applyDaemonOwnershipTransition` (extraída para
+         `composition/daemon-ownership-transition.ts`, pura, testada com dublês — o corpo de
+         `buildAppContext` não tem como ser testado sem tocar o autostart real) para o daemon da
+         CLI, reaponta o autostart e sobe o próprio, só para `'accepted'`; qualquer resposta
+         persiste, então a pergunta nunca repete. Diálogo na janela, mostrado uma vez no `main()` do
+         renderer, depois de tudo mais já estar funcional; fechar com Escape conta como recusar
+         (nunca fica sem resposta).
+
+      **Achado do mantenedor durante a tarefa, incorporado (Q-081).** A implementação inicial só
+      lia `HKCU` (instalação por usuário). O mantenedor mediu, na própria máquina, uma instalação
+      "para todos os usuários" real — registro só em `HKLM`, `InstallLocation` e `UninstallString`
+      ambos vazios, só `DisplayIcon` carregava o caminho. `buildQueryScript` passou a varrer três
+      raízes (`HKCU`, `HKLM`, `HKLM\...\WOW6432Node`) e `deriveExecutablePath` ganhou o terceiro
+      fallback. A prova manual abaixo confirma isso rodando de verdade contra a própria instalação
+      por máquina do mantenedor, ainda na máquina onde a tarefa foi feita.
+
+      **Texto exato da recusa da CLI:**
+      - `seeya daemon`: `seeya: the app is installed (<launchPath>) and now owns the daemon. Open
+        seeya and use the daemon control there (Start daemon / Stop daemon) — "seeya daemon" no
+        longer starts one here.`
+      - `seeya autostart enable`: `seeya: the app is installed (<launchPath>) and now owns
+        autostart. Open seeya and use the autostart toggle there — "seeya autostart enable" no
+        longer registers one here.`
+
+      **Prova manual, na janela, contra um `SEEYA_APP_HOME_OVERRIDE` descartável
+      (`%TEMP%\seeya-verify-v2t13`, apagado ao final, nunca o `~/.seeya` real).** Nenhuma chave de
+      registro `seeya`/`seeya-dev` foi criada, alterada ou apagada — só leitura da instalação real
+      já existente (a própria, medida na tarefa anterior). Um processo real e descartável
+      (`Start-Sleep`, morto ao final) forneceu um `daemon.lock` real (pid + `procStart` capturados
+      pela mesma rotina que `tests/integration/cli/daemon-command.test.ts` usa) para simular "a CLI
+      tem um daemon vivo", sem tocar no daemon de verdade. Duas capturas
+      (`SEEYA_APP_OFFSCREEN`/`SEEYA_APP_SCREENSHOT_PATH`/`SEEYA_APP_QUIT_AFTER_MS`):
+      1. Sem resposta prévia: a pergunta única aparece, com o texto exato "seeya is installed
+         (C:\Program Files\seeya\seeya.exe) and can now own the daemon and autostart on this
+         machine..." — confirma ao vivo a instalação por máquina do mantenedor (o achado do
+         Q-081) sendo lida corretamente pelo `DisplayIcon`, e o painel de status atrás mostra
+         "Daemon: running (pid <do processo semeado>...)".
+      2. Com `daemon-ownership-transition.json` pré-semeado como `declined` (escrito à mão, nunca
+         pelo botão "Let seeya take over" — clicar nele chamaria o autostart real): a pergunta não
+         aparece, e o botão "Disable autostart" mostra (a instalação real desta máquina tem
+         autostart da CLI de verdade registrado, apontando para o binário antigo do checkout —
+         prova que `resolveAutostartControlAvailability` leu o `AutostartStatus` real e escolheu o
+         rótulo certo). O botão "Disable autostart" **não foi clicado** — nenhum agente altera o
+         autostart real.
+
+      **Portão**, tudo na worktree do agente: `format:check` verde; `tsc -p tsconfig.json --noEmit`
+      verde; `eslint .` verde; `build` (`tsc -b`) verde; `dependencias` verde — "no dependency
+      violations found (363 modules, 974 dependencies cruised)";
+      `npx vitest run --project unit --project integration --project integration-process --project
+      guards --maxWorkers 2 --coverage` — **197 arquivos de teste, 2.008 testes passando, 4
+      pulados**; cobertura agregada **96,39% statements / 92,56% branches / 94,93% funções / 96,75%
+      linhas**, acima dos pisos do `AGENTS.md` (todo diretório novo — `adapters/installation`,
+      `state/autostart-control-panel.ts`, `composition/daemon-ownership-transition.ts` — está
+      registrado em `vitest.config.ts`/`tests/integration/guards/_coverage-directories.ts`).
+      `verificar:linux` não rodado (mesma classe de limite de memória do host já registrada em
+      tarefas anteriores; CI cobre).
+
+      **Questões abertas:** Q-081 (detecção de instalação no Windows — o que foi medido, o achado
+      do mantenedor sobre instalação por máquina, e o que ainda não foi medido em Linux/macOS).
+      Nenhuma outra questão nova — a spec e a D-045 cobriram o resto.
 
 ## Definição de pronto (vale para toda tarefa)
 
