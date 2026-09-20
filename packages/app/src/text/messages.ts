@@ -157,4 +157,61 @@ export const MESSAGES = {
   daemonControlStop: 'Stop daemon',
   daemonControlUnknown: 'Daemon: cannot verify — see the status panel.',
   daemonControlRunning: 'Working…',
+
+  // V2-T14 — the "Settings" dialog (state/settings-panel.ts). One row per
+  // `EDITABLE_CONFIG_KEYS` (@seeya-ai/engine/adapters/storage/config-schema.js), same sixteen keys
+  // `seeya config get` already walks. Deliberately NOT typed against `EditableConfigKey` here
+  // (this module's own top comment: no imports on purpose) — `state/settings-panel.ts` is what
+  // proves every key has an entry, via its own unit test.
+  settingsButton: 'Settings…',
+  settingsDialogTitle: 'Settings',
+  settingsDialogClose: 'Close',
+  // Item 3's own "dizer isso na tela, em uma linha": the daemon is a separate process that rereads
+  // config.json at the top of every cycle (scheduler/poll.ts) — a save here never needs it (or
+  // this window) restarted to take effect there.
+  settingsDaemonRereadsNote:
+    'The daemon rereads config.json at the top of every cycle — no restart needed for it to pick ' +
+    'up a change made here.',
+  settingsOriginDefault: 'seeya default',
+  settingsOriginChosen: 'set in config.json',
+  settingsSaveButton: 'Save',
+  settingsSavedNote: (key: string): string => `${key} saved.`,
+  // AGENTS.md § "Mensagens de erro": `errorText` already names the value that was rejected and the
+  // shape expected (`parseConfigFieldUpdate`'s own message, reused verbatim, D-039 — never a second
+  // wording invented in the interface).
+  settingsSaveFailedPrefix: 'Not saved — ',
+
+  settingsFieldDescriptions: {
+    endOfDayTime:
+      'Local time ("HH:MM") the day ends and end-day capture runs; "null" disables the scheduled ' +
+      'trigger — capture then only ever runs when you ask for it.',
+    leadTimesInMinutes:
+      'Minutes before endOfDayTime a "closing soon" notice fires — comma-separated, e.g. "30, 15" ' +
+      'for two warnings.',
+    relevanceHours:
+      'How many hours back a session still counts as relevant enough to show/capture.',
+    idleMinutes: 'Minutes without activity before a session is considered idle rather than alive.',
+    captureModel: 'The Claude model end-day capture asks to summarize each session.',
+    budgetPerSessionUsd: 'The dollar ceiling end-day capture enforces per session.',
+    captureConcurrency: 'How many sessions end-day captures at the same time.',
+    ignore: 'Comma-separated directory prefixes end-day never captures.',
+    forkCleanupDays: 'Days a seeya-created fork is kept on disk before it gets deleted (D-012).',
+    maxGitRootsToVisit:
+      'The ceiling on how many git roots one capture visits looking for evidence.',
+    maxCaptureAttemptsPerSessionPerDay:
+      'How many times end-day retries capturing the same session in one day.',
+    maxBriefingScanDays: 'How many days back "start-day" looks for a pending briefing.',
+    overdueFireThresholdMinutes:
+      'Minutes past endOfDayTime before an overdue session becomes due for termination.',
+    leadTimeHysteresisMinutes:
+      'Minimum minutes between two lead-time warnings, so a moved deadline never fires two notices ' +
+      'back to back.',
+    // Both font fields (V2-T3): the embedded terminal only reads these once, at startup
+    // (electron/renderer.ts's own `terminalFontConfig` docstring) — said here so editing one in
+    // this dialog doesn't look like it silently failed.
+    terminalFontFamily:
+      "The embedded terminal's CSS font-family stack — a change here needs seeya relaunched to show.",
+    terminalFontSize:
+      "The embedded terminal's font size, in pixels — a change here needs seeya relaunched to show.",
+  } as Record<string, string>,
 } as const;
