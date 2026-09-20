@@ -6968,8 +6968,9 @@ texto, mas não são a fila.
       **Aceite do mantenedor:** no Mac, abrir abas, fechar a janela e não ver diálogo de erro
       nenhum; conferir que nenhum processo de aba ficou vivo depois.
 
-- [ ] **V2-T21 — Correção: o botão de autostart mostra o estado anterior por até um minuto; e o
-      painel "Hoje" não diz por que não há nada para marcar.** Especificada pelo PO em 2026-09-20 a
+- [ ] **V2-T21 — Correção: os botões de ação respondem com o estado anterior (autostart por até
+      um minuto, daemon por até dez segundos); e o painel "Hoje" não diz por que não há nada para
+      marcar.** Especificada pelo PO em 2026-09-20 a
       partir de dois achados do mantenedor no mesmo dia, com captura de tela. Pequena, e independente
       das outras da fila.
 
@@ -6997,12 +6998,22 @@ texto, mas não são a fila.
       (*"agora não consigo dar resume em sessão nenhuma"*). Ausência de explicação vira suspeita de
       defeito.
 
+      **Defeito 1b, medido pelo mantenedor no mesmo dia.** O mesmo vale para o botão do daemon,
+      só que com dez segundos em vez de sessenta: clicando em **Start daemon**, o daemon sobe mas
+      o botão continua escrito "Start daemon" até o ciclo ambiente seguinte. Pergunta dele, que é
+      a solução: *"não conseguiríamos executar o service do status logo que o botão fosse
+      apertado?"*. Sim — e é o que `snoozeToday` já faz com a faixa de horário desde a V2-T5b: a
+      resposta da própria ação traz o estado recomputado. **A regra vale para os dois botões**, e
+      é assim que a spec abaixo a escreve: um botão de ação nunca devolve só texto; devolve
+      também a disponibilidade recomputada, e quem desenha usa essa, não a do último ciclo.
+
       **O que entra:**
-      1. **O rótulo do autostart corrige na hora.** Depois de ligar ou desligar, o estado é relido
-         imediatamente (invalidar o cache é o mínimo; melhor ainda se a resposta da própria ação já
-         trouxer a disponibilidade recomputada, como `snoozeToday` já faz com a faixa de horário).
-         O cache de 60s continua valendo para o ciclo ambiente — ele existe por medição (Q-071), e
-         esta tarefa não o remove.
+      1. **O rótulo do autostart e o do daemon corrigem na hora.** A resposta de cada ação
+         (`autostartControl`, `daemonControl`) passa a trazer a disponibilidade recomputada, do
+         mesmo jeito que `snoozeToday` já devolve a faixa de horário pronta — e o cache do
+         autostart é invalidado junto, senão o ciclo seguinte reporia o valor velho. O cache de
+         60s continua valendo para o ciclo ambiente — ele existe por medição (Q-071), e esta
+         tarefa não o remove.
       2. **O painel "Hoje" explica quando não há o que marcar.** Quando nenhuma linha oferece
          caixa, uma frase diz o porquê — "todas as sessões do plano de hoje já estão abertas" — e o
          botão **Resume selected** não fica sozinho oferecendo uma ação vazia (desabilitado, com o
