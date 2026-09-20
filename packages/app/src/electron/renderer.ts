@@ -25,6 +25,7 @@ import type {
   TerminalFontConfigResponse,
 } from '../ipc/channels.js';
 import {
+  hasResumableSession,
   offersResumeCheckbox,
   type TodayPanelData,
   type TodaySessionRow,
@@ -612,7 +613,13 @@ function renderDaemonControl(): void {
 }
 
 async function handleDaemonControlClicked(): Promise<void> {
-  if (daemonControlState.kind !== 'idle' || daemonControlState.availability.kind === 'unknown') {
+  // V2-T21 item 1: clicking is allowed from 'result' too, not just 'idle' — that's what lets a
+  // click right after the previous action's own result send the FRESH action (`reduceDaemonControl`'s
+  // own docstring has the measured defect this fixes).
+  if (
+    (daemonControlState.kind !== 'idle' && daemonControlState.kind !== 'result') ||
+    daemonControlState.availability.kind === 'unknown'
+  ) {
     return;
   }
   const action = daemonControlState.availability.kind === 'start' ? 'start' : 'stop';
@@ -622,6 +629,7 @@ async function handleDaemonControlClicked(): Promise<void> {
   daemonControlState = reduceDaemonControl(daemonControlState, {
     kind: 'finished',
     resultText: response.resultText,
+    availability: response.availability,
   });
   renderDaemonControl();
 }
@@ -679,8 +687,10 @@ function renderAutostartControl(): void {
 }
 
 async function handleAutostartControlClicked(): Promise<void> {
+  // V2-T21 item 1: clicking is allowed from 'result' too, not just 'idle' — mirrors
+  // `handleDaemonControlClicked` above (same measured defect, same fix).
   if (
-    autostartControlState.kind !== 'idle' ||
+    (autostartControlState.kind !== 'idle' && autostartControlState.kind !== 'result') ||
     autostartControlState.availability.kind === 'notApplicable' ||
     autostartControlState.availability.kind === 'unknown'
   ) {
@@ -693,6 +703,7 @@ async function handleAutostartControlClicked(): Promise<void> {
   autostartControlState = reduceAutostartControl(autostartControlState, {
     kind: 'finished',
     resultText: response.resultText,
+    availability: response.availability,
   });
   renderAutostartControl();
 }
@@ -1034,10 +1045,25 @@ function renderTodayPanel(data: TodayPanelData): void {
   }
   panel.appendChild(list);
 
+  // V2-T21 item 2 — the measured defect: with every row already `runningNow` (D-041's own rule:
+  // resuming what's already open would just open a second copy), no row offers a checkbox, but
+  // "Resume selected" stayed there anyway, clickable and doing nothing. A disabled button with the
+  // reason visible reads as "nothing to do here", never as "the app broke" (the mantenedor's own
+  // words for what he saw).
+  const resumable = hasResumableSession(data.rows);
+  if (!resumable) {
+    const explanation = document.createElement('p');
+    explanation.textContent = MESSAGES.todayAllSessionsRunning;
+    panel.appendChild(explanation);
+  }
+
   const resumeButton = document.createElement('button');
   resumeButton.type = 'button';
   resumeButton.textContent = MESSAGES.todayResumeSelected;
-  resumeButton.addEventListener('click', () => void handleResumeSelected(data.day));
+  resumeButton.disabled = !resumable;
+  if (resumable) {
+    resumeButton.addEventListener('click', () => void handleResumeSelected(data.day));
+  }
   panel.appendChild(resumeButton);
 
   const progress = document.createElement('p');

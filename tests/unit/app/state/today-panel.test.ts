@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildTodayPanelData,
+  hasResumableSession,
   offersResumeCheckbox,
   refreshTodayPanelLiveness,
+  type TodaySessionRow,
 } from '../../../../packages/app/src/state/today-panel.js';
 import type { PendingBriefingLookup } from '@seeya-ai/engine/application/find-pending-briefing.js';
 import type { CwdHistoryEntry } from '@seeya-ai/engine/application/cwd-history.js';
@@ -278,6 +280,46 @@ describe('offersResumeCheckbox — V2-T18 defect 1: the checkbox comes back for 
   it('runningNow is the ONLY status that blocks the checkbox', () => {
     expect(offersResumeCheckbox({ kind: 'runningNow', matchedTabId: null })).toBe(false);
     expect(offersResumeCheckbox({ kind: 'runningNow', matchedTabId: 'tab-1' })).toBe(false);
+  });
+});
+
+describe('hasResumableSession — V2-T21 item 2', () => {
+  function row(overrides: Partial<TodaySessionRow> = {}): TodaySessionRow {
+    return {
+      sessionId: 'session-1',
+      name: 'alpha',
+      cwd: '/projects/alpha',
+      firstPlanLine: null,
+      resumeStatus: { kind: 'neverResumed' },
+      cwdHistory: [],
+      ...overrides,
+    };
+  }
+
+  it('empty rows: false — nothing to resume, same as every row already running', () => {
+    expect(hasResumableSession([])).toBe(false);
+  });
+
+  it('every row runningNow: false — the achado this task fixes (all planned sessions already open)', () => {
+    const rows = [
+      row({ sessionId: 'a', resumeStatus: { kind: 'runningNow', matchedTabId: null } }),
+      row({ sessionId: 'b', resumeStatus: { kind: 'runningNow', matchedTabId: 'tab-1' } }),
+    ];
+
+    expect(hasResumableSession(rows)).toBe(false);
+  });
+
+  it('at least one row not runningNow: true', () => {
+    const rows = [
+      row({ sessionId: 'a', resumeStatus: { kind: 'runningNow', matchedTabId: null } }),
+      row({ sessionId: 'b', resumeStatus: { kind: 'neverResumed' } }),
+    ];
+
+    expect(hasResumableSession(rows)).toBe(true);
+  });
+
+  it('resumedEarlier counts as resumable too (the checkbox comes back for it)', () => {
+    expect(hasResumableSession([row({ resumeStatus: { kind: 'resumedEarlier' } })])).toBe(true);
   });
 });
 

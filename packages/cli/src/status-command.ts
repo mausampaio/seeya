@@ -43,13 +43,15 @@ export async function runStatusCommand(context: StatusCommandContext): Promise<s
   // One liveness check for the whole command (docs/PLANO-DE-ENTREGA.md S4-T13, cuidado (g)) —
   // `describeDaemonState` itself only calls `ProcessControl.isAlive` once; nothing here calls it
   // again.
-  const daemonAndScheduleReport = await describeDaemonState(context);
+  const { report: daemonAndScheduleReport, todayEndOfDayOverride } =
+    await describeDaemonState(context);
   const autostartReport = await describeAutostartState(context.autostart);
   return formatStatusReport({
     endOfDayTime: context.config.endOfDayTime,
     discoveredSessionCount: discovery.sessions.length,
     eligibleSessionCount: countEligibleSessions(discovery.sessions, context.config, now),
     daemonAndScheduleReport,
+    todayEndOfDayOverride,
     autostartReport,
   });
 }
