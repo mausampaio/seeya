@@ -452,7 +452,7 @@ Variável de ambiente interna: `SEEYA_DAEMON_CHILD` (S4-T3) distingue o lançado
 daemon. Atravessa um `spawn`, nunca vai para disco, e ninguém digita.
 
 Variáveis de ambiente só de instrumentação de verificação (`packages/app/src/electron/main.ts`,
-V2-T2, V2-T4, V2-T5a, V2-T5b, V2-T14): `SEEYA_APP_OFFSCREEN`, `SEEYA_APP_SCREENSHOT_PATH`, `SEEYA_APP_QUIT_AFTER_MS`,
+V2-T2, V2-T4, V2-T5a, V2-T5b, V2-T14, V2-T17): `SEEYA_APP_OFFSCREEN`, `SEEYA_APP_SCREENSHOT_PATH`, `SEEYA_APP_QUIT_AFTER_MS`,
 `SEEYA_APP_AUTO_OPEN_SHELL_TAB`, `SEEYA_APP_HOME_OVERRIDE`, `SEEYA_APP_AUTO_RESUME_ALL` (V2-T4:
 marca toda caixa de seleção do painel "Hoje" e clica **Resume selected**, respondendo **Skip** se
 o diálogo de fallback aparecer), `SEEYA_APP_AUTO_END_DAY` (V2-T5a: clica o botão real "End day…",
@@ -465,7 +465,11 @@ esperar o próximo ciclo ambiente), `SEEYA_APP_AUTO_EDIT_SETTINGS` (V2-T14: abre
 **Settings…**, tenta um valor inválido em `relevanceHours` — prova a recusa do item 2, a mensagem
 de erro da própria linha fica visível e nada é gravado — e então um valor válido em `endOfDayTime`
 — prova os itens 1 e 3 juntos: a origem daquela linha vira "set in config.json" e a faixa de
-horário na barra lateral atualiza na hora, sem reiniciar nada) —
+horário na barra lateral atualiza na hora, sem reiniciar nada), `SEEYA_APP_STARTUP_TIMING_PATH`
+(V2-T17 item 4: grava, no arquivo indicado, o instante em que o primeiro `sessionsUpdate` foi
+enviado ao renderer — a metade, do lado do app, da medida "tempo até a lista de sessões na tela"
+de `docs/DESEMPENHO.md`; `packages/app/scripts/measure-startup.mjs` é a outra metade, que lança o
+processo e faz a subtração) —
 mesma categoria de `SEEYA_DAEMON_CHILD`
 acima (nunca vão para disco, ninguém digita), mas nenhuma delas é lida por `npm run app` nem
 documentada no `README.md`: existem só para um agente sem tela/teclado próprios provar a janela
@@ -506,6 +510,14 @@ npm run app              # builda o motor e sobe a interface em desenvolvimento 
 Todos rodam na raiz do monorepo (V2-T1) e cobrem os três pacotes de uma vez. Para instalar o
 `seeya` localmente por link (`npm link`), o comando roda dentro de `packages/cli`, não na raiz —
 ver `README.md`.
+
+# Desempenho
+
+`docs/DESEMPENHO.md` (V2-T17) tem as quatro medidas atuais do app (tempo até a lista de sessões,
+memória em repouso somando toda a árvore de processos, CPU parado, tamanho em disco), o método de
+cada uma e a régua: **tarefa de interface que acrescente trabalho em repouso, na subida ou no
+tamanho diz o custo na própria especificação**; piora sem essa explicação vira questão em
+`docs/QUESTOES.md`.
 
 # O erro clássico neste projeto
 
