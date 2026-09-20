@@ -23,6 +23,7 @@ import type {
   FallbackConfirmRequestEvent,
   FallbackConfirmAnswerRequest,
   TodayPanelResponse,
+  TodayUpdateEvent,
   ResumeSelectedRequest,
   ResumeSummaryResponse,
   ResumeProgressUpdateEvent,
@@ -67,6 +68,9 @@ export interface SeeyaApi {
   answerFallbackConfirm(request: FallbackConfirmAnswerRequest): void;
   /** V2-T4 item 1: the "Today" panel's own data. */
   getTodayPanel(): Promise<TodayPanelResponse>;
+  /** V2-T18 item 2: the panel's own data, pushed on the same refresh tick as `onSessionsUpdate` —
+   * the panel tracks liveness without a page reload. */
+  onTodayUpdate(listener: (event: TodayUpdateEvent) => void): void;
   /** V2-T4 items 1/2/3: "Resume selected". */
   resumeSelected(request: ResumeSelectedRequest): Promise<ResumeSummaryResponse>;
   onResumeProgress(listener: (event: ResumeProgressUpdateEvent) => void): void;
@@ -137,6 +141,9 @@ const api: SeeyaApi = {
   },
   answerFallbackConfirm: (request) => ipcRenderer.send(CHANNELS.confirmFallbackAnswer, request),
   getTodayPanel: () => ipcRenderer.invoke(CHANNELS.getTodayPanel),
+  onTodayUpdate: (listener) => {
+    ipcRenderer.on(CHANNELS.todayUpdate, (_event, data: TodayUpdateEvent) => listener(data));
+  },
   resumeSelected: (request) => ipcRenderer.invoke(CHANNELS.resumeSelected, request),
   onResumeProgress: (listener) => {
     ipcRenderer.on(CHANNELS.resumeProgress, (_event, data: ResumeProgressUpdateEvent) =>

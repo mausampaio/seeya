@@ -55,6 +55,13 @@ export const CHANNELS = {
    * fetched once at startup and again after `resumeSelected` finishes, same "no polling of its
    * own" shape `getTerminalFontConfig` already has. */
   getTodayPanel: 'seeya:get-today-panel',
+  /** Main → renderer, pushed on the same refresh tick as `sessionsUpdate` (V2-T18 item 2): the
+   * "Today" panel's own data, recomputed with fresh liveness only
+   * (`state/today-panel.ts#refreshTodayPanelLiveness`) — the second achado this task fixes: the
+   * panel used to render once at startup and then never again, so a session opened outside the
+   * window kept showing "not running now" until the window reloaded. Skipped that tick when
+   * nothing has been fetched yet (`refreshTodayPanelLiveness`'s own `null` case). */
+  todayUpdate: 'seeya:today-update',
   /** Renderer → main: "Resume selected" — the sessions the person checked, for the day the panel
    * is showing. */
   resumeSelected: 'seeya:resume-selected',
@@ -213,6 +220,10 @@ export interface FallbackConfirmAnswerRequest {
 /** `CHANNELS.getTodayPanel`'s response — the exact shape `state/today-panel.ts#buildTodayPanelData`
  * produces. */
 export type TodayPanelResponse = TodayPanelData;
+
+/** `CHANNELS.todayUpdate`'s payload (V2-T18 item 2) — the exact same shape as
+ * `TodayPanelResponse`, just pushed instead of fetched. */
+export type TodayUpdateEvent = TodayPanelData;
 
 /** `CHANNELS.resumeSelected`'s payload. `day` is `core/types.ts`'s `Day` (a plain string,
  * `YYYY-MM-DD`) — not imported from the engine here, same "this file only ever imports app-internal

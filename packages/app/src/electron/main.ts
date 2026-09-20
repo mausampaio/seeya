@@ -24,6 +24,7 @@ import type {
   TerminalFontConfigResponse,
   FallbackConfirmAnswerRequest,
   TodayPanelResponse,
+  TodayUpdateEvent,
   ResumeSelectedRequest,
   ResumeSummaryResponse,
   ResumeProgressUpdateEvent,
@@ -97,7 +98,11 @@ import {
   DEFAULT_AUTOSTART_REFRESH_INTERVAL_MS,
   type AutostartCacheEntry,
 } from '../state/autostart-cache.js';
-import { buildTodayPanelData } from '../state/today-panel.js';
+import {
+  buildTodayPanelData,
+  refreshTodayPanelLiveness,
+  type TodayPanelInputs,
+} from '../state/today-panel.js';
 import { buildResumeSummary } from '../state/resume-summary.js';
 import { PendingFallbackRequests } from '../resume/pending-fallback-requests.js';
 import { buildFallbackConfirmer } from '../resume/fallback-confirmer.js';
@@ -376,6 +381,13 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // until the first tick runs, which is fine (D-025): no session is "running now" before this
   // window has ever discovered any.
   let latestSidebarRows: readonly SidebarRow[] = [];
+  // V2-T18 item 2: the "Today" panel's own lookup/cwd-history from the last time getTodayPanel
+  // below actually built them (window startup, or after resumeSelected/endDayRun refetch it) —
+  // the refresh tick reuses these AS-IS, layering in only a fresh liveSessionIds
+  // (refreshTodayPanelLiveness's own docstring), instead of repeating findPendingBriefing/
+  // readCwdHistory's own storage scans every REFRESH_INTERVAL_MS. `null` until the first
+  // getTodayPanel call resolves, which is fine (D-025): the tick below just skips that push.
+  let latestTodayPanelInputs: TodayPanelInputs | null = null;
   // V2-T4 item 3: at most one truly pending in production (`resumeSessions`'s own sequential
   // loop), but keyed independently by requestId anyway — `PendingFallbackRequests`'s own docstring.
   const pendingFallbackRequests = new PendingFallbackRequests();
@@ -535,6 +547,7 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
       config.maxBriefingScanDays,
     );
     if (!lookup.found) {
+      latestTodayPanelInputs = { lookup, cwdHistoryBySessionId: new Map() };
       return buildTodayPanelData(lookup);
     }
     const cwdHistoryEntries = await Promise.all(
@@ -555,7 +568,12 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
     // V2-T9 item 4: "running now" from THIS session's own most recent discovery, not from
     // resumed.json — see buildLiveSessionIndex's own docstring for why the two disagree.
     const liveSessionIds = buildLiveSessionIndex(latestSidebarRows);
-    return buildTodayPanelData(lookup, new Map(cwdHistoryEntries), liveSessionIds);
+    const cwdHistoryBySessionId = new Map(cwdHistoryEntries);
+    // V2-T18 item 2: cached for the refresh tick below (refreshTodayPanelLiveness) — the lookup
+    // and cwd history just built here stay valid until the next getTodayPanel call; only
+    // liveness needs to be fresh every tick.
+    latestTodayPanelInputs = { lookup, cwdHistoryBySessionId };
+    return buildTodayPanelData(lookup, cwdHistoryBySessionId, liveSessionIds);
   });
 
   // V2-T4 items 1/2/3: "Resume selected" — the same resumeSessions the CLI's start-day-command.ts
@@ -810,6 +828,20 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
       latestSidebarRows = rows;
       const sessionsEvent: SessionsUpdateEvent = { rows };
       window.webContents.send(CHANNELS.sessionsUpdate, sessionsEvent);
+
+      // V2-T18 item 2: the "Today" panel tracks this same tick's own discovery — a session opened
+      // outside the window stops showing "not running now" without a reload (the second achado
+      // this task fixes). Reuses `latestTodayPanelInputs` untouched (no second findPendingBriefing/
+      // readCwdHistory scan); skipped entirely until the window's own first getTodayPanel call has
+      // populated that cache (refreshTodayPanelLiveness's own `null` case, D-025).
+      const todayPanelData = refreshTodayPanelLiveness(
+        latestTodayPanelInputs,
+        buildLiveSessionIndex(rows),
+      );
+      if (todayPanelData !== null) {
+        const todayEvent: TodayUpdateEvent = todayPanelData;
+        window.webContents.send(CHANNELS.todayUpdate, todayEvent);
+      }
 
       autostartCache = await resolveAutostartReport(
         autostartCache,
