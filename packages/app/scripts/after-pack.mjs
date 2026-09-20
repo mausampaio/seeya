@@ -57,11 +57,22 @@ function statOrNull(fs, candidate) {
 }
 
 /**
+ * @typedef {object} SpawnHelperFs
+ * @property {(dirPath: string) => string[]} readdirSync
+ * @property {(filePath: string) => { mode: number }} statSync
+ * @property {(filePath: string, mode: number) => void} chmodSync
+ */
+
+/**
  * Finds every `spawn-helper` under a packaged node-pty `prebuilds/darwin-<arch>` directory and
  * chmods the ones missing an execute bit — idempotent, same "any of owner/group/other is enough"
  * discipline as `build.mjs#ensureSpawnHelperExecutable` (this never tightens or loosens WHO may
  * run it, only restores the bit an install/copy stripped). Returns the paths it actually changed,
  * so a test can assert on the decision without inspecting the fake's internal state directly.
+ *
+ * @param {SpawnHelperFs} fs
+ * @param {string} prebuildsDir
+ * @returns {string[]}
  */
 export function fixSpawnHelperModeIn(fs, prebuildsDir) {
   const fixed = [];
