@@ -6492,6 +6492,51 @@ texto, mas não são a fila.
       diferença entre as duas formas registrada no documento (D-025: dizer o que a medida é, não o
       que se gostaria que ela fosse).
 
+- [ ] **V2-T18 — Correção: a caixa de seleção não volta para a sessão retomada, e o painel "Hoje"
+      não se atualiza sozinho.** Especificada pelo PO em 2026-09-20 a partir de dois achados do
+      mantenedor no mesmo dia, com captura de tela.
+
+      **O defeito, medido.** No painel "Hoje", a linha de uma sessão retomada antes aparece como
+      texto simples — *"resumed earlier, not running now"* — **sem caixa de seleção**, e por isso
+      não há como retomá-la de novo pela janela; o mantenedor voltou a usar o terminal. Isso é
+      exatamente o que a V2-T9 item 4 existia para corrigir, e o estado já está certo: o módulo
+      `state/today-panel.ts` distingue as três formas (`runningNow`/`resumedEarlier`/
+      `neverResumed`) e a docstring dele diz, com todas as letras, que em `resumedEarlier` **"a
+      caixa volta"**. Quem não cumpre é o desenho: `electron/renderer.ts
+      #renderTodaySessionRow` trata `resumedEarlier` no mesmo ramo de `runningNow` e devolve um
+      texto sem caixa. O estado está certo, a tela mente. (A revisão do PO olhou o módulo de
+      estado e não o desenho — registro para não repetir.)
+
+      **Segundo achado, do mesmo relato.** A linha dizia "not running now" para uma sessão que
+      estava aberta. `renderTodayPanel` só é chamado **na subida da janela** e depois de "Resume
+      selected" — o painel nunca acompanha o ciclo de atualização de 10 segundos que o resto da
+      janela usa. Ou seja, a vivacidade mostrada ali é uma fotografia do instante em que a janela
+      abriu, e envelhece calada. É o mesmo tipo de defeito da V2-T16 (responder com um valor lido
+      na subida), em outro lugar.
+
+      **O que entra:**
+      1. **A caixa volta em `resumedEarlier`**, com a nota ao lado dizendo que a sessão já foi
+         retomada hoje — a informação continua visível, o que muda é que ela deixa de impedir a
+         ação. Só `runningNow` fica sem caixa, que é o único caso em que retomar não faz sentido.
+      2. **O painel "Hoje" acompanha o ciclo ambiente**, como a faixa de horário e a barra lateral
+         já fazem, reusando a MESMA descoberta do ciclo (nunca uma segunda consulta). Cuidado ao
+         redesenhar: não apagar caixa que a pessoa acabou de marcar nem o diretório escolhido no
+         seletor "Resume in" — se isso exigir atualizar em vez de redesenhar, atualize.
+      3. **Teste de regressão nos dois**: um provando que a linha `resumedEarlier` traz caixa
+         (faixa de unidade sobre o que o desenho produz, no formato que o projeto já usa para o
+         renderer), e outro provando que uma sessão que passa a estar viva **depois** da subida
+         aparece como tal sem reabrir a janela.
+
+      **O que não entra:** mudar a regra de quando o briefing deixa de estar pendente
+      (`resumed.json` continua decidindo isso); qualquer mudança na CLI.
+
+      **Cuidados:** nenhuma dependência nova; nada no `~/.seeya` real; a prova manual usa
+      `SEEYA_APP_HOME_OVERRIDE` e captura de tela.
+
+      **Aceite do mantenedor:** com uma sessão já retomada hoje e fechada, a caixa dela aparece e
+      "Resume selected" funciona; abrindo uma sessão fora da janela, a linha dela vira "running
+      now" sozinha, sem reabrir o app.
+
 ## Definição de pronto (vale para toda tarefa)
 
 1. Código implementa exatamente a spec; divergência virou questão, não improviso.
