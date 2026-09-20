@@ -7465,6 +7465,15 @@ texto, mas não são a fila.
       **Questões abertas:** nenhuma nova — a única incerteza (que executável comparar para o lock)
       já estava resolvida pela própria spec e pelo precedente de `procStart`/`nodePath` da V2-T22.
 
+      **Mesclada na `main` em 2026-09-20** (portão na worktree do PO: 200 arquivos, 2.069 testes
+      passando, 4 pulados; cobertura 96,42%/92,63%/94,97%/96,78%, **sem** o estouro de prazo que o
+      agente viu em `composition.test.ts` — segunda vez que ele não reproduz no portão do PO, o que
+      reforça o diagnóstico de carga de máquina registrado na Q-081). Revisão sem ajustes na
+      tarefa; **erro do PO corrigido no mesmo commit de mesclagem**: marcadores de conflito da
+      mesclagem da V2-T22 tinham sido publicados dentro deste documento, porque a conferência de
+      conflito foi encadeada junto do portão e a saída dela passou despercebida. Os dois lados
+      foram preservados. Fica em `[~]` até o aceite do mantenedor.
+
 ## Definição de pronto (vale para toda tarefa)
 
 1. Código implementa exatamente a spec; divergência virou questão, não improviso.
