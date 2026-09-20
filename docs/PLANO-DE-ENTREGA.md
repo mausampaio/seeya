@@ -5930,6 +5930,70 @@ texto, mas não são a fila.
       **Aceite do mantenedor:** instalar a versão nova e ver o ícone do seeya na barra de tarefas
       com o app aberto, e no atalho do menu Iniciar.
 
+- [ ] **V2-T13 — O app é dono do daemon e do autostart; a CLI vira cliente (D-045).**
+      Especificada pelo PO em 2026-09-20; terceiro passo do recorte da v2 (`docs/V2-RUMO.md`).
+      Implementa os itens 1 e 2 da D-045 — os itens 3 e 4 dela (o handoff sair do centro, adotar
+      uma sessão) são das tarefas de projetos, não desta.
+
+      **O problema, medido na máquina do mantenedor.** Duas cópias do seeya controlam a mesma
+      coisa: o app instalado e o checkout. Nada diz qual está no comando; o daemon é o de quem o
+      subiu por último, e no aceite da V2-T11 o daemon vivo era um processo de três dias antes,
+      rodando código anterior ao clique no toast existir — a pessoa clicava e nada acontecia, sem
+      nenhum sinal de por quê. Hoje a máquina também não tem nada no autostart: o registro sumiu
+      numa troca de caminho e ninguém percebeu.
+
+      **O que entra:**
+
+      1. **Saber se o app está instalado, pelo registro do sistema** (D-045 item 2: nunca por um
+         arquivo nosso, que qualquer um apaga). Porta nova `AppInstallation` em `core/ports.ts`,
+         com `find()` devolvendo união discriminada `installed` (com o caminho do executável) /
+         `notInstalled` / `unknown` (D-024, D-025 — falha de consulta não vira "não instalado").
+         Adaptador em `adapters/installation/`, uma classe por sistema escolhida por
+         `process.platform` no `index.ts` da pasta, no mesmo formato de `adapters/autostart/`:
+         Windows lê a entrada de desinstalação que o NSIS por usuário cria; Linux pergunta ao
+         `dpkg` pelo pacote; macOS procura o app em `/Applications`. **`AppImage` nunca é dono** —
+         não deixa registro de instalação, e o próprio processo sabe disso (V2-T8 já lê essa marca
+         para o protocolo).
+      2. **Quem é dono, num lugar só.** `application/daemon-ownership.ts#resolveDaemonOwner`
+         (puro, sobre o resultado da porta) devolve `DaemonOwner`: `app` (com o caminho de
+         lançamento), `cli` ou `unknown`. **Regra:** app instalado → o dono é o app; sem
+         instalação → a CLI, como na v1; consulta que falhou → `unknown`, e nesse caso **nada é
+         recusado** (D-025: na dúvida, o comportamento de hoje, nunca um bloqueio inventado).
+      3. **A CLI vira cliente.** Quando o dono é o app, `seeya daemon` (subir) e
+         `seeya autostart enable` recusam com uma linha que diz o porquê e o que fazer na janela;
+         `seeya daemon --stop`, `seeya status`, `seeya autostart status` e `autostart disable`
+         continuam funcionando — um cliente pode olhar e pode parar, nunca assumir a posse.
+         **Cuidado:** o worker do daemon que a própria janela lança passa pelo mesmo arquivo da
+         CLI (`SEEYA_DAEMON_CHILD`); a recusa vale só para a invocação humana, e um teste prova
+         que o filho lançado pela interface continua subindo.
+      4. **O autostart passa a ser do app.** Quando o dono é o app, a janela registra no autostart
+         o lançamento do **daemon do app** (o mesmo `DaemonLaunchTarget` que o botão *Start
+         daemon* já monta, V2-T5b), nunca uma janela abrindo sozinha a cada login. A janela ganha,
+         ao lado do estado de autostart que já mostra, um botão para ligar e desligar — hoje isso
+         só existe na CLI, que passa a recusar.
+      5. **A pergunta única da transição** (D-045 item 1). Na primeira abertura em que o app é dono
+         e encontra daemon ou autostart da CLI, ele **pergunta uma vez** se pode assumir. Aceitando:
+         para o daemon da CLI, reaponta o autostart para si e sobe o próprio. Recusando: não
+         pergunta de novo e segue sem assumir. A resposta é estado de uso e mora num arquivo novo
+         em `~/.seeya/` (chave nova em disco: nome no glossário do `AGENTS.md` **antes** do código,
+         D-027), com `schemaVersion`. Nada em `~/.seeya/` muda de formato além desse arquivo novo.
+
+      **O que não entra:** pôr o `seeya` da CLI no `PATH` pelo instalador (vale a pena, mas é do
+      instalador — vira tarefa própria depois desta); desinstalar o app removendo o autostart (item
+      do instalador, mesma tarefa futura); migrar dado nenhum (os dois usam o mesmo `~/.seeya`);
+      a CLI instalada sozinha muda de comportamento em nada.
+
+      **Cuidados:** `process.platform` e `app.isPackaged` só nas raízes de composição; `core/` e
+      `application/` continuam puros; a porta nova entra na matriz de `docs/ARQUITETURA.md` e no
+      glossário antes do código; nenhum agente instala o app, nem toca no `~/.seeya` real, no
+      `~/.claude` real, no autostart real (a tarefa **inteira** é testável com dublês da porta e,
+      no manual, com `SEEYA_APP_HOME_OVERRIDE`) nem nas chaves `seeya`/`seeya-dev`; nenhuma
+      dependência nova.
+
+      **Aceite do mantenedor:** com o app instalado, `seeya daemon` recusa e explica; a janela
+      liga o autostart e, depois de reiniciar a máquina, o daemon está de pé sem ninguém abrir
+      nada; a pergunta da transição aparece uma vez só.
+
 ## Definição de pronto (vale para toda tarefa)
 
 1. Código implementa exatamente a spec; divergência virou questão, não improviso.
