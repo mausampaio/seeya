@@ -7681,6 +7681,20 @@ texto, mas não são a fila.
       **Questões abertas:** Q-083 (registrada nesta tarefa) — item 1 do macOS não entrou, e o item
       4 (dois usuários) fica como limite conhecido, não medido, ambos pelos motivos acima.
 
+      **Mesclada na `main` em 2026-09-20** (portão na worktree do PO: 202 arquivos, 2.095 testes
+      passando, 4 pulados; cobertura 96,46%/92,59%/95,09%/96,83% — a instabilidade da Q-081 não
+      apareceu aqui, terceira vez que ela falha no agente e passa no portão do PO). Revisão sem
+      ajustes, com **entrega parcial aceita**: o `PATH` no macOS e a medição dos dois usuários
+      ficaram de fora, os dois registrados na Q-083 com o motivo — é o que a própria spec mandava
+      fazer quando um caminho não se sustentasse.
+
+      **Custo de manutenção que o PO registra junto:** os ganchos do pacote `.deb` agora
+      **substituem por inteiro** os scripts que o `electron-builder` gera. O agente preservou tudo
+      o que eles faziam (sandbox do Chrome, bancos de mime e de atalhos, AppArmor) e conferiu isso
+      lendo o gerador — mas, numa atualização futura da ferramenta, melhorias dela nesses scripts
+      não chegam sozinhas. Quem atualizar o `electron-builder` precisa comparar. Fica em `[~]` até
+      o aceite do mantenedor.
+
 ## Definição de pronto (vale para toda tarefa)
 
 1. Código implementa exatamente a spec; divergência virou questão, não improviso.
