@@ -16,8 +16,9 @@ Build and run from the repo root (`npm run app`) — see the root [`README.md`](
 That field used to hold the paragraph above. It's the same field electron-builder writes into the
 Windows Start Menu shortcut's description and into the `.deb` package's `Description:` control
 field (V2-T12) — and, measured on this machine, a description over ~260 characters corrupts the
-shortcut's icon field (`packages/app/electron-builder.yml`'s own comment above `win:`, and
-`tests/unit/app/package-description.test.ts`, has the reproduction and the exact threshold). The
+shortcut's icon field (`packages/app/scripts/check-package-description.mjs`'s own docstring, and
+`tests/unit/app/scripts/check-package-description.test.ts`, have the reproduction and the exact
+threshold). The
 `description` field is now a one-line summary sized for a shortcut tooltip and a package manager
 listing; this file is where the longer architectural note moved to, since it survives an
 `npm install` the way a comment inside `package.json` (which is plain JSON, no comments) could

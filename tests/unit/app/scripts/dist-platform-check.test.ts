@@ -34,7 +34,7 @@ describe('checkPlatformSupport', () => {
     expect(result.message).toContain('hdiutil');
   });
 
-  it('accepts --macos on a Linux host — same rejection, spelled differently', () => {
+  it('rejects --macos on a Linux host — same rejection, spelled differently', () => {
     const result = checkPlatformSupport(['--macos'], 'linux');
 
     expect(result.ok).toBe(false);
