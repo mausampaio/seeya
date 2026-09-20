@@ -6789,6 +6789,14 @@ texto, mas não são a fila.
       o rótulo só se corrige no próximo ciclo em que o cache vence. Mesma família da V2-T16
       (responder a partir de um valor velho), aqui num cache em vez de um campo.
 
+      **E não é só visual — o mantenedor mediu o resto.** Quem decide QUAL ação mandar é a
+      disponibilidade do lado do desenho (D-041), a mesma que está velha: clicando no botão ainda
+      escrito "Disable autostart", o app **manda desligar de novo**, e responde *"Autostart was
+      already disabled. Nothing changed."*. Ou seja, durante até um minuto o botão não só mostra o
+      estado anterior como **age por ele**, e a pessoa não consegue fazer o que quer — que era
+      religar. Isso tira esta correção da categoria "cosmética": o caminho da ação está errado,
+      não a pintura.
+
       **Defeito 2, do mesmo relato.** Com as três sessões do plano abertas, todas aparecem como
       "running now" e **nenhuma tem caixa** — que é a regra certa (retomar o que já está aberto
       abriria uma segunda cópia). Mas a tela não diz isso: sobra um botão **Resume selected** que
@@ -6807,8 +6815,10 @@ texto, mas não são a fila.
          botão **Resume selected** não fica sozinho oferecendo uma ação vazia (desabilitado, com o
          motivo à vista; nunca um botão que aceita clique e não faz nada). O texto fica em
          `text/messages.ts`.
-      3. **Teste dos dois**: a disponibilidade recomputada depois da ação, e a frase aparecendo
-         exatamente quando nenhuma linha oferece caixa (e não aparecendo quando alguma oferece).
+      3. **Teste dos três**: a disponibilidade recomputada depois da ação; **um clique logo após a
+         ação anterior mandando a ação certa** (o caso que o mantenedor mediu — desligar e, em
+         seguida, conseguir religar sem esperar um minuto); e a frase aparecendo exatamente quando
+         nenhuma linha oferece caixa (e não aparecendo quando alguma oferece).
 
       **O que não entra:** permitir retomar uma sessão que já está aberta (abriria uma segunda
       cópia da mesma sessão — se o mantenedor quiser isso um dia, é decisão, não correção); mudar o
