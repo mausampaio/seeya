@@ -57,18 +57,57 @@ try {
 }
 
 /**
+ * Prefixes `argument` with `set K=V&& ` for every entry of `env` (V2-T13, D-045 item 4) and moves
+ * the launched executable to `cmd.exe /c "..."` — `New-ScheduledTaskAction` has no environment
+ * parameter of its own (measured: PowerShell 5.1's `ScheduledTasks` module carries none), so a
+ * `cmd.exe` wrapper is what actually sets the variable before the real command runs; `set` inside
+ * one `cmd.exe /c` invocation stays visible to every process IT spawns (`conhost.exe`, then
+ * `execPath`), which is the only requirement here. Returns `execute`/`argument` unchanged when
+ * `env` is empty/undefined — the CLI's own call (no `env`) never goes through this wrapper at all,
+ * same script text as before this task.
+ */
+function withEnvPrefix(
+  env: Readonly<Record<string, string>> | undefined,
+  execute: string,
+  argument: string,
+): { readonly execute: string; readonly argument: string } {
+  const entries = env === undefined ? [] : Object.entries(env);
+  if (entries.length === 0) {
+    return { execute, argument };
+  }
+  const sets = entries.map(([key, value]) => `set ${key}=${value}`).join('&& ');
+  return { execute: 'cmd.exe', argument: `/c "${sets}&& ${execute} ${argument}"` };
+}
+
+/**
  * Registers (or re-registers, overwriting) the task pointing at `execPath`/`scriptPath` — always
  * `AtLogOn` for the CURRENT user, `Interactive` logon type (see this file's own top comment for
  * why). Idempotent: safe to call whether or not the task already exists —
  * `core/autostart.ts#decideAutostartEnable` decides what to SAY about it from a query taken
  * BEFORE this runs, never from this script's own output.
+ *
+ * `env` (V2-T13, D-045 item 4, optional) is the app's own way to register autostart pointing at
+ * Electron's binary: `execPath` there is `process.execPath` (Electron, not plain Node), and the
+ * launched task needs `ELECTRON_RUN_AS_NODE=1` set for that binary to behave as Node at all
+ * (`adapters/process/daemon-launch.ts#DaemonLaunchTarget`'s own docstring has the full mechanism —
+ * `spawnDetachedDaemon` sets this the same way for the "Start daemon" button, this is the same
+ * fact carried into the REGISTERED task instead of a one-off `spawn`). See `withEnvPrefix` above
+ * for how it's actually injected.
  */
-export function buildRegisterScript(execPath: string, scriptPath: string): string {
-  const argument = `--headless "${execPath}" "${scriptPath}" daemon`;
+export function buildRegisterScript(
+  execPath: string,
+  scriptPath: string,
+  env?: Readonly<Record<string, string>>,
+): string {
+  const { execute, argument } = withEnvPrefix(
+    env,
+    'conhost.exe',
+    `--headless "${execPath}" "${scriptPath}" daemon`,
+  );
   return `
 $ErrorActionPreference = 'Stop'
 $userId = "$env:USERDOMAIN\\$env:USERNAME"
-$taskAction = New-ScheduledTaskAction -Execute 'conhost.exe' -Argument '${quoted(argument)}'
+$taskAction = New-ScheduledTaskAction -Execute '${quoted(execute)}' -Argument '${quoted(argument)}'
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
 $principal = New-ScheduledTaskPrincipal -UserId $userId -LogonType Interactive -RunLevel Limited
 Unregister-ScheduledTask -TaskName '${AUTOSTART_TASK_NAME}' -Confirm:$false -ErrorAction SilentlyContinue

@@ -12,6 +12,7 @@ import type {
   Autostart,
   AutostartDisableResult,
   AutostartEnableResult,
+  AutostartLaunchOptions,
   AutostartStatus,
 } from '../../core/ports.js';
 import {
@@ -77,10 +78,14 @@ export class WindowsAutostart implements Autostart {
     }
   }
 
-  async enable(binaryPath: string): Promise<AutostartEnableResult> {
+  async enable(
+    binaryPath: string,
+    options: AutostartLaunchOptions = {},
+  ): Promise<AutostartEnableResult> {
     const query = await this.query();
     const decision = decideAutostartEnable(query, binaryPath);
-    const script = buildRegisterScript(process.execPath, binaryPath);
+    const execPath = options.execPath ?? process.execPath;
+    const script = buildRegisterScript(execPath, binaryPath, options.env);
     const result = await this.run(this.command, buildPowerShellArgs(script));
     if (result.exitCode !== 0) {
       throw commandFailure('registration of the autostart task', result.exitCode, result.stderr);

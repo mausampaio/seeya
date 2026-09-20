@@ -52,6 +52,36 @@ describe('buildRegisterScript', () => {
     expect(script).toContain("C:\\it''s\\node.exe");
     expect(script).toContain("C:\\it''s\\index.js");
   });
+
+  // V2-T13, D-045 item 4: the app's own daemon needs ELECTRON_RUN_AS_NODE=1 set for its Electron
+  // binary to behave as plain Node — New-ScheduledTaskAction has no environment parameter, so a
+  // cmd.exe wrapper is what actually carries it into the registered task.
+  it('with env: wraps the launch in cmd.exe /c "set VAR=... && ...", never bare conhost.exe', () => {
+    const script = buildRegisterScript('C:\\seeya\\seeya.exe', 'C:\\seeya\\dist\\cli\\index.js', {
+      ELECTRON_RUN_AS_NODE: '1',
+    });
+    expect(script).toContain("Execute 'cmd.exe'");
+    expect(script).toContain(
+      '/c "set ELECTRON_RUN_AS_NODE=1&& conhost.exe --headless "C:\\seeya\\seeya.exe" "C:\\seeya\\dist\\cli\\index.js" daemon"',
+    );
+  });
+
+  it('with multiple env entries: chains them with &&, one "set" per entry', () => {
+    const script = buildRegisterScript('node.exe', 'script.js', { A: '1', B: '2' });
+    expect(script).toContain('set A=1&& set B=2&&');
+  });
+
+  it("without env (undefined): identical to the two-argument call — the CLI's own path never changes", () => {
+    const withoutOptionsArg = buildRegisterScript('node.exe', 'script.js');
+    const withUndefinedEnv = buildRegisterScript('node.exe', 'script.js', undefined);
+    expect(withoutOptionsArg).toBe(withUndefinedEnv);
+    expect(withoutOptionsArg).toContain("Execute 'conhost.exe'");
+  });
+
+  it('an empty env object behaves exactly like no env at all', () => {
+    const script = buildRegisterScript('node.exe', 'script.js', {});
+    expect(script).toContain("Execute 'conhost.exe'");
+  });
 });
 
 describe('buildUnregisterScript', () => {

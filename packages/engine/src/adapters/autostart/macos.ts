@@ -16,6 +16,7 @@ import type {
   Autostart,
   AutostartDisableResult,
   AutostartEnableResult,
+  AutostartLaunchOptions,
   AutostartStatus,
 } from '../../core/ports.js';
 import {
@@ -31,7 +32,32 @@ const PLIST_NAME = `${LABEL}.plist`;
 const MARKER_PREFIX = '<!-- seeyaBinaryPath:';
 const MARKER_SUFFIX = ' -->';
 
-function buildPlistContent(execPath: string, binaryPath: string): string {
+/** V2-T13, D-045 item 4: `launchd`'s own native, documented way to set a job's environment (no
+ * `sh -c`/`cmd.exe`-style wrapper needed here, unlike Windows' Task Scheduler). Returns no lines
+ * at all when `env` is empty/undefined — same plist text as before this task. */
+function buildEnvironmentVariablesLines(
+  env: Readonly<Record<string, string>> | undefined,
+): string[] {
+  const entries = env === undefined ? [] : Object.entries(env);
+  if (entries.length === 0) {
+    return [];
+  }
+  return [
+    '  <key>EnvironmentVariables</key>',
+    '  <dict>',
+    ...entries.flatMap(([key, value]) => [
+      `    <key>${key}</key>`,
+      `    <string>${value}</string>`,
+    ]),
+    '  </dict>',
+  ];
+}
+
+function buildPlistContent(
+  execPath: string,
+  binaryPath: string,
+  env: Readonly<Record<string, string>> | undefined,
+): string {
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
@@ -46,6 +72,7 @@ function buildPlistContent(execPath: string, binaryPath: string): string {
     `    <string>${binaryPath}</string>`,
     '    <string>daemon</string>',
     '  </array>',
+    ...buildEnvironmentVariablesLines(env),
     '  <key>RunAtLoad</key>',
     '  <true/>',
     '</dict>',
@@ -130,13 +157,17 @@ export class MacosAutostart implements Autostart {
     return Promise.resolve(classifyAutostartStatus(query, pathExists));
   }
 
-  async enable(binaryPath: string): Promise<AutostartEnableResult> {
+  async enable(
+    binaryPath: string,
+    options: AutostartLaunchOptions = {},
+  ): Promise<AutostartEnableResult> {
     const query = this.query();
     const decision = decideAutostartEnable(query, binaryPath);
     // `launchctl unload` a possibly-already-loaded agent is tolerated failing (nothing loaded
     // yet, on a first `enable`) — only the write + load that follow have to succeed.
     await this.run('launchctl', ['unload', this.plistPath]).catch(() => undefined);
-    this.writeFile(this.plistPath, buildPlistContent(process.execPath, binaryPath));
+    const execPath = options.execPath ?? process.execPath;
+    this.writeFile(this.plistPath, buildPlistContent(execPath, binaryPath, options.env));
     const result = await this.run('launchctl', ['load', '-w', this.plistPath]);
     if (result.exitCode !== 0) {
       throw commandFailure(`load -w ${this.plistPath}`, result.exitCode, result.stderr);

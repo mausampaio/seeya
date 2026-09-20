@@ -129,6 +129,32 @@ describe('WindowsAutostart#enable', () => {
 
     await expect(autostart.enable(BINARY_PATH)).rejects.toThrow('Access is denied.');
   });
+
+  // V2-T13, D-045 item 4: the app's own composition root passes execPath/env so the registered
+  // task points at Electron with ELECTRON_RUN_AS_NODE=1, instead of the implicit process.execPath
+  // this adapter always used before this task.
+  it('with options.execPath/env: the powershell script carries the cmd.exe env wrapper, not process.execPath', async () => {
+    const runner = new RecordingCommandRunner([
+      { exitCode: 0, stdout: '{"found":false}', stderr: '' },
+      { exitCode: 0, stdout: 'OK', stderr: '' },
+    ]);
+    const autostart = new WindowsAutostart({ run: runner.run });
+
+    await expect(
+      autostart.enable(BINARY_PATH, {
+        execPath: 'C:\\seeya\\seeya.exe',
+        env: { ELECTRON_RUN_AS_NODE: '1' },
+      }),
+    ).resolves.toEqual({ kind: 'registered', path: BINARY_PATH });
+    const scriptArgs = runner.calls[1]?.args ?? [];
+    // buildPowerShellArgs base64-encodes the script; decode it back to assert on its own content
+    // rather than duplicating windows-scripts.test.ts's own assertions on the raw text.
+    const encoded = scriptArgs[scriptArgs.length - 1] ?? '';
+    const decoded = Buffer.from(encoded, 'base64').toString('utf16le');
+    expect(decoded).toContain('cmd.exe');
+    expect(decoded).toContain('set ELECTRON_RUN_AS_NODE=1');
+    expect(decoded).toContain('C:\\seeya\\seeya.exe');
+  });
 });
 
 describe('WindowsAutostart#disable', () => {

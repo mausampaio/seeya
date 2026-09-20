@@ -105,6 +105,47 @@ describe('MacosAutostart#enable', () => {
     ]);
   });
 
+  // V2-T13, D-045 item 4: the plist's own EnvironmentVariables dict, launchd's native mechanism
+  // (no wrapper needed, unlike Windows' Task Scheduler).
+  it('with options.env: the plist carries an EnvironmentVariables dict', async () => {
+    const { files, readFile, writeFile, removeFile } = buildFakeFiles();
+    const runner = new RecordingCommandRunner([
+      { exitCode: 1, stdout: '', stderr: 'not loaded' },
+      { exitCode: 0, stdout: '', stderr: '' },
+    ]);
+    const autostart = new MacosAutostart({
+      readFile,
+      writeFile,
+      removeFile,
+      run: runner.run,
+      homeDir: HOME_DIR,
+    });
+
+    await autostart.enable(BINARY_PATH, { env: { ELECTRON_RUN_AS_NODE: '1' } });
+    const plist = files.get(PLIST_PATH) ?? '';
+    expect(plist).toContain('<key>EnvironmentVariables</key>');
+    expect(plist).toContain('<key>ELECTRON_RUN_AS_NODE</key>');
+    expect(plist).toContain('<string>1</string>');
+  });
+
+  it('without options.env: no EnvironmentVariables key at all — same plist as before this task', async () => {
+    const { files, readFile, writeFile, removeFile } = buildFakeFiles();
+    const runner = new RecordingCommandRunner([
+      { exitCode: 1, stdout: '', stderr: 'not loaded' },
+      { exitCode: 0, stdout: '', stderr: '' },
+    ]);
+    const autostart = new MacosAutostart({
+      readFile,
+      writeFile,
+      removeFile,
+      run: runner.run,
+      homeDir: HOME_DIR,
+    });
+
+    await autostart.enable(BINARY_PATH);
+    expect(files.get(PLIST_PATH)).not.toContain('EnvironmentVariables');
+  });
+
   it('load failing → throws with the raw stderr', async () => {
     const { readFile, writeFile, removeFile } = buildFakeFiles();
     const runner = new RecordingCommandRunner([

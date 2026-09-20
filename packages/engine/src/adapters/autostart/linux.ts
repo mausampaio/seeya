@@ -17,6 +17,7 @@ import type {
   Autostart,
   AutostartDisableResult,
   AutostartEnableResult,
+  AutostartLaunchOptions,
   AutostartStatus,
 } from '../../core/ports.js';
 import {
@@ -30,13 +31,26 @@ import { spawnCommand } from '../notification/backend.js';
 const UNIT_NAME = 'seeya-daemon.service';
 const PATH_MARKER_PREFIX = '# seeyaBinaryPath=';
 
-function buildUnitContent(execPath: string, binaryPath: string): string {
+/** V2-T13, D-045 item 4: one `Environment=` line per entry — systemd's own native, documented way
+ * to set a unit's environment (unlike Windows' Task Scheduler, no `cmd.exe` wrapper needed here). */
+function buildEnvironmentLines(env: Readonly<Record<string, string>> | undefined): string[] {
+  return env === undefined
+    ? []
+    : Object.entries(env).map(([key, value]) => `Environment=${key}=${value}`);
+}
+
+function buildUnitContent(
+  execPath: string,
+  binaryPath: string,
+  env: Readonly<Record<string, string>> | undefined,
+): string {
   return [
     '[Unit]',
     'Description=seeya daemon autostart (docs/PLANO-DE-ENTREGA.md S5-T1)',
     PATH_MARKER_PREFIX + binaryPath,
     '',
     '[Service]',
+    ...buildEnvironmentLines(env),
     `ExecStart=${execPath} ${binaryPath} daemon`,
     'Restart=no',
     '',
@@ -119,10 +133,14 @@ export class LinuxAutostart implements Autostart {
     return Promise.resolve(classifyAutostartStatus(query, pathExists));
   }
 
-  async enable(binaryPath: string): Promise<AutostartEnableResult> {
+  async enable(
+    binaryPath: string,
+    options: AutostartLaunchOptions = {},
+  ): Promise<AutostartEnableResult> {
     const query = this.query();
     const decision = decideAutostartEnable(query, binaryPath);
-    this.writeFile(this.unitPath, buildUnitContent(process.execPath, binaryPath));
+    const execPath = options.execPath ?? process.execPath;
+    this.writeFile(this.unitPath, buildUnitContent(execPath, binaryPath, options.env));
     await this.runSystemctl('daemon-reload', ['daemon-reload']);
     await this.runSystemctl(`enable ${UNIT_NAME}`, ['enable', UNIT_NAME]);
     return decision;
