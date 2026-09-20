@@ -66,6 +66,48 @@ describe('StorageAdapter#readDaemonLock', () => {
     }
   });
 
+  it('reads launchedBy when the document has one (V2-T25)', async () => {
+    const seeyaHome = await makeTmpDir();
+    try {
+      await writeFile(
+        path.join(seeyaHome, 'daemon.lock'),
+        JSON.stringify({
+          schemaVersion: 2,
+          pid: 4242,
+          startedAt: '2026-09-05T10:00:00.000Z',
+          launchedBy: 'C:\\Program Files\\seeya\\seeya.exe',
+        }),
+        'utf8',
+      );
+      const storage = new StorageAdapter(seeyaHome);
+      expect(await storage.readDaemonLock()).toStrictEqual({
+        pid: 4242,
+        startedAt: new Date('2026-09-05T10:00:00.000Z'),
+        procStart: undefined,
+        launchedBy: 'C:\\Program Files\\seeya\\seeya.exe',
+      });
+    } finally {
+      await rm(seeyaHome, { recursive: true, force: true });
+    }
+  });
+
+  it('migrates a schemaVersion 1 document (no launchedBy field at all) forward, reading launchedBy as absent (V2-T25, D-025 — "don\'t know", never "someone else")', async () => {
+    const seeyaHome = await makeTmpDir();
+    try {
+      await writeFile(
+        path.join(seeyaHome, 'daemon.lock'),
+        JSON.stringify({ schemaVersion: 1, pid: 4242, startedAt: '2026-09-05T10:00:00.000Z' }),
+        'utf8',
+      );
+      const storage = new StorageAdapter(seeyaHome);
+      const lock = await storage.readDaemonLock();
+      expect(lock).not.toBeNull();
+      expect(lock).not.toHaveProperty('launchedBy');
+    } finally {
+      await rm(seeyaHome, { recursive: true, force: true });
+    }
+  });
+
   it('defaults procStart to undefined when an older-build document omits it (D-025)', async () => {
     const seeyaHome = await makeTmpDir();
     try {
@@ -110,6 +152,23 @@ describe('StorageAdapter#readDaemonLock', () => {
 });
 
 describe('StorageAdapter#writeDaemonLock / clearDaemonLock', () => {
+  it('writes and reads back a real launchedBy value (round trip, V2-T25)', async () => {
+    const seeyaHome = await makeTmpDir();
+    try {
+      const storage = new StorageAdapter(seeyaHome);
+      const lock = {
+        pid: 555,
+        startedAt: new Date('2026-09-05T10:00:00.000Z'),
+        procStart: undefined,
+        launchedBy: 'C:\\Program Files\\seeya\\seeya.exe',
+      };
+      await storage.writeDaemonLock(lock);
+      expect(await storage.readDaemonLock()).toStrictEqual(lock);
+    } finally {
+      await rm(seeyaHome, { recursive: true, force: true });
+    }
+  });
+
   it('writes a lock that reads back identically (round trip)', async () => {
     const seeyaHome = await makeTmpDir();
     try {

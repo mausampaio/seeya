@@ -11,44 +11,91 @@ import { normalizeCwdForComparison, type PathPlatformHint } from '../core/cwd-no
 
 /**
  * Everything `shouldOfferDaemonOwnershipTransition` needs, all pre-gathered plain facts —
- * `cliDaemonAlive` from `scheduler/daemon-state.ts#checkLiveLock` (a lock found before the app
- * ever ran its own daemon can only be the CLI's, since the app hasn't started one yet the first
- * time this question can even be asked), `cliAutostartEnabled` from `Autostart.status()`. Neither
- * of the two is asked to say WHOSE daemon/autostart it is (the lock/registration carries no
- * "owner" field of its own) — this function only needs "does SOMETHING already exist that the app
- * taking over would change", which either fact alone already answers.
+ * `cliDaemonAlive` from `scheduler/daemon-state.ts#checkLiveLock`, `cliDaemonLaunchedBy` from that
+ * SAME lock's own `DaemonLockInfo.launchedBy` (V2-T25), `cliAutostartRegisteredPath` from
+ * `Autostart.status()`'s own `registeredPath` (only for the `enabled`/`brokenPath` states — the
+ * two that mean "something IS registered"; `undefined` for `disabled`/`unknown`, where there is
+ * nothing to compare at all).
+ *
+ * **V2-T25 fixed a bug here: neither fact used to say WHOSE daemon/autostart it was.** The
+ * original text argued "a lock found before the app ever ran its own daemon can only be the
+ * CLI's" — true only until the app's OWN autostart could start its OWN daemon before its own
+ * window ever opened (exactly what V2-T13 item 4 built): from that point on, "something exists"
+ * stopped implying "something CLI-owned exists", and the question started offering to take over
+ * the app's own daemon/autostart. This function now compares each fact's own executable path
+ * against `owner.launchPath` (`isCallerTheOwningApp`, reused rather than a second comparison, the
+ * plan's own instruction) — only a genuinely DIFFERENT binary counts as evidence.
  */
 export interface DaemonOwnershipTransitionInputs {
   readonly owner: DaemonOwner;
   readonly previousAnswer: DaemonOwnershipTransitionAnswer | null;
   readonly cliDaemonAlive: boolean;
-  readonly cliAutostartEnabled: boolean;
+  /**
+   * The alive lock's own `launchedBy` (`core/daemon-lock.ts#DaemonLockInfo.launchedBy`) —
+   * meaningless, and ignored, when `cliDaemonAlive` is `false`. `undefined` when the lock predates
+   * this field or its own capture failed: read as "don't know who started it", never as "someone
+   * else did" (D-025) — a live daemon with no `launchedBy` recorded contributes NO evidence toward
+   * offering the question, exactly like `cliAutostartRegisteredPath` below being `undefined`.
+   */
+  readonly cliDaemonLaunchedBy: string | undefined;
+  /**
+   * `AutostartStatus.registeredPath`, only when `status().kind` is `'enabled'` or `'brokenPath'`
+   * (D-024's four states collapsed to the one bit this decision needs, same collapse the pre-V2-T25
+   * text already did for the boolean this field replaces) — `undefined` for `'disabled'`/`'unknown'`,
+   * where nothing is registered or nothing could be determined, either way no evidence at all.
+   */
+  readonly cliAutostartRegisteredPath: string | undefined;
+  /** The same `PathPlatformHint` `isCallerTheOwningApp` needs for its own separator/case-tolerant
+   * comparison (`core/cwd-normalization.ts`) — threaded in by the caller, never read from
+   * `process.platform` here (this function stays a plain value comparison, same discipline
+   * `isCallerTheOwningApp`'s own docstring already explains). */
+  readonly platform: PathPlatformHint;
 }
 
 /**
  * D-045 item 1's "pergunta única": true only the first time the app finds itself the owner while
- * something pre-existing (a running daemon or a registered autostart, either one is enough) would
- * actually be affected by taking over — never for a fresh machine with neither, where there is
- * nothing to ask about. `previousAnswer !== null` is what makes this "única": once answered,
- * either way, this returns `false` forever after on this machine (D-045: "recusando: não pergunta
- * de novo" — and accepting obviously shouldn't re-ask either).
+ * something pre-existing AND GENUINELY OWNED BY SOMEONE ELSE (a running daemon or a registered
+ * autostart, either one is enough) would actually be affected by taking over — never for a fresh
+ * machine with neither, and never (V2-T25) for the app's own already-running daemon/already-
+ * registered autostart, which taking over would change nothing about. `previousAnswer !== null` is
+ * what makes this "única": once answered, either way, this returns `false` forever after on this
+ * machine (D-045: "recusando: não pergunta de novo" — and accepting obviously shouldn't re-ask
+ * either).
  *
  * @example
  * shouldOfferDaemonOwnershipTransition({
  *   owner: { kind: 'app', launchPath: 'C:\\...\\seeya.exe' },
  *   previousAnswer: null,
  *   cliDaemonAlive: true,
- *   cliAutostartEnabled: false,
- * }); // -> true
+ *   cliDaemonLaunchedBy: 'C:\\Users\\dev\\node.exe',
+ *   cliAutostartRegisteredPath: undefined,
+ *   platform: 'win32',
+ * }); // -> true — a live daemon, launched by a genuinely different executable
+ *
+ * @example
+ * shouldOfferDaemonOwnershipTransition({
+ *   owner: { kind: 'app', launchPath: 'C:\\...\\seeya.exe' },
+ *   previousAnswer: null,
+ *   cliDaemonAlive: true,
+ *   cliDaemonLaunchedBy: 'C:\\...\\seeya.exe',
+ *   cliAutostartRegisteredPath: undefined,
+ *   platform: 'win32',
+ * }); // -> false — the live daemon IS the app's own; nothing to take over
  */
 export function shouldOfferDaemonOwnershipTransition(
   inputs: DaemonOwnershipTransitionInputs,
 ): boolean {
-  return (
-    inputs.owner.kind === 'app' &&
-    inputs.previousAnswer === null &&
-    (inputs.cliDaemonAlive || inputs.cliAutostartEnabled)
-  );
+  if (inputs.owner.kind !== 'app' || inputs.previousAnswer !== null) {
+    return false;
+  }
+  const daemonIsSomeoneElses =
+    inputs.cliDaemonAlive &&
+    inputs.cliDaemonLaunchedBy !== undefined &&
+    !isCallerTheOwningApp(inputs.owner, inputs.cliDaemonLaunchedBy, inputs.platform);
+  const autostartIsSomeoneElses =
+    inputs.cliAutostartRegisteredPath !== undefined &&
+    !isCallerTheOwningApp(inputs.owner, inputs.cliAutostartRegisteredPath, inputs.platform);
+  return daemonIsSomeoneElses || autostartIsSomeoneElses;
 }
 
 /**

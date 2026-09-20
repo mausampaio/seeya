@@ -291,6 +291,67 @@ describe('runDaemonWorker', () => {
   });
 });
 
+describe('runDaemonWorker — launchedBy is not silently dropped', () => {
+  function buildDeps(storage: Storage, processControl: ProcessControl): DaemonDeps {
+    return {
+      clock: { now: () => new Date('2026-09-05T10:00:00.000Z'), sleep: () => Promise.resolve() },
+      storage,
+      notifier: { notify: () => Promise.resolve() },
+      processControl,
+      transcriptReader: new FakeTranscriptReader(),
+      gitReader: new FakeGitReader(),
+      forkCleanup: new FakeForkCleanup(),
+      buildSessionProvider: () => ({ list: () => Promise.reject(new Error('not exercised')) }),
+      buildGenerators: () => ({
+        leanGenerator: failingGenerator('not exercised by this test'),
+        deepGenerator: failingGenerator('not exercised by this test'),
+      }),
+      discoverEarlyWarnings: () =>
+        Promise.reject(new Error('not exercised — the lock check must win first')),
+    };
+  }
+
+  /** Never clears the lock (unlike `LockOnlyStorage`'s real `clearDaemonLock`), so the test can
+   * still see the write after the worker's own clean-stop sequence has run. */
+  class NonClearingLockStorage extends FakeStorage {
+    private lock: DaemonLockInfo | null = null;
+
+    override readDaemonLock(): Promise<DaemonLockInfo | null> {
+      return Promise.resolve(this.lock);
+    }
+
+    override writeDaemonLock(lock: DaemonLockInfo): Promise<void> {
+      this.lock = lock;
+      return Promise.resolve();
+    }
+
+    override clearDaemonLock(): Promise<void> {
+      return Promise.resolve();
+    }
+  }
+
+  it('writes launchedBy on acquire, before the clean-stop clear', async () => {
+    const storage = new NonClearingLockStorage(DEFAULT_TEST_CONFIG);
+    const deps = buildDeps(storage, new FixedAliveness(false));
+
+    const resultPromise = runDaemonWorker(
+      deps,
+      555,
+      undefined,
+      'C:\\Program Files\\seeya\\seeya.exe',
+    );
+    process.emit('SIGTERM');
+    await resultPromise;
+
+    expect(await storage.readDaemonLock()).toStrictEqual({
+      pid: 555,
+      startedAt: new Date('2026-09-05T10:00:00.000Z'),
+      procStart: undefined,
+      launchedBy: 'C:\\Program Files\\seeya\\seeya.exe',
+    });
+  });
+});
+
 /**
  * `isAlive` is scripted per test, including THROWING — the fourth S4-T5 state ("found a lock but
  * cannot verify"), which none of this file's other `ProcessControl` doubles produce.

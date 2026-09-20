@@ -396,11 +396,14 @@ export async function buildAppContext(homeDir: string = os.homedir()): Promise<A
       env,
     });
   }
-  // V2-T13, D-045 item 1: pre-gathers the two "something CLI-owned already exists" facts
-  // `shouldOfferDaemonOwnershipTransition` needs — a live daemon (whoever started it; the app
-  // hasn't started one of its own until this same dialog is accepted) or a registered autostart
-  // entry (`enabled`/`brokenPath` both count as "something is registered", D-024's four-state
-  // `AutostartStatus` collapsed to the one bit this decision needs).
+  // V2-T25 (D-045 item 1's bug fix): pre-gathers the two "something exists" facts
+  // `shouldOfferDaemonOwnershipTransition` needs, WITH the evidence of who owns each one — a live
+  // daemon's own `launchedBy` (`core/daemon-lock.ts#DaemonLockInfo`) and a registered autostart's
+  // own `registeredPath` (`enabled`/`brokenPath` both count as "something is registered", D-024's
+  // four-state `AutostartStatus` collapsed to the one bit this decision needs). Passing raw facts
+  // instead of a pre-computed boolean is the fix itself: before this task, "something exists" alone
+  // was treated as "something CLI-owned exists", which stopped holding the moment the app's OWN
+  // autostart could start its OWN daemon before its own window ever opened (V2-T13 item 4).
   async function checkDaemonOwnershipTransitionOffer(): Promise<boolean> {
     const [previousAnswer, liveLockCheck, autostartStatus] = await Promise.all([
       storage.readDaemonOwnershipTransitionAnswer(),
@@ -411,8 +414,13 @@ export async function buildAppContext(homeDir: string = os.homedir()): Promise<A
       owner: daemonOwner,
       previousAnswer,
       cliDaemonAlive: liveLockCheck.kind === 'alive',
-      cliAutostartEnabled:
-        autostartStatus.kind === 'enabled' || autostartStatus.kind === 'brokenPath',
+      cliDaemonLaunchedBy:
+        liveLockCheck.kind === 'alive' ? liveLockCheck.lock.launchedBy : undefined,
+      cliAutostartRegisteredPath:
+        autostartStatus.kind === 'enabled' || autostartStatus.kind === 'brokenPath'
+          ? autostartStatus.registeredPath
+          : undefined,
+      platform: platformHint,
     });
   }
   function applyDaemonOwnershipTransition(answer: DaemonOwnershipTransitionAnswer): Promise<void> {
