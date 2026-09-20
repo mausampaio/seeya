@@ -46,12 +46,14 @@ export async function buildStatusPanelText(inputs: StatusPanelInputs): Promise<s
   const now = inputs.clock.now();
   // One liveness check per call, same discipline as cli/status-command.ts's own docstring
   // (describeDaemonState itself only calls ProcessControl.isAlive once).
-  const daemonAndScheduleReport = await describeDaemonState(inputs);
+  const { report: daemonAndScheduleReport, todayEndOfDayOverride } =
+    await describeDaemonState(inputs);
   return formatStatusReport({
     endOfDayTime: inputs.config.endOfDayTime,
     discoveredSessionCount: inputs.discovery.sessions.length,
     eligibleSessionCount: countEligibleSessions(inputs.discovery.sessions, inputs.config, now),
     daemonAndScheduleReport,
+    todayEndOfDayOverride,
     autostartReport: inputs.autostartReport,
   });
 }

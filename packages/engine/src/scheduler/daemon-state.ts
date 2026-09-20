@@ -25,7 +25,7 @@
 import type { Clock, ProcessControl, Storage } from '../core/ports.js';
 import type { DaemonLockInfo } from '../core/daemon-lock.js';
 import type { DaemonHealth, DayState } from '../core/types.js';
-import { localDayString } from '../core/day.js';
+import { localDayString, localTimeString } from '../core/day.js';
 import {
   decideSchedule,
   emptyDayState,
@@ -33,6 +33,15 @@ import {
   type ScheduleDecision,
 } from '../core/schedule.js';
 import { buildDaemonUnhealthyNotice } from './notices.js';
+// `scheduler/ → application/` is allowed by the layer matrix (docs/ARQUITETURA.md) even though
+// `application/ → scheduler/` is not — this module already depends on that arrow going the other
+// way for `buildDaemonUnhealthyNotice`'s own docstring above. V2-T21 item 3 uses it again:
+// `resolveTodayEndOfDayOverride` needs the exact same `decision`/`DayState` this function already
+// computes, so the two can never disagree about whether today was snoozed or skipped.
+import {
+  resolveTodayEndOfDayOverride,
+  type TodayEndOfDayOverride,
+} from '../application/format-status.js';
 
 export interface DaemonStateDeps {
   readonly storage: Storage;
@@ -110,9 +119,7 @@ export function describeLiveness(check: LiveLockCheck): string {
  * pulado" and "se o encerramento já disparou" fall directly out of which variant this is.
  */
 export function describeScheduleDecision(decision: ScheduleDecision, state: DayState): string[] {
-  const pad2 = (value: number): string => String(value).padStart(2, '0');
-  const localTime = (instant: Date): string =>
-    `${pad2(instant.getHours())}:${pad2(instant.getMinutes())}`;
+  const localTime = localTimeString;
   const lines: string[] = [];
   switch (decision.kind) {
     case 'disabled':
@@ -174,6 +181,16 @@ export function describeHealth(health: DaemonHealth, aliveness: LiveLockCheck['k
   return `Daemon health (as of its last recorded cycle, before it stopped): ${detail}`;
 }
 
+/** `describeDaemonState`'s own return shape (V2-T21 item 3) — `report` is the literal multi-line
+ * text `seeya daemon --status`/`seeya status` always rendered; `todayEndOfDayOverride` is the new
+ * piece `seeya status`'s first line needs to fold the configured/effective times together, kept a
+ * SEPARATE field rather than parsed back out of `report` (the report's own shape is prose, not
+ * data this module wants a second caller re-parsing). */
+export interface DaemonStateReport {
+  readonly report: string;
+  readonly todayEndOfDayOverride: TodayEndOfDayOverride | null;
+}
+
 /**
  * The full daemon+schedule block `seeya daemon --status` and `seeya status` both render
  * (docs/PLANO-DE-ENTREGA.md S4-T13) — read-only (never writes `daemon.lock` or `estado.json`, even
@@ -182,7 +199,7 @@ export function describeHealth(health: DaemonHealth, aliveness: LiveLockCheck['k
  * what makes the two commands structurally unable to disagree — not a convention two separate
  * implementations happen to follow, but one implementation two commands call.
  */
-export async function describeDaemonState(deps: DaemonStateDeps): Promise<string> {
+export async function describeDaemonState(deps: DaemonStateDeps): Promise<DaemonStateReport> {
   const check = await checkLiveLock(deps);
   const config = await deps.storage.readConfig();
   const now = deps.clock.now();
@@ -190,9 +207,13 @@ export async function describeDaemonState(deps: DaemonStateDeps): Promise<string
   const persisted = resetIfNewDay((await deps.storage.readState()) ?? emptyDayState(today), today);
   const { decision } = decideSchedule(config, persisted, now);
 
-  return [
+  const report = [
     describeLiveness(check),
     ...describeScheduleDecision(decision, persisted),
     describeHealth(persisted.daemonHealth, check.kind),
   ].join('\n');
+  return {
+    report,
+    todayEndOfDayOverride: resolveTodayEndOfDayOverride(decision, persisted.snoozeMinutesTotal),
+  };
 }

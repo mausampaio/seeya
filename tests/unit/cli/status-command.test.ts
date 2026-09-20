@@ -87,6 +87,9 @@ describe('runStatusCommand — schedule shapes (S4-T13)', () => {
     expect(report).toContain(
       'End-of-day: skipped today (seeya skip-today) — will resume tomorrow.',
     );
+    // V2-T21 item 3: the FIRST line says so too, next to the configured time it doesn't apply to
+    // today — never a bare "End-of-day time: 19:30 local" that reads as "skip did nothing".
+    expect(report).toContain('End-of-day time: 19:30 local (skipped today)');
   });
 
   it('accumulated snooze shows the total minutes, on top of the shifted effective time', async () => {
@@ -104,6 +107,20 @@ describe('runStatusCommand — schedule shapes (S4-T13)', () => {
 
     expect(report).toContain(`End-of-day: scheduled for ${effective}, not reached yet.`);
     expect(report).toContain('Snoozed today: 30 minute(s) total.');
+    // V2-T21 item 3, the measured defect: the mantenedor saw "End-of-day time: 15:00 local" on
+    // its own line while the faixa/agenda showed 15:30, with nothing saying they were the same
+    // fact ("não atualizou" was the natural, wrong, reading). Both numbers now share one line.
+    expect(report).toContain(
+      `End-of-day time: ${nominal} local (today: ${effective}, after snoozing)`,
+    );
+  });
+
+  it('no snooze today: the first line shows only the configured time, nothing to disambiguate', async () => {
+    const storage = new InMemoryDaemonStorage(createConfig({ endOfDayTime: '19:30' }));
+    const report = await runStatusCommand(await buildContext(storage, new FixedAliveness(false)));
+
+    expect(report).toContain('End-of-day time: 19:30 local\n');
+    expect(report).not.toContain('after snoozing');
   });
 
   it('inside a lead-time warning window: names the rule that fired and the effective time', async () => {

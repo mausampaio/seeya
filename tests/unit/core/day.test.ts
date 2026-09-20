@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { localDayString, subtractLocalDays } from '@seeya-ai/engine/core/day.js';
+import { localDayString, localTimeString, subtractLocalDays } from '@seeya-ai/engine/core/day.js';
 
 describe('localDayString', () => {
   it('formats year, month and day, zero-padded', () => {
@@ -19,6 +19,20 @@ describe('localDayString', () => {
     // timezone: getFullYear/getMonth/getDate must read back exactly what was constructed.
     const localMidnight = new Date(2026, 2, 1, 0, 0, 1);
     expect(localDayString(localMidnight)).toBe('2026-03-01');
+  });
+});
+
+describe('localTimeString', () => {
+  it('formats hours and minutes, zero-padded', () => {
+    expect(localTimeString(new Date(2026, 8, 5, 9, 5))).toBe('09:05');
+  });
+
+  it('does not pad two-digit hours or minutes', () => {
+    expect(localTimeString(new Date(2026, 8, 5, 15, 30))).toBe('15:30');
+  });
+
+  it('midnight is "00:00", not an empty string (D-025-style boundary)', () => {
+    expect(localTimeString(new Date(2026, 8, 5, 0, 0))).toBe('00:00');
   });
 });
 

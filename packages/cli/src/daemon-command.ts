@@ -201,5 +201,5 @@ export { runDaemonStop } from '@seeya-ai/engine/scheduler/daemon-control.js';
  * unable to disagree (`tests/unit/cli/daemon-status-agreement.test.ts`).
  */
 export async function runDaemonStatus(deps: DaemonControlDeps): Promise<string> {
-  return describeDaemonState(deps);
+  return (await describeDaemonState(deps)).report;
 }

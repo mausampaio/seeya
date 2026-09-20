@@ -66,6 +66,11 @@ export const MESSAGES = {
   todayResumeProgress: (index: number, total: number, name: string): string =>
     `Resuming ${index} of ${total}: ${name}...`,
   todayNothingSelected: 'Nothing selected — nothing resumed.',
+  // V2-T21 item 2 — shown instead of a silently-empty "Resume selected" click when every row in
+  // today's plan is already `runningNow` (`state/today-panel.ts#hasResumableSession`). The
+  // measured defect: with nothing to check, the button sat there doing nothing, and the
+  // mantenedor read that as the app having broken rather than nothing being left to resume.
+  todayAllSessionsRunning: "All of today's planned sessions are already open — nothing to resume.",
 
   // V2-T4 item 3 — the fallback confirmation dialog (S5-T9's "warn BEFORE, and ask", as a dialog
   // instead of the CLI's readline question). `reasonText` itself comes from

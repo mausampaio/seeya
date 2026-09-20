@@ -59,13 +59,23 @@ export type AutostartControlState =
 export type AutostartControlEvent =
   | { readonly kind: 'availabilityUpdated'; readonly availability: AutostartControlAvailability }
   | { readonly kind: 'clicked' }
-  | { readonly kind: 'finished'; readonly resultText: string };
+  | {
+      readonly kind: 'finished';
+      readonly resultText: string;
+      /** V2-T21 item 1 — the measured defect: `electron/main.ts`'s own `autostartControl` handler
+       * left the 60s cache (`state/autostart-cache.ts`) untouched after acting, so the label stayed
+       * wrong for up to a minute AND a click landing in that window sent the STALE action (the
+       * mantenedor's own "Autostart was already disabled. Nothing changed."). The handler now
+       * refreshes the cache and hands back the recomputed availability here, instead of the panel
+       * reusing the pre-click `state.availability`. */
+      readonly availability: AutostartControlAvailability;
+    };
 
 /**
  * @example
  * let state: AutostartControlState = { kind: 'idle', availability: { kind: 'enable' } };
  * state = reduceAutostartControl(state, { kind: 'clicked' }); // -> running
- * state = reduceAutostartControl(state, { kind: 'finished', resultText }); // -> result
+ * state = reduceAutostartControl(state, { kind: 'finished', resultText, availability }); // -> result
  * // Next refresh tick re-reads the real status and moves the panel back to idle either way:
  * state = reduceAutostartControl(state, { kind: 'availabilityUpdated', availability }); // -> idle
  */
@@ -79,14 +89,17 @@ export function reduceAutostartControl(
       // `reduceDaemonControl` already applies.
       return state.kind === 'running' ? state : { kind: 'idle', availability: event.availability };
     case 'clicked':
-      return state.kind === 'idle' &&
+      // V2-T21 item 1: allowed from `result` too (mirrors `reduceDaemonControl`'s own change) —
+      // `state.availability` in a `result` state is always the value `finished` just recomputed,
+      // never the one from before the click that produced it.
+      return (state.kind === 'idle' || state.kind === 'result') &&
         state.availability.kind !== 'notApplicable' &&
         state.availability.kind !== 'unknown'
         ? { kind: 'running', availability: state.availability }
         : state;
     case 'finished':
       return state.kind === 'running'
-        ? { kind: 'result', availability: state.availability, resultText: event.resultText }
+        ? { kind: 'result', availability: event.availability, resultText: event.resultText }
         : state;
   }
 }

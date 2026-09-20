@@ -718,15 +718,24 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
 
   // V2-T5b item 3: "Start daemon"/"Stop daemon" — the renderer decides WHICH action from its own
   // last-known `DaemonControlAvailability` (never re-derived here, D-041); this handler just runs
-  // it and hands back the literal result text. The availability itself refreshes on the next
-  // ambient tick below (same "at most REFRESH_INTERVAL_MS later" shape every other button here
-  // already has), never assumed to have flipped just because the command resolved.
+  // it and hands back the literal result text.
+  //
+  // V2-T21 item 1: the response ALSO carries the freshly recomputed availability (a `checkLiveLock`
+  // right after the action, same call `buildStatusPanelText`'s own `describeDaemonState` and the
+  // ambient tick below already make) — the measured defect was the button staying mislabeled, and
+  // a click in that window sending the stale action, for up to `REFRESH_INTERVAL_MS` until the
+  // next ambient tick's own `availabilityUpdated` caught up.
   ipcMain.handle(
     CHANNELS.daemonControl,
     async (_event, request: DaemonControlRequest): Promise<DaemonControlResponse> => {
       const resultText =
         request.action === 'start' ? await context.startDaemon() : await context.stopDaemon();
-      return { resultText };
+      const liveLockCheck = await checkLiveLock({
+        storage: context.storage,
+        processControl: context.processControl,
+        clock: context.clock,
+      });
+      return { resultText, availability: resolveDaemonControlAvailability(liveLockCheck) };
     },
   );
 
@@ -771,13 +780,35 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // send, same D-041 discipline `daemonControl` above already follows); `enableAppAutostart`
   // registers the app's own daemon target (Electron's binary + ELECTRON_RUN_AS_NODE=1), never the
   // bare CLI-style `Autostart.enable(binaryPath)` call.
+  //
+  // V2-T21 item 1: the measured defect. `autostartCache` (`state/autostart-cache.ts`) is only
+  // refreshed by the ambient tick below, every `DEFAULT_AUTOSTART_REFRESH_INTERVAL_MS` (60s) — left
+  // untouched here, the label stayed wrong for up to a minute AND a click landing in that window
+  // sent the STALE action (the mantenedor's own "Autostart was already disabled. Nothing
+  // changed."). This handler now forces a fresh `Autostart.status()` right after the action
+  // (`resolveAutostartReport` with `entry: null`, the same helper the ambient tick uses, never a
+  // second implementation of "when is the cache stale"), so both the cache AND the response's own
+  // `availability` reflect what just happened, not what was true before the click.
   ipcMain.handle(
     CHANNELS.autostartControl,
     async (_event, request: AutostartControlRequest): Promise<AutostartControlResponse> => {
-      if (request.action === 'enable') {
-        return { resultText: formatAutostartEnableResult(await context.enableAppAutostart()) };
-      }
-      return { resultText: formatAutostartDisableResult(await context.autostart.disable()) };
+      const resultText =
+        request.action === 'enable'
+          ? formatAutostartEnableResult(await context.enableAppAutostart())
+          : formatAutostartDisableResult(await context.autostart.disable());
+      autostartCache = await resolveAutostartReport(
+        null,
+        context.clock.now(),
+        DEFAULT_AUTOSTART_REFRESH_INTERVAL_MS,
+        () => context.autostart.status(),
+      );
+      return {
+        resultText,
+        availability: resolveAutostartControlAvailability(
+          context.daemonOwner,
+          autostartCache.status,
+        ),
+      };
     },
   );
 

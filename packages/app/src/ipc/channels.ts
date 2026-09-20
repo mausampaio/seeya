@@ -352,9 +352,16 @@ export interface DaemonControlRequest {
 }
 
 /** `CHANNELS.daemonControl`'s response — the literal text `AppContext#startDaemon`/`#stopDaemon`
- * already produces (D-039: the same text the CLI would print for the equivalent action). */
+ * already produces (D-039: the same text the CLI would print for the equivalent action).
+ *
+ * **`availability` (V2-T21 item 1).** The recomputed `DaemonControlAvailability`, from a fresh
+ * `checkLiveLock` the handler runs right after the action — never the request's own `action`
+ * flipped by hand, and never left for the next ambient tick to supply. Same "the action's own
+ * response carries the state that follows from it" rule `snoozeToday`/`skipToday` already follow
+ * for the faixa de horário (V2-T5b). */
 export interface DaemonControlResponse {
   readonly resultText: string;
+  readonly availability: DaemonControlAvailability;
 }
 
 /** `CHANNELS.getSettingsPanel`'s response (V2-T14 item 1) — `rows` is
@@ -404,9 +411,17 @@ export interface AutostartControlRequest {
 /** `CHANNELS.autostartControl`'s response — the literal text
  * `cli/autostart-command.ts#runAutostartEnableCommand`/`runAutostartDisableCommand` already
  * produces for the equivalent CLI action (D-039), rendered by `AppContext.enableAppAutostart`/
- * `context.autostart.disable` through the same wording. */
+ * `context.autostart.disable` through the same wording.
+ *
+ * **`availability` (V2-T21 item 1).** The recomputed `AutostartControlAvailability`, from a fresh
+ * `Autostart.status()` the handler forces right after the action (also refreshing
+ * `state/autostart-cache.ts`'s own 60s cache — otherwise the next ambient tick would still hand
+ * back the pre-click value). The measured defect this fixes: without this, the button stayed
+ * mislabeled for up to a minute AND a click in that window sent the stale action ("Autostart was
+ * already disabled. Nothing changed."). */
 export interface AutostartControlResponse {
   readonly resultText: string;
+  readonly availability: AutostartControlAvailability;
 }
 
 /** `CHANNELS.getDaemonOwnershipTransitionOffer`'s response (V2-T13 item 5, D-045 item 1).

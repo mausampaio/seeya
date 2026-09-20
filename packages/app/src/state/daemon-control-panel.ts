@@ -46,13 +46,22 @@ export type DaemonControlState =
 export type DaemonControlEvent =
   | { readonly kind: 'availabilityUpdated'; readonly availability: DaemonControlAvailability }
   | { readonly kind: 'clicked' }
-  | { readonly kind: 'finished'; readonly resultText: string };
+  | {
+      readonly kind: 'finished';
+      readonly resultText: string;
+      /** V2-T21 item 1 — the availability `electron/main.ts`'s own `daemonControl` handler
+       * recomputed right after running the action, never the pre-click value `state.availability`
+       * still held. This is what lets the button's label correct itself the instant the command
+       * resolves, instead of waiting up to `REFRESH_INTERVAL_MS` for the next ambient tick's
+       * `availabilityUpdated`. */
+      readonly availability: DaemonControlAvailability;
+    };
 
 /**
  * @example
  * let state: DaemonControlState = { kind: 'idle', availability: { kind: 'start' } };
  * state = reduceDaemonControl(state, { kind: 'clicked' }); // -> running
- * state = reduceDaemonControl(state, { kind: 'finished', resultText }); // -> result
+ * state = reduceDaemonControl(state, { kind: 'finished', resultText, availability }); // -> result
  * // Next refresh tick re-reads the real lock and moves the panel back to idle either way:
  * state = reduceDaemonControl(state, { kind: 'availabilityUpdated', availability }); // -> idle
  */
@@ -67,10 +76,16 @@ export function reduceDaemonControl(
       // the next tick after `finished` moves this back to `idle` on its own.
       return state.kind === 'running' ? state : { kind: 'idle', availability: event.availability };
     case 'clicked':
-      return state.kind === 'idle' ? { kind: 'running', availability: state.availability } : state;
+      // V2-T21 item 1: clicking is allowed from `result` too, not just `idle` — the measured
+      // defect was exactly a click landing on a STALE `result.availability` and sending the wrong
+      // action ("desligar de novo"). Reading `state.availability` here always means the value
+      // `finished` just recomputed, never a value from before the previous click.
+      return state.kind === 'idle' || state.kind === 'result'
+        ? { kind: 'running', availability: state.availability }
+        : state;
     case 'finished':
       return state.kind === 'running'
-        ? { kind: 'result', availability: state.availability, resultText: event.resultText }
+        ? { kind: 'result', availability: event.availability, resultText: event.resultText }
         : state;
   }
 }

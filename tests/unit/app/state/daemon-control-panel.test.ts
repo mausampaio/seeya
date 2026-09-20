@@ -37,10 +37,11 @@ describe('reduceDaemonControl', () => {
     state = reduceDaemonControl(state, {
       kind: 'finished',
       resultText: 'seeya daemon started (pid 4242)...',
+      availability: { kind: 'stop', pid: 4242 },
     });
     expect(state).toEqual({
       kind: 'result',
-      availability: { kind: 'start' },
+      availability: { kind: 'stop', pid: 4242 },
       resultText: 'seeya daemon started (pid 4242)...',
     });
 
@@ -75,6 +76,41 @@ describe('reduceDaemonControl', () => {
 
   it('"finished" arriving outside "running" is ignored', () => {
     const state: DaemonControlState = { kind: 'idle', availability: { kind: 'start' } };
-    expect(reduceDaemonControl(state, { kind: 'finished', resultText: 'stray' })).toBe(state);
+    expect(
+      reduceDaemonControl(state, {
+        kind: 'finished',
+        resultText: 'stray',
+        availability: { kind: 'stop', pid: 4242 },
+      }),
+    ).toBe(state);
+  });
+
+  /**
+   * V2-T21 item 1 — the measured defect: stopping the daemon left the button reading "Start
+   * daemon" but a click WOULD have sent 'stop' again (`state.availability` from before the
+   * click), because `finished` used to keep the pre-click availability. The response's own
+   * recomputed availability now lands in `result`, and a click from THAT state is what proves the
+   * next click sends the right action, without waiting for the next ambient tick.
+   */
+  it('a click right after the previous result sends the freshly recomputed action, not the stale one', () => {
+    let state: DaemonControlState = { kind: 'idle', availability: { kind: 'stop', pid: 4242 } };
+    state = reduceDaemonControl(state, { kind: 'clicked' });
+    expect(state).toEqual({ kind: 'running', availability: { kind: 'stop', pid: 4242 } });
+
+    state = reduceDaemonControl(state, {
+      kind: 'finished',
+      resultText: 'seeya daemon stopped.',
+      availability: { kind: 'start' },
+    });
+    expect(state).toEqual({
+      kind: 'result',
+      availability: { kind: 'start' },
+      resultText: 'seeya daemon stopped.',
+    });
+
+    // The button now reads "Start daemon" — clicking again, before any refresh tick, must send
+    // 'start', never the stale 'stop' the mantenedor measured.
+    state = reduceDaemonControl(state, { kind: 'clicked' });
+    expect(state).toEqual({ kind: 'running', availability: { kind: 'start' } });
   });
 });

@@ -24,6 +24,20 @@ export function localDayString(instant: Date): Day {
 }
 
 /**
+ * `"HH:MM"` for `instant`'s local wall-clock time, zero-padded — the one place this formatting
+ * lives (AGENTS.md "nada de duplicação"; `scheduler/daemon-state.ts#describeScheduleDecision` and
+ * `application/format-status.ts#resolveTodayEndOfDayOverride` both need it for the same reason:
+ * rendering a `ScheduleDecision`'s `effectiveEndOfDay` as the local time a person set, never an
+ * ISO instant).
+ *
+ * @example
+ * localTimeString(new Date(2026, 8, 5, 9, 5)) // "09:05"
+ */
+export function localTimeString(instant: Date): string {
+  return `${pad2(instant.getHours())}:${pad2(instant.getMinutes())}`;
+}
+
+/**
  * `instant`'s local calendar day, `days` days earlier — a deterministic transformation of an
  * already-resolved `Date` (D-019: no clock read here), added for
  * `application/find-pending-briefing.ts` (S3-T1) to walk backward one local day at a time

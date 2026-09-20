@@ -6981,7 +6981,7 @@ texto, mas não são a fila.
       **Aceite do mantenedor:** no Mac, abrir abas, fechar a janela e não ver diálogo de erro
       nenhum; conferir que nenhum processo de aba ficou vivo depois.
 
-- [ ] **V2-T21 — Correção: os botões de ação respondem com o estado anterior (autostart por até
+- [~] **V2-T21 — Correção: os botões de ação respondem com o estado anterior (autostart por até
       um minuto, daemon por até dez segundos); e o painel "Hoje" não diz por que não há nada para
       marcar.** Especificada pelo PO em 2026-09-20 a
       partir de dois achados do mantenedor no mesmo dia, com captura de tela. Pequena, e independente
@@ -7055,6 +7055,78 @@ texto, mas não são a fila.
 
       **Aceite do mantenedor:** desligar o autostart e o botão virar "Enable autostart" na hora;
       com todas as sessões do plano abertas, a janela dizer isso em vez de parecer quebrada.
+
+      **Relatório.**
+
+      *Item 1 — os dois botões devolvem a disponibilidade recomputada.* `DaemonControlResponse`/
+      `AutostartControlResponse` (`packages/app/src/ipc/channels.ts`) ganharam um campo
+      `availability`. Em `electron/main.ts`, o handler de `CHANNELS.daemonControl` roda a ação e
+      então repete o MESMO `checkLiveLock` que `buildStatusPanelText` já faz, devolvendo
+      `resolveDaemonControlAvailability(liveLockCheck)`; o handler de `CHANNELS.autostartControl`
+      força uma releitura (`resolveAutostartReport(null, ...)`, o mesmo helper do ciclo ambiente,
+      nunca uma segunda implementação) — isso substitui `autostartCache` por um valor fresco, então
+      o próximo ciclo de 10s também para de repetir o valor velho. `reduceDaemonControl`/
+      `reduceAutostartControl` (`state/*-control-panel.ts`) passaram a usar
+      `event.availability` (do próprio `finished`) em vez do `state.availability` anterior ao
+      clique, e o evento `clicked` agora é aceito também a partir de `result`, não só `idle` — sem
+      isso, o rótulo corrigiria na hora mas um segundo clique continuaria bloqueado até o próximo
+      `availabilityUpdated`. `renderer.ts`'s own `handleDaemonControlClicked`/
+      `handleAutostartControlClicked` seguem a mesma liberação.
+
+      *Item 2 — o painel "Hoje" explica quando não há nada para marcar.* Nova função pura
+      `hasResumableSession` (`state/today-panel.ts`), usada por `renderTodayPanel`
+      (`electron/renderer.ts`): quando nenhuma linha oferece caixa, aparece o texto
+      `MESSAGES.todayAllSessionsRunning` — *"All of today's planned sessions are already open —
+      nothing to resume."* — e o botão **Resume selected** nasce com `disabled = true` e sem
+      listener de clique (nunca um botão clicável que não faz nada).
+
+      *Item 3 — a linha de horário do status diz as duas coisas quando há adiamento/pulo.* Novo
+      tipo `TodayEndOfDayOverride` e função `resolveTodayEndOfDayOverride`
+      (`application/format-status.ts`), calculados a partir do MESMO `decideSchedule`/`DayState`
+      que `scheduler/daemon-state.ts#describeDaemonState` já lia para a seção do daemon —
+      `describeDaemonState` passou a devolver `{ report, todayEndOfDayOverride }`
+      (`DaemonStateReport`) em vez de só a string, e os três chamadores (`cli/daemon-command.ts`,
+      `cli/status-command.ts`, `app/src/state/status-panel.ts`) foram ajustados. A formatação nova
+      de `formatEndOfDayLine`:
+      - sem adiamento/pulo hoje: `End-of-day time: 19:30 local` (inalterado);
+      - adiado: `End-of-day time: 15:00 local (today: 15:30, after snoozing)`;
+      - pulado: `End-of-day time: 19:30 local (skipped today)`.
+
+      Nova função pura `localTimeString` (`core/day.ts`) extrai a formatação `"HH:MM"` que já
+      existia, local, dentro de `describeScheduleDecision` — reaproveitada nos dois lugares em vez
+      de duplicada.
+
+      **Testes.** `resolveTodayEndOfDayOverride`/`formatEndOfDayLine`
+      (`tests/unit/application/format-status.test.ts`), a linha combinada via
+      `runStatusCommand` (`tests/unit/cli/status-command.test.ts`, casos "skipped"/"snoozed"/"sem
+      adiamento"), `localTimeString` (`tests/unit/core/day.test.ts`), `hasResumableSession`
+      (`tests/unit/app/state/today-panel.test.ts`) e, para o item 1, o teste de regressão pedido
+      pelo item 4 da spec em `tests/unit/app/state/daemon-control-panel.test.ts` e
+      `tests/unit/app/state/autostart-control-panel.test.ts` — "a click right after the previous
+      result sends the freshly recomputed action, not the stale one", reproduzindo exatamente o
+      caso medido (desligar, depois um clique imediato manda `enable`, nunca `disable` de novo).
+
+      **Prova manual.** `SEEYA_APP_HOME_OVERRIDE` numa pasta descartável em `scratch/`,
+      `SEEYA_APP_OFFSCREEN=1` + `SEEYA_APP_SCREENSHOT_PATH`: a janela sobe limpa (sem exceção nos
+      handlers de IPC novos), painel "Hoje" e "Status" renderizam. A janela de captura embutida
+      (2.500ms após `did-finish-load`) é curta demais para o primeiro ciclo ambiente terminar sua
+      própria consulta real de `Autostart.status()`/`checkLiveLock` neste ambiente descartável
+      (sem daemon nem tarefa agendada), então os botões de daemon/autostart ainda não têm rótulo
+      nessa captura — o comportamento dos itens 1/2 em si é provado pelos testes de unidade acima
+      (dublê da porta `Autostart`/`LiveLockCheck`), não por este screenshot; nenhum `~/.claude`
+      ou `~/.seeya` real foi tocado.
+
+      **Portão.** `npm run verificar` completo: `format:check`, `tsc --noEmit`, `lint`, `build` e
+      `dependencias` verdes de primeira. `npx vitest run --project unit --project integration
+      --project integration-process --project guards --coverage` reproduziu, em duas rodadas
+      seguidas, um timeout pré-existente e alheio a esta tarefa em
+      `tests/integration/app/composition.test.ts` (4 testes que fazem I/O real — leitura de
+      instalação/registro do Windows — estourando o `testTimeout` padrão de 5000ms só sob o
+      overhead da instrumentação de cobertura); reproduzido também em cima do `main` sem nenhuma
+      mudança minha, confirmando que não é efeito desta tarefa. Com `--testTimeout=20000` (só o
+      prazo do runner, nenhum arquivo tocado), a mesma suíte fecha em 200 arquivos, 2057 testes
+      passando, 4 pulados, cobertura 96,41%/92,68%/94,97%/96,77% — acima dos pisos por diretório.
+      `npm run verificar:linux` não foi rodado (opcional).
 
 - [~] **V2-T22 — Correção: o instalador para o daemon e não consegue religar, porque a própria
       CLI o recusa.** Especificada pelo PO em 2026-09-20 a partir do aceite da V2-T15 pelo

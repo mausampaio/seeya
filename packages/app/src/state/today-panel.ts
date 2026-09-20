@@ -79,6 +79,21 @@ export interface TodaySessionRow {
   readonly cwdHistory: readonly CwdHistoryEntry[];
 }
 
+/**
+ * V2-T21 item 2 — whether AT LEAST ONE row in `rows` actually offers the resume checkbox
+ * (`offersResumeCheckbox`, above). `electron/renderer.ts#renderTodayPanel` uses this to decide
+ * whether "Resume selected" has anything to do: with every row already `runningNow` (the achado
+ * this task fixes — all of today's planned sessions already open), the button used to sit there
+ * doing nothing on click, and the mantenedor read that as "the app broke" rather than "nothing
+ * left to select".
+ *
+ * @example
+ * hasResumableSession([{ ..., resumeStatus: { kind: 'runningNow', matchedTabId: null } }]); // false
+ */
+export function hasResumableSession(rows: readonly TodaySessionRow[]): boolean {
+  return rows.some((row) => offersResumeCheckbox(row.resumeStatus));
+}
+
 export type TodayPanelData =
   | { readonly kind: 'noBriefing'; readonly message: string }
   | {
