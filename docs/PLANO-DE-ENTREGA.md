@@ -6654,6 +6654,11 @@ texto, mas não são a fila.
       chamada de religar é recusada pela própria CLI desde a V2-T13. Vira a **V2-T22**; esta
       entrada segue em `[~]` até ela fechar e o ciclo completo passar.
 
+      **Aceite do macOS em 2026-09-20:** o mantenedor instalou o `.dmg` construído pela CI a partir
+      desta tarefa e **as abas abrem** — shell e `claude`, no mesmo Mac Apple Silicon onde toda aba
+      falhava com `posix_spawnp failed`. O item 2 está fechado na plataforma onde o defeito existia,
+      e a versão de macOS deixou de sair quebrada.
+
 - [~] **V2-T16 — Correção: a janela responde com a configuração da subida, não com a que está em
       disco.** Especificada pelo PO em 2026-09-20 a partir de um achado do mantenedor no mesmo dia,
       no aceite da V2-T14. **Depende da V2-T13** só por ordem de fila: as duas mexem em
