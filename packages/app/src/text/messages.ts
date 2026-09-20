@@ -168,14 +168,16 @@ export const MESSAGES = {
   autostartControlRunning: 'Working…',
 
   // V2-T13 item 5 — the ownership-transition dialog (D-045 item 1), shown once per machine.
-  daemonOwnershipTransitionTitle: 'seeya found an existing daemon/autostart set up by the CLI',
+  daemonOwnershipTransitionTitle:
+    'seeya found a daemon or autostart already set up on this machine',
   daemonOwnershipTransitionBody: (launchPath: string): string =>
     `seeya is installed (${launchPath}) and can now own the daemon and autostart on this machine. ` +
-    'Accepting stops the CLI-managed daemon (if running), points autostart at this app, and ' +
-    'starts its own daemon. Declining changes nothing — the CLI keeps running its own daemon and ' +
-    'autostart, and you can enable this later from the button next to Autostart in this window.',
+    'Accepting stops the daemon that is running (if any), points autostart at this app, and ' +
+    'starts its own daemon. Declining changes nothing — whatever runs the daemon and autostart ' +
+    'today keeps doing it, and you can enable this later from the button next to Autostart in ' +
+    'this window. Either way, this is asked only once on this machine.',
   daemonOwnershipTransitionAccept: 'Let seeya take over',
-  daemonOwnershipTransitionDecline: 'Not now',
+  daemonOwnershipTransitionDecline: 'Leave it as it is',
   daemonOwnershipTransitionApplying: 'Working…',
 
   // V2-T14 — the "Settings" dialog (state/settings-panel.ts). One row per
