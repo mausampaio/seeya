@@ -6219,6 +6219,44 @@ texto, mas não são a fila.
       liga o autostart e, depois de reiniciar a máquina, o daemon está de pé sem ninguém abrir
       nada; a pergunta da transição aparece uma vez só.
 
+- [ ] **V2-T16 — Correção: a janela responde com a configuração da subida, não com a que está em
+      disco.** Especificada pelo PO em 2026-09-20 a partir de um achado do mantenedor no mesmo dia,
+      no aceite da V2-T14. **Depende da V2-T13** só por ordem de fila: as duas mexem em
+      `electron/main.ts`.
+
+      **O defeito, medido.** Com a janela aberta, o mantenedor mudou o horário de encerramento de
+      11:00 para 09:30 e clicou em **Snooze +15m**. A região de estado piscou **11:15** e só depois
+      virou **09:45**; no clique seguinte, piscou **11:30** e virou **10:00**. **Causa:**
+      `electron/main.ts` guarda a configuração lida **uma vez, na subida da janela**
+      (`AppContext.config`) e a passa para `snoozeToday`/`skipToday`, que devolvem a decisão de
+      agenda calculada com ela — o horário velho. O valor certo só aparece no ciclo seguinte de
+      atualização, que desde a V2-T14 relê o arquivo. **O que foi gravado está correto**: o que o
+      adiamento persiste é o total de minutos, que não depende do horário; só a resposta exibida
+      estava errada.
+
+      **O que entra:**
+      1. **Nenhuma resposta da janela sai de uma configuração velha.** Todo lugar de
+         `electron/main.ts` que hoje usa `AppContext.config` passa a usar a configuração lida no
+         momento: adiar, pular hoje, a prévia e o relatório do `end-day`, e a busca do briefing
+         pendente.
+      2. **O tipo impede a recaída** (D-024). `AppContext` deixa de expor uma configuração de
+         propósito geral — se um campo de subida ainda for necessário para algo que só vale na
+         criação da janela, ele tem nome que diz isso e é usado só ali. Assim o erro não volta por
+         descuido: não há mais o que ler por engano.
+      3. **Teste de regressão que falha antes da correção:** um duplo de `Storage` devolve um
+         horário na subida e outro depois; o adiamento tem de responder com o segundo.
+
+      **O que não entra:** reler configuração dentro do motor (quem lê arquivo é a raiz de
+      composição); mudar a fonte do terminal já aplicada numa aba aberta; qualquer mudança no
+      daemon, que já relê a cada ciclo.
+
+      **Cuidados:** nenhuma dependência nova; sem tocar no `~/.seeya` real; a leitura a mais por
+      clique é de um arquivo pequeno, no mesmo `Storage` que o laço de atualização já lê a cada
+      ciclo.
+
+      **Aceite do mantenedor:** mudar o horário com a janela aberta e clicar em **Snooze +15m** —
+      o valor certo de primeira, sem piscar o antigo.
+
 ## Definição de pronto (vale para toda tarefa)
 
 1. Código implementa exatamente a spec; divergência virou questão, não improviso.
