@@ -6009,7 +6009,11 @@ texto, mas não são a fila.
 
       Nenhuma questão nova aberta.
 
-      Fica em `[~]` até o review.
+      **Mesclada na `main` em 2026-09-20** (portão na worktree do PO: 187 arquivos, 1.914 testes
+      passando, 4 pulados; cobertura 96,46%/92,51%/95,31%/96,85%). Revisão com dois ajustes: o
+      `README.md` novo do pacote apontava para dois arquivos com nomes que não existem, e um teste
+      de `checkPlatformSupport` se chamava "accepts" enquanto provava uma recusa. Fica em `[~]` até
+      o aceite do mantenedor.
 
 - [ ] **V2-T14 — Configurações na janela: o que está valendo, de onde vem, e dá para mudar ali.**
       Especificada pelo PO em 2026-09-20 a pedido do mantenedor no mesmo dia, e **entra antes da
