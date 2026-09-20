@@ -6037,7 +6037,7 @@ texto, mas não são a fila.
       **sessões descobertas**, nunca o nosso daemon (`ProcessControl.terminateAbruptly` existe
       para isso) — e todo o estado dele mora em disco.
 
-- [~] **V2-T14 — Configurações na janela: o que está valendo, de onde vem, e dá para mudar ali.**
+- [x] **V2-T14 — Configurações na janela: o que está valendo, de onde vem, e dá para mudar ali.**
       Especificada pelo PO em 2026-09-20 a pedido do mantenedor no mesmo dia, e **entra antes da
       V2-T13**. Pedido dele, nas palavras dele: *"eu quero mudar o horário do fechamento do daemon
       por exemplo e eu não lembro o comando do cli, sei que posso te perguntar e fazer mas daqui a
@@ -6153,7 +6153,10 @@ texto, mas não são a fila.
       **Mesclada na `main` em 2026-09-20** (portão na worktree do PO: 188 arquivos, 1.925 testes
       passando, 4 pulados; cobertura 96,41%/92,50%/95,13%/96,80%). Revisão com um ajuste: uma das
       descrições mostradas na tela citava o número de uma decisão interna, que não diz nada a quem
-      lê o diálogo. Fica em `[~]` até o aceite do mantenedor.
+      lê o diálogo. **Aceita pelo mantenedor em 2026-09-20**: ele mudou o horário de encerramento
+      de 11:00 para 09:30 **pelo painel novo**, e a mudança valeu — foi ela que provocou a
+      notificação cujo clique fechou o aceite da V2-T10. O mesmo uso revelou um defeito vizinho,
+      que virou a V2-T16 (a janela respondia ao adiamento com o horário lido na subida).
 
 - [ ] **V2-T13 — O app é dono do daemon e do autostart; a CLI vira cliente (D-045).**
       Especificada pelo PO em 2026-09-20; terceiro passo do recorte da v2 (`docs/V2-RUMO.md`).
