@@ -38,6 +38,12 @@ export async function checkDaemonLock(
  * the CALLER's own (the worker's `process.pid`, its own freshly-captured `procStart`, and
  * `Clock.now()`, never re-derived here so this file stays free of `node:process`, `adapters/
  * process/`, and the `Clock` port).
+ *
+ * `launchedBy` (V2-T25, D-045 item 1's bug fix) is optional and spread in conditionally, never
+ * assigned `undefined` directly — same "key absent, not key-with-undefined-value" discipline
+ * `adapters/storage/daemon-lock-schema.ts#parseDaemonLockDocument` already applies on the read
+ * side, so a caller that doesn't have this value (every existing caller before this task) writes
+ * the exact same lock shape it always did.
  */
 export async function acquireDaemonLock(
   storage: Storage,
@@ -45,10 +51,16 @@ export async function acquireDaemonLock(
   pid: number,
   procStart: string | undefined,
   now: Date,
+  launchedBy?: string,
 ): Promise<LockAcquisitionDecision> {
   const decision = await checkDaemonLock(storage, processControl);
   if (decision.kind === 'acquire') {
-    await storage.writeDaemonLock({ pid, startedAt: now, procStart });
+    await storage.writeDaemonLock({
+      pid,
+      startedAt: now,
+      procStart,
+      ...(launchedBy === undefined ? {} : { launchedBy }),
+    });
   }
   return decision;
 }

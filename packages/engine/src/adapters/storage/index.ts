@@ -45,6 +45,7 @@ import {
 import { STATE_SCHEMA_VERSION, parseStateDocument, serializeState } from './state-schema.js';
 import {
   DAEMON_LOCK_SCHEMA_VERSION,
+  DAEMON_LOCK_SCHEMA_MIGRATIONS,
   parseDaemonLockDocument,
   serializeDaemonLock,
 } from './daemon-lock-schema.js';
@@ -341,7 +342,11 @@ export class StorageAdapter implements Storage {
   }
 
   async readDaemonLock(): Promise<DaemonLockInfo | null> {
-    const resolved = await readVersionedDocument(this.daemonLockPath(), DAEMON_LOCK_SCHEMA_VERSION);
+    const resolved = await readVersionedDocument(
+      this.daemonLockPath(),
+      DAEMON_LOCK_SCHEMA_VERSION,
+      DAEMON_LOCK_SCHEMA_MIGRATIONS,
+    );
     if (resolved === null) {
       // No daemon has ever run on this machine yet (D-025), not an error.
       return null;

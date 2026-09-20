@@ -103,6 +103,16 @@ export async function runDaemon(
    */
   procStart: string | undefined,
   options: RunDaemonOptions = {},
+  /**
+   * V2-T25 (D-045 item 1's bug fix): the CALLER's own `process.execPath` at the moment this worker
+   * started (`cli/index.ts`'s daemon branch) — the executable that "subiu o daemon", threaded down
+   * the same way `procStart` already is (never derived here). Appended after `options` rather than
+   * inserted before it so every existing call site — production and test — keeps compiling
+   * unchanged; only the one caller that now has this value (`cli/daemon-command.ts#runDaemonWorker`)
+   * passes it. `undefined` for the ordinary CLI worker before this task, or if a caller simply
+   * doesn't have it — read downstream as "don't know who launched it" (D-025), never "someone else".
+   */
+  launchedBy?: string,
 ): Promise<DaemonRunOutcome> {
   const decision = await acquireDaemonLock(
     deps.storage,
@@ -110,6 +120,7 @@ export async function runDaemon(
     pid,
     procStart,
     deps.clock.now(),
+    launchedBy,
   );
   if (decision.kind === 'refuse') {
     return { kind: 'alreadyRunning', heldByPid: decision.heldByPid };

@@ -197,7 +197,12 @@ program
       // itself already gets).
       const procStartCapture = await captureObservedProcStart(process.pid, processExists);
       const procStart = procStartCapture.kind === 'value' ? procStartCapture.value : undefined;
-      const exitCode = await runDaemonWorker(deps, process.pid, procStart);
+      // V2-T25: the WORKER's own `process.execPath` — for a plain CLI launch this is a Node
+      // binary; for the app's own detached child (`packages/app/src/composition/index.ts#startDaemon`)
+      // it's Electron's own binary, spawned with `ELECTRON_RUN_AS_NODE=1` — either way, the exact
+      // executable currently running as the daemon, recorded on the lock so a later process can
+      // tell "my own daemon" apart from "someone else's" (`core/daemon-lock.ts#DaemonLockInfo.launchedBy`).
+      const exitCode = await runDaemonWorker(deps, process.pid, procStart, process.execPath);
       if (exitCode !== 0) {
         process.exitCode = exitCode;
       }
