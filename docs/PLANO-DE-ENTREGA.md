@@ -7114,6 +7114,16 @@ texto, mas não são a fila.
       passando, 4 pulados; cobertura 96,40%/92,63%/94,96%/96,76%). Revisão sem ajustes. Fica em
       `[~]` até o aceite do mantenedor.
 
+      **Terceira manifestação do mesmo defeito, medida no Mac horas depois (2026-09-20):** o
+      mantenedor reiniciou a máquina e, no login, **o autostart não subiu daemon nenhum** — sem
+      `~/.seeya/daemon.lock`, com o autostart ainda ligado. Rodando à mão exatamente o que o
+      `LaunchAgent` executa (`ELECTRON_RUN_AS_NODE=1 <app>/Contents/MacOS/seeya <cli>/dist/index.js
+      daemon`), veio a mesma recusa. Ou seja, a V2-T13 quebrou **três** caminhos legítimos, não dois
+      — instalador, desinstalador e autostart —, e esta tarefa conserta os três de uma vez, porque
+      todos são o próprio binário do app chamando a si mesmo. Também corrige uma suposição do PO
+      registrada antes: o autostart do logout/login anterior não "recuou por causa da trava viva",
+      foi recusado do mesmo jeito; o daemon que estava lá era o sobrevivente do logout.
+
 - [ ] **V2-T23 — Correção: o autostart congela o ambiente inteiro do app, inclusive coisas que só
       valem naquele login.** Especificada pelo PO em 2026-09-20 a partir de uma medição do
       mantenedor no Mac dele, no mesmo dia — o primeiro `cat` que alguém deu no arquivo de
@@ -7158,6 +7168,14 @@ texto, mas não são a fila.
          V2-T8 já mediu como esse assunto é traiçoeiro fora do Windows.
       4. **Teste** que prove a lista: uma variável fora dela nunca aparece no arquivo gerado, nos
          três adaptadores.
+
+      5. **O autostart deixa de falhar em silêncio.** Medido no mesmo dia: quando o login não
+         consegue subir o daemon (foi o que aconteceu no Mac, pela recusa que a V2-T22 corrigiu),
+         **não sobra rastro nenhum** — o arquivo gerado não guarda saída em lugar algum, e a única
+         forma de descobrir foi rodar o comando à mão. O registro de autostart passa a guardar a
+         saída do que ele lança, dentro de `~/.seeya/` (a única raiz onde o projeto escreve), com
+         o mesmo cuidado nos três sistemas. **Não inventar logger** (`AGENTS.md` § "Registro e
+         saída"): é um arquivo de saída do processo lançado, não um sistema de log.
 
       **O que não entra:** reler o `PATH` no login; mudar o mecanismo de autostart de qualquer
       sistema; qualquer coisa do daemon fora do registro de autostart.
