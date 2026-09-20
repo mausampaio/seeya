@@ -23,36 +23,113 @@ describe('resolveDaemonOwner', () => {
   });
 });
 
+// V2-T25 (D-045 item 1's bug fix): the app's own launchPath throughout these fixtures.
+const APP_OWNER = { kind: 'app', launchPath: 'C:\\seeya.exe' } as const;
+const OTHER_BINARY = 'C:\\Users\\dev\\node.exe';
+
 describe('shouldOfferDaemonOwnershipTransition', () => {
-  it('app owner, never answered, a CLI daemon is alive → true', () => {
+  it('app owner, never answered, a daemon launched by a DIFFERENT binary is alive → true', () => {
     expect(
       shouldOfferDaemonOwnershipTransition({
-        owner: { kind: 'app', launchPath: 'C:\\seeya.exe' },
+        owner: APP_OWNER,
         previousAnswer: null,
         cliDaemonAlive: true,
-        cliAutostartEnabled: false,
+        cliDaemonLaunchedBy: OTHER_BINARY,
+        cliAutostartRegisteredPath: undefined,
+        platform: 'win32',
       }),
     ).toBe(true);
   });
 
-  it('app owner, never answered, CLI autostart registered (no live daemon) → true', () => {
+  it('app owner, never answered, autostart registered to a DIFFERENT binary (no live daemon) → true', () => {
     expect(
       shouldOfferDaemonOwnershipTransition({
-        owner: { kind: 'app', launchPath: 'C:\\seeya.exe' },
+        owner: APP_OWNER,
         previousAnswer: null,
         cliDaemonAlive: false,
-        cliAutostartEnabled: true,
+        cliDaemonLaunchedBy: undefined,
+        cliAutostartRegisteredPath: OTHER_BINARY,
+        platform: 'win32',
       }),
     ).toBe(true);
   });
 
-  it('app owner, never answered, but nothing CLI-owned exists → false (nothing to ask about)', () => {
+  it('app owner, never answered, but nothing is registered/alive at all → false (nothing to ask about)', () => {
     expect(
       shouldOfferDaemonOwnershipTransition({
-        owner: { kind: 'app', launchPath: 'C:\\seeya.exe' },
+        owner: APP_OWNER,
         previousAnswer: null,
         cliDaemonAlive: false,
-        cliAutostartEnabled: false,
+        cliDaemonLaunchedBy: undefined,
+        cliAutostartRegisteredPath: undefined,
+        platform: 'win32',
+      }),
+    ).toBe(false);
+  });
+
+  // V2-T25's own bug fix, items 1/3/4 — the app's own already-running daemon/already-registered
+  // autostart must never trigger the "found someone else's" question.
+  it("autostart pointing at the app's OWN binary → false, does not offer (item 4, test 1)", () => {
+    expect(
+      shouldOfferDaemonOwnershipTransition({
+        owner: APP_OWNER,
+        previousAnswer: null,
+        cliDaemonAlive: false,
+        cliDaemonLaunchedBy: undefined,
+        cliAutostartRegisteredPath: 'C:\\seeya.exe',
+        platform: 'win32',
+      }),
+    ).toBe(false);
+  });
+
+  it('autostart pointing at a DIFFERENT binary → true, offers (item 4, test 2)', () => {
+    expect(
+      shouldOfferDaemonOwnershipTransition({
+        owner: APP_OWNER,
+        previousAnswer: null,
+        cliDaemonAlive: false,
+        cliDaemonLaunchedBy: undefined,
+        cliAutostartRegisteredPath: OTHER_BINARY,
+        platform: 'win32',
+      }),
+    ).toBe(true);
+  });
+
+  it('a live lock with NO launchedBy recorded → false, does not offer (item 4, test 3 — D-025: "don\'t know", never "someone else")', () => {
+    expect(
+      shouldOfferDaemonOwnershipTransition({
+        owner: APP_OWNER,
+        previousAnswer: null,
+        cliDaemonAlive: true,
+        cliDaemonLaunchedBy: undefined,
+        cliAutostartRegisteredPath: undefined,
+        platform: 'win32',
+      }),
+    ).toBe(false);
+  });
+
+  it('a live lock launched by a DIFFERENT executable → true, offers (item 4, test 4)', () => {
+    expect(
+      shouldOfferDaemonOwnershipTransition({
+        owner: APP_OWNER,
+        previousAnswer: null,
+        cliDaemonAlive: true,
+        cliDaemonLaunchedBy: OTHER_BINARY,
+        cliAutostartRegisteredPath: undefined,
+        platform: 'win32',
+      }),
+    ).toBe(true);
+  });
+
+  it("a live lock launched by the app's own binary AND autostart pointing at the app itself → false", () => {
+    expect(
+      shouldOfferDaemonOwnershipTransition({
+        owner: APP_OWNER,
+        previousAnswer: null,
+        cliDaemonAlive: true,
+        cliDaemonLaunchedBy: 'C:\\seeya.exe',
+        cliAutostartRegisteredPath: 'c:/seeya.exe',
+        platform: 'win32',
       }),
     ).toBe(false);
   });
@@ -60,10 +137,12 @@ describe('shouldOfferDaemonOwnershipTransition', () => {
   it('already answered "declined" → false, never asked twice (D-045)', () => {
     expect(
       shouldOfferDaemonOwnershipTransition({
-        owner: { kind: 'app', launchPath: 'C:\\seeya.exe' },
+        owner: APP_OWNER,
         previousAnswer: 'declined',
         cliDaemonAlive: true,
-        cliAutostartEnabled: true,
+        cliDaemonLaunchedBy: OTHER_BINARY,
+        cliAutostartRegisteredPath: OTHER_BINARY,
+        platform: 'win32',
       }),
     ).toBe(false);
   });
@@ -71,10 +150,12 @@ describe('shouldOfferDaemonOwnershipTransition', () => {
   it('already answered "accepted" → false, never asked twice', () => {
     expect(
       shouldOfferDaemonOwnershipTransition({
-        owner: { kind: 'app', launchPath: 'C:\\seeya.exe' },
+        owner: APP_OWNER,
         previousAnswer: 'accepted',
         cliDaemonAlive: true,
-        cliAutostartEnabled: true,
+        cliDaemonLaunchedBy: OTHER_BINARY,
+        cliAutostartRegisteredPath: OTHER_BINARY,
+        platform: 'win32',
       }),
     ).toBe(false);
   });
@@ -85,7 +166,9 @@ describe('shouldOfferDaemonOwnershipTransition', () => {
         owner: { kind: 'cli' },
         previousAnswer: null,
         cliDaemonAlive: true,
-        cliAutostartEnabled: true,
+        cliDaemonLaunchedBy: OTHER_BINARY,
+        cliAutostartRegisteredPath: OTHER_BINARY,
+        platform: 'win32',
       }),
     ).toBe(false);
   });
@@ -96,7 +179,9 @@ describe('shouldOfferDaemonOwnershipTransition', () => {
         owner: { kind: 'unknown' },
         previousAnswer: null,
         cliDaemonAlive: true,
-        cliAutostartEnabled: true,
+        cliDaemonLaunchedBy: OTHER_BINARY,
+        cliAutostartRegisteredPath: OTHER_BINARY,
+        platform: 'win32',
       }),
     ).toBe(false);
   });

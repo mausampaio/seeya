@@ -117,11 +117,19 @@ export async function runDaemonLauncher(
  * the same discipline `pid` itself already gets from `runDaemon`'s own docstring: this function has
  * no real-I/O concern of its own to keep pure for its unit tests (`tests/unit/cli/daemon-command.test.ts`
  * passes `undefined` and never touches a real process for it).
+ *
+ * **`launchedBy` (V2-T25) is the same discipline applied to a new fact.** `cli/index.ts` passes its
+ * own `process.execPath` — the exact binary this worker is running as, whether that's a plain Node
+ * install (a human's `seeya daemon`) or Electron with `ELECTRON_RUN_AS_NODE=1` (the app's own
+ * "Start daemon"/autostart, `packages/app/src/composition/index.ts#startDaemon`). Optional so
+ * `runDaemonWorker(deps, pid, procStart)` — every existing call in this file's own tests — keeps
+ * compiling unchanged.
  */
 export async function runDaemonWorker(
   deps: DaemonDeps,
   pid: number,
   procStart: string | undefined,
+  launchedBy?: string,
 ): Promise<number> {
   let stopRequested = false;
   const requestStop = (): void => {
@@ -130,7 +138,13 @@ export async function runDaemonWorker(
   process.once('SIGINT', requestStop);
   process.once('SIGTERM', requestStop);
   try {
-    const outcome = await runDaemon(deps, pid, procStart, { shouldStop: () => stopRequested });
+    const outcome = await runDaemon(
+      deps,
+      pid,
+      procStart,
+      { shouldStop: () => stopRequested },
+      launchedBy,
+    );
     return outcome.kind === 'alreadyRunning' ? 1 : 0;
   } finally {
     process.off('SIGINT', requestStop);

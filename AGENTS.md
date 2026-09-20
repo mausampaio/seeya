@@ -413,6 +413,7 @@ usa. Fixados em S1-T0g, antes de qualquer um deles existir em código.
 | tentativas de captura de hoje | `captureAttemptsToday` | `estado.json` (S4-T3) |
 | saúde do daemon / último erro de ciclo / falhas consecutivas | `daemonHealth` / `lastCycleError` / `consecutiveCycleFailures` | `estado.json` (S4-T3b) |
 | lock do daemon / pid / iniciado em / início do processo | `daemon.lock` / `pid` / `startedAt` / `procStart` | raiz de `~/.seeya/` (S4-T3, S4-T3b) |
+| executável que lançou o daemon | `launchedBy` (opcional; ausente = "não sei quem lançou", nunca "foi outro", D-025) | `daemon.lock` (V2-T25, D-045 item 1's bug fix — `schemaVersion` 1→2, lock v1 migrado sem o campo) |
 | marcador de registro do protocolo / esquema ativo | `protocol-handler.json` / `activeScheme` (era `registered`, V2-T5b; renomeado e o valor virou o esquema, não mais um booleano, pela V2-T10 item 2 — `schemaVersion` 1→2, documento v1 migrado para `activeScheme: 'seeya'`) | raiz de `~/.seeya/` (V2-T5b) |
 | resposta da pergunta única de transição de posse | `daemon-ownership-transition.json` / `answer` (`'accepted'`/`'declined'`) | raiz de `~/.seeya/` (V2-T13, D-045 item 1) |
 | raiz do repositório | `root` | handoff (git, D-032) |

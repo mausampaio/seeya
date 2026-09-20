@@ -91,6 +91,35 @@ describe('acquireDaemonLock', () => {
     });
   });
 
+  it('writes launchedBy when the caller provides one (V2-T25)', async () => {
+    const storage = new InMemoryDaemonStorage(DEFAULT_TEST_CONFIG);
+    const processControl = new ControllableProcessControl();
+    const now = new Date('2026-09-05T10:00:00.000Z');
+    await acquireDaemonLock(
+      storage,
+      processControl,
+      555,
+      'my-proc-start',
+      now,
+      'C:\\Program Files\\seeya\\seeya.exe',
+    );
+    expect(await storage.readDaemonLock()).toStrictEqual({
+      pid: 555,
+      startedAt: now,
+      procStart: 'my-proc-start',
+      launchedBy: 'C:\\Program Files\\seeya\\seeya.exe',
+    });
+  });
+
+  it('omits launchedBy entirely (not a key with an undefined value) when the caller does not provide one — same round-trip shape as before V2-T25', async () => {
+    const storage = new InMemoryDaemonStorage(DEFAULT_TEST_CONFIG);
+    const processControl = new ControllableProcessControl();
+    const now = new Date('2026-09-05T10:00:00.000Z');
+    await acquireDaemonLock(storage, processControl, 555, 'my-proc-start', now);
+    const lock = await storage.readDaemonLock();
+    expect(lock).not.toHaveProperty('launchedBy');
+  });
+
   it('writes procStart: undefined when the caller could not capture one', async () => {
     const storage = new InMemoryDaemonStorage(DEFAULT_TEST_CONFIG);
     const processControl = new ControllableProcessControl();

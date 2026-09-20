@@ -45,6 +45,25 @@ export interface DaemonLockInfo {
    * `resolveIsAlive` already applies to a live registry PID whose `procStart` couldn't be read).
    */
   readonly procStart: string | undefined;
+  /**
+   * The executable that started this daemon (V2-T25, D-045 item 1's own bug fix) — `process.execPath`
+   * of the worker process at the moment it acquired the lock (`cli/index.ts`'s daemon branch, the
+   * same composition-root-only capture discipline `procStart` above already follows). Compared
+   * against `DaemonOwner.launchPath` by `application/daemon-ownership.ts#isCallerTheOwningApp` to
+   * tell "the app's own daemon" apart from "a separately-launched CLI daemon" — the fact this
+   * project had no way to know before this task, which is why the ownership-transition question
+   * used to offer to take over a daemon that was already the app's own.
+   *
+   * **Optional, not `string | undefined` like `procStart` (D-025 applied to the TYPE, not just the
+   * value): a lock written by a build before this task, or one whose capture genuinely failed,
+   * OMITS the key entirely** — read as "don't know who launched it", never as "launched by someone
+   * else" (`application/daemon-ownership.ts#shouldOfferDaemonOwnershipTransition`'s own docstring:
+   * "na dúvida, não pergunta"). `undefined` and "key absent" are handled identically by every
+   * reader of this field; the key is only ever omitted, on both the parse and the acquire side, so
+   * a lock round-trips to the exact same shape it was written with (see
+   * `adapters/storage/daemon-lock-schema.ts#parseDaemonLockDocument`'s own comment).
+   */
+  readonly launchedBy?: string;
 }
 
 export type LockAcquisitionDecision =

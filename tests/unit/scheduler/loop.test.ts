@@ -64,6 +64,38 @@ describe('runDaemon — single instance (D-005)', () => {
     const outcome = await runDaemon(deps, 555, undefined, { maxIterations: 1 });
     expect(outcome).toStrictEqual({ kind: 'stopped' });
   });
+
+  it('threads launchedBy through to the written lock when the caller provides one (V2-T25)', async () => {
+    // `runDaemon` clears the lock on its own clean stop (this file's top comment on
+    // `maxIterations`) — a plain `readDaemonLock()` after it returns would see `null` again, so
+    // this asserts through `writeDaemonLock` itself, the same point `scheduler/lock.ts#acquireDaemonLock`
+    // actually threads `launchedBy` through.
+    const storage = new InMemoryDaemonStorage(createConfig());
+    const writes: unknown[] = [];
+    const originalWrite = storage.writeDaemonLock.bind(storage);
+    storage.writeDaemonLock = (lock) => {
+      writes.push(lock);
+      return originalWrite(lock);
+    };
+    const deps = buildDeps({ storage });
+
+    await runDaemon(
+      deps,
+      555,
+      undefined,
+      { maxIterations: 1 },
+      'C:\\Program Files\\seeya\\seeya.exe',
+    );
+
+    expect(writes).toStrictEqual([
+      {
+        pid: 555,
+        startedAt: NOW,
+        procStart: undefined,
+        launchedBy: 'C:\\Program Files\\seeya\\seeya.exe',
+      },
+    ]);
+  });
 });
 
 describe('runDaemon — the loop itself', () => {
