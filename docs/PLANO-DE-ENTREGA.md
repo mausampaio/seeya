@@ -6148,6 +6148,11 @@ texto, mas não são a fila.
       Nenhuma questão nova aberta (Q-081 não foi necessária — a spec já cobria os pontos que
       surgiram, inclusive a normalização de origem por comparação com `DEFAULT_CONFIG`).
 
+      **Mesclada na `main` em 2026-09-20** (portão na worktree do PO: 188 arquivos, 1.925 testes
+      passando, 4 pulados; cobertura 96,41%/92,50%/95,13%/96,80%). Revisão com um ajuste: uma das
+      descrições mostradas na tela citava o número de uma decisão interna, que não diz nada a quem
+      lê o diálogo. Fica em `[~]` até o aceite do mantenedor.
+
 - [ ] **V2-T13 — O app é dono do daemon e do autostart; a CLI vira cliente (D-045).**
       Especificada pelo PO em 2026-09-20; terceiro passo do recorte da v2 (`docs/V2-RUMO.md`).
       Implementa os itens 1 e 2 da D-045 — os itens 3 e 4 dela (o handoff sair do centro, adotar
