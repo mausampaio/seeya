@@ -85,6 +85,7 @@ describe('runDaemonLauncher — real spawn path', () => {
           args: [shutdownMarker, readyMarker],
         },
         { kind: 'cli' },
+        'win32',
       );
 
       expect(message).toContain('seeya daemon started');
