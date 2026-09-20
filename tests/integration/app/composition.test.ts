@@ -157,6 +157,48 @@ describe('buildAppContext', () => {
       false,
     );
   });
+
+  // V2-T13, D-045 items 2/4: `daemonOwner` is resolved against the REAL OS installation record —
+  // its exact value (`'app'`/`'cli'`/`'unknown'`) depends on whether THIS machine has seeya
+  // installed, so this only asserts the shape, never a specific outcome (portable across every
+  // machine this suite runs on, including one where the real app happens to be installed).
+  it('daemonOwner is resolved for real, one of the three D-024 states', async () => {
+    fixture = await createDiscoveryFixture();
+    const context = await buildAppContext(fixture.root);
+
+    expect(['app', 'cli', 'unknown']).toContain(context.daemonOwner.kind);
+    if (context.daemonOwner.kind === 'app') {
+      expect(typeof context.daemonOwner.launchPath).toBe('string');
+    }
+  });
+
+  it('checkDaemonOwnershipTransitionOffer resolves to a boolean without throwing', async () => {
+    fixture = await createDiscoveryFixture();
+    const context = await buildAppContext(fixture.root);
+
+    expect(typeof (await context.checkDaemonOwnershipTransitionOffer())).toBe('boolean');
+  });
+
+  it(
+    'applyDaemonOwnershipTransition("declined") only persists the answer to the FIXTURE\'s own ' +
+      '~/.seeya, never the real autostart mechanism',
+    async () => {
+      fixture = await createDiscoveryFixture();
+      const context = await buildAppContext(fixture.root);
+      expect(await context.storage.readDaemonOwnershipTransitionAnswer()).toBeNull();
+
+      await context.applyDaemonOwnershipTransition('declined');
+
+      expect(await context.storage.readDaemonOwnershipTransitionAnswer()).toBe('declined');
+    },
+  );
+
+  it('enableAppAutostart is wired as a callable function (never invoked by this suite — see AGENTS.md)', async () => {
+    fixture = await createDiscoveryFixture();
+    const context = await buildAppContext(fixture.root);
+
+    expect(typeof context.enableAppAutostart).toBe('function');
+  });
 });
 
 describe('toEndDayDeps', () => {

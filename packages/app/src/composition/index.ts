@@ -38,6 +38,7 @@ import {
 import { StorageAdapter } from '@seeya-ai/engine/adapters/storage/index.js';
 import { FsDirectoryExistence } from '@seeya-ai/engine/adapters/filesystem/index.js';
 import { buildAutostart } from '@seeya-ai/engine/adapters/autostart/index.js';
+import { buildAppInstallation } from '@seeya-ai/engine/adapters/installation/index.js';
 import { TranscriptFileReader } from '@seeya-ai/engine/adapters/transcript/index.js';
 import { GitAdapter } from '@seeya-ai/engine/adapters/git/index.js';
 import {
@@ -46,9 +47,15 @@ import {
 } from '@seeya-ai/engine/adapters/generation/index.js';
 import { notifier as realNotifier } from '@seeya-ai/engine/adapters/notification/index.js';
 import { checkDaemonLock } from '@seeya-ai/engine/scheduler/index.js';
+import { checkLiveLock } from '@seeya-ai/engine/scheduler/daemon-state.js';
 import { runDaemonStop } from '@seeya-ai/engine/scheduler/daemon-control.js';
+import {
+  resolveDaemonOwner,
+  shouldOfferDaemonOwnershipTransition,
+} from '@seeya-ai/engine/application/daemon-ownership.js';
 import type {
   Autostart,
+  AutostartEnableResult,
   Clock,
   DirectoryExistence,
   ForkCleanup,
@@ -60,13 +67,18 @@ import type {
   Storage,
   TranscriptReader,
 } from '@seeya-ai/engine/core/ports.js';
-import type { Config } from '@seeya-ai/engine/core/types.js';
+import type {
+  Config,
+  DaemonOwner,
+  DaemonOwnershipTransitionAnswer,
+} from '@seeya-ai/engine/core/types.js';
 import type { PathPlatformHint } from '@seeya-ai/engine/core/cwd-normalization.js';
 import type { EndDayDeps } from '@seeya-ai/engine/application/types.js';
 import { NodePtyAdapter } from '../pty/node-pty-adapter.js';
 import { PtyManager, type PtyManagerCallbacks } from '../pty/pty-manager.js';
 import { defaultShellCommand, type ShellCommand } from '../pty/default-shell.js';
 import { readLoginShellPath } from './read-login-shell-path.js';
+import { applyDaemonOwnershipTransition as applyDaemonOwnershipTransitionOrchestration } from './daemon-ownership-transition.js';
 
 export interface AppHome {
   readonly claudeHome: string;
@@ -102,6 +114,41 @@ export interface AppContext {
   readonly storage: Storage;
   readonly processControl: ProcessControl;
   readonly autostart: Autostart;
+  /**
+   * V2-T13 (D-045 items 1/2): who owns the daemon/autostart on this machine, resolved ONCE at
+   * startup from `AppInstallation.find()` (installation state changes only across an
+   * install/uninstall, never mid-session). `'app'` is what gates the autostart control button
+   * (`state/autostart-control-panel.ts#resolveAutostartControlAvailability`) and the ownership-
+   * transition dialog — everything else in the window (tabs, sidebar, "Start daemon"/"Stop
+   * daemon") behaves identically regardless of this value; only those two pieces read it.
+   */
+  readonly daemonOwner: DaemonOwner;
+  /**
+   * V2-T13 (D-045 item 4): registers the app's OWN daemon in autostart — the exact same
+   * `daemonLaunchTarget` `startDaemon` below spawns (Electron's own binary + `env` carrying
+   * `ELECTRON_RUN_AS_NODE=1`), via `Autostart.enable`'s new `AutostartLaunchOptions`. Only ever
+   * called when `daemonOwner.kind === 'app'` (the autostart control button/transition dialog are
+   * the only two callers, both gated the same way).
+   */
+  enableAppAutostart(): Promise<AutostartEnableResult>;
+  /**
+   * V2-T13 (D-045 item 1): true only the very first time this window opens with `daemonOwner.kind
+   * === 'app'` AND something CLI-owned (a live daemon or a registered autostart) already exists —
+   * `application/daemon-ownership.ts#shouldOfferDaemonOwnershipTransition`'s own docstring has the
+   * full rule. `electron/main.ts` calls this once, right after the window is created, and shows
+   * the transition dialog only when it resolves `true`.
+   */
+  checkDaemonOwnershipTransitionOffer(): Promise<boolean>;
+  /**
+   * V2-T13 (D-045 item 1): applies the person's answer to the transition dialog. `'accepted'`
+   * stops the CLI's daemon (`stopDaemon`, tolerant of nothing running), repoints autostart at the
+   * app (`enableAppAutostart`) and starts the app's own daemon (`startDaemon`) — in that order, so
+   * the OS-level autostart mechanism (one shared registration, D-045's own "reaponta") never has
+   * two owners racing to register during the switch. `'declined'` touches nothing. Either way, the
+   * answer is persisted (`Storage.saveDaemonOwnershipTransitionAnswer`) so
+   * `checkDaemonOwnershipTransitionOffer` never offers again.
+   */
+  applyDaemonOwnershipTransition(answer: DaemonOwnershipTransitionAnswer): Promise<void>;
   readonly config: Config;
   /** V2-T9 item 1/2 — whether a session's OLD `cwd` (from an earlier day's handoff) still exists,
    * before ever offering it in the "Resume in" selector (`application/cwd-history.ts`). */
@@ -270,6 +317,7 @@ export async function buildAppContext(homeDir: string = os.homedir()): Promise<A
         ? 'inherited'
         : 'login-shell';
   const pathEnv = loginShellPath ?? process.env.PATH;
+  const autostart = buildAutostart(homeDir);
   // V2-T5a item 5: same shape as cli/composition.ts#buildEndDayContext's own generatorOptions —
   // both generators are always built, never chosen here; captureSession (application/
   // capture-session.ts) picks between them per session (see EndDayDeps's own docstring on why).
@@ -315,6 +363,54 @@ export async function buildAppContext(homeDir: string = os.homedir()): Promise<A
   function stopDaemon(): Promise<string> {
     return runDaemonStop({ storage, processControl: realProcessControl, clock });
   }
+  // V2-T13, D-045 item 2: the OS's own installation record, asked once at startup — see
+  // AppContext#daemonOwner's own docstring for why this never re-queries mid-session.
+  const daemonOwner = resolveDaemonOwner(await buildAppInstallation(platform).find());
+  // V2-T13, D-045 item 4: same target as `startDaemon`'s own `spawnDetachedDaemon` call, reused
+  // here as the (nodePath, scriptPath, env) trio `Autostart.enable`'s options now accept.
+  function enableAppAutostart(): Promise<AutostartEnableResult> {
+    // `AutostartLaunchOptions.env` is `Record<string, string>` (every real OS mechanism it feeds —
+    // the Windows cmd.exe wrapper, a systemd Environment= line, a plist string value — needs an
+    // actual string, never the literal text "undefined"); `NodeJS.ProcessEnv`'s index signature
+    // allows `string | undefined`, so this drops any `undefined` entry rather than assuming
+    // `daemonLaunchTarget.env` (always fully defined, built above) never has one.
+    const env = Object.fromEntries(
+      Object.entries(daemonLaunchTarget.env ?? {}).filter(
+        (entry): entry is [string, string] => entry[1] !== undefined,
+      ),
+    );
+    return autostart.enable(daemonLaunchTarget.scriptPath, {
+      execPath: daemonLaunchTarget.nodePath,
+      env,
+    });
+  }
+  // V2-T13, D-045 item 1: pre-gathers the two "something CLI-owned already exists" facts
+  // `shouldOfferDaemonOwnershipTransition` needs — a live daemon (whoever started it; the app
+  // hasn't started one of its own until this same dialog is accepted) or a registered autostart
+  // entry (`enabled`/`brokenPath` both count as "something is registered", D-024's four-state
+  // `AutostartStatus` collapsed to the one bit this decision needs).
+  async function checkDaemonOwnershipTransitionOffer(): Promise<boolean> {
+    const [previousAnswer, liveLockCheck, autostartStatus] = await Promise.all([
+      storage.readDaemonOwnershipTransitionAnswer(),
+      checkLiveLock({ storage, processControl: realProcessControl, clock }),
+      autostart.status(),
+    ]);
+    return shouldOfferDaemonOwnershipTransition({
+      owner: daemonOwner,
+      previousAnswer,
+      cliDaemonAlive: liveLockCheck.kind === 'alive',
+      cliAutostartEnabled:
+        autostartStatus.kind === 'enabled' || autostartStatus.kind === 'brokenPath',
+    });
+  }
+  function applyDaemonOwnershipTransition(answer: DaemonOwnershipTransitionAnswer): Promise<void> {
+    return applyDaemonOwnershipTransitionOrchestration(answer, {
+      storage,
+      stopDaemon,
+      enableAppAutostart,
+      startDaemon,
+    });
+  }
   return {
     clock,
     home,
@@ -327,7 +423,11 @@ export async function buildAppContext(homeDir: string = os.homedir()): Promise<A
     sessionProvider,
     storage,
     processControl: realProcessControl,
-    autostart: buildAutostart(homeDir),
+    autostart,
+    daemonOwner,
+    enableAppAutostart,
+    checkDaemonOwnershipTransitionOffer,
+    applyDaemonOwnershipTransition,
     config,
     directoryExistence: new FsDirectoryExistence(),
     platformHint,
