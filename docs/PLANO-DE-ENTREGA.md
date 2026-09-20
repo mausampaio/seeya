@@ -7474,6 +7474,51 @@ texto, mas não são a fila.
       conflito foi encadeada junto do portão e a saída dela passou despercebida. Os dois lados
       foram preservados. Fica em `[~]` até o aceite do mantenedor.
 
+- [ ] **V2-T20 — Instalador, o que sobrou: o `seeya` no `PATH`, a desinstalação removendo o
+      autostart, e a instalação por máquina revisada.** Especificada pelo PO em 2026-09-20;
+      aprovada pelo mantenedor para entrar **depois da V2-T23**. São os itens que saíram da V2-T15
+      quando ela foi cortada para ficar só com os dois defeitos que quebravam ou irritavam.
+
+      **O que entra:**
+
+      1. **O comando `seeya` disponível no terminal depois de instalar.** Hoje o app instalado traz
+         a CLI dentro dele, mas ninguém consegue chamá-la sem saber o caminho para dentro do
+         pacote. **Medir por sistema antes de escolher o mecanismo**, porque cada um tem o seu
+         jeito honesto: no Windows, o instalador NSIS pode acrescentar o diretório ao `PATH` do
+         usuário e deixar um atalho de linha de comando que já chama o executável com
+         `ELECTRON_RUN_AS_NODE=1` e o caminho da CLI (é a mesma invocação que o
+         `installer.nsh` e o autostart já usam); no Linux, o `.deb` pode instalar um link em
+         `/usr/bin`; no macOS, um link em `/usr/local/bin` exige permissão de administrador, então
+         **avalie oferecer isso pela janela** (um botão que pede a permissão na hora) em vez de
+         fazer o instalador exigir elevação. Se algum caminho não se sustentar, registre e entregue
+         os que se sustentam — melhor dois sistemas certos que três improvisados.
+      2. **A desinstalação remove o autostart.** Hoje o desinstalador limpa a chave do protocolo
+         (V2-T10) e, desde a V2-T15, para o daemon — mas deixa o registro de autostart para trás,
+         apontando para um app que não existe mais. Vale para os três sistemas, com a mesma
+         medição por sistema do item 1.
+      3. **A instalação por máquina revisada.** O mantenedor decidiu **manter as duas formas**
+         (por usuário e para todos), e o `electron-builder.yml` ainda afirma no comentário que só
+         existe a por usuário — corrigir o texto e conferir o que muda de verdade quando a
+         instalação é para todos: o autostart continua por usuário, a chave de protocolo continua
+         por usuário, o caminho do daemon muda, e a entrada de desinstalação vai para outro lugar
+         do registro (já tratado pela V2-T13).
+      4. **O risco dos dois usuários, medido ou registrado.** Com instalação para todos, duas
+         pessoas podem ter daemon ao mesmo tempo. O isolamento já existe (cada uma tem o próprio
+         `~/.seeya`), mas o `pid` é global da máquina: se o `pid` do lock de uma bater com um
+         processo **de outra**, a checagem de vivacidade pode não conseguir ler o `procStart`
+         alheio (permissão negada) e tratar como "vivo", impedindo o daemon de subir. **Medir com
+         duas contas**; se o custo da medição não se pagar, registrar como limite conhecido com o
+         sintoma descrito — nunca "resolver" às cegas.
+
+      **O que não entra:** assinatura do instalador (Q-078); atualização automática (D-041).
+
+      **Cuidados:** nenhuma dependência nova; **nenhum agente instala, desinstala ou roda o
+      instalador** — a prova é o script gerado, o conteúdo do pacote e teste; nada do `~/.seeya`
+      real, do registro, do autostart real ou do `PATH` real é tocado.
+
+      **Aceite do mantenedor:** depois de instalar, abrir um terminal novo e `seeya status`
+      responder; desinstalar e não sobrar autostart registrado.
+
 ## Definição de pronto (vale para toda tarefa)
 
 1. Código implementa exatamente a spec; divergência virou questão, não improviso.
