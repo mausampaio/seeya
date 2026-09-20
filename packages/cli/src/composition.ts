@@ -17,13 +17,15 @@ import type {
   SessionResumer,
   Storage,
 } from '@seeya-ai/engine/core/ports.js';
-import type { Config } from '@seeya-ai/engine/core/types.js';
+import type { Config, DaemonOwner } from '@seeya-ai/engine/core/types.js';
 import type { PathPlatformHint } from '@seeya-ai/engine/core/cwd-normalization.js';
 import { processControl as realProcessControl } from '@seeya-ai/engine/adapters/process/index.js';
 import { systemClock } from '@seeya-ai/engine/adapters/clock/index.js';
 import { StorageAdapter } from '@seeya-ai/engine/adapters/storage/index.js';
 import { FsDirectoryExistence } from '@seeya-ai/engine/adapters/filesystem/index.js';
 import { buildAutostart } from '@seeya-ai/engine/adapters/autostart/index.js';
+import { buildAppInstallation } from '@seeya-ai/engine/adapters/installation/index.js';
+import { resolveDaemonOwner } from '@seeya-ai/engine/application/daemon-ownership.js';
 import {
   DiscoverySessionProvider,
   DiscoveryForkCleanup,
@@ -371,4 +373,17 @@ export interface AutostartContext {
  */
 export function buildAutostartContext(homeDir: string = os.homedir()): AutostartContext {
   return { autostart: buildAutostart(homeDir) };
+}
+
+/**
+ * V2-T13 (D-045 items 2/3): who owns the daemon/autostart on THIS machine — the one query
+ * `cli/index.ts`'s `daemon` launcher branch and `seeya autostart enable` both need before doing
+ * anything (`daemon-command.ts#runDaemonLauncher`, `autostart-command.ts#runAutostartEnableCommand`).
+ * No `homeDir` parameter, unlike every other `build*Context` here: `AppInstallation` asks the OS's
+ * own installation record, never `~/.seeya/` (D-045 item 2's own reasoning — see
+ * `core/ports.ts#AppInstallation`'s docstring) — there is no root for this one to accept.
+ */
+export async function resolveCliDaemonOwner(): Promise<DaemonOwner> {
+  const status = await buildAppInstallation().find();
+  return resolveDaemonOwner(status);
 }

@@ -266,6 +266,13 @@ const PRODUCTION_DIRECTORY_THRESHOLDS = {
     functions: 80,
     lines: 80,
   },
+  // V2-T13: AppInstallation, one adapter per OS (D-045 item 2).
+  'packages/engine/src/adapters/installation/**': {
+    statements: 80,
+    branches: 80,
+    functions: 80,
+    lines: 80,
+  },
   'packages/engine/src/adapters/notification/**': {
     statements: 80,
     branches: 80,

@@ -38,6 +38,11 @@ import type {
   SettingsPanelResponse,
   SaveSettingRequest,
   SaveSettingResponse,
+  AutostartAvailabilityUpdateEvent,
+  AutostartControlRequest,
+  AutostartControlResponse,
+  DaemonOwnershipTransitionOfferResponse,
+  AnswerDaemonOwnershipTransitionRequest,
 } from '../ipc/channels.js';
 
 export interface SeeyaApi {
@@ -90,6 +95,15 @@ export interface SeeyaApi {
   /** V2-T14 items 2/3: one field's edit — resolves with the updated rows and the freshly
    * recomputed faixa de horário on success, or the refusal message on failure. */
   saveSetting(request: SaveSettingRequest): Promise<SaveSettingResponse>;
+  /** V2-T13 item 4: the autostart button's own liveness, pushed on the same refresh tick as
+   * `onDaemonAvailabilityUpdate`. */
+  onAutostartAvailabilityUpdate(listener: (event: AutostartAvailabilityUpdateEvent) => void): void;
+  /** V2-T13 item 4: "Enable autostart"/"Disable autostart". */
+  autostartControl(request: AutostartControlRequest): Promise<AutostartControlResponse>;
+  /** V2-T13 item 5: the ownership-transition dialog's own data, fetched once at startup. */
+  getDaemonOwnershipTransitionOffer(): Promise<DaemonOwnershipTransitionOfferResponse>;
+  /** V2-T13 item 5: the person's answer to the ownership-transition dialog. */
+  answerDaemonOwnershipTransition(request: AnswerDaemonOwnershipTransitionRequest): Promise<void>;
 }
 
 const api: SeeyaApi = {
@@ -155,6 +169,17 @@ const api: SeeyaApi = {
   daemonControl: (request) => ipcRenderer.invoke(CHANNELS.daemonControl, request),
   getSettingsPanel: () => ipcRenderer.invoke(CHANNELS.getSettingsPanel),
   saveSetting: (request) => ipcRenderer.invoke(CHANNELS.saveSetting, request),
+  onAutostartAvailabilityUpdate: (listener) => {
+    ipcRenderer.on(
+      CHANNELS.autostartAvailabilityUpdate,
+      (_event, data: AutostartAvailabilityUpdateEvent) => listener(data),
+    );
+  },
+  autostartControl: (request) => ipcRenderer.invoke(CHANNELS.autostartControl, request),
+  getDaemonOwnershipTransitionOffer: () =>
+    ipcRenderer.invoke(CHANNELS.getDaemonOwnershipTransitionOffer),
+  answerDaemonOwnershipTransition: (request) =>
+    ipcRenderer.invoke(CHANNELS.answerDaemonOwnershipTransition, request),
 };
 
 contextBridge.exposeInMainWorld('seeya', api);

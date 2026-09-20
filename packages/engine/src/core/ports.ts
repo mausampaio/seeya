@@ -15,6 +15,7 @@
 import type {
   Config,
   Day,
+  DaemonOwnershipTransitionAnswer,
   DiscoveredSession,
   EarlyWarningState,
   GeneratedUnderstanding,
@@ -411,6 +412,25 @@ export interface Storage {
    * react to in v2's own scope.
    */
   saveActiveProtocolScheme(scheme: ProtocolScheme): Promise<void>;
+
+  /**
+   * V2-T13 (D-045 item 1): the person's answer to the daemon-ownership transition question, the
+   * ONE time the app finds itself `DaemonOwner.kind === 'app'` while a CLI-launched daemon or
+   * CLI-registered autostart already exists (`core/types.ts#DaemonOwnershipTransitionAnswer`'s own
+   * docstring has the full "why persisted" reasoning). `null` when the question has never been
+   * asked/answered on this machine (D-025) — never a guess either way, same "absence reads as
+   * nothing happened yet" contract `readActiveProtocolScheme` above already documents for its own
+   * marker file.
+   */
+  readDaemonOwnershipTransitionAnswer(): Promise<DaemonOwnershipTransitionAnswer | null>;
+
+  /**
+   * Persists `answer` to `~/.seeya/daemon-ownership-transition.json`, atomically. Called exactly
+   * once per machine, right after the person answers the dialog — never called again afterward
+   * (`readDaemonOwnershipTransitionAnswer`'s non-`null` result is what stops the question from
+   * being asked a second time, D-045's own "não pergunta de novo" for EITHER answer).
+   */
+  saveDaemonOwnershipTransitionAnswer(answer: DaemonOwnershipTransitionAnswer): Promise<void>;
 }
 
 /**
@@ -842,6 +862,25 @@ export type AutostartDisableResult =
   { readonly kind: 'removed' } | { readonly kind: 'notRegistered' };
 
 /**
+ * `Autostart.enable()`'s optional second argument (V2-T13, D-045 item 4). Every field defaults to
+ * this task's own pre-existing behavior when omitted: `execPath` to `process.execPath` read
+ * inside the adapter (unchanged since S5-T1 — the CLI's own `execPath` genuinely IS a plain Node
+ * binary, nothing to override), `env` to none. The interface's own composition root
+ * (`packages/app/src/composition/index.ts`) is the one real caller that ever passes either: its
+ * `process.execPath` is the Electron binary, not Node, so registering the app's own daemon in
+ * autostart needs BOTH `execPath` set to that binary AND `env` carrying
+ * `ELECTRON_RUN_AS_NODE: '1'` (Electron's own documented mechanism for making it behave as plain
+ * Node) — the exact same two facts `adapters/process/daemon-launch.ts#DaemonLaunchTarget` already
+ * carries for the "Start daemon" button, reused here rather than a second, independent pair of
+ * fields (a caller building a `DaemonLaunchTarget` already satisfies this shape structurally,
+ * `nodePath` read as `execPath`).
+ */
+export interface AutostartLaunchOptions {
+  readonly execPath?: string;
+  readonly env?: Readonly<Record<string, string>>;
+}
+
+/**
  * Registers/removes/queries `seeya daemon` in the current OS's own autostart mechanism
  * (docs/PLANO-DE-ENTREGA.md S5-T1: Task Scheduler on Windows, `systemd --user` on Linux, a
  * LaunchAgent on macOS). Implemented in `adapters/autostart/`, one class per OS, picked by
@@ -855,10 +894,11 @@ export type AutostartDisableResult =
  * `enable`'s `binaryPath` is the `dist/cli/index.js` currently in use (S5-T1's cuidado (f)) —
  * `cli/index.ts` resolves it the same way `seeya daemon`'s own self-relaunch already does
  * (`fileURLToPath(import.meta.url)`), so autostart always points at the binary that registered
- * it, never a hardcoded install location.
+ * it, never a hardcoded install location. `options` is V2-T13's own addition — see
+ * `AutostartLaunchOptions`'s own docstring.
  */
 export interface Autostart {
-  enable(binaryPath: string): Promise<AutostartEnableResult>;
+  enable(binaryPath: string, options?: AutostartLaunchOptions): Promise<AutostartEnableResult>;
   disable(): Promise<AutostartDisableResult>;
   status(): Promise<AutostartStatus>;
 }
@@ -888,4 +928,51 @@ export interface Autostart {
  */
 export interface DirectoryExistence {
   exists(cwd: string): Promise<boolean>;
+}
+
+// Own block at the end of the file on purpose (V2-T13), same pattern `Autostart`/`Notifier`/
+// `DirectoryExistence` above already established: a new interface, appended rather than inserted
+// mid-file, to reduce merge collisions.
+
+/**
+ * `AppInstallation.find()`'s return shape (V2-T13, D-045 item 2) — a discriminated union (D-024),
+ * never `{ installed: boolean; executablePath?: string }`: a Windows/Linux/macOS adapter that
+ * reports "installed" always has a real path to report alongside it, so the type doesn't leave
+ * room for the pair to disagree.
+ * - `installed` — the OS's own installation record for this app exists; `executablePath` is what
+ *   that record itself names (Windows: derived from the per-user uninstall entry's own
+ *   `InstallLocation`/`UninstallString`; Linux: `dpkg`'s own file list for the package; macOS: the
+ *   `.app` bundle's own `Contents/MacOS/<executableName>`).
+ * - `notInstalled` — the OS's own record was asked and genuinely says no (Windows: no matching
+ *   uninstall entry; Linux: `dpkg` reports the package not installed, which is also what an
+ *   `AppImage` run naturally gets — it never touches `dpkg`'s database in the first place, so
+ *   nothing in this adapter has to special-case it, D-045's own "AppImage nunca é dono" falls out
+ *   of the query itself; macOS: no `.app` bundle at the expected path).
+ * - `unknown` — the OS QUERY ITSELF failed (permission denied, the OS tool missing, a malformed
+ *   answer) — D-025: neither "installed" nor "not installed" is something this call actually
+ *   knows, so neither is claimed. `application/daemon-ownership.ts#resolveDaemonOwner` is what
+ *   turns this into a `DaemonOwner`, and its own docstring has the "unknown never blocks" rule
+ *   this state exists to feed.
+ */
+export type AppInstallationStatus =
+  | { readonly kind: 'installed'; readonly executablePath: string }
+  | { readonly kind: 'notInstalled' }
+  | { readonly kind: 'unknown'; readonly error: string };
+
+/**
+ * Whether `seeya` the app (not the CLI) is installed on this machine, asked of the OS's OWN
+ * installation record — never a file this project writes itself (D-045 item 2's own reasoning:
+ * "opções assim disponíveis para alguém ir lá e apagar são um problema"; the marker in
+ * `~/.seeya/` stays reserved for USE state, like `protocol-handler.json` already is, never for
+ * ownership). Implemented in `adapters/installation/`, one class per OS, picked by
+ * `process.platform` in that adapter's own `index.ts` — same per-OS-adapter shape
+ * `adapters/autostart/` already uses.
+ *
+ * **Only Windows was measured on the machine this task shipped from (docs/QUESTOES.md Q-081).**
+ * Linux/macOS follow the mechanisms D-045 item 2 names (`dpkg`, `/Applications`) without being
+ * run against a real `.deb` install or a real `.app` bundle — same "not measured" disclaimer
+ * `adapters/autostart/linux.ts`/`macos.ts` already carry for the identical reason (S5-T1).
+ */
+export interface AppInstallation {
+  find(): Promise<AppInstallationStatus>;
 }

@@ -10,6 +10,7 @@ import type { TerminalFontOptions } from '../state/terminal-font.js';
 import type { TodayPanelData } from '../state/today-panel.js';
 import type { ScheduleStripData } from '../state/schedule-strip.js';
 import type { DaemonControlAvailability } from '../state/daemon-control-panel.js';
+import type { AutostartControlAvailability } from '../state/autostart-control-panel.js';
 import type { SettingsRow, ProjectPolicyLine } from '../state/settings-panel.js';
 
 export const CHANNELS = {
@@ -112,6 +113,20 @@ export const CHANNELS = {
    * `Storage.saveConfig` path `seeya config set` already uses, never a second validation of its
    * own. */
   saveSetting: 'seeya:save-setting',
+  /** Main → renderer, pushed on the same refresh tick as `daemonAvailabilityUpdate` (V2-T13 item
+   * 4): the autostart button's own availability, from
+   * `state/autostart-control-panel.ts#resolveAutostartControlAvailability`. */
+  autostartAvailabilityUpdate: 'seeya:autostart-availability-update',
+  /** Renderer → main: "Enable autostart"/"Disable autostart" (V2-T13 item 4) — `action` is decided
+   * by the renderer's own last-known `AutostartControlAvailability` at click time, never
+   * re-derived in `main.ts` (same D-041 discipline `daemonControl` already follows). */
+  autostartControl: 'seeya:autostart-control',
+  /** Renderer → main: the ownership-transition dialog's own data (V2-T13 item 5, D-045 item 1) —
+   * fetched once at startup, same "no polling of its own" shape `getTerminalFontConfig` already
+   * has. `shouldOffer: false` means the dialog never opens this run. */
+  getDaemonOwnershipTransitionOffer: 'seeya:get-daemon-ownership-transition-offer',
+  /** Renderer → main: the person's answer to the ownership-transition dialog (V2-T13 item 5). */
+  answerDaemonOwnershipTransition: 'seeya:answer-daemon-ownership-transition',
 } as const;
 
 export interface CreateTabRequest {
@@ -363,3 +378,35 @@ export type SaveSettingResponse =
       readonly schedule: ScheduleStripData;
     }
   | { readonly ok: false; readonly error: string };
+
+/** `CHANNELS.autostartAvailabilityUpdate`'s payload — the exact shape
+ * `state/autostart-control-panel.ts#resolveAutostartControlAvailability` produces (V2-T13 item 4). */
+export type AutostartAvailabilityUpdateEvent = AutostartControlAvailability;
+
+/** `CHANNELS.autostartControl`'s payload. `action` is `'enable'` when the button last showed
+ * "Enable autostart", `'disable'` otherwise — decided renderer-side from its own
+ * `AutostartControlAvailability` (never re-derived by `electron/main.ts`, D-041). */
+export interface AutostartControlRequest {
+  readonly action: 'enable' | 'disable';
+}
+
+/** `CHANNELS.autostartControl`'s response — the literal text
+ * `cli/autostart-command.ts#runAutostartEnableCommand`/`runAutostartDisableCommand` already
+ * produces for the equivalent CLI action (D-039), rendered by `AppContext.enableAppAutostart`/
+ * `context.autostart.disable` through the same wording. */
+export interface AutostartControlResponse {
+  readonly resultText: string;
+}
+
+/** `CHANNELS.getDaemonOwnershipTransitionOffer`'s response (V2-T13 item 5, D-045 item 1).
+ * `launchPath` is only meaningful when `shouldOffer` is `true` (the app's own installed path,
+ * shown in the dialog's body) — empty string otherwise, never read by the renderer in that case. */
+export interface DaemonOwnershipTransitionOfferResponse {
+  readonly shouldOffer: boolean;
+  readonly launchPath: string;
+}
+
+/** `CHANNELS.answerDaemonOwnershipTransition`'s payload (V2-T13 item 5). */
+export interface AnswerDaemonOwnershipTransitionRequest {
+  readonly answer: 'accepted' | 'declined';
+}

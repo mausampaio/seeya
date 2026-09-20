@@ -164,9 +164,41 @@ interface Clock {
 interface DirectoryExistence { // V2-T9, adapters/filesystem/
   exists(path: string): Promise<boolean>;
 }
+
+interface AppInstallation { // V2-T13, adapters/installation/ (D-045 item 2)
+  find(): Promise<AppInstallationStatus>; // installed (com o caminho) / notInstalled / unknown
+}
 ```
 
 Nos testes, cada porta tem um duplo em memória. Nenhum teste unitário toca disco.
+
+### `installation/` (V2-T13, D-045 item 2)
+
+Descobre se o app está instalado, pelo registro do próprio sistema operacional — nunca por um
+arquivo do `seeya`. Um adaptador por SO, escolhido por `process.platform`, mesmo formato de
+`adapters/autostart/`:
+
+- **Windows:** lê a entrada de desinstalação que o NSIS cria — em **três** raízes de registro, não
+  só uma: `HKCU\...\Uninstall` (instalação por usuário, o padrão deste projeto), `HKLM\...\
+  Uninstall` e `HKLM\...\WOW6432Node\...\Uninstall` (instalação por máquina, opção do próprio
+  instalador — o registro fica só em HKLM, nunca em HKCU, achado do mantenedor durante a tarefa),
+  procurando pelo `DisplayName` do produto em qualquer uma das três. O caminho do executável sai de
+  `InstallLocation` quando presente, senão do diretório de `UninstallString`, senão de
+  `DisplayIcon` — **medido**: no NSIS por usuário, `InstallLocation` veio vazio e o caminho real só
+  existia em `UninstallString`; no NSIS por máquina, `InstallLocation` E `UninstallString` vieram
+  ambos vazios, e só `DisplayIcon` carregava o caminho (docs/QUESTOES.md Q-081, os dois achados).
+  Falhando os três, o resultado é `unknown`, nunca um caminho inventado (D-025).
+- **Linux:** pergunta ao `dpkg` pelo pacote (`dpkg-query`). Um `AppImage` nunca aparece nesse
+  banco, então "não instalado" sai da própria consulta, sem tratamento especial (D-045: "AppImage
+  nunca é dono"). Não medido contra um `.deb` real (mesma ressalva de `adapters/autostart/
+  linux.ts`, S5-T1/Q-067).
+- **macOS:** procura o `.app` em `/Applications`. Não medido (mesma ressalva de `adapters/
+  autostart/macos.ts`).
+
+`AppInstallationStatus.unknown` (a consulta ao SO falhou) nunca vira `notInstalled` — D-025.
+`application/daemon-ownership.ts#resolveDaemonOwner` é a única função que lê este resultado e o
+transforma em `DaemonOwner` (`app` / `cli` / `unknown`); nenhum outro módulo decide posse do
+daemon por conta própria.
 
 ## Decisões técnicas por adapter
 

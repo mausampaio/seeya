@@ -27,6 +27,10 @@ import type {
 import type { TodayPanelData, TodaySessionRow } from '../state/today-panel.js';
 import { reduceEndDayPanel, type EndDayPanelState } from '../state/end-day-panel.js';
 import { reduceDaemonControl, type DaemonControlState } from '../state/daemon-control-panel.js';
+import {
+  reduceAutostartControl,
+  type AutostartControlState,
+} from '../state/autostart-control-panel.js';
 import type { SettingsRow, ProjectPolicyLine } from '../state/settings-panel.js';
 
 declare global {
@@ -276,6 +280,14 @@ function wireIncomingEvents(): void {
       availability,
     });
     renderDaemonControl();
+  });
+  // V2-T13 item 4: the autostart button's own availability, same refresh tick.
+  window.seeya.onAutostartAvailabilityUpdate((availability) => {
+    autostartControlState = reduceAutostartControl(autostartControlState, {
+      kind: 'availabilityUpdated',
+      availability,
+    });
+    renderAutostartControl();
   });
   // V2-T5a item 4: "capturing N of M: <name>" while "Run end-day now" is in flight — a no-op if
   // the dialog has already moved past `running` (e.g. a straggler event after `runFinished`),
@@ -609,6 +621,144 @@ async function handleDaemonControlClicked(): Promise<void> {
 function wireDaemonControl(): void {
   document.getElementById('daemon-control-button')?.addEventListener('click', () => {
     void handleDaemonControlClicked();
+  });
+}
+
+/**
+ * V2-T13 item 4: "Enable autostart"/"Disable autostart" — mirrors `daemonControlState`/
+ * `renderDaemonControl`/`handleDaemonControlClicked`/`wireDaemonControl` above exactly (same "one
+ * state machine, one render function" shape), for the second button that only ever shows when
+ * `AutostartControlAvailability.kind !== 'notApplicable'` (the app owns autostart on this
+ * machine — `state/autostart-control-panel.ts#resolveAutostartControlAvailability`'s own gate).
+ */
+let autostartControlState: AutostartControlState = {
+  kind: 'idle',
+  availability: { kind: 'notApplicable' },
+};
+
+function renderAutostartControl(): void {
+  const button = document.getElementById('autostart-control-button') as HTMLButtonElement;
+  const result = document.getElementById('autostart-control-result') as HTMLElement;
+
+  if (autostartControlState.kind === 'running') {
+    button.hidden = false;
+    button.textContent = MESSAGES.autostartControlRunning;
+    button.disabled = true;
+    return;
+  }
+  if (autostartControlState.kind === 'result') {
+    result.textContent = autostartControlState.resultText;
+  }
+  const availability = autostartControlState.availability;
+  if (availability.kind === 'notApplicable') {
+    // The CLI (or an ownership query that failed, D-025) owns autostart here — this button has
+    // nothing honest to offer, so it stays out of the way entirely rather than showing disabled.
+    button.hidden = true;
+    return;
+  }
+  button.hidden = false;
+  if (availability.kind === 'unknown') {
+    button.textContent = MESSAGES.autostartControlUnknown;
+    button.disabled = true;
+    return;
+  }
+  button.textContent =
+    availability.kind === 'enable'
+      ? MESSAGES.autostartControlEnable
+      : MESSAGES.autostartControlDisable;
+  button.disabled = false;
+}
+
+async function handleAutostartControlClicked(): Promise<void> {
+  if (
+    autostartControlState.kind !== 'idle' ||
+    autostartControlState.availability.kind === 'notApplicable' ||
+    autostartControlState.availability.kind === 'unknown'
+  ) {
+    return;
+  }
+  const action = autostartControlState.availability.kind === 'enable' ? 'enable' : 'disable';
+  autostartControlState = reduceAutostartControl(autostartControlState, { kind: 'clicked' });
+  renderAutostartControl();
+  const response = await window.seeya.autostartControl({ action });
+  autostartControlState = reduceAutostartControl(autostartControlState, {
+    kind: 'finished',
+    resultText: response.resultText,
+  });
+  renderAutostartControl();
+}
+
+/** Wired once, at startup. */
+function wireAutostartControl(): void {
+  document.getElementById('autostart-control-button')?.addEventListener('click', () => {
+    void handleAutostartControlClicked();
+  });
+}
+
+/**
+ * V2-T13 item 5 (D-045 item 1): the ownership-transition dialog — fetched once at startup
+ * (`main()` below); shown only when `getDaemonOwnershipTransitionOffer` says so. Never re-checked
+ * later in this same session (the answer, once given, persists on disk — `main.ts`'s own
+ * `answerDaemonOwnershipTransition` handler), so this dialog has no state machine of its own
+ * beyond "open" / "closed", unlike the two buttons above.
+ */
+function daemonOwnershipTransitionDialog(): HTMLDialogElement {
+  return document.getElementById('daemon-ownership-transition-dialog') as HTMLDialogElement;
+}
+
+async function answerDaemonOwnershipTransitionDialog(
+  answer: 'accepted' | 'declined',
+): Promise<void> {
+  const dialog = daemonOwnershipTransitionDialog();
+  const acceptButton = document.getElementById(
+    'daemon-ownership-transition-accept',
+  ) as HTMLButtonElement;
+  const declineButton = document.getElementById(
+    'daemon-ownership-transition-decline',
+  ) as HTMLButtonElement;
+  acceptButton.disabled = true;
+  declineButton.disabled = true;
+  (document.getElementById('daemon-ownership-transition-status') as HTMLElement).textContent =
+    MESSAGES.daemonOwnershipTransitionApplying;
+  await window.seeya.answerDaemonOwnershipTransition({ answer });
+  dialog.close();
+}
+
+/** Fetches the offer once and opens the dialog if it says so — called once from `main()` below,
+ * after every OTHER startup wiring (the dialog itself never blocks tabs/sidebar from working). */
+async function offerDaemonOwnershipTransitionIfNeeded(): Promise<void> {
+  const offer = await window.seeya.getDaemonOwnershipTransitionOffer();
+  if (!offer.shouldOffer) {
+    return;
+  }
+  (document.getElementById('daemon-ownership-transition-title') as HTMLElement).textContent =
+    MESSAGES.daemonOwnershipTransitionTitle;
+  (document.getElementById('daemon-ownership-transition-body') as HTMLElement).textContent =
+    MESSAGES.daemonOwnershipTransitionBody(offer.launchPath);
+  daemonOwnershipTransitionDialog().showModal();
+}
+
+/** Wired once, at startup. */
+function wireDaemonOwnershipTransitionDialog(): void {
+  const acceptButton = document.getElementById(
+    'daemon-ownership-transition-accept',
+  ) as HTMLButtonElement;
+  acceptButton.textContent = MESSAGES.daemonOwnershipTransitionAccept;
+  acceptButton.addEventListener('click', () => {
+    void answerDaemonOwnershipTransitionDialog('accepted');
+  });
+  const declineButton = document.getElementById(
+    'daemon-ownership-transition-decline',
+  ) as HTMLButtonElement;
+  declineButton.textContent = MESSAGES.daemonOwnershipTransitionDecline;
+  declineButton.addEventListener('click', () => {
+    void answerDaemonOwnershipTransitionDialog('declined');
+  });
+  // "cancel" (Escape) is the same as declining — closing without an explicit choice must not
+  // leave the machine's OWN question unanswered forever (it would just reopen next launch
+  // otherwise, since nothing would ever get persisted).
+  daemonOwnershipTransitionDialog().addEventListener('cancel', () => {
+    void answerDaemonOwnershipTransitionDialog('declined');
   });
 }
 
@@ -1106,8 +1256,13 @@ async function main(): Promise<void> {
   wireEndDayDialog();
   wireScheduleStrip();
   wireDaemonControl();
+  wireAutostartControl();
   wireSettingsDialog();
+  wireDaemonOwnershipTransitionDialog();
   await refreshTodayPanel();
+  // V2-T13 item 5: after every other piece of the window is already wired and usable — the
+  // ownership-transition question never blocks tabs/sidebar/settings from working.
+  await offerDaemonOwnershipTransitionIfNeeded();
 }
 
 void main();

@@ -16,6 +16,7 @@ import type {
   AutostartEnableResult,
   AutostartStatus,
 } from '@seeya-ai/engine/core/ports.js';
+import type { DaemonOwner } from '@seeya-ai/engine/core/types.js';
 
 class ScriptedAutostart implements Autostart {
   constructor(
@@ -37,12 +38,29 @@ class ScriptedAutostart implements Autostart {
   }
 }
 
+/** V2-T13: proves `runAutostartEnableCommand` never reaches the port at all when the app owns
+ * autostart — every method rejects loudly instead of a scripted "should never be called" flag
+ * that a test would have to remember to assert on (AGENTS.md § "Testes": named double, not a
+ * stub). */
+class NeverCalledAutostart implements Autostart {
+  enable(): Promise<AutostartEnableResult> {
+    return Promise.reject(new Error('NeverCalledAutostart.enable should not have been called'));
+  }
+  disable(): Promise<AutostartDisableResult> {
+    return Promise.reject(new Error('NeverCalledAutostart.disable should not have been called'));
+  }
+  status(): Promise<AutostartStatus> {
+    return Promise.reject(new Error('NeverCalledAutostart.status should not have been called'));
+  }
+}
+
 const BINARY_PATH = 'c:\\code\\seeya\\dist\\cli\\index.js';
+const CLI_OWNER: DaemonOwner = { kind: 'cli' };
 
 describe('runAutostartEnableCommand', () => {
   it('freshly registered', async () => {
     const autostart = new ScriptedAutostart({ kind: 'registered', path: BINARY_PATH });
-    const report = await runAutostartEnableCommand(autostart, BINARY_PATH);
+    const report = await runAutostartEnableCommand(autostart, BINARY_PATH, CLI_OWNER);
     expect(report).toBe(
       `Autostart enabled: seeya daemon will now start on login, from ${BINARY_PATH}.`,
     );
@@ -50,7 +68,7 @@ describe('runAutostartEnableCommand', () => {
 
   it('already registered at the same path (cuidado f: says it already existed)', async () => {
     const autostart = new ScriptedAutostart({ kind: 'alreadyRegistered', path: BINARY_PATH });
-    const report = await runAutostartEnableCommand(autostart, BINARY_PATH);
+    const report = await runAutostartEnableCommand(autostart, BINARY_PATH, CLI_OWNER);
     expect(report).toBe(
       `Autostart was already enabled, pointing at ${BINARY_PATH}. Nothing changed.`,
     );
@@ -63,9 +81,29 @@ describe('runAutostartEnableCommand', () => {
       previousPath: oldPath,
       newPath: BINARY_PATH,
     });
-    const report = await runAutostartEnableCommand(autostart, BINARY_PATH);
+    const report = await runAutostartEnableCommand(autostart, BINARY_PATH, CLI_OWNER);
     expect(report).toContain(oldPath);
     expect(report).toContain(BINARY_PATH);
+  });
+
+  // V2-T13, D-045 item 3: the app owns autostart on this machine — refuses, never calls enable().
+  it('the app owns autostart → refuses, names the app path, and never calls Autostart.enable', async () => {
+    const autostart = new NeverCalledAutostart();
+    const owner: DaemonOwner = { kind: 'app', launchPath: 'C:\\seeya\\seeya.exe' };
+
+    const report = await runAutostartEnableCommand(autostart, BINARY_PATH, owner);
+
+    expect(report).toContain('the app is installed');
+    expect(report).toContain('C:\\seeya\\seeya.exe');
+    expect(report).toContain('seeya autostart enable');
+  });
+
+  it('the query for ownership failed (unknown) → behaves exactly like cli, never refuses (D-025)', async () => {
+    const autostart = new ScriptedAutostart({ kind: 'registered', path: BINARY_PATH });
+    const report = await runAutostartEnableCommand(autostart, BINARY_PATH, { kind: 'unknown' });
+    expect(report).toBe(
+      `Autostart enabled: seeya daemon will now start on login, from ${BINARY_PATH}.`,
+    );
   });
 });
 

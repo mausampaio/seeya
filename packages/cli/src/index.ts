@@ -24,12 +24,14 @@ import {
   buildEndDayContext,
   buildSnoozeContext,
   buildStartDayContext,
+  resolveCliDaemonOwner,
 } from './composition.js';
 import { runSessionsCommand } from './sessions-command.js';
 import { runStatusCommand } from './status-command.js';
 import { runEndDayCommand } from './end-day-command.js';
 import { runStartDayCommand } from './start-day-command.js';
 import {
+  resolveDaemonInvocationMode,
   runDaemonLauncher,
   runDaemonWorker,
   runDaemonStatus,
@@ -163,17 +165,23 @@ program
       process.exitCode = 1;
       return;
     }
-    if (options.stop === true) {
+    // V2-T13, D-045 item 3's own "cuidado central": `resolveDaemonInvocationMode` decides purely
+    // from `options`/the env var, BEFORE `DaemonOwner` is ever asked about — the 'worker' branch
+    // below (`runDaemonWorker`, dispatched to when the app's own detached child sets
+    // DAEMON_CHILD_ENV_VAR=1) never even reaches `resolveCliDaemonOwner`, let alone gets refused
+    // by it. Only the 'launcher' branch (a human typing "seeya daemon") does.
+    const mode = resolveDaemonInvocationMode(options, process.env[DAEMON_CHILD_ENV_VAR] === '1');
+    if (mode === 'stop') {
       const { storage, processControl, clock } = await buildDaemonContext();
       console.log(await runDaemonStop({ storage, processControl, clock }));
       return;
     }
-    if (options.status === true) {
+    if (mode === 'status') {
       const { storage, processControl, clock } = await buildDaemonContext();
       console.log(await runDaemonStatus({ storage, processControl, clock }));
       return;
     }
-    if (process.env[DAEMON_CHILD_ENV_VAR] === '1') {
+    if (mode === 'worker') {
       const deps = await buildDaemonContext();
       // S4-T3b: the lock's own recycled-PID tie-break needs the WORKER's own procStart at the
       // moment it starts (core/daemon-lock.ts's own docstring) — captured here, the one real
@@ -189,13 +197,15 @@ program
       return;
     }
     const { storage, processControl } = await buildDaemonContext();
+    const daemonOwner = await resolveCliDaemonOwner();
     const scriptPath = fileURLToPath(import.meta.url);
     console.log(
-      await runDaemonLauncher(storage, processControl, {
-        nodePath: process.execPath,
-        scriptPath,
-        args: ['daemon'],
-      }),
+      await runDaemonLauncher(
+        storage,
+        processControl,
+        { nodePath: process.execPath, scriptPath, args: ['daemon'] },
+        daemonOwner,
+      ),
     );
   });
 
@@ -216,7 +226,8 @@ autostartCommand
   .action(async () => {
     const { autostart } = buildAutostartContext();
     const binaryPath = fileURLToPath(import.meta.url);
-    console.log(await runAutostartEnableCommand(autostart, binaryPath));
+    const daemonOwner = await resolveCliDaemonOwner();
+    console.log(await runAutostartEnableCommand(autostart, binaryPath, daemonOwner));
   });
 
 autostartCommand

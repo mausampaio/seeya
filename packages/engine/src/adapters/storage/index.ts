@@ -11,6 +11,7 @@ import type { Briefing, RejectedDiscoveryRecord, Storage } from '../../core/port
 import type {
   Config,
   Day,
+  DaemonOwnershipTransitionAnswer,
   DayState,
   EarlyWarningState,
   Handoff,
@@ -53,6 +54,11 @@ import {
   parseProtocolHandlerDocument,
   serializeProtocolHandlerDocument,
 } from './protocol-handler-schema.js';
+import {
+  DAEMON_OWNERSHIP_TRANSITION_SCHEMA_VERSION,
+  parseDaemonOwnershipTransitionDocument,
+  serializeDaemonOwnershipTransitionDocument,
+} from './daemon-ownership-transition-schema.js';
 import { resolveSchemaVersion, type SchemaMigration } from './schema-version.js';
 import { writeFileAtomic } from './atomic-write.js';
 
@@ -381,6 +387,32 @@ export class StorageAdapter implements Storage {
     await writeFileAtomic(
       this.protocolHandlerPath(),
       JSON.stringify(serializeProtocolHandlerDocument(scheme)),
+    );
+  }
+
+  /** `~/.seeya/daemon-ownership-transition.json` (V2-T13, D-045 item 1). */
+  private daemonOwnershipTransitionPath(): string {
+    return path.join(this.seeyaHome, 'daemon-ownership-transition.json');
+  }
+
+  async readDaemonOwnershipTransitionAnswer(): Promise<DaemonOwnershipTransitionAnswer | null> {
+    const resolved = await readVersionedDocument(
+      this.daemonOwnershipTransitionPath(),
+      DAEMON_OWNERSHIP_TRANSITION_SCHEMA_VERSION,
+    );
+    if (resolved === null) {
+      // Never asked/answered on this machine yet (D-025), not an error.
+      return null;
+    }
+    return parseDaemonOwnershipTransitionDocument(resolved);
+  }
+
+  async saveDaemonOwnershipTransitionAnswer(
+    answer: DaemonOwnershipTransitionAnswer,
+  ): Promise<void> {
+    await writeFileAtomic(
+      this.daemonOwnershipTransitionPath(),
+      JSON.stringify(serializeDaemonOwnershipTransitionDocument(answer)),
     );
   }
 }

@@ -1007,3 +1007,32 @@ export type ResolvedEndDayScope =
  * V2-T10 plan entry: the daemon serves both worlds and must not decide between them itself).
  */
 export type ProtocolScheme = 'seeya' | 'seeya-dev';
+
+/**
+ * V2-T13 (D-045 items 1/2): who is allowed to run `seeya daemon`/register autostart on THIS
+ * machine, decided once from `AppInstallation.find()`'s own answer
+ * (`application/daemon-ownership.ts#resolveDaemonOwner`) — never guessed from which process is
+ * asking. `'app'` carries `launchPath` (`AppInstallationStatus`'s own `executablePath`, D-024:
+ * kept on the variant that actually has it, not hoisted to a shared optional field) — the fact
+ * D-045 item 1 names ("com o caminho de lançamento"), for a caller that wants to show it. `'cli'`
+ * is the v1 behavior (no app installed, the CLI still owns its own daemon/autostart). `'unknown'`
+ * is D-025 applied to installation detection itself: the OS query failed, so NOTHING is refused —
+ * see `cli/daemon-command.ts`'s own docstring on why `'unknown'` and `'cli'` behave identically
+ * for every CLI command this task touches.
+ */
+export type DaemonOwner =
+  | { readonly kind: 'app'; readonly launchPath: string }
+  | { readonly kind: 'cli' }
+  | { readonly kind: 'unknown' };
+
+/**
+ * D-045 item 1's "pergunta única da transição": the person's answer, the first (and only) time the
+ * app finds itself the owner (`DaemonOwner.kind === 'app'`) while a CLI-launched daemon or
+ * CLI-registered autostart already exists on this machine. Persisted once
+ * (`Storage.readDaemonOwnershipTransitionAnswer`/`saveDaemonOwnershipTransitionAnswer`,
+ * `~/.seeya/daemon-ownership-transition.json`) so the question is never asked twice, whichever way
+ * it was answered (D-045's own text: "recusando: não pergunta de novo"). `'accepted'` — the app
+ * stopped the CLI's daemon, pointed autostart at itself, and started its own daemon. `'declined'`
+ * — nothing was touched; the person keeps running the CLI's daemon/autostart by hand.
+ */
+export type DaemonOwnershipTransitionAnswer = 'accepted' | 'declined';

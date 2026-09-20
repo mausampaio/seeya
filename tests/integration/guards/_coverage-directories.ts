@@ -79,6 +79,11 @@ export const DECLARED_COVERAGE_DIRECTORIES: readonly DeclaredCoverageDirectory[]
     expectation: { kind: 'covered', threshold: 80 },
   },
   {
+    // V2-T13: AppInstallation, one adapter per OS (D-045 item 2).
+    path: 'packages/engine/src/adapters/installation',
+    expectation: { kind: 'covered', threshold: 80 },
+  },
+  {
     path: 'packages/engine/src/adapters/notification',
     expectation: { kind: 'covered', threshold: 80 },
   },

@@ -25,6 +25,8 @@
         <button id="end-day-button" type="button"></button>
         <button id="daemon-control-button" type="button"></button>
         <p id="daemon-control-result"></p>
+        <button id="autostart-control-button" type="button" hidden></button>
+        <p id="autostart-control-result"></p>
         <button id="settings-button" type="button"></button>
       </aside>
       <main id="main">
@@ -78,6 +80,15 @@
       <h4 id="settings-project-policy-heading"></h4>
       <div id="settings-project-policy-lines"></div>
       <button id="settings-dialog-close" type="button"></button>
+    </dialog>
+    <dialog id="daemon-ownership-transition-dialog">
+      <h3 id="daemon-ownership-transition-title"></h3>
+      <p id="daemon-ownership-transition-body"></p>
+      <p id="daemon-ownership-transition-status"></p>
+      <div id="daemon-ownership-transition-actions">
+        <button id="daemon-ownership-transition-accept" type="button"></button>
+        <button id="daemon-ownership-transition-decline" type="button"></button>
+      </div>
     </dialog>
     <script type="module" src="renderer.js"></script>
   </body>

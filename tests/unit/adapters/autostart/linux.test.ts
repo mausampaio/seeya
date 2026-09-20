@@ -126,6 +126,44 @@ describe('LinuxAutostart#enable', () => {
     });
   });
 
+  // V2-T13, D-045 item 4: the unit's own [Service] block carries an Environment= line, systemd's
+  // native mechanism (no wrapper needed, unlike Windows' Task Scheduler).
+  it('with options.env: the unit file carries an Environment= line', async () => {
+    const { files, readFile, writeFile, removeFile } = buildFakeFiles();
+    const runner = new RecordingCommandRunner([
+      { exitCode: 0, stdout: '', stderr: '' },
+      { exitCode: 0, stdout: '', stderr: '' },
+    ]);
+    const autostart = new LinuxAutostart({
+      readFile,
+      writeFile,
+      removeFile,
+      run: runner.run,
+      homeDir: HOME_DIR,
+    });
+
+    await autostart.enable(BINARY_PATH, { env: { ELECTRON_RUN_AS_NODE: '1' } });
+    expect(files.get(UNIT_PATH)).toContain('Environment=ELECTRON_RUN_AS_NODE=1');
+  });
+
+  it('without options.env: no Environment= line at all — same unit as before this task', async () => {
+    const { files, readFile, writeFile, removeFile } = buildFakeFiles();
+    const runner = new RecordingCommandRunner([
+      { exitCode: 0, stdout: '', stderr: '' },
+      { exitCode: 0, stdout: '', stderr: '' },
+    ]);
+    const autostart = new LinuxAutostart({
+      readFile,
+      writeFile,
+      removeFile,
+      run: runner.run,
+      homeDir: HOME_DIR,
+    });
+
+    await autostart.enable(BINARY_PATH);
+    expect(files.get(UNIT_PATH)).not.toContain('Environment=');
+  });
+
   it('systemctl failing → throws with the raw stderr', async () => {
     const { readFile, writeFile, removeFile } = buildFakeFiles();
     const runner = new RecordingCommandRunner([
