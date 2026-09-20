@@ -416,6 +416,7 @@ usa. Fixados em S1-T0g, antes de qualquer um deles existir em código.
 | executável que lançou o daemon | `launchedBy` (opcional; ausente = "não sei quem lançou", nunca "foi outro", D-025) | `daemon.lock` (V2-T25, D-045 item 1's bug fix — `schemaVersion` 1→2, lock v1 migrado sem o campo) |
 | marcador de registro do protocolo / esquema ativo | `protocol-handler.json` / `activeScheme` (era `registered`, V2-T5b; renomeado e o valor virou o esquema, não mais um booleano, pela V2-T10 item 2 — `schemaVersion` 1→2, documento v1 migrado para `activeScheme: 'seeya'`) | raiz de `~/.seeya/` (V2-T5b) |
 | resposta da pergunta única de transição de posse | `daemon-ownership-transition.json` / `answer` (`'accepted'`/`'declined'`) | raiz de `~/.seeya/` (V2-T13, D-045 item 1) |
+| saída do processo que o autostart lança | `autostart.log` (`AUTOSTART_OUTPUT_LOG_FILE_NAME`, `adapters/autostart/env.ts`) — stdout/stderr do daemon lançado pelo próprio mecanismo de autostart de cada SO (não um logger do `seeya`; cada adaptador usa o recurso nativo do próprio SO: `StandardOutPath`/`StandardErrorPath` no macOS, `StandardOutput=`/`StandardError=append:` no Linux, redirecionamento via `cmd.exe` no Windows) | raiz de `~/.seeya/` (V2-T23 item 5) |
 | raiz do repositório | `root` | handoff (git, D-032) |
 | arquivos fora de repositório / repositórios não visitados | `filesOutsideRepository` / `reposNotVisited` | handoff (git, D-032) |
 | avisos já dados | `early-warnings.json` | arquivo em `~/.seeya/` (S1-T7) |
