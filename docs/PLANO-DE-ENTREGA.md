@@ -6643,6 +6643,11 @@ texto, mas não são a fila.
       pergunta nunca mais volte. O texto passou a dizer só o que sabe, e que a pergunta é feita uma
       vez só. Fica em `[~]` até o aceite do mantenedor.
 
+      **Mesclada na `main` em 2026-09-20** (portão na worktree do PO: 200 arquivos, 2.029 testes
+      passando, 4 pulados; cobertura 96,40%/92,62%/94,95%/96,76%). Revisão sem ajustes. Fica em
+      `[~]` até o aceite do mantenedor — que é instalar por cima com o daemon de pé, no Windows, e
+      abrir uma aba no app instalado no Mac.
+
 - [~] **V2-T16 — Correção: a janela responde com a configuração da subida, não com a que está em
       disco.** Especificada pelo PO em 2026-09-20 a partir de um achado do mantenedor no mesmo dia,
       no aceite da V2-T14. **Depende da V2-T13** só por ordem de fila: as duas mexem em
