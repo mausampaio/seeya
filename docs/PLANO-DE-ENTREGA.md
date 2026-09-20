@@ -7096,6 +7096,61 @@ texto, mas não são a fila.
       **Aceite do mantenedor:** instalar por cima com o daemon de pé e, ao fim, o daemon estar de
       pé de novo, sem clicar em nada.
 
+- [ ] **V2-T23 — Correção: o autostart congela o ambiente inteiro do app, inclusive coisas que só
+      valem naquele login.** Especificada pelo PO em 2026-09-20 a partir de uma medição do
+      mantenedor no Mac dele, no mesmo dia — o primeiro `cat` que alguém deu no arquivo de
+      autostart gerado.
+
+      **O defeito, medido.** Ligando o autostart pela janela no macOS, o arquivo criado
+      (`~/Library/LaunchAgents/com.seeya.daemon.plist`) está certo no essencial — aponta para o
+      executável dentro do `.app`, passa o `index.js` da CLI, tem `ELECTRON_RUN_AS_NODE=1` e
+      `RunAtLoad`. **Mas o bloco de ambiente é uma fotografia do processo do app**, e leva junto:
+
+      - `SSH_AUTH_SOCK`, apontando para um socket em `/private/tmp/...` **daquele login** — no
+        próximo login o caminho não existe mais. O daemon roda `git` durante a captura, e um
+        `SSH_AUTH_SOCK` morto é exatamente o que faz `git` sobre SSH pendurar ou falhar sem
+        explicação;
+      - `TMPDIR`, também por login (`/var/folders/...`);
+      - `XPC_SERVICE_NAME`, `XPC_FLAGS`, `__CFBundleIdentifier`, `__CF_USER_TEXT_ENCODING`,
+        `MallocNanoZone`, `COMMAND_MODE` — estado interno do lançamento daquele processo, que não
+        significa nada num job novo;
+      - `USER`, `LOGNAME`, `HOME`, `SHELL`, que o próprio sistema já define;
+      - `PATH` congelado, incluindo a versão de Node de um gerenciador de versões — se ela mudar
+        de lugar, o `PATH` do autostart continua apontando para o caminho velho.
+
+      **Causa.** `packages/app/src/composition/index.ts` passa `daemonLaunchTarget.env` — o ambiente
+      **inteiro** já limpo das variáveis de sessão (D-017) — como `AutostartLaunchOptions.env`, e
+      cada adaptador escreve o que recebe: `plist` no macOS, `set K=V&&` no Windows
+      (`windows-scripts.ts`), e o equivalente no Linux. O que serve para um `spawn` que acontece
+      **agora** não serve para um registro que vai ser lido **daqui a semanas**, num login diferente.
+      É a mesma lição da D-017 ("monte o ambiente explicitamente"), aplicada ao caso que ela não
+      previa: ambiente que vai para disco.
+
+      **O que entra:**
+      1. **Uma lista explícita do que o autostart carrega**, com o porquê de cada variável ao lado,
+         e nada além dela: hoje isso é `ELECTRON_RUN_AS_NODE` (sem ele, o login abriria a janela em
+         vez do daemon) e o `PATH` (o daemon precisa achar `claude` e `git`; o `PATH` de um job de
+         login é mínimo nos três sistemas). Toda variável de socket, de diretório temporário, de
+         XPC e de identidade de usuário sai.
+      2. **A regra vale para os três adaptadores**, não só o macOS — a mesma fotografia chega ao
+         Windows e ao Linux pelo mesmo caminho.
+      3. **O `PATH` congelado fica registrado como limite conhecido**, com uma linha no documento
+         dizendo o que acontece se ele mudar (e como refazer: desligar e ligar o autostart). Não
+         inventar releitura de `PATH` em tempo de login nesta tarefa — isso é trabalho próprio, e a
+         V2-T8 já mediu como esse assunto é traiçoeiro fora do Windows.
+      4. **Teste** que prove a lista: uma variável fora dela nunca aparece no arquivo gerado, nos
+         três adaptadores.
+
+      **O que não entra:** reler o `PATH` no login; mudar o mecanismo de autostart de qualquer
+      sistema; qualquer coisa do daemon fora do registro de autostart.
+
+      **Cuidados:** nenhuma dependência nova; **nenhum agente escreve no autostart real** — os três
+      adaptadores já são testados por dublê, e é assim que esta tarefa se prova; nada do `~/.seeya`
+      real, do registro ou do `~/Library/LaunchAgents` real é tocado.
+
+      **Aceite do mantenedor:** desligar e ligar o autostart, e o arquivo gerado conter só as
+      variáveis da lista.
+
 ## Definição de pronto (vale para toda tarefa)
 
 1. Código implementa exatamente a spec; divergência virou questão, não improviso.
