@@ -1573,3 +1573,8 @@ decisão é um número, não um modo novo.
 **O que não muda:** o `seeya end-day` pedido à mão nunca consulta teto nenhum — quem digitou o
 comando já decidiu; os avisos prévios seguem como estão; o formato do handoff não muda.
 
+**Quando isto vira código (mantenedor, no mesmo dia).** Não vira tarefa própria: *"não é tão
+grave... ela muda completamente com o comportamento de projetos"*. A regra fica registrada aqui e
+é **absorvida pela tarefa que introduz `checkpoint`, `pause` e o `end-day` global**
+(`docs/V2-RUMO.md`, passos 5 e 6), que redesenha justamente quem dispara o quê e quando. Registrar
+agora, implementar junto do resto: decidir cedo é barato, implementar duas vezes não.

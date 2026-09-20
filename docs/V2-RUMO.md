@@ -335,7 +335,7 @@ mantenedor) e no Windows**.
    agrupar as sessões por projeto; **inclui adotar uma sessão existente** (D-045 item 4), com um
    spike antes (acesso de escrita fora do diretório da sessão no `--resume`, e mensagem inicial
    na retomada do Codex);
-5. `checkpoint` e `pause`, com a camada de afirmações verificáveis do detector — o `pause`
+5. `checkpoint` e `pause`, com a camada de afirmações verificáveis do detector — o `pause` **Absorve a D-046** (teto do encerramento vencido).
    propõe a atualização dos arquivos do projeto no lugar do handoff (D-045 item 3);
 6. `end-day` global, com `priority` e `status` — é dele a visão da manhã;
 7. sincronização em níveis e continuidade entre dispositivos;
