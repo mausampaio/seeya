@@ -38,6 +38,7 @@ import {
 import { StorageAdapter } from '@seeya-ai/engine/adapters/storage/index.js';
 import { FsDirectoryExistence } from '@seeya-ai/engine/adapters/filesystem/index.js';
 import { buildAutostart } from '@seeya-ai/engine/adapters/autostart/index.js';
+import { buildAutostartEnv } from '@seeya-ai/engine/adapters/autostart/env.js';
 import { buildAppInstallation } from '@seeya-ai/engine/adapters/installation/index.js';
 import { TranscriptFileReader } from '@seeya-ai/engine/adapters/transcript/index.js';
 import { GitAdapter } from '@seeya-ai/engine/adapters/git/index.js';
@@ -329,7 +330,7 @@ export async function buildAppContext(homeDir: string = os.homedir()): Promise<A
         ? 'inherited'
         : 'login-shell';
   const pathEnv = loginShellPath ?? process.env.PATH;
-  const autostart = buildAutostart(homeDir);
+  const autostart = buildAutostart(homeDir, home.seeyaHome);
   // V2-T5a item 5: same shape as cli/composition.ts#buildEndDayContext's own generatorOptions —
   // both generators are always built, never chosen here; captureSession (application/
   // capture-session.ts) picks between them per session (see EndDayDeps's own docstring on why).
@@ -381,16 +382,15 @@ export async function buildAppContext(homeDir: string = os.homedir()): Promise<A
   // V2-T13, D-045 item 4: same target as `startDaemon`'s own `spawnDetachedDaemon` call, reused
   // here as the (nodePath, scriptPath, env) trio `Autostart.enable`'s options now accept.
   function enableAppAutostart(): Promise<AutostartEnableResult> {
-    // `AutostartLaunchOptions.env` is `Record<string, string>` (every real OS mechanism it feeds —
-    // the Windows cmd.exe wrapper, a systemd Environment= line, a plist string value — needs an
-    // actual string, never the literal text "undefined"); `NodeJS.ProcessEnv`'s index signature
-    // allows `string | undefined`, so this drops any `undefined` entry rather than assuming
-    // `daemonLaunchTarget.env` (always fully defined, built above) never has one.
-    const env = Object.fromEntries(
-      Object.entries(daemonLaunchTarget.env ?? {}).filter(
-        (entry): entry is [string, string] => entry[1] !== undefined,
-      ),
-    );
+    // V2-T23: `daemonLaunchTarget.env` is the FULL, D-017-cleaned environment the live "Start
+    // daemon" spawn uses right now — a photograph of this login (dead `SSH_AUTH_SOCK`/`TMPDIR` at
+    // the next one, XPC/launch bookkeeping, `USER`/`HOME`/`SHELL` the OS already sets) that has no
+    // business going to disk for a registration read back weeks later. `buildAutostartEnv` is the
+    // measured fix: only `ELECTRON_RUN_AS_NODE`/`PATH` survive (see its own docstring in
+    // `@seeya-ai/engine/adapters/autostart/env.js` for the allowlist and why), and it also handles
+    // `NodeJS.ProcessEnv`'s `string | undefined` values directly, so no separate filter is needed
+    // here any more.
+    const env = buildAutostartEnv(daemonLaunchTarget.env ?? {});
     return autostart.enable(daemonLaunchTarget.scriptPath, {
       execPath: daemonLaunchTarget.nodePath,
       env,

@@ -24,6 +24,7 @@ import {
   decideAutostartEnable,
   type AutostartRawQuery,
 } from '../../core/autostart.js';
+import { AUTOSTART_OUTPUT_LOG_FILE_NAME, buildAutostartEnv } from './env.js';
 import type { CommandRunner } from '../notification/backend.js';
 import { spawnCommand } from '../notification/backend.js';
 
@@ -53,10 +54,26 @@ function buildEnvironmentVariablesLines(
   ];
 }
 
+/** V2-T23 item 5: `launchd`'s own native way to capture a launched job's stdout/stderr — no
+ * wrapper needed here, unlike Windows' Task Scheduler. Both keys point at the SAME file
+ * (`AUTOSTART_OUTPUT_LOG_FILE_NAME`), stdout and stderr interleaved, which is enough to answer "did
+ * this run, and what did it say" without a second file to check; launchd creates the file if it
+ * doesn't exist and does not truncate it between runs, so the file is a running history across
+ * logins, not just the last one. */
+function buildOutputCaptureLines(outputLogPath: string): string[] {
+  return [
+    '  <key>StandardOutPath</key>',
+    `  <string>${outputLogPath}</string>`,
+    '  <key>StandardErrorPath</key>',
+    `  <string>${outputLogPath}</string>`,
+  ];
+}
+
 function buildPlistContent(
   execPath: string,
   binaryPath: string,
   env: Readonly<Record<string, string>> | undefined,
+  outputLogPath: string,
 ): string {
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
@@ -73,6 +90,7 @@ function buildPlistContent(
     '    <string>daemon</string>',
     '  </array>',
     ...buildEnvironmentVariablesLines(env),
+    ...buildOutputCaptureLines(outputLogPath),
     '  <key>RunAtLoad</key>',
     '  <true/>',
     '</dict>',
@@ -117,6 +135,11 @@ function commandFailure(action: string, exitCode: number | null, stderr: string)
 
 export interface MacosAutostartOptions {
   readonly homeDir?: string;
+  /** V2-T23: the injectable `~/.seeya/` root (D-027) — separate from `homeDir` above, which is
+   * only ever used for `~/Library/LaunchAgents/`. Defaults to `''` the same way `homeDir` falls
+   * back to `process.env.HOME ?? ''`: a real value always comes from `buildAutostart`'s own
+   * caller, this is only ever hit by a test that doesn't care about the output log path. */
+  readonly seeyaHome?: string;
   readonly run?: CommandRunner;
   readonly readFile?: (path: string) => string | null;
   readonly writeFile?: (path: string, content: string) => void;
@@ -126,6 +149,7 @@ export interface MacosAutostartOptions {
 
 export class MacosAutostart implements Autostart {
   private readonly plistPath: string;
+  private readonly outputLogPath: string;
   private readonly run: CommandRunner;
   private readonly readFile: (path: string) => string | null;
   private readonly writeFile: (path: string, content: string) => void;
@@ -135,6 +159,7 @@ export class MacosAutostart implements Autostart {
   constructor(options: MacosAutostartOptions = {}) {
     const homeDir = options.homeDir ?? process.env.HOME ?? '';
     this.plistPath = path.join(homeDir, 'Library', 'LaunchAgents', PLIST_NAME);
+    this.outputLogPath = path.join(options.seeyaHome ?? '', AUTOSTART_OUTPUT_LOG_FILE_NAME);
     this.run = options.run ?? spawnCommand;
     this.readFile = options.readFile ?? defaultReadFile;
     this.writeFile = options.writeFile ?? defaultWriteFile;
@@ -167,7 +192,13 @@ export class MacosAutostart implements Autostart {
     // yet, on a first `enable`) — only the write + load that follow have to succeed.
     await this.run('launchctl', ['unload', this.plistPath]).catch(() => undefined);
     const execPath = options.execPath ?? process.execPath;
-    this.writeFile(this.plistPath, buildPlistContent(execPath, binaryPath, options.env));
+    // V2-T23: only the allowlisted vars ever reach the plist — see env.ts's own docstring for why
+    // `options.env` (which could be anything a caller hands in) is never trusted verbatim.
+    const env = buildAutostartEnv(options.env ?? {});
+    this.writeFile(
+      this.plistPath,
+      buildPlistContent(execPath, binaryPath, env, this.outputLogPath),
+    );
     const result = await this.run('launchctl', ['load', '-w', this.plistPath]);
     if (result.exitCode !== 0) {
       throw commandFailure(`load -w ${this.plistPath}`, result.exitCode, result.stderr);

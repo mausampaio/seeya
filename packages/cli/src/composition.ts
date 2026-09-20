@@ -131,7 +131,7 @@ export async function buildCliContext(homeDir: string = os.homedir()): Promise<C
     clock,
     storage,
     processControl: realProcessControl,
-    autostart: buildAutostart(homeDir),
+    autostart: buildAutostart(homeDir, home.seeyaHome),
   };
 }
 
@@ -372,7 +372,7 @@ export interface AutostartContext {
  * rather than this function reaching for it a second, different way.
  */
 export function buildAutostartContext(homeDir: string = os.homedir()): AutostartContext {
-  return { autostart: buildAutostart(homeDir) };
+  return { autostart: buildAutostart(homeDir, resolveCliHome(homeDir).seeyaHome) };
 }
 
 /**

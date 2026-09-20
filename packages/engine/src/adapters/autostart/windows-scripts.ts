@@ -57,26 +57,35 @@ try {
 }
 
 /**
- * Prefixes `argument` with `set K=V&& ` for every entry of `env` (V2-T13, D-045 item 4) and moves
- * the launched executable to `cmd.exe /c "..."` — `New-ScheduledTaskAction` has no environment
- * parameter of its own (measured: PowerShell 5.1's `ScheduledTasks` module carries none), so a
- * `cmd.exe` wrapper is what actually sets the variable before the real command runs; `set` inside
- * one `cmd.exe /c` invocation stays visible to every process IT spawns (`conhost.exe`, then
- * `execPath`), which is the only requirement here. Returns `execute`/`argument` unchanged when
- * `env` is empty/undefined — the CLI's own call (no `env`) never goes through this wrapper at all,
- * same script text as before this task.
+ * Wraps the launch command in `cmd.exe /c "..."`, ALWAYS since V2-T23 (before that task, only
+ * when `env` carried at least one entry). Two things need this wrapper, both because
+ * `New-ScheduledTaskAction` has no parameter of its own for either (measured: PowerShell 5.1's
+ * `ScheduledTasks` module carries neither):
+ *
+ * - `set K=V&& ` for every entry of `env` (V2-T13, D-045 item 4) — `set` inside one `cmd.exe /c`
+ *   invocation stays visible to every process IT spawns (`conhost.exe`, then `execPath`), which is
+ *   the only requirement here.
+ * - `>> "<outputLogPath>" 2>&1` (V2-T23 item 5) — redirects whatever the launched process writes
+ *   to stdout/stderr into a file inside `~/.seeya/`, appending across runs, so a login that failed
+ *   to start the daemon leaves a trace instead of vanishing silently (the exact 2026-09-20 Mac case
+ *   docs/PLANO-DE-ENTREGA.md V2-T23's own plan entry measures — this fixes it on Windows too, per
+ *   that entry's own item 2: "a regra vale para os três adaptadores").
  */
-function withEnvPrefix(
+function buildWrappedLaunch(
   env: Readonly<Record<string, string>> | undefined,
+  outputLogPath: string,
   execute: string,
   argument: string,
 ): { readonly execute: string; readonly argument: string } {
   const entries = env === undefined ? [] : Object.entries(env);
-  if (entries.length === 0) {
-    return { execute, argument };
-  }
-  const sets = entries.map(([key, value]) => `set ${key}=${value}`).join('&& ');
-  return { execute: 'cmd.exe', argument: `/c "${sets}&& ${execute} ${argument}"` };
+  const setsPrefix =
+    entries.length === 0
+      ? ''
+      : `${entries.map(([key, value]) => `set ${key}=${value}`).join('&& ')}&& `;
+  return {
+    execute: 'cmd.exe',
+    argument: `/c "${setsPrefix}${execute} ${argument} >> "${outputLogPath}" 2>&1"`,
+  };
 }
 
 /**
@@ -91,16 +100,19 @@ function withEnvPrefix(
  * launched task needs `ELECTRON_RUN_AS_NODE=1` set for that binary to behave as Node at all
  * (`adapters/process/daemon-launch.ts#DaemonLaunchTarget`'s own docstring has the full mechanism —
  * `spawnDetachedDaemon` sets this the same way for the "Start daemon" button, this is the same
- * fact carried into the REGISTERED task instead of a one-off `spawn`). See `withEnvPrefix` above
- * for how it's actually injected.
+ * fact carried into the REGISTERED task instead of a one-off `spawn`). `outputLogPath` (V2-T23
+ * item 5, required) is where the launched process's stdout/stderr land. See `buildWrappedLaunch`
+ * above for how both are actually injected.
  */
 export function buildRegisterScript(
   execPath: string,
   scriptPath: string,
+  outputLogPath: string,
   env?: Readonly<Record<string, string>>,
 ): string {
-  const { execute, argument } = withEnvPrefix(
+  const { execute, argument } = buildWrappedLaunch(
     env,
+    outputLogPath,
     'conhost.exe',
     `--headless "${execPath}" "${scriptPath}" daemon`,
   );

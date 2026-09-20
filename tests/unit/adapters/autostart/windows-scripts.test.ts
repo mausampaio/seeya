@@ -6,6 +6,8 @@ import {
   buildUnregisterScript,
 } from '@seeya-ai/engine/adapters/autostart/windows-scripts.js';
 
+const OUTPUT_LOG_PATH = 'C:\\Users\\<usuario>\\.seeya\\autostart.log';
+
 describe('buildQueryScript', () => {
   it('queries the fixed task name and prints found/registeredPath as compact JSON', () => {
     const script = buildQueryScript();
@@ -17,30 +19,35 @@ describe('buildQueryScript', () => {
 });
 
 describe('buildRegisterScript', () => {
-  it('wraps the launch command in conhost.exe --headless, with both paths quoted', () => {
+  it('wraps the launch command in cmd.exe /c "conhost.exe --headless ...", with both paths quoted (V2-T23: always wrapped, for output capture)', () => {
     const script = buildRegisterScript(
       'C:\\Program Files\\nodejs\\node.exe',
       'C:\\code\\seeya\\dist\\cli\\index.js',
+      OUTPUT_LOG_PATH,
     );
-    expect(script).toContain("Execute 'conhost.exe'");
+    expect(script).toContain("Execute 'cmd.exe'");
     expect(script).toContain(
-      '--headless "C:\\Program Files\\nodejs\\node.exe" "C:\\code\\seeya\\dist\\cli\\index.js" daemon',
+      '/c "conhost.exe --headless "C:\\Program Files\\nodejs\\node.exe" "C:\\code\\seeya\\dist\\cli\\index.js" daemon',
     );
   });
 
   it('registers AtLogOn for the current user, Interactive logon type (Q-067: the toast needs the interactive session)', () => {
-    const script = buildRegisterScript('node.exe', 'script.js');
+    const script = buildRegisterScript('node.exe', 'script.js', OUTPUT_LOG_PATH);
     expect(script).toContain('New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME');
     expect(script).toContain('-LogonType Interactive -RunLevel Limited');
   });
 
   it('stores the registered path in -Description, not only inside -Argument', () => {
-    const script = buildRegisterScript('node.exe', 'C:\\code\\seeya\\dist\\cli\\index.js');
+    const script = buildRegisterScript(
+      'node.exe',
+      'C:\\code\\seeya\\dist\\cli\\index.js',
+      OUTPUT_LOG_PATH,
+    );
     expect(script).toContain("-Description 'C:\\code\\seeya\\dist\\cli\\index.js'");
   });
 
   it('unregisters any previous task with the same name before registering (idempotent, never duplicates)', () => {
-    const script = buildRegisterScript('node.exe', 'script.js');
+    const script = buildRegisterScript('node.exe', 'script.js', OUTPUT_LOG_PATH);
     const unregisterIndex = script.indexOf('Unregister-ScheduledTask');
     const registerIndex = script.indexOf('Register-ScheduledTask -TaskName');
     expect(unregisterIndex).toBeGreaterThan(-1);
@@ -48,39 +55,59 @@ describe('buildRegisterScript', () => {
   });
 
   it('escapes a single quote in the path for the PowerShell single-quoted string literal', () => {
-    const script = buildRegisterScript("C:\\it's\\node.exe", "C:\\it's\\index.js");
+    const script = buildRegisterScript("C:\\it's\\node.exe", "C:\\it's\\index.js", OUTPUT_LOG_PATH);
     expect(script).toContain("C:\\it''s\\node.exe");
     expect(script).toContain("C:\\it''s\\index.js");
+  });
+
+  // V2-T23 item 5: whatever conhost.exe/node/seeya daemon write to stdout/stderr lands in
+  // outputLogPath, appended across runs — never lost the way a silent login failure was before
+  // this task (docs/PLANO-DE-ENTREGA.md V2-T23's own measured Mac defect).
+  it('always redirects stdout/stderr to outputLogPath, appending', () => {
+    const script = buildRegisterScript('node.exe', 'script.js', OUTPUT_LOG_PATH);
+    expect(script).toContain(`>> "${OUTPUT_LOG_PATH}" 2>&1`);
   });
 
   // V2-T13, D-045 item 4: the app's own daemon needs ELECTRON_RUN_AS_NODE=1 set for its Electron
   // binary to behave as plain Node — New-ScheduledTaskAction has no environment parameter, so a
   // cmd.exe wrapper is what actually carries it into the registered task.
-  it('with env: wraps the launch in cmd.exe /c "set VAR=... && ...", never bare conhost.exe', () => {
-    const script = buildRegisterScript('C:\\seeya\\seeya.exe', 'C:\\seeya\\dist\\cli\\index.js', {
-      ELECTRON_RUN_AS_NODE: '1',
-    });
+  it('with env: wraps the launch in cmd.exe /c "set VAR=... && ...", still redirecting output', () => {
+    const script = buildRegisterScript(
+      'C:\\seeya\\seeya.exe',
+      'C:\\seeya\\dist\\cli\\index.js',
+      OUTPUT_LOG_PATH,
+      { ELECTRON_RUN_AS_NODE: '1' },
+    );
     expect(script).toContain("Execute 'cmd.exe'");
     expect(script).toContain(
-      '/c "set ELECTRON_RUN_AS_NODE=1&& conhost.exe --headless "C:\\seeya\\seeya.exe" "C:\\seeya\\dist\\cli\\index.js" daemon"',
+      `/c "set ELECTRON_RUN_AS_NODE=1&& conhost.exe --headless "C:\\seeya\\seeya.exe" "C:\\seeya\\dist\\cli\\index.js" daemon >> "${OUTPUT_LOG_PATH}" 2>&1"`,
     );
   });
 
   it('with multiple env entries: chains them with &&, one "set" per entry', () => {
-    const script = buildRegisterScript('node.exe', 'script.js', { A: '1', B: '2' });
+    const script = buildRegisterScript('node.exe', 'script.js', OUTPUT_LOG_PATH, {
+      A: '1',
+      B: '2',
+    });
     expect(script).toContain('set A=1&& set B=2&&');
   });
 
-  it("without env (undefined): identical to the two-argument call — the CLI's own path never changes", () => {
-    const withoutOptionsArg = buildRegisterScript('node.exe', 'script.js');
-    const withUndefinedEnv = buildRegisterScript('node.exe', 'script.js', undefined);
+  it("without env (undefined): identical to the three-argument call — the CLI's own path never changes", () => {
+    const withoutOptionsArg = buildRegisterScript('node.exe', 'script.js', OUTPUT_LOG_PATH);
+    const withUndefinedEnv = buildRegisterScript(
+      'node.exe',
+      'script.js',
+      OUTPUT_LOG_PATH,
+      undefined,
+    );
     expect(withoutOptionsArg).toBe(withUndefinedEnv);
-    expect(withoutOptionsArg).toContain("Execute 'conhost.exe'");
+    expect(withoutOptionsArg).not.toContain('set ');
   });
 
   it('an empty env object behaves exactly like no env at all', () => {
-    const script = buildRegisterScript('node.exe', 'script.js', {});
-    expect(script).toContain("Execute 'conhost.exe'");
+    const withEmptyEnv = buildRegisterScript('node.exe', 'script.js', OUTPUT_LOG_PATH, {});
+    const withNoEnv = buildRegisterScript('node.exe', 'script.js', OUTPUT_LOG_PATH);
+    expect(withEmptyEnv).toBe(withNoEnv);
   });
 });
 

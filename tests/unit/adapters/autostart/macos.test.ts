@@ -9,10 +9,12 @@ import { MacosAutostart } from '@seeya-ai/engine/adapters/autostart/macos.js';
 import { RecordingCommandRunner } from './_command-runner-fakes.js';
 
 const HOME_DIR = '/Users/<usuario>';
+const SEEYA_HOME = '/Users/<usuario>/.seeya';
 const BINARY_PATH = '/Users/<usuario>/code/seeya/dist/cli/index.js';
 // Built with `path.join`, same as `MacosAutostart` itself — host-independent, same reasoning
 // as `linux.test.ts`'s own `UNIT_PATH`.
 const PLIST_PATH = path.join(HOME_DIR, 'Library', 'LaunchAgents', 'com.seeya.daemon.plist');
+const OUTPUT_LOG_PATH = path.join(SEEYA_HOME, 'autostart.log');
 
 function buildFakeFiles(initial: Map<string, string> = new Map()) {
   const files = initial;
@@ -92,6 +94,7 @@ describe('MacosAutostart#enable', () => {
       removeFile,
       run: runner.run,
       homeDir: HOME_DIR,
+      seeyaHome: SEEYA_HOME,
     });
 
     await expect(autostart.enable(BINARY_PATH)).resolves.toEqual({
@@ -103,6 +106,30 @@ describe('MacosAutostart#enable', () => {
       { command: 'launchctl', args: ['unload', PLIST_PATH] },
       { command: 'launchctl', args: ['load', '-w', PLIST_PATH] },
     ]);
+  });
+
+  // V2-T23 item 5: launchd's own native StandardOutPath/StandardErrorPath, pointing inside
+  // ~/.seeya/ — never left out, so a login that fails to start the daemon leaves a trace.
+  it('always writes StandardOutPath/StandardErrorPath, pointing at ~/.seeya/autostart.log', async () => {
+    const { files, readFile, writeFile, removeFile } = buildFakeFiles();
+    const runner = new RecordingCommandRunner([
+      { exitCode: 1, stdout: '', stderr: 'not loaded' },
+      { exitCode: 0, stdout: '', stderr: '' },
+    ]);
+    const autostart = new MacosAutostart({
+      readFile,
+      writeFile,
+      removeFile,
+      run: runner.run,
+      homeDir: HOME_DIR,
+      seeyaHome: SEEYA_HOME,
+    });
+
+    await autostart.enable(BINARY_PATH);
+    const plist = files.get(PLIST_PATH) ?? '';
+    expect(plist).toContain('<key>StandardOutPath</key>');
+    expect(plist).toContain('<key>StandardErrorPath</key>');
+    expect(plist).toContain(`<string>${OUTPUT_LOG_PATH}</string>`);
   });
 
   // V2-T13, D-045 item 4: the plist's own EnvironmentVariables dict, launchd's native mechanism
@@ -119,6 +146,7 @@ describe('MacosAutostart#enable', () => {
       removeFile,
       run: runner.run,
       homeDir: HOME_DIR,
+      seeyaHome: SEEYA_HOME,
     });
 
     await autostart.enable(BINARY_PATH, { env: { ELECTRON_RUN_AS_NODE: '1' } });
@@ -126,6 +154,48 @@ describe('MacosAutostart#enable', () => {
     expect(plist).toContain('<key>EnvironmentVariables</key>');
     expect(plist).toContain('<key>ELECTRON_RUN_AS_NODE</key>');
     expect(plist).toContain('<string>1</string>');
+  });
+
+  // V2-T23 items 1/2/4: the measured Mac defect — a caller handing in a live-spawn's WHOLE
+  // environment must never see anything but the allowlist land in the plist. `SSH_AUTH_SOCK` is
+  // the specific variable docs/PLANO-DE-ENTREGA.md V2-T23's own plan entry names as the most
+  // dangerous one to keep (a dead socket path makes `git` hang/fail during capture).
+  it('with a candidate env far beyond the allowlist: only ELECTRON_RUN_AS_NODE/PATH ever reach the plist', async () => {
+    const { files, readFile, writeFile, removeFile } = buildFakeFiles();
+    const runner = new RecordingCommandRunner([
+      { exitCode: 1, stdout: '', stderr: 'not loaded' },
+      { exitCode: 0, stdout: '', stderr: '' },
+    ]);
+    const autostart = new MacosAutostart({
+      readFile,
+      writeFile,
+      removeFile,
+      run: runner.run,
+      homeDir: HOME_DIR,
+      seeyaHome: SEEYA_HOME,
+    });
+
+    await autostart.enable(BINARY_PATH, {
+      env: {
+        ELECTRON_RUN_AS_NODE: '1',
+        PATH: '/usr/bin:/bin',
+        SSH_AUTH_SOCK: '/private/tmp/com.apple.launchd.deadSocket/Listeners',
+        TMPDIR: '/var/folders/dead-login-temp-dir/',
+        XPC_SERVICE_NAME: 'com.seeya.app',
+        USER: '<usuario>',
+        HOME: '/Users/<usuario>',
+        SHELL: '/bin/zsh',
+      },
+    });
+    const plist = files.get(PLIST_PATH) ?? '';
+    expect(plist).toContain('<key>ELECTRON_RUN_AS_NODE</key>');
+    expect(plist).toContain('<key>PATH</key>');
+    expect(plist).not.toContain('SSH_AUTH_SOCK');
+    expect(plist).not.toContain('TMPDIR');
+    expect(plist).not.toContain('XPC_SERVICE_NAME');
+    expect(plist).not.toContain('<key>USER</key>');
+    expect(plist).not.toContain('<key>HOME</key>');
+    expect(plist).not.toContain('<key>SHELL</key>');
   });
 
   it('without options.env: no EnvironmentVariables key at all — same plist as before this task', async () => {
