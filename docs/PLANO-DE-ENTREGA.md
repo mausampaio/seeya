@@ -6775,6 +6775,51 @@ texto, mas não são a fila.
       **Aceite do mantenedor:** no Mac, abrir abas, fechar a janela e não ver diálogo de erro
       nenhum; conferir que nenhum processo de aba ficou vivo depois.
 
+- [ ] **V2-T21 — Correção: o botão de autostart mostra o estado anterior por até um minuto; e o
+      painel "Hoje" não diz por que não há nada para marcar.** Especificada pelo PO em 2026-09-20 a
+      partir de dois achados do mantenedor no mesmo dia, com captura de tela. Pequena, e independente
+      das outras da fila.
+
+      **Defeito 1, medido.** Depois de clicar em **Disable autostart**, a mensagem confirma
+      ("Autostart disabled: seeya daemon will no longer start on login") mas **o botão continua
+      escrito "Disable autostart"** — não vira "Enable autostart". A opção de religar existe, só
+      demora a aparecer. **Causa:** o estado do autostart é lido com cache de 60 segundos
+      (`state/autostart-cache.ts`, `DEFAULT_AUTOSTART_REFRESH_INTERVAL_MS`), e o handler de
+      `CHANNELS.autostartControl` (`electron/main.ts`) **não invalida esse cache** depois de agir —
+      o rótulo só se corrige no próximo ciclo em que o cache vence. Mesma família da V2-T16
+      (responder a partir de um valor velho), aqui num cache em vez de um campo.
+
+      **Defeito 2, do mesmo relato.** Com as três sessões do plano abertas, todas aparecem como
+      "running now" e **nenhuma tem caixa** — que é a regra certa (retomar o que já está aberto
+      abriria uma segunda cópia). Mas a tela não diz isso: sobra um botão **Resume selected** que
+      não faz nada, e a leitura natural é "o app quebrou", que foi exatamente a do mantenedor
+      (*"agora não consigo dar resume em sessão nenhuma"*). Ausência de explicação vira suspeita de
+      defeito.
+
+      **O que entra:**
+      1. **O rótulo do autostart corrige na hora.** Depois de ligar ou desligar, o estado é relido
+         imediatamente (invalidar o cache é o mínimo; melhor ainda se a resposta da própria ação já
+         trouxer a disponibilidade recomputada, como `snoozeToday` já faz com a faixa de horário).
+         O cache de 60s continua valendo para o ciclo ambiente — ele existe por medição (Q-071), e
+         esta tarefa não o remove.
+      2. **O painel "Hoje" explica quando não há o que marcar.** Quando nenhuma linha oferece
+         caixa, uma frase diz o porquê — "todas as sessões do plano de hoje já estão abertas" — e o
+         botão **Resume selected** não fica sozinho oferecendo uma ação vazia (desabilitado, com o
+         motivo à vista; nunca um botão que aceita clique e não faz nada). O texto fica em
+         `text/messages.ts`.
+      3. **Teste dos dois**: a disponibilidade recomputada depois da ação, e a frase aparecendo
+         exatamente quando nenhuma linha oferece caixa (e não aparecendo quando alguma oferece).
+
+      **O que não entra:** permitir retomar uma sessão que já está aberta (abriria uma segunda
+      cópia da mesma sessão — se o mantenedor quiser isso um dia, é decisão, não correção); mudar o
+      cache de 60s.
+
+      **Cuidados:** nenhuma dependência nova; nada no `~/.seeya` real, no autostart real ou no
+      registro — a disponibilidade é testada com dublê da porta `Autostart`.
+
+      **Aceite do mantenedor:** desligar o autostart e o botão virar "Enable autostart" na hora;
+      com todas as sessões do plano abertas, a janela dizer isso em vez de parecer quebrada.
+
 ## Definição de pronto (vale para toda tarefa)
 
 1. Código implementa exatamente a spec; divergência virou questão, não improviso.
