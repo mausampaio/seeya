@@ -4549,9 +4549,29 @@ texto, mas não são a fila.
       do seeya. Um detalhe que confirma o desenho: a sessão que instalou o `oh-my-posh` escolheu
       uma fonte diferente para o terminal do sistema, e a aba do seeya ficou certa mesmo assim —
       porque a aba desenha com a Nerd Font embutida, não com a fonte do terminal da máquina.
-      **Pendente:** o Linux (o `oh-my-posh` legível lá) e o Mac (o diagnóstico do helper e uma
-      aba de shell abrindo); a tarefa fica em `[~]` até um dos dois, com o Mac registrado como
-      pendência do mantenedor de qualquer forma.
+      **Diagnóstico do Mac, medido pelo mantenedor em 2026-09-20 — hipótese CONFIRMADA, e com uma
+      surpresa.** No Mac dele, `ls -l node_modules/node-pty/prebuilds/*/spawn-helper` devolveu:
+
+      ```
+      -rw-r--r--  ... darwin-arm64/spawn-helper
+      -rwxr-xr-x  ... darwin-x64/spawn-helper
+      ```
+
+      Ou seja: **só o prebuild `arm64` vem sem o bit de execução**; o `x64`, do mesmo pacote e da
+      mesma instalação, vem com ele. Isso explica o `posix_spawnp failed` num Mac Apple Silicon e
+      explica também por que o defeito nunca apareceu em máquina Intel — não é "o npm perde o
+      modo", é o próprio tarball do node-pty que empacota os dois arquivos com modos diferentes.
+      A correção já existente (`ensureSpawnHelperExecutable`, em `build.mjs`) cobre este caso no
+      **desenvolvimento**.
+
+      **Consequência que a medição expõe, e que esta tarefa NÃO cobre:** o app **instalado** no
+      macOS nunca roda `build.mjs`. O `.dmg` leva o `spawn-helper` com o modo que estiver no
+      `node_modules` de quem empacotou — 644 no caso do `arm64` —, então um Mac Apple Silicon com
+      o app instalado cairia no mesmo `posix_spawnp failed`, e a correção de hoje não o alcança.
+      Registrado como item da tarefa de instalador (V2-T15).
+
+      **Pendente:** o Linux (o `oh-my-posh` legível lá) e, no Mac, uma aba de shell abrindo com
+      `npm run app` — o diagnóstico acima já está feito.
 
 - [x] **V2-T4 — A interface retoma o dia: `start-day` em abas e pergunta antes do fallback
       (D-042, D-043, D-039).** Especificada pelo PO em 2026-09-14; aprovada e despachada pelo
@@ -6047,6 +6067,14 @@ texto, mas não são a fila.
       formas (e então dizer isso no comentário, e conferir tudo que depende do local — autostart,
       caminho do daemon, remoção na desinstalação) ou esconder a opção. **A V2-T13 já foi avisada**
       do efeito imediato: a detecção de instalação no Windows tem de olhar HKCU e HKLM.
+      **Quarto achado, medido pelo mantenedor no Mac em 2026-09-20 (ver V2-T3).** O
+      `spawn-helper` do node-pty vem **sem bit de execução no prebuild `arm64`** (e com ele no
+      `x64`). No desenvolvimento, `build.mjs` corrige antes de subir; o app **instalado** nunca
+      roda esse script, então o `.dmg` leva o arquivo como está e um Mac Apple Silicon instalado
+      falharia em toda aba com `posix_spawnp failed`. Esta tarefa garante o bit de execução no
+      pacote (o `electron-builder` preserva o modo do que empacota: ou o arquivo é corrigido antes
+      de empacotar, ou o alvo macOS declara isso) e **mede num Mac de verdade** antes de fechar.
+
       **Decisão do mantenedor, 2026-09-20: manter as duas formas de instalação**, com o cuidado que
       ele mesmo levantou — "dois daemon rodando em dois users ao mesmo tempo". O que já protege
       hoje, e o que a tarefa precisa **conferir**:
