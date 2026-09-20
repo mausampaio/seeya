@@ -21,6 +21,7 @@ import type {
 } from '@seeya-ai/engine/core/ports.js';
 import type {
   Config,
+  DaemonOwnershipTransitionAnswer,
   DayState,
   DiscoveredSession,
   EarlyWarningState,
@@ -319,6 +320,23 @@ export class FakeStorage implements Storage {
 
   clearDaemonLock(): ReturnType<Storage['clearDaemonLock']> {
     return Promise.reject(new Error('FakeStorage.clearDaemonLock is not exercised by endDay'));
+  }
+
+  readDaemonOwnershipTransitionAnswer(): ReturnType<
+    Storage['readDaemonOwnershipTransitionAnswer']
+  > {
+    return Promise.reject(
+      new Error('FakeStorage.readDaemonOwnershipTransitionAnswer is not exercised by endDay'),
+    );
+  }
+
+  saveDaemonOwnershipTransitionAnswer(
+    answer: DaemonOwnershipTransitionAnswer,
+  ): ReturnType<Storage['saveDaemonOwnershipTransitionAnswer']> {
+    void answer;
+    return Promise.reject(
+      new Error('FakeStorage.saveDaemonOwnershipTransitionAnswer is not exercised by endDay'),
+    );
   }
 }
 
