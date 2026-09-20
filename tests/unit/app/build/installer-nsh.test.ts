@@ -79,4 +79,65 @@ describe('packages/app/build/installer.nsh', () => {
   it('never shows a MessageBox of its own', () => {
     expect(installerNsh).not.toContain('MessageBox');
   });
+
+  // V2-T20 item 1: "seeya" on PATH after installing.
+  describe('the seeya CLI shim and PATH entry', () => {
+    it('writes the shim and adds it to PATH in customInstall', () => {
+      const customInstallMatch = installerNsh.match(/!macro customInstall([\s\S]*?)!macroend/);
+      expect(customInstallMatch).not.toBeNull();
+      const body = customInstallMatch?.[1] ?? '';
+      expect(body).toContain('seeyaWriteCliShim');
+      expect(body).toContain('seeyaAddBinDirToUserPath');
+    });
+
+    it('removes the shim and the PATH entry in customUnInstall, unconditionally', () => {
+      const customUnInstallMatch = installerNsh.match(/!macro customUnInstall([\s\S]*?)!macroend/);
+      expect(customUnInstallMatch).not.toBeNull();
+      const body = customUnInstallMatch?.[1] ?? '';
+      expect(body).toContain('seeyaRemoveCliShim');
+      expect(body).toContain('seeyaRemoveBinDirFromUserPath');
+    });
+
+    it('writes the shim into its own bin subdirectory, never the GUI exe directory', () => {
+      const shimMacroMatch = installerNsh.match(/!macro seeyaWriteCliShim([\s\S]*?)!macroend/);
+      expect(shimMacroMatch).not.toBeNull();
+      const body = shimMacroMatch?.[1] ?? '';
+      expect(body).toContain('$SeeyaBinDirPath\\seeya.cmd');
+      expect(body).toContain('ELECTRON_RUN_AS_NODE=1');
+      // %~dp0-relative, never a baked-in $INSTDIR — see the macro's own comment for why.
+      expect(body).toContain('%~dp0..\\${APP_EXECUTABLE_FILENAME}');
+      expect(body).toContain(
+        '%~dp0..\\resources\\app.asar\\node_modules\\@seeya-ai\\cli\\dist\\index.js',
+      );
+    });
+
+    it('never reuses StrContains.nsh (already !include-d by the default assisted-installer template)', () => {
+      // The name itself is still allowed in explanatory comments (why it's not reused) — only an
+      // actual !include, which would double-define its Function and fail the compile, is checked.
+      expect(installerNsh).not.toContain('!include StrContains');
+      expect(installerNsh).not.toContain('!include "StrContains');
+    });
+
+    it('defines a separate un.-prefixed find function for the uninstaller half', () => {
+      expect(installerNsh).toContain('Function SeeyaPathFind');
+      expect(installerNsh).toContain('Function un.SeeyaPathFind');
+      expect(installerNsh).toContain('Call SeeyaPathFind');
+      expect(installerNsh).toContain('Call un.SeeyaPathFind');
+    });
+  });
+
+  // V2-T20 item 2: uninstalling removes the autostart registration too.
+  it('removes autostart in customUnInstall, best-effort, via the packaged CLI', () => {
+    const customUnInstallMatch = installerNsh.match(/!macro customUnInstall([\s\S]*?)!macroend/);
+    expect(customUnInstallMatch).not.toBeNull();
+    const body = customUnInstallMatch?.[1] ?? '';
+    expect(body).toContain('seeyaDisableAutostart');
+    const disableMacroMatch = installerNsh.match(/!macro seeyaDisableAutostart([\s\S]*?)!macroend/);
+    expect(disableMacroMatch).not.toBeNull();
+    const disableBody = disableMacroMatch?.[1] ?? '';
+    expect(disableBody).toContain('autostart disable');
+    expect(disableBody).toContain('nsExec::ExecToLog');
+    // Best-effort like the restart in customInstall: logs a failure, never aborts (no `Abort`).
+    expect(disableBody).not.toContain('Abort');
+  });
 });
