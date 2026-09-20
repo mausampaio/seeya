@@ -17,7 +17,7 @@ describe('WindowsAppInstallation#find', () => {
     await expect(installation.find()).resolves.toEqual({ kind: 'notInstalled' });
   });
 
-  it('found, with InstallLocation set → installed, carrying the derived .exe path', async () => {
+  it('found (per-user install), with InstallLocation set → installed, carrying the derived .exe path', async () => {
     const runner = new RecordingCommandRunner([
       {
         exitCode: 0,
@@ -25,6 +25,7 @@ describe('WindowsAppInstallation#find', () => {
           found: true,
           installLocation: 'C:\\Users\\<usuario>\\AppData\\Local\\Programs\\seeya',
           uninstallString: '',
+          displayIcon: '',
         }),
         stderr: '',
       },
@@ -37,7 +38,7 @@ describe('WindowsAppInstallation#find', () => {
     });
   });
 
-  it('found, InstallLocation empty (the measured case, Q-081) → derives from UninstallString', async () => {
+  it('found (per-user install), InstallLocation empty (measured, Q-081) → derives from UninstallString', async () => {
     const runner = new RecordingCommandRunner([
       {
         exitCode: 0,
@@ -46,6 +47,7 @@ describe('WindowsAppInstallation#find', () => {
           installLocation: '',
           uninstallString:
             '"C:\\Users\\<usuario>\\AppData\\Local\\Programs\\seeya\\Uninstall seeya.exe" /currentuser',
+          displayIcon: '',
         }),
         stderr: '',
       },
@@ -58,11 +60,39 @@ describe('WindowsAppInstallation#find', () => {
     });
   });
 
-  it('found, but neither field names a usable directory → unknown, never guessed (D-025)', async () => {
+  // Measured per-machine install (Q-081): InstallLocation AND UninstallString both empty —
+  // DisplayIcon was the only field naming the executable at all, found under HKLM (never HKCU).
+  it('found (per-machine install), InstallLocation/UninstallString both empty → derives from DisplayIcon', async () => {
     const runner = new RecordingCommandRunner([
       {
         exitCode: 0,
-        stdout: JSON.stringify({ found: true, installLocation: '', uninstallString: '' }),
+        stdout: JSON.stringify({
+          found: true,
+          installLocation: '',
+          uninstallString: '',
+          displayIcon: '"C:\\Program Files\\seeya\\seeya.exe",0',
+        }),
+        stderr: '',
+      },
+    ]);
+    const installation = new WindowsAppInstallation({ run: runner.run });
+
+    await expect(installation.find()).resolves.toEqual({
+      kind: 'installed',
+      executablePath: 'C:\\Program Files\\seeya\\seeya.exe',
+    });
+  });
+
+  it('found, but none of the three fields name a usable path → unknown, never guessed (D-025)', async () => {
+    const runner = new RecordingCommandRunner([
+      {
+        exitCode: 0,
+        stdout: JSON.stringify({
+          found: true,
+          installLocation: '',
+          uninstallString: '',
+          displayIcon: '',
+        }),
         stderr: '',
       },
     ]);

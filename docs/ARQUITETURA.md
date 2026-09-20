@@ -178,11 +178,16 @@ Descobre se o app está instalado, pelo registro do próprio sistema operacional
 arquivo do `seeya`. Um adaptador por SO, escolhido por `process.platform`, mesmo formato de
 `adapters/autostart/`:
 
-- **Windows:** lê a entrada de desinstalação (`HKCU\Software\Microsoft\Windows\CurrentVersion\
-  Uninstall`) que o NSIS por usuário cria, procurando pelo `DisplayName` do produto; o caminho do
-  executável sai de `InstallLocation` quando presente, senão é derivado do diretório do próprio
-  `UninstallString` — **medido**: no NSIS por usuário deste projeto, `InstallLocation` veio vazio
-  e o caminho real só existe dentro de `UninstallString` (docs/QUESTOES.md Q-081).
+- **Windows:** lê a entrada de desinstalação que o NSIS cria — em **três** raízes de registro, não
+  só uma: `HKCU\...\Uninstall` (instalação por usuário, o padrão deste projeto), `HKLM\...\
+  Uninstall` e `HKLM\...\WOW6432Node\...\Uninstall` (instalação por máquina, opção do próprio
+  instalador — o registro fica só em HKLM, nunca em HKCU, achado do mantenedor durante a tarefa),
+  procurando pelo `DisplayName` do produto em qualquer uma das três. O caminho do executável sai de
+  `InstallLocation` quando presente, senão do diretório de `UninstallString`, senão de
+  `DisplayIcon` — **medido**: no NSIS por usuário, `InstallLocation` veio vazio e o caminho real só
+  existia em `UninstallString`; no NSIS por máquina, `InstallLocation` E `UninstallString` vieram
+  ambos vazios, e só `DisplayIcon` carregava o caminho (docs/QUESTOES.md Q-081, os dois achados).
+  Falhando os três, o resultado é `unknown`, nunca um caminho inventado (D-025).
 - **Linux:** pergunta ao `dpkg` pelo pacote (`dpkg-query`). Um `AppImage` nunca aparece nesse
   banco, então "não instalado" sai da própria consulta, sem tratamento especial (D-045: "AppImage
   nunca é dono"). Não medido contra um `.deb` real (mesma ressalva de `adapters/autostart/

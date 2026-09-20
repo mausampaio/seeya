@@ -16,7 +16,12 @@ import { buildQueryScript, deriveExecutablePath } from './windows-installation-s
 // not a collection — D-022's item-by-item rule is about external COLLECTIONS, which this isn't.
 const QueryOutputSchema = z.union([
   z.object({ found: z.literal(false) }),
-  z.object({ found: z.literal(true), installLocation: z.string(), uninstallString: z.string() }),
+  z.object({
+    found: z.literal(true),
+    installLocation: z.string(),
+    uninstallString: z.string(),
+    displayIcon: z.string(),
+  }),
 ]);
 
 export interface WindowsAppInstallationOptions {
@@ -48,14 +53,18 @@ export class WindowsAppInstallation implements AppInstallation {
       if (!parsed.found) {
         return { kind: 'notInstalled' };
       }
-      const executablePath = deriveExecutablePath(parsed.installLocation, parsed.uninstallString);
+      const executablePath = deriveExecutablePath(
+        parsed.installLocation,
+        parsed.uninstallString,
+        parsed.displayIcon,
+      );
       if (executablePath === null) {
         return {
           kind: 'unknown',
           error:
-            `the "seeya" uninstall entry was found but neither InstallLocation ` +
-            `("${parsed.installLocation}") nor UninstallString ("${parsed.uninstallString}") ` +
-            'named a usable install directory',
+            `the "seeya" uninstall entry was found but none of InstallLocation ` +
+            `("${parsed.installLocation}"), UninstallString ("${parsed.uninstallString}") or ` +
+            `DisplayIcon ("${parsed.displayIcon}") named a usable executable path`,
         };
       }
       return { kind: 'installed', executablePath };

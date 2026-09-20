@@ -8292,3 +8292,82 @@ ramo `win32` mesmo rodando em Linux, que era o ponto do ajuste.
    equivalente); escolher o diretório anterior no seletor "Resume in" e confirmar que a aba abre
    lá; e, para o item 4, fechar o app com uma sessão retomada nele e ver a caixa dela de volta no
    painel ao reabrir.
+
+## Q-081 — V2-T13 (o app é dono do daemon e do autostart): a detecção de instalação no Windows —
+o que foi medido, o que ficou sem medir, e o achado do mantenedor sobre instalação por máquina
+
+**Contexto.** D-045 item 2 manda detectar a instalação do app pelo registro do próprio sistema,
+nunca por um arquivo do `seeya`. `AppInstallation`/`adapters/installation/` (V2-T13 item 1) foi
+implementada com essa regra; esta entrada registra o que ficou medido contra sistemas reais versus
+o que segue apenas inferido do mecanismo documentado (mesma disciplina que S5-T1/Q-067 já aplicou
+ao `Autostart`).
+
+**Medido no Windows, na máquina onde a tarefa foi feita (leitura, nunca escrita — nenhuma chave
+`seeya`/`seeya-dev` foi criada, alterada ou apagada por este agente).**
+
+Uma instalação NSIS por usuário (`nsis.perMachine: false`, o padrão deste projeto) já existente
+nesta máquina — de uma tarefa anterior — apareceu, ao listar (sem filtrar por nome) as entradas
+de `HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall`, com `DisplayName` = `"seeya
+0.1.0"` (nunca só `"seeya"` — é o default do NSIS do `electron-builder` para
+`uninstallDisplayName`, `"<productName> <version>"`) e `InstallLocation` **vazio**; o único campo
+que carregava o diretório real foi `UninstallString`
+(`"<diretório>\Uninstall seeya.exe" /currentuser`). A implementação inicial só cobria esse caso
+(HKCU + `InstallLocation`/`UninstallString`).
+
+**Correção durante a tarefa, a partir de um achado do mantenedor.** O mantenedor mediu, na própria
+máquina, que o instalador NSIS também oferece "para todos os usuários" — e nesse caso a instalação
+vai para `C:\Program Files\seeya` e a entrada de desinstalação fica em **HKLM**, nunca em HKCU.
+Saída bruta lida por ele (a chave de registro em si é um GUID gerado pelo instalador, sem relação
+com esta máquina — trocado aqui por um obviamente sintético, `11111111-1111-4111-8111-111111111111`,
+seguindo a convenção do projeto para exemplo em doc):
+
+```
+HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall  => (nada)
+HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall  => 11111111-1111-4111-8111-111111111111 | seeya 0.1.0 | InstallLocation=(vazio)
+```
+
+Ou seja: uma consulta restrita a HKCU reportaria `notInstalled` para uma instalação por máquina
+real — o oposto do que D-045 item 2 pede. `InstallLocation` veio vazio aqui também, e desta vez
+`UninstallString` (medido pelo mantenedor) também veio vazio — nenhum dos dois campos que a
+implementação original usava carregava o caminho.
+
+**Correção aplicada, ainda dentro desta tarefa (não ficou pendente para depois):**
+
+1. `adapters/installation/windows-installation-scripts.ts#buildQueryScript` agora varre **três**
+   raízes de registro — `HKCU:\...\Uninstall`, `HKLM:\...\Uninstall` e
+   `HKLM:\...\WOW6432Node\...\Uninstall` (a visão de 32 bits que alguns instaladores usam num
+   Windows de 64 bits) — e considera "instalado" um `DisplayName` batendo em qualquer uma das três,
+   nunca só a primeira. Cada `Get-ChildItem` usa `-ErrorAction SilentlyContinue` própria: uma raiz
+   ausente (ex.: sem instalação por máquina, ou sem entrada nenhuma na visão WOW6432Node) é o caso
+   comum, não uma falha.
+2. `deriveExecutablePath` ganhou um terceiro campo de entrada, `displayIcon` (agora lido de
+   `$match.DisplayIcon` no script) — cadeia de fallback: `InstallLocation` → diretório de
+   `UninstallString` → `DisplayIcon` (que já nomeia o executável diretamente, ao contrário dos
+   outros dois, que nomeiam um diretório). `DisplayIcon` é tipicamente `"<caminho>",N` (caminho
+   entre aspas mais um índice de ícone) ou o caminho nu — ambas as formas são tratadas.
+3. Só quando os três campos falham em dar um caminho utilizável é que `find()` devolve `unknown`
+   (nunca `installed` com um caminho inventado, D-025) — a mensagem de erro nomeia os três valores
+   brutos lidos, para depuração.
+
+**O que ainda não foi medido, e por quê.** A instalação por máquina em si não foi criada/testada
+por este agente (proibido: "não instala o app"); a correção acima foi feita a partir da saída
+bruta que o mantenedor colou, não de uma segunda medição própria. `DisplayIcon`'s exata formatação
+(aspas, índice de ícone) para uma instalação por máquina real deste projeto especificamente
+também não foi confirmada — a implementação trata as duas formas mais comuns do NSIS em geral,
+mas se um instalador futuro gerar um `DisplayIcon` num formato diferente, `find()` degrada para
+`unknown` (nunca inventa), o comportamento seguro já coberto pelo item 3 acima.
+
+**Consequência para `AppInstallationStatus`/`DaemonOwner`.** Nenhuma mudança de formato foi
+necessária: `installed` continua exigindo `executablePath: string` (D-024) — quando nenhuma das
+três fontes dá um caminho confiável, o resultado é `unknown` (D-025: "o estado menos específico
+que a evidência sustenta"), que por sua vez nunca bloqueia nada a jusante
+(`application/daemon-ownership.ts#resolveDaemonOwner`'s própria regra). Isso significa que uma
+instalação por máquina cujo registro não dê caminho nenhum ainda assim não é tratada como
+"instalada" pelo `DaemonOwner` (vira `unknown`, que se comporta como `cli` para a CLI) — um
+resultado conservador, não um caso quebrado: o pior efeito é a CLI continuar permitindo `seeya
+daemon`/`autostart enable` numa máquina onde o app está instalado mas o registro não deu pista
+nenhuma de caminho, nunca o oposto (recusar por engano).
+
+**Linux/macOS continuam sem medição real** (mesma ressalva já registrada nos comentários dos
+próprios adaptadores) — a tarefa não tinha como criar um `.deb` instalado ou um `.app` real dentro
+do escopo permitido.
