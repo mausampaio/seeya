@@ -7392,6 +7392,13 @@ texto, mas não são a fila.
       **Questão aberta:** Q-082 (o nome do arquivo de saída, escolhido sem espec explícita, e o que
       ficou sem medir contra um sistema real em cada SO).
 
+      **Mesclada na `main` em 2026-09-20** (portão na worktree do PO: 201 arquivos, 2.083 testes
+      passando, 4 pulados; cobertura 96,46%/92,59%/95,09%/96,83%). Revisão sem ajustes.
+      **Limite conhecido que o PO registra junto:** o `autostart.log` **cresce sem rotação**. Na
+      prática são poucas linhas por login; num daemon que entre em ciclo de falha, engorda. Fica
+      escrito para não virar surpresa — rotação é trabalho próprio, e só se pagará se alguém
+      medir o arquivo grande de verdade. Fica em `[~]` até o aceite do mantenedor.
+
 - [ ] **V2-T24 (precisa de decisão do mantenedor antes de virar tarefa) — No macOS a notificação
       se apresenta como "Editor de Scripts", e clicar nela abre o editor.** Medido pelo mantenedor
       em 2026-09-20, com captura: o aviso prévio chegou na hora certa e com o texto certo, mas com
