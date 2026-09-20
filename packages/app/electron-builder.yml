@@ -80,6 +80,19 @@ directories:
 # AppImage) — `publish: null` keeps `npm run dist` fully offline and never touches GitHub.
 publish: null
 
+# V2-T15 item 2: re-applies node-pty's own `spawn-helper` execute bit on the PACKAGED output,
+# after asarUnpack has extracted it onto real disk — the one hook electron-builder offers that
+# runs late enough to matter. `scripts/build.mjs`'s own `ensureSpawnHelperExecutable` already fixes
+# this in `node_modules` before packaging starts (now called unconditionally, not just under
+# `--dev` — see that script's own `main`), but that alone was measured NOT to be enough: the
+# maintainer's own installed `.dmg` still had mode 644 on the unpacked file, so packaging itself
+# was not preserving it. `scripts/after-pack.mjs` is a no-op on every platform but macOS (win/linux
+# never ship `spawn-helper` at all) — see that file's own docstring for the measurement behind
+# using an injectable `fs`-like seam instead of a hardcoded one, which is what lets
+# `tests/unit/app/scripts/after-pack.test.ts` prove this on every OS `npm run verificar` runs on,
+# not only a real Mac.
+afterPack: scripts/after-pack.mjs
+
 # Replaces electron-builder's own default file set (which would otherwise ALSO sweep in src/,
 # scripts/, tests, tsconfig.json, docs, everything not git-ignored) with exactly the bundle
 # scripts/build.mjs produces, plus package.json (electron-builder always needs it for metadata —
@@ -252,9 +265,11 @@ mac:
       schemes:
         - seeya
   # Same trims as linux's own "files" (see that block's own comment), for the same reason —
-  # macOS keeps its own darwin-* prebuilds and spawn-helper (build.mjs's own
-  # ensureSpawnHelperExecutable runs in DEV only; the installed app's own native-module handling
-  # here is untouched by that dev-only chmod fix).
+  # macOS keeps its own darwin-* prebuilds and spawn-helper. V2-T15 item 2: `build.mjs`'s own
+  # `ensureSpawnHelperExecutable` now also runs on this (non-dev) `dist` path, and `afterPack`
+  # (top-level field above, `scripts/after-pack.mjs`) fixes the PACKAGED copy again after
+  # `asarUnpack` extraction — see that script's own docstring for why the pre-pack fix alone was
+  # measured not to be enough.
   files:
     - dist/electron/**/*
     - package.json
