@@ -7745,6 +7745,18 @@ texto, mas não são a fila.
       não chegam sozinhas. Quem atualizar o `electron-builder` precisa comparar. Fica em `[~]` até
       o aceite do mantenedor.
 
+      **Mesclada na `main` em 2026-09-20** (portão na worktree do PO: 202 arquivos, 2.095 testes
+      passando, 4 pulados; cobertura 96,46%/92,59%/95,09%/96,83%). Revisão sem ajustes.
+
+      **Leitura do PO sobre os números, para quem chegar depois:** três estão bons e um não.
+      Processador parado em ~0,5% de um núcleo é ótimo para um ciclo que a cada 10s lê `config.json`
+      e descobre sessões. Memória em ~336 MiB é o preço de entrada de um Electron com terminal
+      embutido — nem bom nem mau, é a base a defender. Tamanho em disco é o de qualquer app
+      Electron. **Quase 6 segundos até a lista na tela é lento**, e contradiz o objetivo declarado
+      pelo mantenedor ("leve e rápido"). Antes de otimizar, falta a medida que esta tarefa não podia
+      fazer: **a subida do app INSTALADO**, que não passa pelo lançamento a partir de
+      `node_modules`. Só depois dessa comparação é que uma tarefa de otimização tem alvo — hoje ela
+      teria palpite.
 ## Definição de pronto (vale para toda tarefa)
 
 1. Código implementa exatamente a spec; divergência virou questão, não improviso.
