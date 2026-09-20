@@ -63,8 +63,35 @@ describe('buildAppContext', () => {
 
     expect(discovery.sessions).toHaveLength(1);
     expect(discovery.sessions[0]?.sessionId).toBe('11111111-1111-4111-8111-111111111111');
-    expect(context.config.relevanceHours).toBe(6);
+    // V2-T16: `AppContext` no longer exposes a general-purpose `config` field (item 2) — asserting
+    // the SessionProvider's own filtering above already proves relevanceHours: 6 was read; this
+    // reads it back through the same `Storage` port every other caller now uses.
+    expect((await context.storage.readConfig()).relevanceHours).toBe(6);
   });
+
+  it(
+    'V2-T16 item 2: initialTerminalFontOptions is the one config snapshot still on AppContext, ' +
+      'resolved once from config.json at startup',
+    async () => {
+      fixture = await createDiscoveryFixture();
+      await writeFile(
+        path.join(fixture.seeyaHome, 'config.json'),
+        JSON.stringify({
+          schemaVersion: 1,
+          terminalFontFamily: 'Fixture Mono',
+          terminalFontSize: 21,
+        }),
+        'utf8',
+      );
+
+      const context = await buildAppContext(fixture.root);
+
+      expect(context.initialTerminalFontOptions).toEqual({
+        fontFamily: 'Fixture Mono',
+        fontSize: 21,
+      });
+    },
+  );
 
   it('every other field is built without further I/O', async () => {
     fixture = await createDiscoveryFixture();
