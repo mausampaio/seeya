@@ -72,6 +72,10 @@
 
 Var SeeyaDaemonLockPath
 Var SeeyaCliScriptPath
+; V2-T20 item 1: `$INSTDIR\bin`, the directory this file adds to the current user's own PATH --
+; see `seeyaResolvePaths` below for why it is recomputed alongside the other two paths, and the
+; "seeya on PATH" section further down for the macros that use it.
+Var SeeyaBinDirPath
 ; Measured (a real `npm run dist:windows` run, V2-T15): NSIS's own compiler treats "unreferenced
 ; variable" as a fatal warning (`warning 6001 ... wasting memory!`, `electron-builder`'s own
 ; `makensis` wrapper turns any compiler warning into a hard build failure). `$SeeyaDaemonWasRunning`
@@ -86,6 +90,14 @@ Var SeeyaCliScriptPath
   ; below) — same `!ifndef BUILD_UNINSTALLER` guard as `$SeeyaDaemonWasRunning`, for the identical
   ; reason: only `customInstall` (installer-only) ever writes it.
   Var SeeyaDaemonRestartExitCode
+!endif
+
+; V2-T20 item 2: `customUnInstall`'s own `autostart disable` call's return code -- the mirror image
+; of `$SeeyaDaemonRestartExitCode` above: only the UNINSTALLER half ever writes this one, so it
+; carries the opposite guard (`!ifdef`, not `!ifndef`) for the identical "unreferenced variable"
+; reason.
+!ifdef BUILD_UNINSTALLER
+  Var SeeyaAutostartDisableExitCode
 !endif
 
 ; Sets/clears ELECTRON_RUN_AS_NODE in the INSTALLER'S OWN process environment (System.dll — a
@@ -114,6 +126,201 @@ Var SeeyaCliScriptPath
 !macro seeyaResolvePaths
   StrCpy $SeeyaDaemonLockPath "$PROFILE\.seeya\daemon.lock"
   StrCpy $SeeyaCliScriptPath "$INSTDIR\resources\app.asar\node_modules\@seeya-ai\cli\dist\index.js"
+  StrCpy $SeeyaBinDirPath "$INSTDIR\bin"
+!macroend
+
+; -----------------------------------------------------------------------------------------------
+; V2-T20 item 1: "seeya" on PATH after installing (docs/PLANO-DE-ENTREGA.md V2-T20's own "medir por
+; sistema antes de escolher o mecanismo" — this is the Windows measurement).
+;
+; **What's shipped: a `seeya.cmd` shim in `$INSTDIR\bin`, added to `HKCU\Environment\Path`.** NOT a
+; shim directly inside `$INSTDIR` itself, and NOT a symlink to `${APP_EXECUTABLE_FILENAME}` --
+; `$INSTDIR` already contains `seeya.exe` (the GUI binary), and Windows resolves a bare `seeya`
+; typed at a prompt by PATHEXT order (`.COM`,`.EXE`,`.BAT`,`.CMD` by default), which would pick the
+; GUI `.exe` over a same-directory `.cmd` every time. A SEPARATE `bin\` subdirectory, containing
+; only the shim, is what lets `seeya` on PATH mean "run the CLI" without renaming or touching the
+; GUI executable at all.
+;
+; **The shim uses `%~dp0` (its own directory) instead of a baked-in `$INSTDIR`,** so it keeps
+; working if `allowToChangeInstallationDirectory` ever changes where this ships without this file
+; needing to know about it, and identically to how `seeyaResolvePaths` above already recomputes
+; every path from `$INSTDIR` fresh rather than caching one baked in at a different point in time.
+;
+; **Per-user PATH (`HKCU\Environment`), never `HKLM`'s machine-wide one** -- matches the plan's own
+; wording ("acrescentar ao PATH do usuário") and needs no elevation even under a per-machine
+; (`perMachine: true`, item 3's own finding) install: the CURRENT user, whoever is running this
+; installer, gets `seeya` on their own next terminal either way.
+;
+; **No bundled EnvVarUpdate.nsh-style plugin.** That macro is a well-known community contribution,
+; but it doesn't ship in this project's own `node_modules` (electron-builder's bundled NSIS
+; toolset) or in `app-builder-lib`'s own template tree, and AGENTS.md bans a new dependency without
+; asking. `seeyaPathFind`/`SeeyaPathFind` below are hand-written instead, built from core NSIS
+; instructions already used elsewhere in this file (`StrCpy`/`StrLen`/`StrCmp`/`ReadRegStr`/
+; `WriteRegExpandStr`) plus `SendMessage`, all part of the NSIS compiler this project's own
+; toolchain already downloads (nothing new to fetch). Verified against seven cases (only entry,
+; first/middle/last of several, absent, a same-prefix decoy that must survive, and an empty PATH)
+; with a throwaway `makensis`-compiled harness before landing here -- see this task's own report
+; for the case list; not part of the repo, since it never touches anything this project ships.
+;
+; **A separate, uniquely-named substring function, not a reuse of `StrContains.nsh`.**
+; `app-builder-lib`'s own `assistedInstaller.nsh` ALREADY `!include`s that file unconditionally
+; (because `allowToChangeInstallationDirectory: true` — its own directory-sanitizing check),
+; measured by reading that template; a second `!include` here would double-define
+; `Function StrContains` and fail the installer compile pass.
+; -----------------------------------------------------------------------------------------------
+
+; Broadcast so already-open processes (Explorer, in particular -- it hands its own cached
+; environment block to whatever it launches) notice the PATH change without a reboot; a NEW
+; terminal opened right after still needs this, otherwise it can inherit Explorer's stale block.
+; Defined under seeya-prefixed names rather than `!include "WinMessages.nsh"` (which carries the
+; plain `HWND_BROADCAST`/`WM_SETTINGCHANGE` names) purely to avoid depending on whether that core
+; NSIS header happens to be include-guarded the same way in every future NSIS version this
+; project's toolchain might download -- two integer literals are not worth that question.
+!define SEEYA_HWND_BROADCAST 0xffff
+!define SEEYA_WM_SETTINGCHANGE 0x001A
+
+Var SeeyaPathValue
+Var SeeyaPathHaystack
+Var SeeyaPathNeedle
+Var SeeyaPathScan
+Var SeeyaPathNeedleLen
+Var SeeyaPathHaystackLen
+Var SeeyaPathWindow
+Var SeeyaPathMatchPos
+
+; Returns (via the stack) the 0-based offset of the first occurrence of the needle inside the
+; haystack, or "-1" if it never occurs. Same brute-force scan technique
+; `app-builder-lib`'s own bundled `StrContains.nsh` uses (this section's own top comment explains
+; why that file's function isn't reused directly) — fine for PATH-sized strings, never called in a
+; loop over anything large.
+;
+; **Defined twice, `SeeyaPathFind` and `un.SeeyaPathFind`, identical bodies.** Measured (a real
+; `npm run dist:windows` run): NSIS's own compiler refuses `Call SeeyaPathFind` (no `un.` prefix)
+; from inside the uninstaller half with "Call must be used with function names starting with
+; 'un.' in the uninstall section" — `customUnInstall` (below) is exactly that section, since
+; electron-builder's own two-pass build (`BUILD_UNINSTALLER`, this file's own top comment)
+; compiles a standalone uninstaller binary where the ENTIRE script counts as "the uninstall
+; section". `!macro SeeyaPathFindBody` holds the one body both `Function` blocks share, so the
+; scan logic itself is never duplicated by hand.
+!macro SeeyaPathFindBody
+  Exch $SeeyaPathNeedle
+  Exch
+  Exch $SeeyaPathHaystack
+  StrCpy $SeeyaPathMatchPos -1
+  StrCpy $SeeyaPathScan -1
+  StrLen $SeeyaPathNeedleLen $SeeyaPathNeedle
+  StrLen $SeeyaPathHaystackLen $SeeyaPathHaystack
+  seeyaPathFindLoop:
+    IntOp $SeeyaPathScan $SeeyaPathScan + 1
+    StrCpy $SeeyaPathWindow $SeeyaPathHaystack $SeeyaPathNeedleLen $SeeyaPathScan
+    StrCmp $SeeyaPathWindow $SeeyaPathNeedle seeyaPathFindFound
+    StrCmp $SeeyaPathScan $SeeyaPathHaystackLen seeyaPathFindDone
+    Goto seeyaPathFindLoop
+  seeyaPathFindFound:
+    StrCpy $SeeyaPathMatchPos $SeeyaPathScan
+  seeyaPathFindDone:
+  Pop $SeeyaPathNeedle
+  Exch $SeeyaPathMatchPos
+!macroend
+
+; Each `Function` block below is guarded to the ONE pass that ever calls it (see `seeyaPathFind`/
+; `seeyaPathFindUn` further down) — measured: leaving either unguarded made the OTHER pass's own
+; `makensis` invocation fail with "install function ... not referenced - zeroing code out", a
+; warning this project's own build already treats as fatal (this file's own top comment on
+; `warning 6001`).
+!ifndef BUILD_UNINSTALLER
+Function SeeyaPathFind
+  !insertmacro SeeyaPathFindBody
+FunctionEnd
+!endif
+
+!ifdef BUILD_UNINSTALLER
+Function un.SeeyaPathFind
+  !insertmacro SeeyaPathFindBody
+FunctionEnd
+!endif
+
+; Install-context caller (`seeyaAddBinDirToUserPath`, from `customInstall`).
+!macro seeyaPathFind OUT HAYSTACK NEEDLE
+  Push `${HAYSTACK}`
+  Push `${NEEDLE}`
+  Call SeeyaPathFind
+  Pop ${OUT}
+!macroend
+
+; Uninstall-context caller (`seeyaRemoveBinDirFromUserPath`, from `customUnInstall`) — same
+; arguments, calls the `un.`-prefixed twin above instead.
+!macro seeyaPathFindUn OUT HAYSTACK NEEDLE
+  Push `${HAYSTACK}`
+  Push `${NEEDLE}`
+  Call un.SeeyaPathFind
+  Pop ${OUT}
+!macroend
+
+; Writes/overwrites `$SeeyaBinDirPath\seeya.cmd` -- idempotent, safe to call on every
+; install/upgrade (an upgrade just rewrites the identical content).
+!macro seeyaWriteCliShim
+  CreateDirectory "$SeeyaBinDirPath"
+  FileOpen $0 "$SeeyaBinDirPath\seeya.cmd" w
+  FileWrite $0 "@echo off$\r$\n"
+  FileWrite $0 "rem Generated by the seeya installer (V2-T20 item 1) -- dispatches to the CLI$\r$\n"
+  FileWrite $0 "rem bundled inside the installed app, the same ELECTRON_RUN_AS_NODE=1 mechanism$\r$\n"
+  FileWrite $0 "rem the daemon's own launcher already uses (adapters/process/daemon-launch.ts).$\r$\n"
+  FileWrite $0 "rem %~dp0 is this file's own directory, so this keeps working however the app$\r$\n"
+  FileWrite $0 "rem was installed or reinstalled.$\r$\n"
+  FileWrite $0 "set ELECTRON_RUN_AS_NODE=1$\r$\n"
+  FileWrite $0 '"%~dp0..\${APP_EXECUTABLE_FILENAME}" "%~dp0..\resources\app.asar\node_modules\@seeya-ai\cli\dist\index.js" %*$\r$\n'
+  FileClose $0
+!macroend
+
+!macro seeyaRemoveCliShim
+  Delete "$SeeyaBinDirPath\seeya.cmd"
+  ; No /r: only removes the directory if the shim was the only thing in it -- never touches
+  ; anything a person might have dropped in there themselves.
+  RMDir "$SeeyaBinDirPath"
+!macroend
+
+; Adds `$SeeyaBinDirPath` to `HKCU\Environment\Path` unless it is already there (an upgrade
+; reinstalling over itself must not grow the value every time).
+!macro seeyaAddBinDirToUserPath
+  ReadRegStr $SeeyaPathValue HKCU "Environment" "Path"
+  StrCpy $SeeyaPathHaystack ";$SeeyaPathValue;"
+  !insertmacro seeyaPathFind $SeeyaPathMatchPos "$SeeyaPathHaystack" ";$SeeyaBinDirPath;"
+  ${if} $SeeyaPathMatchPos == -1
+    ${if} $SeeyaPathValue == ""
+      StrCpy $SeeyaPathValue "$SeeyaBinDirPath"
+    ${else}
+      StrCpy $SeeyaPathValue "$SeeyaPathValue;$SeeyaBinDirPath"
+    ${endIf}
+    WriteRegExpandStr HKCU "Environment" "Path" "$SeeyaPathValue"
+    SendMessage ${SEEYA_HWND_BROADCAST} ${SEEYA_WM_SETTINGCHANGE} 0 "STR:Environment" /TIMEOUT=5000
+    DetailPrint "Added $SeeyaBinDirPath to your PATH -- open a new terminal for 'seeya' to be found"
+  ${else}
+    DetailPrint "$SeeyaBinDirPath is already on your PATH"
+  ${endIf}
+!macroend
+
+; Removes exactly one ';'-delimited occurrence of `$SeeyaBinDirPath` from `HKCU\Environment\Path`
+; -- never a blind string-replace, so a directory that merely shares a prefix (e.g. a hand-added
+; `C:\seeya\bin2`) survives untouched. No-op, quietly, if it was never there.
+!macro seeyaRemoveBinDirFromUserPath
+  ReadRegStr $SeeyaPathValue HKCU "Environment" "Path"
+  StrCpy $SeeyaPathHaystack ";$SeeyaPathValue;"
+  !insertmacro seeyaPathFindUn $SeeyaPathMatchPos "$SeeyaPathHaystack" ";$SeeyaBinDirPath;"
+  ${if} $SeeyaPathMatchPos != -1
+    StrCpy $SeeyaPathWindow $SeeyaPathHaystack $SeeyaPathMatchPos
+    StrLen $SeeyaPathNeedleLen ";$SeeyaBinDirPath"
+    IntOp $SeeyaPathScan $SeeyaPathMatchPos + $SeeyaPathNeedleLen
+    StrCpy $SeeyaPathHaystack "$SeeyaPathHaystack" "" $SeeyaPathScan
+    StrCpy $SeeyaPathHaystack "$SeeyaPathWindow$SeeyaPathHaystack"
+    ; $SeeyaPathHaystack is padded (";A;B;") again at this point -- strip the padding back off.
+    StrLen $SeeyaPathHaystackLen $SeeyaPathHaystack
+    IntOp $SeeyaPathHaystackLen $SeeyaPathHaystackLen - 2
+    StrCpy $SeeyaPathValue $SeeyaPathHaystack $SeeyaPathHaystackLen 1
+    WriteRegExpandStr HKCU "Environment" "Path" "$SeeyaPathValue"
+    SendMessage ${SEEYA_HWND_BROADCAST} ${SEEYA_WM_SETTINGCHANGE} 0 "STR:Environment" /TIMEOUT=5000
+    DetailPrint "Removed $SeeyaBinDirPath from your PATH"
+  ${endIf}
 !macroend
 
 !macro customInit
@@ -153,9 +360,14 @@ Var SeeyaCliScriptPath
 ;    that DOES exit non-zero (a spawn failure inside `spawnDetachedDaemon`, for one) will now also
 ;    get its own explicit line, instead of counting on someone reading the log line above closely.
 !macro customInstall
+  ; V2-T20 item 1: independent of whether the daemon needs restarting below -- this runs on every
+  ; install AND every upgrade, `$INSTDIR` already final at this point (see `seeyaResolvePaths`'s
+  ; own top comment on why every hook recomputes it rather than trusting `customInit`'s copy).
+  !insertmacro seeyaResolvePaths
+  !insertmacro seeyaWriteCliShim
+  !insertmacro seeyaAddBinDirToUserPath
   ${if} $SeeyaDaemonWasRunning == "1"
     DetailPrint "Restarting the seeya daemon (it was running before this install)..."
-    !insertmacro seeyaResolvePaths
     !insertmacro seeyaSetRunAsNode
     nsExec::ExecToLog '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" "$SeeyaCliScriptPath" daemon'
     Pop $SeeyaDaemonRestartExitCode
@@ -166,6 +378,26 @@ Var SeeyaCliScriptPath
   ${endIf}
 !macroend
 
+; V2-T20 item 2: "a desinstalação remove o autostart" -- run through the packaged CLI
+; (`seeya autostart disable`, same reasoning `customInit`'s own top comment already gives for
+; `daemon --stop`: it already knows how to read/remove the OS-specific registration, own tests
+; cover it, and D-045 item 3 left `disable` working for every `DaemonOwner`, not just the app's own).
+; Best-effort like the restart in `customInstall`: `nsExec::ExecToLog` so the CLI's own output
+; ("autostart removed"/"autostart was not registered", or a failure) reaches
+; `%TEMP%\seeya-installer.log`, but a non-zero exit never aborts the uninstall -- the app itself is
+; already gone by the time this runs; a person can still open a terminal and run the command by
+; hand if this one line failed for some OS-specific reason.
+!macro seeyaDisableAutostart
+  DetailPrint "Removing the seeya autostart registration..."
+  !insertmacro seeyaSetRunAsNode
+  nsExec::ExecToLog '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" "$SeeyaCliScriptPath" autostart disable'
+  Pop $SeeyaAutostartDisableExitCode
+  !insertmacro seeyaClearRunAsNode
+  ${if} $SeeyaAutostartDisableExitCode != 0
+    DetailPrint "Removing the seeya autostart registration failed (exit code $SeeyaAutostartDisableExitCode) -- run 'seeya autostart disable' yourself if it is still registered."
+  ${endIf}
+!macroend
+
 !macro customUnInstall
   !insertmacro seeyaResolvePaths
   IfFileExists "$INSTDIR\${APP_EXECUTABLE_FILENAME}" 0 seeyaUnInstallNoExe
@@ -173,6 +405,12 @@ Var SeeyaCliScriptPath
     !insertmacro seeyaSetRunAsNode
     ExecWait '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" "$SeeyaCliScriptPath" daemon --stop'
     !insertmacro seeyaClearRunAsNode
+    !insertmacro seeyaDisableAutostart
   seeyaUnInstallNoExe:
+  ; V2-T20 item 1: undoes `customInstall`'s own `seeyaWriteCliShim`/`seeyaAddBinDirToUserPath` --
+  ; unconditional (unlike the two calls above, which need the packaged exe to still be there to run
+  ; `seeya` itself): removing a file and a registry value needs no exe at all.
+  !insertmacro seeyaRemoveCliShim
+  !insertmacro seeyaRemoveBinDirFromUserPath
   DeleteRegKey HKCU "Software\Classes\seeya"
 !macroend

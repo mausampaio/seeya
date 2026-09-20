@@ -8440,3 +8440,65 @@ que o layout de `~/.seeya/` não é por SO em nenhum outro lugar do projeto.
 funcional): ligar o autostart nos três sistemas, forçar uma falha de login (ex.: renomear o
 binário registrado) e conferir que `~/.seeya/autostart.log` realmente carrega o erro — o mesmo
 "aceite do mantenedor" que V2-T23 já pede para a lista de variáveis, estendido à captura de saída.
+
+## Q-083 — V2-T20 (instalador, o que sobrou): o `seeya` no PATH do macOS não entrou, e o risco dos
+dois usuários fica registrado, não medido
+
+**Contexto.** A tarefa pede, no item 1, "medir por sistema antes de escolher o mecanismo" para
+colocar `seeya` no PATH depois de instalar, com a instrução explícita de que o macOS pode não se
+sustentar ("`/usr/local/bin` exige permissão de administrador, então avalie oferecer isso pela
+janela... Se algum caminho não se sustentar, registre e entregue os que se sustentam"). O item 4
+pede medir o risco dos dois usuários "com duas contas **ou** registrar como limite conhecido com o
+sintoma descrito — nunca resolver às cegas". Os dois pontos abaixo são exatamente essas duas
+saídas, usadas deliberadamente.
+
+**Item 1 — macOS: não implementado nesta tarefa.** Windows (NSIS: `bin\seeya.cmd` mais
+`HKCU\Environment\Path`) e Linux (`.deb`: `/usr/bin/seeya` como script CLI, ver
+`packages/app/build/deb-after-install.sh`) entraram — os dois caminhos "se sustentam" e foram
+verificados por simulação (NSIS: um `makensis` real compilado à parte, sete casos; `.deb`: os
+scripts rodados contra um diretório descartável). O macOS ficou de fora por dois motivos que se
+reforçam:
+
+- A própria tarefa já desaconselha o caminho óbvio (link em `/usr/local/bin` exige elevação no
+  instalador, o que o `.dmg` nem tem como pedir — não há gancho de pós-instalação num `.dmg`,
+  só arrastar para `/Applications`) e sugere "avalie oferecer pela janela" em vez disso — ou seja,
+  um botão na interface do Electron que pede a permissão na hora, uma peça de UI nova, não um
+  ajuste de instalador.
+- Esta tarefa roda inteira numa máquina Windows, com a mesma regra que já parou a V2-T19 por
+  perto: **nenhum agente instala, desinstala ou verifica nada num Mac de verdade.** Uma peça de
+  UI nova que promete "pedir permissão de administrador e criar o link" sem nunca ter sido vista
+  rodando num Mac é exatamente o tipo de "resolver às cegas" que o contrato pede para evitar — o
+  próprio `docs/PLANO-DE-ENTREGA.md` já tem um precedente igual (V2-T19, estacionada "porque o
+  mantenedor não usa o Mac no dia a dia").
+
+**Consequência prática:** depois de instalar o `.dmg`, `seeya` não aparece no PATH do macOS — só
+o ícone abre a janela. Continua possível chamar a CLI manualmente apontando para dentro do pacote
+(`ELECTRON_RUN_AS_NODE=1 /Applications/seeya.app/Contents/MacOS/seeya
+.../Contents/Resources/app.asar/node_modules/@seeya-ai/cli/dist/index.js status`), mas não há
+atalho. Fica para uma tarefa futura, feita (ou ao menos aceita) num Mac de verdade.
+
+**Item 4 — o risco dos dois usuários: registrado como limite conhecido, não medido.** Medir de
+verdade pediria duas contas Windows na mesma máquina, uma delas com uma instalação `perMachine`
+(item 3) — nada disso existe neste ambiente (uma conta só, sandboxed). Custo de arranjar isso não
+se paga para esta tarefa; o sintoma abaixo já é preciso o bastante para decidir se vale medir de
+verdade mais tarde.
+
+**O mecanismo exato, lido em código (não hipótese solta).** `adapters/process/liveness.ts#
+resolveIsAlive`: quando o PID existe (`pidExists: true`, o que uma checagem de sinal cega — sem
+saber de quem é o processo — já confirma tanto para PID vivo quanto para PID de OUTRO usuário,
+via `EPERM`) mas a captura do `procStart` alheio falha (`capture.kind === 'unavailable'`, o caso
+esperado quando o processo pertence a outra conta — sem permissão para ler o tempo de início
+dele), a função devolve `true` — "alive", nunca `false` (D-025: ausência de dado não vira
+afirmação do contrário, a resposta menos específica que a evidência sustenta é "não consigo
+provar que morreu", não "morreu"). Consequência: se o `pid` gravado no `daemon.lock` de uma pessoa
+colidir, por acidente do SO, com o `pid` de um processo QUALQUER de outra conta na mesma máquina
+(instalação `perMachine`, item 3), `scheduler/lock.ts#checkDaemonLock` trata esse lock como "ainda
+vivo" e recusa subir o daemon da segunda pessoa — sem journal, sem aviso do motivo real, só "seeya
+daemon is already running (pid N)" apontando para um processo que não é o seeya de ninguém.
+
+**Por que isso é aceitável registrar, não bloquear a tarefa:** o isolamento de dados (`~/.seeya`
+por conta) já existe e não é afetado — o pior caso é o daemon da segunda pessoa recusar subir até
+o `pid` colidido morrer ou o lock expirar por outro caminho, nunca uma leitura ou escrita cruzada
+entre contas. `perMachine` já era opcional antes desta tarefa (V2-T20 item 3 só documentou que a
+opção sempre existiu); ninguém além do mantenedor decide se o caso de uso justifica medir isso de
+verdade.

@@ -176,9 +176,30 @@ win:
     - '!**/node_modules/node-pty/prebuilds/win32-arm64/**'
 
 nsis:
-  # "NSIS por usuário" (the task's own wording): no admin elevation, installs under the current
-  # user's own AppData, matches how `npm run app`'s dev launch already behaves (no privilege
-  # requirement) and is the one NSIS mode that never prompts UAC.
+  # V2-T20 item 3 corrects what this comment used to claim: **both per-user AND per-machine
+  # installs are available, not just per-user.** `perMachine: false` only sets the DEFAULT
+  # selection (no admin elevation, installs under the current user's own AppData, matching how
+  # `npm run app`'s dev launch already behaves) — it does NOT remove the "Install for all users"
+  # option `oneClick: false`'s own assisted-installer page always offers. Measured by reading
+  # `NsisTarget.js#configureDefines`: `INSTALL_MODE_PER_ALL_USERS_REQUIRED` (which the NSIS
+  # template reads to decide whether to show that page's own per-machine radio button at all) is
+  # defined whenever `!oneClick`, REGARDLESS of `perMachine` — and `MULTIUSER_INSTALLMODE_ALLOW_
+  # ELEVATION` is defined whenever `allowElevation !== false` (never set here, so it defaults to
+  # allowed). This is exactly what let the maintainer pick "for all users" and land the app in
+  # `C:\Program Files\seeya` with an HKLM uninstall entry (docs/PLANO-DE-ENTREGA.md V2-T20's own
+  # "terceiro achado") despite this file only ever having said "per-user".
+  #
+  # **The maintainer's own decision (V2-T20): keep both.** What changes for real under a
+  # per-machine install, confirmed by this task: the daemon's own script path (`$INSTDIR\...`,
+  # `build/installer.nsh#seeyaResolvePaths`, recomputed fresh in every hook so it already tracks
+  # whichever `$INSTDIR` the person chose) and the uninstall registry root (HKCU vs HKLM, already
+  # handled by V2-T13's own three-root query, `adapters/installation/windows-installation-
+  # scripts.ts`). Autostart (`adapters/autostart/windows.ts`, a per-user Task Scheduler task) and
+  # the protocol-handler registry key (`HKCU\Software\Classes\seeya`) stay per-user EITHER way —
+  # neither one has a per-machine form to begin with, so a per-machine install of the app still
+  # only ever registers autostart/the protocol for the one account that runs `seeya` and enables
+  # it. V2-T20 item 4 covers the risk that follows from two different accounts each doing that on
+  # the same per-machine install.
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
@@ -246,7 +267,18 @@ deb:
   # placeholder that says so on its face, not a real inbox nor a guess at one. Registered in
   # Q-078 for the maintainer to replace with a real one if they ever want the .deb's Maintainer
   # field to mean something.
-  {}
+  #
+  # V2-T20 items 1/2: `afterInstall`/`afterRemove` REPLACE electron-builder's own default
+  # `after-install.tpl`/`after-remove.tpl` wholesale (measured by reading `FpmTarget.js#
+  # createScripts` — a custom path is handed straight to `getResource`, no merge with the
+  # default), so both scripts below are the default template's OWN content plus this task's own
+  # additions — see each file's own top comment for exactly what changed and why. `deb:`, not
+  # `linux:` (the block covering BOTH `deb` and `AppImage`, `linux.target` above): an AppImage run
+  # has nothing installed system-wide for a maintainer script to hook, so neither item applies to
+  # it at all (same reasoning `linux.protocols`'s own comment already gives for the desktop-file
+  # MIME association).
+  afterInstall: build/deb-after-install.sh
+  afterRemove: build/deb-after-remove.sh
 
 mac:
   # CI-only this task (V2-T8's own scope: "macOS x64 só construído pela CI, sem aceite nesta
