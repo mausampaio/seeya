@@ -5942,8 +5942,8 @@ texto, mas não são a fila.
       `Description:` do `.deb` — um único campo guarda os dois alvos. Reprodução isolada: um
       `.lnk` descartável em `$env:TEMP` (nunca o atalho instalado do mantenedor), criado e lido de
       volta com `WScript.Shell` — o mesmo objeto COM que o mantenedor usou para ler o campo
-      corrompido de verdade. Saída bruta (script em
-      `scripts/v2t12-lnk-repro.ps1`, fora do repositório):
+      corrompido de verdade. Saída bruta (script `v2t12-lnk-repro.ps1` na pasta de scratchpad do
+      agente, fora deste repositório inteiramente — nunca commitado):
       ```
       len= 260 okIcon=True  readIcon='C:\WINDOWS\System32\notepad.exe,0'
       len= 261 okIcon=False readIcon=',0'
