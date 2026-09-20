@@ -4429,7 +4429,7 @@ texto, mas não são a fila.
       shell, e `chmod +x` no helper. **Pendência do mantenedor**, registrada na V2-T3 como
       correção condicional. Com Windows e a segunda máquina passando, a tarefa está **aceita**.
 
-- [~] **V2-T3 — Terminal usável no dia a dia: fonte configurável com Nerd Font embutida, aba
+- [x] **V2-T3 — Terminal usável no dia a dia: fonte configurável com Nerd Font embutida, aba
       encerrada removível, helper executável no macOS/Linux (D-035, D-042).** Especificada pelo
       PO em 2026-09-14 a partir do uso real do mantenedor no mesmo dia; aprovada e despachada
       pelo mantenedor em 2026-09-14; **mesclada na `main` em 2026-09-14** depois de uma rodada de
@@ -4570,8 +4570,11 @@ texto, mas não são a fila.
       o app instalado cairia no mesmo `posix_spawnp failed`, e a correção de hoje não o alcança.
       Registrado como item da tarefa de instalador (V2-T15).
 
-      **Pendente:** o Linux (o `oh-my-posh` legível lá) e, no Mac, uma aba de shell abrindo com
-      `npm run app` — o diagnóstico acima já está feito.
+      **Aceita pelo mantenedor em 2026-09-20, no Mac:** `npm run app` abriu aba de shell e aba do
+      `claude` normalmente, no mesmo Mac Apple Silicon onde toda aba falhava — a correção do
+      `spawn-helper` resolve o caso do desenvolvimento, como o diagnóstico acima previa. Com o
+      Windows já aceito antes, a tarefa sai de `[~]`. **Fica só o Linux** (o `oh-my-posh` legível
+      lá), que anda junto do aceite pendente da V2-T8, sem segurar esta entrada.
 
 - [x] **V2-T4 — A interface retoma o dia: `start-day` em abas e pergunta antes do fallback
       (D-042, D-043, D-039).** Especificada pelo PO em 2026-09-14; aprovada e despachada pelo
