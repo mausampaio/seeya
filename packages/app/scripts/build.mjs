@@ -206,7 +206,6 @@ function ensureSpawnHelperExecutable() {
 
 function launchElectron() {
   ensureElectronBinary();
-  ensureSpawnHelperExecutable();
   // `import electron from 'electron'` (the package's own main export) resolves to the path of
   // the real Electron binary for this platform — the standard way an npm-installed `electron`
   // package is launched from a script, rather than guessing `node_modules/.bin/electron`'s exact
@@ -226,6 +225,14 @@ function launchElectron() {
 async function main() {
   console.log(`Bundling @seeya-ai/app (esbuild) into ${outElectron}`);
   await bundle();
+  // V2-T15 item 2: called unconditionally now, not just under `--dev`. Measured
+  // (docs/PLANO-DE-ENTREGA.md V2-T15): this fix used to run only inside `launchElectron` (`npm run
+  // app`'s own path), so the `dist` path (this same script, non-dev, then `electron-builder`) left
+  // `node_modules` exactly as broken as node-pty's own tarball — the packaged `.dmg` inherited the
+  // same missing execute bit. `scripts/after-pack.mjs` (wired via `electron-builder.yml`'s own
+  // `afterPack:`) re-applies this again on the PACKAGED output after asarUnpack extraction; see
+  // that file's own docstring for why the pre-pack fix here, alone, was measured not to be enough.
+  ensureSpawnHelperExecutable();
   if (isDev) {
     console.log('Launching Electron...');
     await launchElectron();
