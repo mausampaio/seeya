@@ -6680,6 +6680,11 @@ texto, mas não são a fila.
       ambiguidade dela — registrada aqui, não em `docs/QUESTOES.md`, porque não bloqueou o
       trabalho nem exigiu decisão do mantenedor.
 
+      **Mesclada na `main` em 2026-09-20** (portão na worktree do PO: 198 arquivos, 2.018 testes
+      passando, 4 pulados; cobertura 96,40%/92,62%/94,95%/96,76%). Revisão com um ajuste: duas
+      frases em português tinham ficado dentro de comentários de código, que por contrato são em
+      inglês (D-028). Fica em `[~]` até o aceite do mantenedor.
+
 - [ ] **V2-T19 — Correção: fechar a janela no macOS quebra o processo principal ("Object has been
       destroyed").** Especificada pelo PO em 2026-09-20 a partir de um achado do mantenedor no
       mesmo dia, com captura de tela.
