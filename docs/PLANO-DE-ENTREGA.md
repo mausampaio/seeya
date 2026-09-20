@@ -7110,6 +7110,10 @@ texto, mas não são a fila.
       pé de novo, sem clicar em nada.
 
 <<<<<<< HEAD
+      **Mesclada na `main` em 2026-09-20** (portão na worktree do PO: 200 arquivos, 2.038 testes
+      passando, 4 pulados; cobertura 96,40%/92,63%/94,96%/96,76%). Revisão sem ajustes. Fica em
+      `[~]` até o aceite do mantenedor.
+
 - [ ] **V2-T23 — Correção: o autostart congela o ambiente inteiro do app, inclusive coisas que só
       valem naquele login.** Especificada pelo PO em 2026-09-20 a partir de uma medição do
       mantenedor no Mac dele, no mesmo dia — o primeiro `cat` que alguém deu no arquivo de
