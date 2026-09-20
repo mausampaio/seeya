@@ -3,7 +3,10 @@ import {
   DEFAULT_CONFIG,
   EDITABLE_CONFIG_KEYS,
 } from '@seeya-ai/engine/adapters/storage/config-schema.js';
-import { buildSettingsRows } from '../../../../packages/app/src/state/settings-panel.js';
+import {
+  buildSettingsRows,
+  buildProjectPolicyLines,
+} from '../../../../packages/app/src/state/settings-panel.js';
 
 describe('buildSettingsRows', () => {
   it('one row per EDITABLE_CONFIG_KEYS, same order — never a second, drifting list', () => {
@@ -66,5 +69,25 @@ describe('buildSettingsRows', () => {
     const rows = buildSettingsRows(DEFAULT_CONFIG);
     expect(rows.some((row) => (row.key as string) === 'projectPolicy')).toBe(false);
     expect(rows.some((row) => (row.key as string) === 'schemaVersion')).toBe(false);
+  });
+});
+
+describe('buildProjectPolicyLines', () => {
+  it('no projectPolicy entries — an empty list', () => {
+    expect(buildProjectPolicyLines(DEFAULT_CONFIG)).toEqual([]);
+  });
+
+  it('one line per cwd, carrying canTerminate/deepCapture through unchanged', () => {
+    const config = {
+      ...DEFAULT_CONFIG,
+      projectPolicy: {
+        '/repo/one': { canTerminate: true, deepCapture: false },
+        '/repo/two': { canTerminate: false, deepCapture: true },
+      },
+    };
+    expect(buildProjectPolicyLines(config)).toEqual([
+      { cwd: '/repo/one', canTerminate: true, deepCapture: false },
+      { cwd: '/repo/two', canTerminate: false, deepCapture: true },
+    ]);
   });
 });

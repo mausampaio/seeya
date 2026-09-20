@@ -10,7 +10,7 @@ import type { TerminalFontOptions } from '../state/terminal-font.js';
 import type { TodayPanelData } from '../state/today-panel.js';
 import type { ScheduleStripData } from '../state/schedule-strip.js';
 import type { DaemonControlAvailability } from '../state/daemon-control-panel.js';
-import type { SettingsRow } from '../state/settings-panel.js';
+import type { SettingsRow, ProjectPolicyLine } from '../state/settings-panel.js';
 
 export const CHANNELS = {
   /** Renderer → main: open a new tab. */
@@ -331,10 +331,13 @@ export interface DaemonControlResponse {
   readonly resultText: string;
 }
 
-/** `CHANNELS.getSettingsPanel`'s response (V2-T14 item 1) — the exact shape
- * `state/settings-panel.ts#buildSettingsRows` produces. */
+/** `CHANNELS.getSettingsPanel`'s response (V2-T14 item 1) — `rows` is
+ * `state/settings-panel.ts#buildSettingsRows`'s own output; `projectPolicyLines` is
+ * `buildProjectPolicyLines`'s own output, shown read-only (the plan entry's own "o que não
+ * entra": `projectPolicy` isn't scalar, so it never gets an editable row). */
 export interface SettingsPanelResponse {
   readonly rows: readonly SettingsRow[];
+  readonly projectPolicyLines: readonly ProjectPolicyLine[];
 }
 
 /** `CHANNELS.saveSetting`'s payload (V2-T14 item 2). `key`/`rawValue` are untyped strings, not

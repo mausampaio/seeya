@@ -67,7 +67,7 @@ import { buildEndDayCostCeiling } from '../state/end-day-preview.js';
 import { projectEndDayProgressEvent } from '../state/end-day-progress.js';
 import { buildScheduleStripData } from '../state/schedule-strip.js';
 import { resolveDaemonControlAvailability } from '../state/daemon-control-panel.js';
-import { buildSettingsRows } from '../state/settings-panel.js';
+import { buildSettingsRows, buildProjectPolicyLines } from '../state/settings-panel.js';
 import {
   addTab,
   createTab,
@@ -665,7 +665,7 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // own previous save, must always be reflected the next time it's opened).
   ipcMain.handle(CHANNELS.getSettingsPanel, async (): Promise<SettingsPanelResponse> => {
     const config = await context.storage.readConfig();
-    return { rows: buildSettingsRows(config) };
+    return { rows: buildSettingsRows(config), projectPolicyLines: buildProjectPolicyLines(config) };
   });
 
   // V2-T14 items 2/3: "Save" on one Settings row — the SAME validation/write path `seeya config

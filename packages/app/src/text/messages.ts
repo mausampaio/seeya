@@ -180,6 +180,16 @@ export const MESSAGES = {
   // shape expected (`parseConfigFieldUpdate`'s own message, reused verbatim, D-039 — never a second
   // wording invented in the interface).
   settingsSaveFailedPrefix: 'Not saved — ',
+  // V2-T14's own "o que não entra": projectPolicy is read-only here, same content
+  // cli/config-command.ts#renderProjectPolicySection already prints for "seeya config get".
+  settingsProjectPolicyHeading:
+    'Project policy (read-only — edit with "seeya config policy <cwd>")',
+  settingsProjectPolicyEmpty: '(none)',
+  settingsProjectPolicyLine: (line: {
+    readonly cwd: string;
+    readonly canTerminate: boolean;
+    readonly deepCapture: boolean;
+  }): string => `${line.cwd}: canTerminate=${line.canTerminate}, deepCapture=${line.deepCapture}`,
 
   settingsFieldDescriptions: {
     endOfDayTime:

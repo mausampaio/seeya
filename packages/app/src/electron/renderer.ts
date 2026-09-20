@@ -27,7 +27,7 @@ import type {
 import type { TodayPanelData, TodaySessionRow } from '../state/today-panel.js';
 import { reduceEndDayPanel, type EndDayPanelState } from '../state/end-day-panel.js';
 import { reduceDaemonControl, type DaemonControlState } from '../state/daemon-control-panel.js';
-import type { SettingsRow } from '../state/settings-panel.js';
+import type { SettingsRow, ProjectPolicyLine } from '../state/settings-panel.js';
 
 declare global {
   interface Window {
@@ -654,6 +654,13 @@ function renderSettingsRow(row: SettingsRow): HTMLElement {
   wrapper.className = 'settings-row';
   wrapper.dataset.key = row.key;
 
+  // V2-T14 item 1's own "o nome, o valor em vigor, e de onde ele vem" — the key name itself,
+  // exactly as `seeya config get`/`set` spell it, not just the one-line description below it.
+  const name = document.createElement('strong');
+  name.className = 'settings-row-name';
+  name.textContent = row.key;
+  wrapper.appendChild(name);
+
   const description = document.createElement('p');
   description.className = 'settings-row-description';
   description.textContent = row.description;
@@ -694,11 +701,34 @@ function renderSettingsRows(rows: readonly SettingsRow[]): void {
   }
 }
 
-/** "Settings…" clicked: re-fetches the rows every time (never cached across opens — another
- * terminal's `seeya config set`, or this dialog's own last save, must always show). */
+/** V2-T14's own "o que não entra": `projectPolicy`, read-only, one line per `cwd` — same content
+ * `seeya config get`'s own `projectPolicy:` section prints, never an input/Save button next to it
+ * (editing it stays the CLI's job, `seeya config policy <cwd>`). Rendered once, right after
+ * `getSettingsPanel` resolves — unlike the scalar rows above, nothing here ever changes from
+ * inside this dialog, so there is no re-render to wire a click up to. */
+function renderProjectPolicyLines(lines: readonly ProjectPolicyLine[]): void {
+  const container = document.getElementById('settings-project-policy-lines') as HTMLElement;
+  container.textContent = '';
+  if (lines.length === 0) {
+    const empty = document.createElement('p');
+    empty.textContent = MESSAGES.settingsProjectPolicyEmpty;
+    container.appendChild(empty);
+    return;
+  }
+  for (const line of lines) {
+    const item = document.createElement('p');
+    item.textContent = MESSAGES.settingsProjectPolicyLine(line);
+    container.appendChild(item);
+  }
+}
+
+/** "Settings…" clicked: re-fetches everything every time (never cached across opens — another
+ * terminal's `seeya config set`/`config policy`, or this dialog's own last save, must always
+ * show). */
 async function handleSettingsOpenClicked(): Promise<void> {
   const response = await window.seeya.getSettingsPanel();
   renderSettingsRows(response.rows);
+  renderProjectPolicyLines(response.projectPolicyLines);
   settingsDialog().showModal();
 }
 
@@ -713,6 +743,8 @@ function wireSettingsDialog(): void {
     MESSAGES.settingsDialogTitle;
   (document.getElementById('settings-dialog-daemon-note') as HTMLElement).textContent =
     MESSAGES.settingsDaemonRereadsNote;
+  (document.getElementById('settings-project-policy-heading') as HTMLElement).textContent =
+    MESSAGES.settingsProjectPolicyHeading;
   const closeButton = document.getElementById('settings-dialog-close') as HTMLButtonElement;
   closeButton.textContent = MESSAGES.settingsDialogClose;
   closeButton.addEventListener('click', () => settingsDialog().close());

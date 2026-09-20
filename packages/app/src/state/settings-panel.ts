@@ -63,3 +63,25 @@ export function buildSettingsRows(config: Config): readonly SettingsRow[] {
     };
   });
 }
+
+/**
+ * V2-T14's own "o que não entra": `projectPolicy` isn't scalar, so it never gets a `SettingsRow` —
+ * it "aparece só para leitura, uma linha por cwd, e continua sendo editada pela CLI"
+ * (`seeya config policy <cwd>`, unchanged). Same per-entry shape
+ * `cli/config-command.ts#renderProjectPolicyLine` already prints, reimplemented here rather than
+ * imported — `app/` and `cli/` are two independent composition roots that never import each other
+ * (D-043) — a one-line format, not logic worth a shared module for.
+ */
+export interface ProjectPolicyLine {
+  readonly cwd: string;
+  readonly canTerminate: boolean;
+  readonly deepCapture: boolean;
+}
+
+export function buildProjectPolicyLines(config: Config): readonly ProjectPolicyLine[] {
+  return Object.entries(config.projectPolicy).map(([cwd, policy]) => ({
+    cwd,
+    canTerminate: policy.canTerminate,
+    deepCapture: policy.deepCapture,
+  }));
+}
