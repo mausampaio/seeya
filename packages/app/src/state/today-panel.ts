@@ -41,6 +41,22 @@ export type TodayResumeStatus =
   | { readonly kind: 'resumedEarlier' }
   | { readonly kind: 'neverResumed' };
 
+/**
+ * V2-T18 — the ONE decision `electron/renderer.ts#renderTodaySessionRow` needs to pick a DOM
+ * shape (D-041: the renderer holds no decision of its own): every status except `runningNow`
+ * offers the checkbox. Kept here, not inline in the renderer, so it's unit-tested — the bug this
+ * function fixes had the renderer's own branching group `resumedEarlier` with `runningNow`,
+ * losing the checkbox for a session already resumed once today and then closed (the achado V2-T9
+ * item 4 existed to fix, undone by that branching).
+ *
+ * @example
+ * offersResumeCheckbox({ kind: 'resumedEarlier' }); // true — the checkbox comes back
+ * offersResumeCheckbox({ kind: 'runningNow', matchedTabId: null }); // false — nothing to resume
+ */
+export function offersResumeCheckbox(status: TodayResumeStatus): boolean {
+  return status.kind !== 'runningNow';
+}
+
 export interface TodaySessionRow {
   readonly sessionId: string;
   readonly name: string;
@@ -143,4 +159,40 @@ export function buildTodayPanelData(
       buildRow(handoff, lookup.resumedSessionIds, cwdHistoryBySessionId, liveSessionIds),
     ),
   };
+}
+
+/**
+ * V2-T18 item 2 — the two inputs to `buildTodayPanelData` that DON'T change on every refresh
+ * tick: `lookup` (`findPendingBriefing`, a storage scan) and `cwdHistoryBySessionId`
+ * (`readCwdHistory` per handoff, more storage scans). `electron/main.ts`'s own `getTodayPanel`
+ * handler caches these the moment it builds them; `refreshTodayPanelLiveness` below is what the
+ * ambient refresh loop calls every tick instead, so the panel tracks liveness without repeating
+ * that I/O ten times a minute.
+ */
+export interface TodayPanelInputs {
+  readonly lookup: PendingBriefingLookup;
+  readonly cwdHistoryBySessionId: ReadonlyMap<string, readonly CwdHistoryEntry[]>;
+}
+
+/**
+ * V2-T18 item 2 — recomputes the "Today" panel with FRESH liveness only, reusing `inputs` from
+ * the last full build untouched. `liveSessionIds` is the SAME discovery the refresh loop's own
+ * tick already did for the sidebar (`sidebar/sidebar-data.ts#buildLiveSessionIndex`), never a
+ * second `SessionProvider.list()` call — the plan entry's own "reusando a MESMA descoberta do
+ * ciclo". Returns `null` when nothing has been built yet (the window hasn't called
+ * `getTodayPanel` for the first time, so there is no `lookup` to recompute from) — D-025: never a
+ * fabricated empty panel, `electron/main.ts`'s own tick simply skips the push that tick.
+ *
+ * @example
+ * const data = refreshTodayPanelLiveness(latestTodayPanelInputs, buildLiveSessionIndex(rows));
+ * if (data !== null) window.webContents.send(CHANNELS.todayUpdate, data);
+ */
+export function refreshTodayPanelLiveness(
+  inputs: TodayPanelInputs | null,
+  liveSessionIds: ReadonlyMap<string, LiveSessionInfo>,
+): TodayPanelData | null {
+  if (inputs === null) {
+    return null;
+  }
+  return buildTodayPanelData(inputs.lookup, inputs.cwdHistoryBySessionId, liveSessionIds);
 }

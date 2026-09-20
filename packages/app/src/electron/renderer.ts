@@ -24,7 +24,11 @@ import type {
   ScheduleUpdateEvent,
   TerminalFontConfigResponse,
 } from '../ipc/channels.js';
-import type { TodayPanelData, TodaySessionRow } from '../state/today-panel.js';
+import {
+  offersResumeCheckbox,
+  type TodayPanelData,
+  type TodaySessionRow,
+} from '../state/today-panel.js';
 import { reduceEndDayPanel, type EndDayPanelState } from '../state/end-day-panel.js';
 import { reduceDaemonControl, type DaemonControlState } from '../state/daemon-control-panel.js';
 import {
@@ -258,6 +262,11 @@ function wireIncomingEvents(): void {
   });
   window.seeya.onSessionsUpdate(({ rows }) => {
     renderSidebar(rows);
+  });
+  // V2-T18 item 2: the "Today" panel, same refresh tick as onSessionsUpdate above — a session
+  // opened outside the window now shows "running now" on its own, without reopening.
+  window.seeya.onTodayUpdate((data) => {
+    renderTodayPanelPreservingSelections(data);
   });
   window.seeya.onStatusUpdate(({ text }) => {
     const panel = document.getElementById('status-panel') as HTMLElement;
@@ -954,21 +963,20 @@ function renderResumeInSelect(
   return label;
 }
 
-/** One session row in the "Today" panel (V2-T4 item 1, checkbox rule reshaped by V2-T9 item 4) —
- * a checkbox for a session that isn't running right now, or a plain note for one that is (D-024/
- * D-025: the three `TodayResumeStatus` forms are never rendered the same way, same discipline
- * `core/consolidated-plan.ts#renderSessionPlanLine` already applies to the CLI's own plan text). */
+/** One session row in the "Today" panel (V2-T4 item 1, checkbox rule reshaped by V2-T9 item 4,
+ * `runningNow`/otherwise split fixed by V2-T18 item 1) — a checkbox for any session that isn't
+ * running right now, or a plain note for one that is. The branch itself is
+ * `offersResumeCheckbox` (`state/today-panel.ts`, D-041: the ONE decision this file makes here),
+ * never re-derived inline — the bug this task fixes was exactly a second, inconsistent version of
+ * this same condition living only in this function, grouping `resumedEarlier` with `runningNow`
+ * and losing the checkbox for a session already resumed once today and then closed. */
 function renderTodaySessionRow(row: TodaySessionRow): HTMLLIElement {
   const item = document.createElement('li');
-  if (row.resumeStatus.kind === 'runningNow') {
+  if (!offersResumeCheckbox(row.resumeStatus)) {
     item.textContent = `${row.name} (${row.cwd}) — ${MESSAGES.todayRunningNow}`;
-    if (row.resumeStatus.matchedTabId !== null) {
+    if (row.resumeStatus.kind === 'runningNow' && row.resumeStatus.matchedTabId !== null) {
       item.classList.add('matched');
     }
-    return item;
-  }
-  if (row.resumeStatus.kind === 'resumedEarlier') {
-    item.textContent = `${row.name} (${row.cwd}) — ${MESSAGES.todayResumedEarlier}`;
     return item;
   }
   const label = document.createElement('label');
@@ -977,7 +985,14 @@ function renderTodaySessionRow(row: TodaySessionRow): HTMLLIElement {
   checkbox.className = 'today-session-checkbox';
   checkbox.value = row.sessionId;
   label.appendChild(checkbox);
-  label.append(` ${row.name} (${row.cwd}) — ${row.firstPlanLine ?? MESSAGES.todayNoPlanRecorded}`);
+  // V2-T18 item 1: `resumedEarlier` keeps saying so — the checkbox coming back doesn't erase the
+  // information that this session already ran once today, it only stops that fact from blocking
+  // a second resume.
+  const statusSuffix =
+    row.resumeStatus.kind === 'resumedEarlier' ? ` — ${MESSAGES.todayResumedEarlier}` : '';
+  label.append(
+    ` ${row.name} (${row.cwd}) — ${row.firstPlanLine ?? MESSAGES.todayNoPlanRecorded}${statusSuffix}`,
+  );
   item.appendChild(label);
   const cwdHistoryNote = renderCwdHistoryNote(row.cwdHistory);
   if (cwdHistoryNote !== null) {
@@ -991,11 +1006,13 @@ function renderTodaySessionRow(row: TodaySessionRow): HTMLLIElement {
 }
 
 /**
- * Renders the whole "Today" panel from scratch — called once at startup (`main` below) and again
- * after "Resume selected" finishes (`handleResumeSelected`), so a session just resumed stops
- * showing a checkbox without a page reload. Simpler than patching the existing DOM in place for a
- * list this small, and it's what keeps the resume button's own click handler always closed over
- * the CURRENT `data.day` rather than a stale one from an earlier render.
+ * Renders the whole "Today" panel from scratch — called once at startup (`main` below), again
+ * after "Resume selected"/"Run end-day now" finish, and now on every ambient refresh tick
+ * (V2-T18 item 2, via `renderTodayPanelPreservingSelections` below). Simpler than patching the
+ * existing DOM in place for a list this small, and it's what keeps the resume button's own click
+ * handler always closed over the CURRENT `data.day` rather than a stale one from an earlier
+ * render. Never called directly from the refresh tick — see
+ * `renderTodayPanelPreservingSelections`'s own docstring for why.
  */
 function renderTodayPanel(data: TodayPanelData): void {
   const panel = todayPanel();
@@ -1032,8 +1049,78 @@ function renderTodayPanel(data: TodayPanelData): void {
   panel.appendChild(result);
 }
 
+interface TodayPanelSelections {
+  readonly checkedSessionIds: ReadonlySet<string>;
+  readonly resumeInBySessionId: ReadonlyMap<string, string>;
+}
+
+/** V2-T18 item 2 — captures what the person has checked/chosen in the CURRENT panel DOM before a
+ * refresh tick rebuilds it from scratch: a checked checkbox (by `sessionId`, the checkbox's own
+ * `value`) and a chosen "Resume in" directory (by `sessionId`, the select's own
+ * `dataset.sessionId`) — `renderResumeInSelect`'s own docstring has why it's keyed that way. */
+function snapshotTodayPanelSelections(): TodayPanelSelections {
+  const checkedSessionIds = new Set<string>();
+  for (const checkbox of todayPanel().querySelectorAll<HTMLInputElement>(
+    '.today-session-checkbox:checked',
+  )) {
+    checkedSessionIds.add(checkbox.value);
+  }
+  const resumeInBySessionId = new Map<string, string>();
+  for (const select of todayPanel().querySelectorAll<HTMLSelectElement>(
+    '.today-session-resume-in',
+  )) {
+    const sessionId = select.dataset.sessionId;
+    if (sessionId !== undefined) {
+      resumeInBySessionId.set(sessionId, select.value);
+    }
+  }
+  return { checkedSessionIds, resumeInBySessionId };
+}
+
+/** The other half of `snapshotTodayPanelSelections`, applied AFTER `renderTodayPanel` has already
+ * rebuilt the DOM — so it only ever restores onto a row the fresh data still offers a
+ * checkbox/select for. A session that stopped offering one (it just started running) simply has
+ * nothing to restore onto, which is correct: resuming no longer makes sense for it. A chosen
+ * directory that no longer appears in the fresh options (the history changed) is left at
+ * whatever `renderResumeInSelect` already preselected, never forced onto a stale value. */
+function restoreTodayPanelSelections(selections: TodayPanelSelections): void {
+  for (const checkbox of todayPanel().querySelectorAll<HTMLInputElement>(
+    '.today-session-checkbox',
+  )) {
+    checkbox.checked = selections.checkedSessionIds.has(checkbox.value);
+  }
+  for (const select of todayPanel().querySelectorAll<HTMLSelectElement>(
+    '.today-session-resume-in',
+  )) {
+    const sessionId = select.dataset.sessionId;
+    const chosen =
+      sessionId === undefined ? undefined : selections.resumeInBySessionId.get(sessionId);
+    const stillOffered =
+      chosen !== undefined && Array.from(select.options).some((option) => option.value === chosen);
+    if (stillOffered) {
+      select.value = chosen;
+    }
+  }
+}
+
+/**
+ * V2-T18 item 2 — the panel's own re-render, safe to call on every ambient refresh tick
+ * (`onTodayUpdate` below): snapshots whatever the person just checked/chose, lets
+ * `renderTodayPanel` rebuild the DOM from scratch as it always has, then restores those
+ * selections. Without this, a tick landing between "person checks a box" and "person clicks
+ * Resume selected" would silently uncheck it — exactly the hazard the plan entry's own "cuidado
+ * ao redesenhar: não apagar caixa ... nem o diretório escolhido" calls out. Also used by the
+ * ordinary fetch-and-render callers below (`refreshTodayPanel`); harmless there since there is
+ * nothing yet to preserve on a fresh panel.
+ */
+function renderTodayPanelPreservingSelections(data: TodayPanelData): void {
+  const selections = snapshotTodayPanelSelections();
+  renderTodayPanel(data);
+  restoreTodayPanelSelections(selections);
+}
+
 async function refreshTodayPanel(): Promise<void> {
-  renderTodayPanel(await window.seeya.getTodayPanel());
+  renderTodayPanelPreservingSelections(await window.seeya.getTodayPanel());
 }
 
 /** One labeled `<ul>` of `name (cwd)` lines — the shared shape every section of the summary below

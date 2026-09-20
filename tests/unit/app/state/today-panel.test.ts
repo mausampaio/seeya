@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildTodayPanelData } from '../../../../packages/app/src/state/today-panel.js';
+import {
+  buildTodayPanelData,
+  offersResumeCheckbox,
+  refreshTodayPanelLiveness,
+} from '../../../../packages/app/src/state/today-panel.js';
 import type { PendingBriefingLookup } from '@seeya-ai/engine/application/find-pending-briefing.js';
 import type { CwdHistoryEntry } from '@seeya-ai/engine/application/cwd-history.js';
 import { buildHandoffFixture as modelHandoff } from '../_handoff-fixture.js';
@@ -259,5 +263,65 @@ describe('buildTodayPanelData', () => {
     const data = buildTodayPanelData(lookup);
 
     expect(data.kind === 'pending' && data.rows[0]?.firstPlanLine).toBeNull();
+  });
+});
+
+describe('offersResumeCheckbox — V2-T18 defect 1: the checkbox comes back for resumedEarlier', () => {
+  it('resumedEarlier offers the checkbox — the achado this task exists to fix', () => {
+    expect(offersResumeCheckbox({ kind: 'resumedEarlier' })).toBe(true);
+  });
+
+  it('neverResumed offers the checkbox, as it always did', () => {
+    expect(offersResumeCheckbox({ kind: 'neverResumed' })).toBe(true);
+  });
+
+  it('runningNow is the ONLY status that blocks the checkbox', () => {
+    expect(offersResumeCheckbox({ kind: 'runningNow', matchedTabId: null })).toBe(false);
+    expect(offersResumeCheckbox({ kind: 'runningNow', matchedTabId: 'tab-1' })).toBe(false);
+  });
+});
+
+describe('refreshTodayPanelLiveness — V2-T18 defect 2: the panel tracks the ambient cycle', () => {
+  it('returns null with no cached inputs — nothing built yet, never a fabricated panel (D-025)', () => {
+    expect(refreshTodayPanelLiveness(null, new Map())).toBeNull();
+  });
+
+  it('a session that goes live on a LATER tick recomputes as runningNow, without a fresh lookup', () => {
+    const handoff = modelHandoff();
+    const lookup: PendingBriefingLookup = {
+      found: true,
+      daysAgo: 0,
+      resumedSessionIds: new Set(),
+      briefing: { day: '2026-08-17', handoffs: [handoff], rejected: [] },
+    };
+    const inputs = { lookup, cwdHistoryBySessionId: new Map() };
+
+    // First tick: the session isn't running yet — same "found nothing live" shape getTodayPanel
+    // itself would have produced on this same lookup.
+    const beforeOpen = refreshTodayPanelLiveness(inputs, new Map());
+    expect(beforeOpen?.kind === 'pending' && beforeOpen.rows[0]?.resumeStatus).toEqual({
+      kind: 'neverResumed',
+    });
+
+    // A LATER tick: the person opened the session from a bare terminal — the exact scenario the
+    // window is supposed to reflect "sem reabrir o app" (the mantenedor's own aceite wording).
+    // `inputs` (the lookup/cwd-history) is untouched; only `liveSessionIds` is fresh.
+    const afterOpen = refreshTodayPanelLiveness(
+      inputs,
+      new Map([[handoff.sessionId, { matchedTabId: null }]]),
+    );
+    expect(afterOpen?.kind === 'pending' && afterOpen.rows[0]?.resumeStatus).toEqual({
+      kind: 'runningNow',
+      matchedTabId: null,
+    });
+  });
+
+  it('a "noBriefing" lookup recomputes the same message, never crashing on empty history', () => {
+    const lookup: PendingBriefingLookup = { found: false, daysSearched: 30 };
+    const inputs = { lookup, cwdHistoryBySessionId: new Map() };
+
+    const data = refreshTodayPanelLiveness(inputs, new Map());
+
+    expect(data?.kind).toBe('noBriefing');
   });
 });
