@@ -5761,7 +5761,7 @@ texto, mas não são a fila.
       (Windows e Linux), abrir os dois mundos, e confirmar que o clique segue a última janela e que
       a desinstalação limpa a chave.
 
-- [~] **V2-T11 — O ícone do seeya: instalador, janela e README a partir de `design/`.**
+- [x] **V2-T11 — O ícone do seeya: instalador, janela e README a partir de `design/`.**
       Especificada pelo PO em 2026-09-19 e aprovada pelo mantenedor no mesmo dia, logo depois de
       a identidade visual entrar no repositório (`design/`, commit `641f803`); **mesclada na
       `main` em 2026-09-19** (portão na worktree do PO: 1.901 passando, 4 pulados; cobertura
@@ -5879,7 +5879,7 @@ texto, mas não são a fila.
 
       Fica em `[~]` até o review.
 
-- [~] **V2-T12 — Correção: o atalho do Windows nasce com o ícone quebrado; e um `dist` por
+- [x] **V2-T12 — Correção: o atalho do Windows nasce com o ícone quebrado; e um `dist` por
       plataforma.** Especificada pelo PO em 2026-09-20 a partir de um defeito medido na máquina do
       mantenedor durante o aceite da V2-T11, e de um pedido dele no mesmo dia. Aprovada e
       despachada no mesmo dia.
@@ -6013,7 +6013,27 @@ texto, mas não são a fila.
       passando, 4 pulados; cobertura 96,46%/92,51%/95,31%/96,85%). Revisão com dois ajustes: o
       `README.md` novo do pacote apontava para dois arquivos com nomes que não existem, e um teste
       de `checkPlatformSupport` se chamava "accepts" enquanto provava uma recusa. Fica em `[~]` até
-      o aceite do mantenedor.
+      o aceite do mantenedor. **Aceita pelo mantenedor em 2026-09-20**, no Windows: instalou por
+      cima da versão anterior (sem desinstalar) e o ícone aparece no atalho e na barra de tarefas.
+      A conferência no Linux anda junto com o aceite pendente da V2-T8.
+
+- [ ] **V2-T15 (candidato, NÃO agendado) — Instalador: o `seeya` no `PATH`, a desinstalação
+      removendo o autostart, e o daemon parado e religado na atualização.** Três itens de
+      instalador que se acumularam; **depende da V2-T13**, que é quem define de quem é o daemon.
+
+      **O achado do terceiro item, do mantenedor em 2026-09-20.** Instalando por cima da versão
+      anterior, o instalador avisou que o seeya estava rodando — mesmo com a janela já fechada. Era
+      o daemon, lançado pela própria janela: ele é **o mesmo executável** do app rodando como
+      processo de apoio, então fechar a janela não o encerra e não há como a pessoa adivinhar isso.
+      Instalar por cima funcionou depois de encerrá-lo, mas o aviso não diz o que encerrar.
+
+      **Decisão de desenho do PO, a confirmar na especificação: sem pergunta na tela.** O
+      instalador para o daemon antes de instalar e, **se ele estava de pé**, sobe de novo no fim,
+      avisando numa linha. Perguntar no meio de uma instalação sobre um processo que a pessoa não
+      vê não produz uma resposta informada, e uma das respostas possíveis apenas impede a
+      instalação. O daemon é processo do próprio seeya — a D-002 proíbe encerrar à força as
+      **sessões descobertas**, nunca o nosso daemon (`ProcessControl.terminateAbruptly` existe
+      para isso) — e todo o estado dele mora em disco.
 
 - [ ] **V2-T14 — Configurações na janela: o que está valendo, de onde vem, e dá para mudar ali.**
       Especificada pelo PO em 2026-09-20 a pedido do mantenedor no mesmo dia, e **entra antes da
