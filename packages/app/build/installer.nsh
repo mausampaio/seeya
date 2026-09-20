@@ -82,6 +82,10 @@ Var SeeyaCliScriptPath
 ; guard for the same reason.
 !ifndef BUILD_UNINSTALLER
   Var SeeyaDaemonWasRunning
+  ; V2-T22: `customInstall`'s own restart call's return code (nsExec::ExecToLog's own stack value,
+  ; below) — same `!ifndef BUILD_UNINSTALLER` guard as `$SeeyaDaemonWasRunning`, for the identical
+  ; reason: only `customInstall` (installer-only) ever writes it.
+  Var SeeyaDaemonRestartExitCode
 !endif
 
 ; Sets/clears ELECTRON_RUN_AS_NODE in the INSTALLER'S OWN process environment (System.dll — a
@@ -129,13 +133,36 @@ Var SeeyaCliScriptPath
   seeyaInitDone:
 !macroend
 
+; V2-T22: the defect this task fixes, measured on the maintainer's machine — this restart used to
+; fail SILENTLY. `runDaemonLauncher` refused it (D-045 item 3's ownership check didn't yet know the
+; app's own binary is calling itself), and `ExecWait` alone would have thrown that refusal's own
+; text away: it only ever returns an exit code, never the child's stdout, and nothing here looked
+; at the code either. Two independent fixes to that silence, not one:
+;
+; 1. **`nsExec::ExecToLog` instead of plain `ExecWait`.** Same bundled plugin
+;    `allowOnlyOneInstallerInstance.nsh` already calls elsewhere in this template tree (no new
+;    dependency) — it runs the command exactly like `ExecWait` but also pipes every line the child
+;    prints to stdout/stderr straight into the installer's own DetailPrint log, so the CLI's own
+;    message ("seeya daemon started (pid ...)", or the refusal text this task's own `daemon-
+;    command.ts` fix addresses) is what a person reading `%TEMP%\seeya-installer.log` (or the
+;    on-screen details view) actually sees, not silence.
+; 2. **The exit code, captured and checked too**, as a defensive belt: `runDaemonLauncher`'s own
+;    "launcher" branch (`cli/index.ts`) does not currently set a non-zero `process.exitCode` on
+;    refusal (only the worker path does) — measured while writing this fix, not assumed — so this
+;    check alone would NOT have caught the original defect. It stays because a future failure mode
+;    that DOES exit non-zero (a spawn failure inside `spawnDetachedDaemon`, for one) will now also
+;    get its own explicit line, instead of counting on someone reading the log line above closely.
 !macro customInstall
   ${if} $SeeyaDaemonWasRunning == "1"
-    DetailPrint "Restarting the seeya daemon (it was running before this install)."
+    DetailPrint "Restarting the seeya daemon (it was running before this install)..."
     !insertmacro seeyaResolvePaths
     !insertmacro seeyaSetRunAsNode
-    ExecWait '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" "$SeeyaCliScriptPath" daemon'
+    nsExec::ExecToLog '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" "$SeeyaCliScriptPath" daemon'
+    Pop $SeeyaDaemonRestartExitCode
     !insertmacro seeyaClearRunAsNode
+    ${if} $SeeyaDaemonRestartExitCode != 0
+      DetailPrint "Restarting the seeya daemon failed (exit code $SeeyaDaemonRestartExitCode) -- open seeya and use Start daemon, or run 'seeya daemon' yourself."
+    ${endIf}
   ${endIf}
 !macroend
 

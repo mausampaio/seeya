@@ -40,6 +40,20 @@ describe('packages/app/build/installer.nsh', () => {
     expect(body).not.toContain('--stop');
   });
 
+  // V2-T22 regression: the restart used to fail silently (a plain `ExecWait` whose exit code
+  // nobody looked at). The fix is `nsExec::ExecToLog` — so the CLI's own message ends up in the
+  // installer's own log — plus an explicit failure line when the exit code IS non-zero.
+  it('the restart call no longer fails silently — logs the CLI output and checks the exit code', () => {
+    const customInstallMatch = installerNsh.match(/!macro customInstall([\s\S]*?)!macroend/);
+    expect(customInstallMatch).not.toBeNull();
+    const body = customInstallMatch?.[1] ?? '';
+    expect(body).toContain('nsExec::ExecToLog');
+    expect(body).not.toContain('ExecWait');
+    expect(body).toContain('Pop $SeeyaDaemonRestartExitCode');
+    expect(body).toContain('$SeeyaDaemonRestartExitCode != 0');
+    expect(body).toContain('Restarting the seeya daemon failed');
+  });
+
   it('stops the daemon on uninstall and never restarts it there', () => {
     const customUnInstallMatch = installerNsh.match(/!macro customUnInstall([\s\S]*?)!macroend/);
     expect(customUnInstallMatch).not.toBeNull();
