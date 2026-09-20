@@ -6941,8 +6941,11 @@ texto, mas não são a fila.
       frases em português tinham ficado dentro de comentários de código, que por contrato são em
       inglês (D-028). Fica em `[~]` até o aceite do mantenedor.
 
-- [ ] **V2-T19 — Correção: fechar a janela no macOS quebra o processo principal ("Object has been
-      destroyed").** Especificada pelo PO em 2026-09-20 a partir de um achado do mantenedor no
+- [ ] **V2-T19 (na fila, sem pressa) — Correção: fechar a janela no macOS quebra o processo
+      principal ("Object has been destroyed").** **Prioridade rebaixada pelo mantenedor em
+      2026-09-20:** *"não uso Mac no dia a dia"* — o defeito continua real e a spec continua
+      válida, só não disputa lugar com o que dói no uso diário. Entra quando a fila do Windows
+      esvaziar, ou antes disso se alguém passar a usar o app no Mac com frequência. Especificada pelo PO em 2026-09-20 a partir de um achado do mantenedor no
       mesmo dia, com captura de tela.
 
       **O defeito, medido.** No Mac, em `npm run app`, fechar a janela abre o diálogo de erro do
