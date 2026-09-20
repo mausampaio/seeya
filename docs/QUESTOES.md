@@ -8502,3 +8502,30 @@ o `pid` colidido morrer ou o lock expirar por outro caminho, nunca uma leitura o
 entre contas. `perMachine` já era opcional antes desta tarefa (V2-T20 item 3 só documentou que a
 opção sempre existiu); ninguém além do mantenedor decide se o caso de uso justifica medir isso de
 verdade.
+
+## Q-084 — V2-T17 (orçamento de desempenho): "medir três vezes" para (b)/(c) virou três janelas
+dentro de um lançamento só, não três lançamentos
+
+**Contexto.** O item 1 da tarefa pede, para as quatro medidas, "com a variação entre execuções
+(medir três vezes, registrar a faixa — um número único sem faixa esconde o ruído)". Para (a)
+tempo de subida e (d) tamanho em disco, isso foi seguido ao pé da letra: três lançamentos
+descartáveis independentes (`measure-startup.mjs`) e três rodadas completas de
+`npm run dist:windows`, cada uma do zero.
+
+**O desvio.** Para (b) memória em repouso e (c) CPU parado, as três amostras vieram de **um único
+processo**, lançado uma vez e observado ao longo de três janelas de 60 segundos consecutivas —
+não de três lançamentos separados. `docs/DESEMPENHO.md` (seção de (c)) registra o raciocínio: (b)
+e (c) perguntam sobre o comportamento em regime — quanto o app custa depois de estabilizado —, não
+sobre a variância de lançamento (essa pergunta já é (a)). Três lançamentos frios só somariam três
+reinícios sem acrescentar nada à pergunta "quanto isto custa parado", e a máquina desta medição
+(o próprio contrato desta tarefa avisa: "às vezes fica com pouca memória") ficaria com três
+Electrons inteiros abertos em sequência por mais tempo que o necessário — o oposto do "meça com o
+mínimo aberto" que a tarefa também pede.
+
+**Por que segui sem parar.** O efeito é pequeno e reversível: se um dia isso parecer errado, é
+trocar o laço de `measure-idle.mjs` por três `spawn()`s — o script já isola cada chamada de
+`process-tree-stats.ps1` por processo, então a mudança não tocaria o método de medição em si, só
+quantas vezes o processo é recriado. A faixa registrada (335,6–338,0 MiB; 0,39%–0,57% de um
+núcleo) continua sendo três números com variação real entre si, só que a variação captura
+"quanto isto muda ao longo do tempo parado" em vez de "quanto isto muda a cada reinício" — uma
+leitura diferente, não uma ausente.
