@@ -35,6 +35,9 @@ import type {
   DaemonAvailabilityUpdateEvent,
   DaemonControlRequest,
   DaemonControlResponse,
+  SettingsPanelResponse,
+  SaveSettingRequest,
+  SaveSettingResponse,
 } from '../ipc/channels.js';
 
 export interface SeeyaApi {
@@ -82,6 +85,11 @@ export interface SeeyaApi {
   onDaemonAvailabilityUpdate(listener: (event: DaemonAvailabilityUpdateEvent) => void): void;
   /** V2-T5b item 3: "Start daemon"/"Stop daemon". */
   daemonControl(request: DaemonControlRequest): Promise<DaemonControlResponse>;
+  /** V2-T14 item 1: the Settings dialog's own rows, re-fetched every time it opens. */
+  getSettingsPanel(): Promise<SettingsPanelResponse>;
+  /** V2-T14 items 2/3: one field's edit — resolves with the updated rows and the freshly
+   * recomputed faixa de horário on success, or the refusal message on failure. */
+  saveSetting(request: SaveSettingRequest): Promise<SaveSettingResponse>;
 }
 
 const api: SeeyaApi = {
@@ -145,6 +153,8 @@ const api: SeeyaApi = {
     );
   },
   daemonControl: (request) => ipcRenderer.invoke(CHANNELS.daemonControl, request),
+  getSettingsPanel: () => ipcRenderer.invoke(CHANNELS.getSettingsPanel),
+  saveSetting: (request) => ipcRenderer.invoke(CHANNELS.saveSetting, request),
 };
 
 contextBridge.exposeInMainWorld('seeya', api);

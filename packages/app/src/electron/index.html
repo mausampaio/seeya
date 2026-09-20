@@ -25,6 +25,7 @@
         <button id="end-day-button" type="button"></button>
         <button id="daemon-control-button" type="button"></button>
         <p id="daemon-control-result"></p>
+        <button id="settings-button" type="button"></button>
       </aside>
       <main id="main">
         <div id="toolbar">
@@ -69,6 +70,12 @@
         <button id="end-day-dialog-run" type="button" hidden></button>
         <button id="end-day-dialog-cancel" type="button" hidden></button>
       </div>
+    </dialog>
+    <dialog id="settings-dialog">
+      <h3 id="settings-dialog-title"></h3>
+      <p id="settings-dialog-daemon-note"></p>
+      <div id="settings-rows"></div>
+      <button id="settings-dialog-close" type="button"></button>
     </dialog>
     <script type="module" src="renderer.js"></script>
   </body>
