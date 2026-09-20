@@ -7,6 +7,7 @@
  * its own.
  */
 import path from 'node:path';
+import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { CHANNELS } from '../ipc/channels.js';
@@ -181,6 +182,31 @@ async function captureVerificationScreenshot(
     await clock.sleep(quitAfterMs);
     app.quit();
   }
+}
+
+/**
+ * V2-T17 item 4: opt-in instrumentation for the "time until the session list is on screen"
+ * measurement (`docs/DESEMPENHO.md`). Writes the wall-clock instant (via the injected `Clock`,
+ * D-019 — `process.hrtime`/`Date.now()` are banned outside `adapters/clock/` by
+ * `eslint.config.js`'s own rule, which does not exempt this directory) at which the FIRST
+ * `sessionsUpdate` reached the renderer, to the file `SEEYA_APP_STARTUP_TIMING_PATH` names.
+ *
+ * **What this measures, precisely (D-025):** the instant `main.ts` sent the sidebar data over
+ * IPC, not the instant Chromium painted it — the two are microseconds apart next to the
+ * multi-hundred-millisecond `SessionProvider.list()` call that precedes this send (this file's
+ * own `REFRESH_INTERVAL_MS` docstring has the ~0.24s measurement), so this is close enough for a
+ * "how long until the list appears" budget without adding a second IPC round trip just to have
+ * the renderer confirm its own paint.
+ *
+ * A measurement script spawns this process, records its own launch instant with the OS clock,
+ * and subtracts this file's timestamp from it — both instants come from the same machine's
+ * clock, so comparing across the two processes is safe even though neither one reads the other's
+ * clock directly. Same "instrumentação só do spike" discipline as every other `SEEYA_APP_*` flag
+ * in this file: unset in every normal run, never read by `npm run app`.
+ */
+async function writeStartupTiming(clock: Clock, timingPath: string): Promise<void> {
+  const payload = JSON.stringify({ sessionsListSentAt: clock.now().toISOString() });
+  await writeFile(timingPath, payload, 'utf8');
 }
 
 function createWindow(clock: Clock): BrowserWindow {
@@ -401,6 +427,10 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // because a REAL run terminates opted-in sessions (D-002), a consequence worth refusing a stray
   // concurrent call over rather than trusting the renderer alone.
   let endDayRunInProgress = false;
+  // V2-T17 item 4: set once the first `sessionsUpdate` of this window's lifetime has been sent —
+  // `writeStartupTiming`'s own docstring has the reasoning. `SEEYA_APP_STARTUP_TIMING_PATH` unset
+  // (every normal run) means this flag is simply never consulted.
+  let startupTimingWritten = false;
 
   const ptyManager = context.buildPtyManager({
     onData: (id, data) => {
@@ -859,6 +889,12 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
       latestSidebarRows = rows;
       const sessionsEvent: SessionsUpdateEvent = { rows };
       window.webContents.send(CHANNELS.sessionsUpdate, sessionsEvent);
+
+      const startupTimingPath = process.env.SEEYA_APP_STARTUP_TIMING_PATH;
+      if (startupTimingPath !== undefined && !startupTimingWritten) {
+        startupTimingWritten = true;
+        await writeStartupTiming(context.clock, startupTimingPath);
+      }
 
       // V2-T18 item 2: the "Today" panel tracks this same tick's own discovery — a session opened
       // outside the window stops showing "not running now" without a reload (the second achado
