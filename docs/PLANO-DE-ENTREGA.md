@@ -7032,10 +7032,19 @@ texto, mas não são a fila.
          botão **Resume selected** não fica sozinho oferecendo uma ação vazia (desabilitado, com o
          motivo à vista; nunca um botão que aceita clique e não faz nada). O texto fica em
          `text/messages.ts`.
-      3. **Teste dos três**: a disponibilidade recomputada depois da ação; **um clique logo após a
+      3. **O status não mostra dois horários sem dizer qual é qual.** Medido pelo mantenedor no
+         Mac em 2026-09-20: depois de adiar, a faixa e a linha de agenda mostram 15:30, mas a
+         PRIMEIRA linha do status continua "End-of-day time: 15:00 local" — que é o horário
+         **configurado**, e está certo (adiar não muda a configuração, muda só o dia de hoje). Só
+         que os dois números aparecem juntos sem nada distinguindo, e a leitura natural é "não
+         atualizou". Quando houver adiamento ou pulo no dia, essa linha diz as duas coisas numa só
+         (`application/format-status.ts#formatEndOfDayLine`) — e isso vale para a CLI e para a
+         janela, que compartilham o mesmo texto.
+      4. **Teste dos quatro**: a disponibilidade recomputada depois da ação; **um clique logo após a
          ação anterior mandando a ação certa** (o caso que o mantenedor mediu — desligar e, em
          seguida, conseguir religar sem esperar um minuto); e a frase aparecendo exatamente quando
-         nenhuma linha oferece caixa (e não aparecendo quando alguma oferece).
+         nenhuma linha oferece caixa (e não aparecendo quando alguma oferece); e a linha de
+         horário dizendo as duas coisas quando há adiamento, e só uma quando não há.
 
       **O que não entra:** permitir retomar uma sessão que já está aberta (abriria uma segunda
       cópia da mesma sessão — se o mantenedor quiser isso um dia, é decisão, não correção); mudar o
@@ -7154,6 +7163,35 @@ texto, mas não são a fila.
 
       **Aceite do mantenedor:** desligar e ligar o autostart, e o arquivo gerado conter só as
       variáveis da lista.
+
+- [ ] **V2-T24 (precisa de decisão do mantenedor antes de virar tarefa) — No macOS a notificação
+      se apresenta como "Editor de Scripts", e clicar nela abre o editor.** Medido pelo mantenedor
+      em 2026-09-20, com captura: o aviso prévio chegou na hora certa e com o texto certo, mas com
+      **o ícone do Editor de Scripts**, e o clique abre uma janela dele.
+
+      **Causa, e por que não é descuido.** No macOS o aviso é enviado por `osascript`
+      (`adapters/notification/macos-osascript.ts`), e o sistema atribui a notificação ao aplicativo
+      que a enviou — que é o próprio interpretador de scripts, não o seeya. Não há como um
+      `display notification` dizer "sou outro app": a identidade vem do processo que chama. O
+      spike B já havia registrado que `osascript` não tem ação de clique; o que ninguém tinha visto
+      é que ele também **empresta a própria identidade** ao aviso.
+
+      **As saídas, com o custo de cada uma — decisão do mantenedor:**
+      1. **Deixar como está e documentar.** Custo zero, e o aviso continua chegando na hora. O
+         preço é a marca errada na notificação e um clique que abre um editor de scripts, que é
+         pior que um clique que não faz nada.
+      2. **O app posta o aviso quando está aberto** (a API de notificação do próprio Electron, com
+         a identidade e o ícone do seeya, e clique que foca a janela), e o `osascript` fica só
+         para quando o app não está rodando. Precisa de um caminho do daemon para a janela, que
+         hoje não existe — é o item de maior custo, e o único que resolve de verdade.
+      3. **Depender de um utilitário de terceiro** capaz de identidade e ação (o mesmo que o spike
+         B descartou). Resolve com pouco código, mas a pessoa precisa instalar uma ferramenta a
+         mais, e o seeya passa a depender de algo que pode não estar lá.
+
+      **Recomendação do PO:** (1) agora, registrado como limite conhecido, e (2) quando a
+      notificação virar assunto de novo — provavelmente junto do `end-day` global, que muda o que
+      os avisos dizem. O que não vale é (3): trocar uma marca errada por uma dependência que a
+      pessoa tem de instalar.
 
 ## Definição de pronto (vale para toda tarefa)
 
