@@ -5962,6 +5962,12 @@ usable outcome (exit 5). stdout: "". stderr: #< CLIXML`; Ubuntu e macOS verdes, 
 passando. O teste não é tocado pela tarefa e passa nesta máquina. Reexecução só do job, sem mudança
 de código: verde.
 
+**Ocorrência (2026-09-20, PO):** classe (b) de novo, no mesmo teste, na mesclagem da V2-T13
+(`abe638e`): `windows-latest` falhou com o mesmo `exit 5` e o mesmo `stderr: #< CLIXML`, enquanto
+Ubuntu, macOS e a auditoria passaram — 2.007 dos 2.008 testes verdes. Terceira ocorrência
+registrada, sempre o mesmo teste e sempre só no Windows do CI; o portão local desta mesma mesclagem
+foi verde (197 arquivos, 2.008 testes). Reexecutado só o job que falhou.
+
 ---
 
 ## Q-065 — S4-T12: onde a normalização de `projectPolicy` mora, a escolha de resolver (não recusar) caminho relativo, e por que `buildDaemonContext` perdeu seu único `readConfig` de startup
