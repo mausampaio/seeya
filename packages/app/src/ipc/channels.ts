@@ -10,6 +10,7 @@ import type { TerminalFontOptions } from '../state/terminal-font.js';
 import type { TodayPanelData } from '../state/today-panel.js';
 import type { ScheduleStripData } from '../state/schedule-strip.js';
 import type { DaemonControlAvailability } from '../state/daemon-control-panel.js';
+import type { SettingsRow, ProjectPolicyLine } from '../state/settings-panel.js';
 
 export const CHANNELS = {
   /** Renderer → main: open a new tab. */
@@ -102,6 +103,15 @@ export const CHANNELS = {
    * renderer's own `DaemonControlAvailability` at click time (`state/daemon-control-panel.ts`),
    * never re-derived in main.ts. */
   daemonControl: 'seeya:daemon-control',
+  /** Renderer → main: the Settings dialog's own data (V2-T14 item 1) — fetched every time the
+   * dialog opens (never cached across opens, unlike `getTerminalFontConfig`: another process, e.g.
+   * `seeya config set`, could have written `config.json` since the dialog last showed). */
+  getSettingsPanel: 'seeya:get-settings-panel',
+  /** Renderer → main: one field's edit, from the Settings dialog (V2-T14 item 2) — validated and
+   * applied through the SAME `parseConfigFieldUpdate`/`applyConfigFieldUpdate` +
+   * `Storage.saveConfig` path `seeya config set` already uses, never a second validation of its
+   * own. */
+  saveSetting: 'seeya:save-setting',
 } as const;
 
 export interface CreateTabRequest {
@@ -320,3 +330,36 @@ export interface DaemonControlRequest {
 export interface DaemonControlResponse {
   readonly resultText: string;
 }
+
+/** `CHANNELS.getSettingsPanel`'s response (V2-T14 item 1) — `rows` is
+ * `state/settings-panel.ts#buildSettingsRows`'s own output; `projectPolicyLines` is
+ * `buildProjectPolicyLines`'s own output, shown read-only (the plan entry's own "o que não
+ * entra": `projectPolicy` isn't scalar, so it never gets an editable row). */
+export interface SettingsPanelResponse {
+  readonly rows: readonly SettingsRow[];
+  readonly projectPolicyLines: readonly ProjectPolicyLine[];
+}
+
+/** `CHANNELS.saveSetting`'s payload (V2-T14 item 2). `key`/`rawValue` are untyped strings, not
+ * `EditableConfigKey` — the renderer only ever offers one of the sixteen rows it was just handed,
+ * but the SAME validation the CLI's `seeya config set` runs
+ * (`parseConfigFieldUpdate`/`applyConfigFieldUpdate`) is what decides whether a key/value is
+ * accepted, in `electron/main.ts`'s own handler — never a second, renderer-side check of its own. */
+export interface SaveSettingRequest {
+  readonly key: string;
+  readonly rawValue: string;
+}
+
+/** `CHANNELS.saveSetting`'s response — a discriminated union (D-024, "nada achatado"): a rejected
+ * value carries `error` (`parseConfigFieldUpdate`'s own message, AGENTS.md § "Mensagens de erro" —
+ * the raw value and the expected shape) and nothing else, never a half-updated `rows`/`schedule`
+ * next to it. A saved value carries the freshly re-read `rows` (so every row's own `origin` stays
+ * correct, not just the one that changed) and the freshly recomputed `schedule` (V2-T14 item 3 —
+ * the faixa de horário updates immediately, without waiting for the next ambient refresh tick). */
+export type SaveSettingResponse =
+  | {
+      readonly ok: true;
+      readonly rows: readonly SettingsRow[];
+      readonly schedule: ScheduleStripData;
+    }
+  | { readonly ok: false; readonly error: string };

@@ -6035,7 +6035,7 @@ texto, mas não são a fila.
       **sessões descobertas**, nunca o nosso daemon (`ProcessControl.terminateAbruptly` existe
       para isso) — e todo o estado dele mora em disco.
 
-- [ ] **V2-T14 — Configurações na janela: o que está valendo, de onde vem, e dá para mudar ali.**
+- [~] **V2-T14 — Configurações na janela: o que está valendo, de onde vem, e dá para mudar ali.**
       Especificada pelo PO em 2026-09-20 a pedido do mantenedor no mesmo dia, e **entra antes da
       V2-T13**. Pedido dele, nas palavras dele: *"eu quero mudar o horário do fechamento do daemon
       por exemplo e eu não lembro o comando do cli, sei que posso te perguntar e fazer mas daqui a
@@ -6082,6 +6082,71 @@ texto, mas não são a fila.
       **Aceite do mantenedor:** abrir as configurações, ver as dezesseis chaves com valor e
       origem, trocar o horário de encerramento e ver a faixa de horário mudar sem reiniciar nada;
       e um valor inválido ser recusado com uma mensagem que diz o que se esperava.
+
+      **Entregue pelo agente em 2026-09-20, worktree isolada, branch
+      `tarefa/V2-T14-configuracoes`, quatro commits** (`ba1802e` item 1; `d12150f` itens 2/3;
+      `12f0810` nome da chave + `projectPolicy` só leitura, achado no próprio review; `ddd2587` o
+      hook de verificação).
+
+      **Item 1.** `packages/app/src/state/settings-panel.ts` — `buildSettingsRows(config)` mapeia
+      `EDITABLE_CONFIG_KEYS` (`@seeya-ai/engine/adapters/storage/config-schema.js`, as mesmas
+      dezesseis chaves de `seeya config get`, sem lista paralela) para `SettingsRow` (chave,
+      descrição, valor formatado por `formatConfigValue`, e origem). **Origem por comparação com
+      `DEFAULT_CONFIG`** (D-025) — como `Storage.readConfig()` já funde `config.json` nos padrões
+      e descarta quais campos o arquivo realmente citava, não sobra documento cru para perguntar
+      "isso foi escolhido"; um valor igual ao padrão sempre aparece como `'default'`, mesmo no caso
+      raro de alguém ter escrito esse número de propósito — a afirmação menos específica que a
+      spec pediu textualmente ("comparando o config.json lido com DEFAULT_CONFIG"). `projectPolicy`
+      (não escalar, "o que não entra") ganhou sua própria função, `buildProjectPolicyLines`, e
+      aparece só para leitura no fim do diálogo. Descrição de cada chave concentrada em
+      `text/messages.ts#settingsFieldDescriptions`.
+      **Item 2.** IPC nova em `ipc/channels.ts` (`getSettingsPanel`/`saveSetting`, seguindo o
+      formato das V2-T5a/V2-T5b). O handler de `saveSetting`
+      (`electron/main.ts`) chama exatamente `parseConfigFieldUpdate` → `applyConfigFieldUpdate` →
+      `Storage.saveConfig` — o mesmo caminho de `packages/cli/src/config-command.ts`, sem cópia da
+      validação nem dos padrões na interface. Um valor recusado devolve
+      `{ ok: false, error }` com a mensagem literal de `parseConfigFieldUpdate` (o valor bruto e a
+      forma esperada, AGENTS.md § "Mensagens de erro") e nada é gravado; o renderer mostra esse
+      texto sob o campo, sem reformular.
+      **Item 3.** Depois de um `saveSetting` bem-sucedido, o handler relê `estado.json`, chama
+      `decideSchedule` com o `Config` recém-gravado e devolve a faixa já recomputada — o mesmo
+      `buildScheduleStripData` da V2-T5b — que o renderer pinta na hora, sem esperar o ciclo
+      ambiente. **Achado ao implementar, corrigido no mesmo commit:** o laço de atualização de 10s
+      de `electron/main.ts` usava `context.config` (lido uma única vez na subida da janela) para
+      `decideSchedule`/a barra lateral/o texto de status — sem tocar nisso, um valor salvo no
+      diálogo apareceria certo por um instante e voltaria ao antigo no ciclo seguinte. O laço passou
+      a reler `Storage.readConfig()` a cada ciclo (mesma disciplina que `dayState` já tinha),
+      reaproveitado para a barra lateral e o texto de status também, não só a faixa — efeito além
+      da tarefa original, registrado aqui, sem abrir questão (o efeito é estritamente positivo e a
+      spec já citava o mesmo raciocínio para o daemon).
+
+      **Prova manual.** `SEEYA_APP_AUTO_EDIT_SETTINGS` (documentado em `electron/main.ts` junto de
+      onde é lido, e no glossário do `AGENTS.md`) abre o diálogo real, salva um `endOfDayTime`
+      válido primeiro e só depois tenta um `relevanceHours` inválido — nessa ordem porque um save
+      bem-sucedido re-renderiza todas as linhas, o que apagaria o erro de uma tentativa anterior
+      antes da captura. Rodado contra um `SEEYA_APP_HOME_OVERRIDE` descartável
+      (`%TEMP%\seeya-verify-v2t14-*`, nunca o `~/.seeya` real) com `SEEYA_APP_OFFSCREEN`/
+      `SEEYA_APP_SCREENSHOT_PATH`/`SEEYA_APP_QUIT_AFTER_MS`, a captura mostra: as dezesseis linhas
+      com nome, descrição, valor e origem (`endOfDayTime` em "set in config.json" = `09:15`, as
+      demais em "seeya default"); `relevanceHours` com `-5` no campo e a linha de erro `Not saved —
+      invalid value "-5" for "relevanceHours": Too small: expected number to be >0` (nada gravado —
+      a origem continua "seeya default"); e a faixa de horário, fora do diálogo, já em "End of day
+      at 09:15 — in 37 min" — a prova de que o efeito apareceu sem reiniciar nada. `projectPolicy`
+      aparece como "(none)" no fixture vazio usado na verificação.
+
+      **Portão**, rodado em pedaços pela pouca memória da máquina: `format:check` verde;
+      `tsc -p tsconfig.json --noEmit` verde; `eslint .` verde; `build` (`tsc -b`) verde;
+      `dependencias` verde — "no dependency violations found (347 modules, 922 dependencies
+      cruised)"; `npx vitest run --project unit --project integration --project
+      integration-process --project guards --maxWorkers 2` — 188 arquivos, 1.925 testes passando,
+      4 pulados; o mesmo comando com `--coverage` — 96,41% statements / 92,5% branches / 95,13%
+      funções / 96,8% linhas, acima dos pisos do `AGENTS.md`. `verificar:linux` não rodado (a
+      mesma classe de limite de memória do host que motivou o comando existir, já registrada em
+      tarefas anteriores; CI cobre). Nenhum agente tocou o `~/.seeya` real, o `~/.claude` real, as
+      chaves de registro `seeya`/`seeya-dev` ou o atalho instalado; nenhuma dependência nova.
+
+      Nenhuma questão nova aberta (Q-081 não foi necessária — a spec já cobria os pontos que
+      surgiram, inclusive a normalização de origem por comparação com `DEFAULT_CONFIG`).
 
 - [ ] **V2-T13 — O app é dono do daemon e do autostart; a CLI vira cliente (D-045).**
       Especificada pelo PO em 2026-09-20; terceiro passo do recorte da v2 (`docs/V2-RUMO.md`).

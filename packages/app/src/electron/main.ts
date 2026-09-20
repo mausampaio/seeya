@@ -35,8 +35,15 @@ import type {
   DaemonAvailabilityUpdateEvent,
   DaemonControlRequest,
   DaemonControlResponse,
+  SettingsPanelResponse,
+  SaveSettingRequest,
+  SaveSettingResponse,
 } from '../ipc/channels.js';
 import type { Clock } from '@seeya-ai/engine/core/ports.js';
+import {
+  applyConfigFieldUpdate,
+  parseConfigFieldUpdate,
+} from '@seeya-ai/engine/adapters/storage/config-schema.js';
 import { checkLiveLock } from '@seeya-ai/engine/scheduler/daemon-state.js';
 import { findPendingBriefing } from '@seeya-ai/engine/application/find-pending-briefing.js';
 import { readCwdHistory } from '@seeya-ai/engine/application/cwd-history.js';
@@ -60,6 +67,7 @@ import { buildEndDayCostCeiling } from '../state/end-day-preview.js';
 import { projectEndDayProgressEvent } from '../state/end-day-progress.js';
 import { buildScheduleStripData } from '../state/schedule-strip.js';
 import { resolveDaemonControlAvailability } from '../state/daemon-control-panel.js';
+import { buildSettingsRows, buildProjectPolicyLines } from '../state/settings-panel.js';
 import {
   addTab,
   createTab,
@@ -298,6 +306,43 @@ function createWindow(clock: Clock): BrowserWindow {
         .then(() =>
           window.webContents.executeJavaScript(
             "document.getElementById('schedule-strip-snooze-15')?.click();",
+          ),
+        );
+    });
+  }
+  // SEEYA_APP_AUTO_EDIT_SETTINGS: same "instrumentação só do spike" class as the five above —
+  // opens the real Settings dialog (V2-T14), saves a valid `endOfDayTime` value first (proving
+  // items 1 and 3 together: that row's own origin flips from "seeya default" to "set in
+  // config.json", and the faixa de horário in the sidebar updates immediately — no restart of the
+  // window or the daemon) and only THEN tries an invalid `relevanceHours` value (proving item 2's
+  // refusal: the row's own error text stays put, nothing is written). The invalid attempt has to
+  // come LAST — a successful save re-renders every row (so no OTHER row's `origin` goes stale next
+  // to the one that changed, this file's own `saveSetting` handler docstring), which would wipe an
+  // earlier row's error text right back off screen before the screenshot below ever fires. Never
+  // set by `npm run app` or the README.
+  if (process.env.SEEYA_APP_AUTO_EDIT_SETTINGS === '1') {
+    window.webContents.once('did-finish-load', () => {
+      void clock
+        .sleep(500)
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('settings-button').click();",
+          ),
+        )
+        .then(() => clock.sleep(500))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            'const validRow = document.querySelector(\'.settings-row[data-key="endOfDayTime"]\'); ' +
+              "validRow.querySelector('.settings-row-input').value = '09:15'; " +
+              "validRow.querySelector('.settings-row-save').click();",
+          ),
+        )
+        .then(() => clock.sleep(300))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            'const invalidRow = document.querySelector(\'.settings-row[data-key="relevanceHours"]\'); ' +
+              "invalidRow.querySelector('.settings-row-input').value = '-5'; " +
+              "invalidRow.querySelector('.settings-row-save').click();",
           ),
         );
     });
@@ -652,6 +697,42 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
     },
   );
 
+  // V2-T14 item 1: the Settings dialog's own rows — re-read from disk on every open (never cached,
+  // unlike `getTerminalFontConfig`: `seeya config set` in another terminal, or this same dialog's
+  // own previous save, must always be reflected the next time it's opened).
+  ipcMain.handle(CHANNELS.getSettingsPanel, async (): Promise<SettingsPanelResponse> => {
+    const config = await context.storage.readConfig();
+    return { rows: buildSettingsRows(config), projectPolicyLines: buildProjectPolicyLines(config) };
+  });
+
+  // V2-T14 items 2/3: "Save" on one Settings row — the SAME validation/write path `seeya config
+  // set` uses (`parseConfigFieldUpdate`/`applyConfigFieldUpdate` + `Storage.saveConfig`), never a
+  // second validation of its own. On success, the faixa de horário is recomputed right here from
+  // the value that was just written — `decideSchedule` needs `dayState` too, read fresh the same
+  // way `runRefreshLoop`'s own `onTick` below already does, never a stale one from an earlier tick.
+  ipcMain.handle(
+    CHANNELS.saveSetting,
+    async (_event, request: SaveSettingRequest): Promise<SaveSettingResponse> => {
+      const parsed = parseConfigFieldUpdate(request.key, request.rawValue);
+      if (!parsed.ok) {
+        return { ok: false, error: parsed.error };
+      }
+      const current = await context.storage.readConfig();
+      const updated = applyConfigFieldUpdate(current, parsed.key, parsed.value);
+      await context.storage.saveConfig(updated);
+
+      const now = context.clock.now();
+      const today = localDayString(now);
+      const dayState = (await context.storage.readState()) ?? emptyDayState(today);
+      const { decision } = decideSchedule(updated, dayState, now);
+      return {
+        ok: true,
+        rows: buildSettingsRows(updated),
+        schedule: buildScheduleStripData(decision, now),
+      };
+    },
+  );
+
   void runRefreshLoop({
     clock: context.clock,
     intervalMs: REFRESH_INTERVAL_MS,
@@ -665,8 +746,15 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
     onTick: async () => {
       const discovery = await context.sessionProvider.list();
       const now = context.clock.now();
+      // V2-T14 item 3: read fresh every tick, like `dayState` below already is — never
+      // `context.config` (read once at startup) alone, or a settings-panel save would show
+      // correctly for one tick and then flip back to the stale startup value on the next ambient
+      // refresh (at most REFRESH_INTERVAL_MS later). Reused for the sidebar/status text too, so
+      // the whole window agrees with itself about what's currently in config.json, not just the
+      // faixa de horário the plan entry calls out by name.
+      const liveConfig = await context.storage.readConfig();
 
-      const rows = buildSidebarRows(discovery, context.config, now, tabs);
+      const rows = buildSidebarRows(discovery, liveConfig, now, tabs);
       // V2-T9 item 4: cached for getTodayPanel's own handler above — the same discovery this
       // cycle already did, never a second SessionProvider.list() call just for "Today".
       latestSidebarRows = rows;
@@ -682,7 +770,7 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
 
       const text = await buildStatusPanelText({
         discovery,
-        config: context.config,
+        config: liveConfig,
         clock: context.clock,
         storage: context.storage,
         processControl: context.processControl,
@@ -697,7 +785,7 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
       // never shows a stale decision on purpose).
       const today = localDayString(now);
       const dayState = (await context.storage.readState()) ?? emptyDayState(today);
-      const { decision } = decideSchedule(context.config, dayState, now);
+      const { decision } = decideSchedule(liveConfig, dayState, now);
       const scheduleEvent: ScheduleUpdateEvent = buildScheduleStripData(decision, now);
       window.webContents.send(CHANNELS.scheduleUpdate, scheduleEvent);
 
