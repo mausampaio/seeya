@@ -25,8 +25,23 @@ export type GitCommandResult =
   | { readonly ran: true; readonly stdout: string; readonly exitCode: number }
   | { readonly ran: false; readonly reason: string };
 
-/** Never rejects — every failure mode above is reported through the return value. */
-export function runGit(workingDir: string, args: string[]): Promise<GitCommandResult> {
+/**
+ * Never rejects — every failure mode above is reported through the return value.
+ *
+ * `env` (V2-T27) is optional and additive to the caller's own concern, not something every
+ * read-only caller in this adapter needs to think about — `branch.ts`/`commits.ts`/`status.ts`/
+ * `git-adapter.ts` all still call this with two arguments, which keeps `process.env` inherited
+ * exactly as before. `adapters/workspace/index.ts#FsWorkspaceRepository.commitAll` is the one
+ * caller that passes it, to set `GIT_AUTHOR_NAME`/`GIT_COMMITTER_EMAIL`/etc. on the one command in
+ * this project that actually writes a commit — same technique
+ * `tests/integration/git/_fixtures.ts#commitAt` already uses to keep a commit's identity
+ * independent of whatever happens to be in the machine's own `git config`.
+ */
+export function runGit(
+  workingDir: string,
+  args: string[],
+  env?: NodeJS.ProcessEnv,
+): Promise<GitCommandResult> {
   return new Promise((resolve) => {
     // S4-T6: the daemon calls this once per repository at end-of-day, with no console of its own
     // (D-005) — without `windowsHide`, each `git` invocation pops a real, visible window on
@@ -36,6 +51,7 @@ export function runGit(workingDir: string, args: string[]): Promise<GitCommandRe
       cwd: workingDir,
       stdio: ['ignore', 'pipe', 'ignore'],
       shell: false,
+      ...(env !== undefined ? { env } : {}),
     });
     let stdout = '';
     child.stdout.on('data', (chunk: Buffer) => {

@@ -60,6 +60,11 @@ import {
   parseDaemonOwnershipTransitionDocument,
   serializeDaemonOwnershipTransitionDocument,
 } from './daemon-ownership-transition-schema.js';
+import {
+  WORKSPACE_ROOT_SCHEMA_VERSION,
+  parseWorkspaceRootDocument,
+  serializeWorkspaceRootDocument,
+} from './workspace-root-schema.js';
 import { resolveSchemaVersion, type SchemaMigration } from './schema-version.js';
 import { writeFileAtomic } from './atomic-write.js';
 
@@ -418,6 +423,31 @@ export class StorageAdapter implements Storage {
     await writeFileAtomic(
       this.daemonOwnershipTransitionPath(),
       JSON.stringify(serializeDaemonOwnershipTransitionDocument(answer)),
+    );
+  }
+
+  /** `~/.seeya/workspace.json` (V2-T27). */
+  private workspaceRootPath(): string {
+    return path.join(this.seeyaHome, 'workspace.json');
+  }
+
+  async readWorkspaceRoot(): Promise<string | null> {
+    const resolved = await readVersionedDocument(
+      this.workspaceRootPath(),
+      WORKSPACE_ROOT_SCHEMA_VERSION,
+    );
+    if (resolved === null) {
+      // No `seeya project` command has resolved a workspace location on this machine yet
+      // (D-025), not an error.
+      return null;
+    }
+    return parseWorkspaceRootDocument(resolved);
+  }
+
+  async saveWorkspaceRoot(root: string): Promise<void> {
+    await writeFileAtomic(
+      this.workspaceRootPath(),
+      JSON.stringify(serializeWorkspaceRootDocument(root)),
     );
   }
 }

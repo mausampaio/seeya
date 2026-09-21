@@ -338,6 +338,18 @@ export class FakeStorage implements Storage {
       new Error('FakeStorage.saveDaemonOwnershipTransitionAnswer is not exercised by endDay'),
     );
   }
+
+  // V2-T27: `seeya project`'s own workspace root — never touched by `endDay`/`startDay`/the
+  // daemon, same "reject loudly" convention this fake already uses above for every other method
+  // outside its own scope.
+  readWorkspaceRoot(): ReturnType<Storage['readWorkspaceRoot']> {
+    return Promise.reject(new Error('FakeStorage.readWorkspaceRoot is not exercised by endDay'));
+  }
+
+  saveWorkspaceRoot(root: string): ReturnType<Storage['saveWorkspaceRoot']> {
+    void root;
+    return Promise.reject(new Error('FakeStorage.saveWorkspaceRoot is not exercised by endDay'));
+  }
 }
 
 /** Named double for `SessionResumer` (S3-T3, docs/TESTES.md: "duplo de I/O é classe/objeto
