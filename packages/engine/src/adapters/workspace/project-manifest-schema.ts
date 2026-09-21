@@ -18,12 +18,34 @@ import type { AssociatedRepository, ProjectManifest, ProjectTracker } from '../.
  * adapter (`index.ts`) before this module ever sees the document. */
 export const PROJECT_MANIFEST_SCHEMA_VERSION = 1;
 
+const repositoryIdentitySchema = z
+  .object({
+    host: z.string().min(1),
+    owner: z.string().min(1),
+    repository: z.string().min(1),
+  })
+  .passthrough();
+
+/**
+ * V2-T28: `remote`/`identity` are both nullable now — `hasRemote: false`
+ * (`core/types.ts#AssociatedRepositoryWithoutRemote`) serializes as `remote: null, identity:
+ * null`. `.refine()` below is the one cross-field rule zod's own object shape can't express: an
+ * `identity` without a `remote` would be a fact this schema has no source for (D-025 applied to
+ * the schema itself, not just the type) — every REAL document this project ever writes already
+ * satisfies it; this only guards a hand-edited `seeya.json` (the rumo's own expectation that the
+ * file is meant to be edited, this module's own top comment).
+ */
 const associatedRepositorySchema = z
   .object({
     name: z.string().min(1),
-    remote: z.string().min(1),
+    remote: z.string().min(1).nullable(),
+    identity: repositoryIdentitySchema.nullable().optional(),
   })
-  .passthrough();
+  .passthrough()
+  .refine((value) => value.remote !== null || (value.identity ?? null) === null, {
+    message: 'identity must be null when remote is null',
+    path: ['identity'],
+  });
 
 const projectTrackerSchema = z
   .object({
@@ -46,7 +68,18 @@ const projectManifestDocumentSchema = z
 function toAssociatedRepository(
   raw: z.infer<typeof associatedRepositorySchema>,
 ): AssociatedRepository {
-  return { name: raw.name, remote: raw.remote };
+  if (raw.remote === null) {
+    return { hasRemote: false, name: raw.name };
+  }
+  return { hasRemote: true, name: raw.name, remote: raw.remote, identity: raw.identity ?? null };
+}
+
+/** The inverse of `toAssociatedRepository` — what `serializeProjectManifestDocument` writes for
+ * one `repositories` entry. */
+function serializeAssociatedRepository(repository: AssociatedRepository): Record<string, unknown> {
+  return repository.hasRemote
+    ? { name: repository.name, remote: repository.remote, identity: repository.identity }
+    : { name: repository.name, remote: null, identity: null };
 }
 
 function toProjectTracker(raw: z.infer<typeof projectTrackerSchema>): ProjectTracker {
@@ -73,7 +106,8 @@ export function parseProjectManifestDocument(raw: unknown): ProjectManifest {
   };
 }
 
-/** What `FsWorkspaceRepository#writeProjectSkeleton` writes for `seeya.json`. */
+/** What `FsWorkspaceRepository#writeProjectSkeleton`/`writeProjectManifest` write for
+ * `seeya.json`. */
 export function serializeProjectManifestDocument(
   manifest: ProjectManifest,
 ): Record<string, unknown> {
@@ -82,7 +116,7 @@ export function serializeProjectManifestDocument(
     id: manifest.id,
     name: manifest.name,
     defaultHarness: manifest.defaultHarness,
-    repositories: manifest.repositories,
+    repositories: manifest.repositories.map(serializeAssociatedRepository),
     trackers: manifest.trackers,
   };
 }

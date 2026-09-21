@@ -10,6 +10,8 @@ import type {
   GitReader,
   GitReadResult,
   HandoffGenerator,
+  HarnessLauncher,
+  HarnessOpenResult,
   ProcessControl,
   RejectedDiscoveryRecord,
   SessionProvider,
@@ -32,6 +34,7 @@ import type {
   ProjectManifest,
   ProjectSkeleton,
   ProtocolScheme,
+  RepositoryMapEntry,
   ResumeFallbackReason,
   ResumeOutcome,
   SessionFacts,
@@ -144,6 +147,38 @@ export class FakeGitReader implements GitReader {
       reposNotVisited: 0,
     };
   }
+
+  // V2-T28: not exercised by endDay/evidence-gathering — same "reject loudly" convention this
+  // fake uses for methods outside its own scope. `FakeGitReaderWithRemote` below is the double
+  // for tests that DO care about this method.
+  readRemoteUrl(): Promise<string | null> {
+    return Promise.reject(new Error('FakeGitReader.readRemoteUrl is not exercised by endDay'));
+  }
+}
+
+/** `GitReader` double for `application/repository-association.ts#addRepository`'s own tests —
+ * `readRemoteUrl` keyed by `cwd`, everything else rejects (`add-repo` never reads facts or
+ * cross-repo evidence, only the remote). */
+export class FakeGitReaderWithRemote implements GitReader {
+  constructor(private readonly remoteByCwd: ReadonlyMap<string, string | null> = new Map()) {}
+
+  readFacts(): Promise<GitReadResult> {
+    return Promise.reject(
+      new Error('FakeGitReaderWithRemote.readFacts is not exercised by addRepository'),
+    );
+  }
+
+  readEvidenceAcrossRepos(): Promise<GitEvidenceAcrossRepos> {
+    return Promise.reject(
+      new Error(
+        'FakeGitReaderWithRemote.readEvidenceAcrossRepos is not exercised by addRepository',
+      ),
+    );
+  }
+
+  readRemoteUrl(cwd: string): Promise<string | null> {
+    return Promise.resolve(this.remoteByCwd.get(cwd) ?? null);
+  }
 }
 
 /**
@@ -163,6 +198,12 @@ export class StaticGitReader implements GitReader {
 
   readEvidenceAcrossRepos(): Promise<GitEvidenceAcrossRepos> {
     return Promise.resolve(this.result);
+  }
+
+  readRemoteUrl(): Promise<string | null> {
+    return Promise.reject(
+      new Error('StaticGitReader.readRemoteUrl is not exercised by this double'),
+    );
   }
 }
 
@@ -353,6 +394,19 @@ export class FakeStorage implements Storage {
     void root;
     return Promise.reject(new Error('FakeStorage.saveWorkspaceRoot is not exercised by endDay'));
   }
+
+  // V2-T28: `repository-map.json` — never touched by `endDay`/`startDay`/the daemon, same
+  // "reject loudly" convention this fake uses above for every other method outside its own scope.
+  readRepositoryMap(): ReturnType<Storage['readRepositoryMap']> {
+    return Promise.reject(new Error('FakeStorage.readRepositoryMap is not exercised by endDay'));
+  }
+
+  saveRepositoryMap(
+    entries: readonly RepositoryMapEntry[],
+  ): ReturnType<Storage['saveRepositoryMap']> {
+    void entries;
+    return Promise.reject(new Error('FakeStorage.saveRepositoryMap is not exercised by endDay'));
+  }
 }
 
 /**
@@ -371,6 +425,25 @@ export class InMemoryWorkspaceStorage extends FakeStorage {
 
   override saveWorkspaceRoot(root: string): Promise<void> {
     this.root = root;
+    return Promise.resolve();
+  }
+}
+
+/**
+ * V2-T28: an in-memory `Storage` double for `repository-association.ts#addRepository` and
+ * `project-open.ts#openProject` tests — extends `InMemoryWorkspaceStorage` (already in-memory for
+ * the workspace root) with an in-memory `repository-map.json`, the other device-local file both
+ * use.
+ */
+export class InMemoryDeviceStorage extends InMemoryWorkspaceStorage {
+  private entries: readonly RepositoryMapEntry[] = [];
+
+  override readRepositoryMap(): Promise<readonly RepositoryMapEntry[]> {
+    return Promise.resolve(this.entries);
+  }
+
+  override saveRepositoryMap(entries: readonly RepositoryMapEntry[]): Promise<void> {
+    this.entries = entries;
     return Promise.resolve();
   }
 }
@@ -410,6 +483,11 @@ export class FakeWorkspaceRepository implements WorkspaceRepository {
 
   writeProjectSkeleton(root: string, projectId: string, skeleton: ProjectSkeleton): Promise<void> {
     this.projectsOf(root).set(projectId, skeleton.manifest);
+    return Promise.resolve();
+  }
+
+  writeProjectManifest(root: string, projectId: string, manifest: ProjectManifest): Promise<void> {
+    this.projectsOf(root).set(projectId, manifest);
     return Promise.resolve();
   }
 
@@ -662,6 +740,19 @@ export class FakeDirectoryExistence implements DirectoryExistence {
 
   exists(cwd: string): Promise<boolean> {
     return Promise.resolve(this.existingCwds.has(cwd));
+  }
+}
+
+/** `HarnessLauncher` double (V2-T28) — records every call and answers with whatever `result`
+ * (or `resultFor`, keyed by `cwd`) the test configured, defaulting to a clean `opened` exit 0. */
+export class FakeHarnessLauncher implements HarnessLauncher {
+  readonly calls: { readonly cwd: string; readonly addDirs: readonly string[] }[] = [];
+
+  constructor(private readonly result: HarnessOpenResult = { kind: 'opened', exitCode: 0 }) {}
+
+  open(cwd: string, addDirs: readonly string[]): Promise<HarnessOpenResult> {
+    this.calls.push({ cwd, addDirs });
+    return Promise.resolve(this.result);
   }
 }
 

@@ -169,14 +169,19 @@ interface AppInstallation { // V2-T13, adapters/installation/ (D-045 item 2)
   find(): Promise<AppInstallationStatus>; // installed (com o caminho) / notInstalled / unknown
 }
 
-interface WorkspaceRepository { // V2-T27, adapters/workspace/
+interface WorkspaceRepository { // V2-T27/V2-T28, adapters/workspace/
   isInitialized(root: string): Promise<boolean>;
   initialize(root: string): Promise<void>; // git init
   projectExists(root: string, projectId: string): Promise<boolean>;
   writeProjectSkeleton(root: string, projectId: string, skeleton: ProjectSkeleton): Promise<void>;
+  writeProjectManifest(root: string, projectId: string, manifest: ProjectManifest): Promise<void>; // V2-T28: só seeya.json
   commitAll(root: string, message: string): Promise<void>; // git add -A + commit; no-op sem diff
   listProjects(root: string): Promise<{ manifests: ProjectManifest[]; rejected: RejectedDiscoveryRecord[] }>;
   readProjectManifest(root: string, projectId: string): Promise<ProjectManifest | null>;
+}
+
+interface HarnessLauncher { // V2-T28, adapters/harness/
+  open(cwd: string, addDirs: readonly string[]): Promise<HarnessOpenResult>; // stdio inherit, nunca headless
 }
 ```
 
@@ -239,6 +244,11 @@ Mais importante do que parecia. Além de branch e status do `cwd`, enumera **wor
 commits do dia. Para sessões sem transcript, esta é a única fonte substantiva (D-013). Não
 quebra quando o `cwd` não é repositório: devolve "sem git" e segue.
 
+**`readRemoteUrl` (V2-T28).** `git remote get-url origin` num diretório qualquer — a leitura que
+`seeya project add-repo` usa para descobrir a identidade de um clone local. `null` cobre todo caso
+de "sem remoto resolvível" (não é repositório, é repositório mas sem `origin`, ou o comando falha)
+igualmente: nunca lança, e a distinção entre esses três casos não importa para quem chama (D-025).
+
 ### `generation/`
 Duas implementações da mesma porta, escolhidas por config (D-011):
 
@@ -278,6 +288,11 @@ residente. Não validado; ver S4-T1.
 Raiz injetada (nunca `os.homedir()` direto no código de negócio). Escrita atômica. Todo arquivo
 lido passa por zod. `schemaVersion` em todo documento persistido, com migração explícita.
 
+`readRepositoryMap`/`saveRepositoryMap` (V2-T28) seguem a mesma convenção de `readWorkspaceRoot`/
+`saveWorkspaceRoot`: um documento pequeno, escrito só pelo próprio `seeya`
+(`repository-map.json`), sem a tolerância item-a-item do D-022 — essa regra é para coleção
+externa, e nenhuma entrada deste arquivo chega de fora.
+
 ### `clock/`
 Um único módulo produz `now()`. Nenhum outro arquivo do projeto pode chamar `new Date()`,
 `Date.now()` ou `setTimeout` com prazo longo — imposto por regra de lint.
@@ -305,6 +320,26 @@ sessão (`git/`, só leitura) e distinto de `~/.seeya/` (`storage/`). Um adaptad
   `readHandoff`/`listHandoffs` já fazem para o mesmo par leitura-única/coleção.
 - **Reusa `adapters/storage/atomic-write.ts#writeFileAtomic`** para cada arquivo do esqueleto —
   mesma escrita atômica que `~/.seeya/` já tem, aplicada aqui ao espaço de trabalho.
+- **`writeProjectManifest` (V2-T28)** reescreve só o `seeya.json` de um projeto que já existe —
+  extrai o mesmo trecho de serialização que `writeProjectSkeleton` já usava para esse arquivo, sem
+  tocar nos outros arquivos do esqueleto nem recriar diretórios.
+
+### `harness/` (V2-T28)
+
+Abre o harness escolhido (só `claude` nesta tarefa) fora de qualquer sessão existente —
+`seeya project open`, distinto de `adapters/resumption/` (que sempre `--resume` um `sessionId`
+específico). Um adaptador só (`ClaudeHarnessLauncher`), sem escolha por plataforma:
+
+- **Reusa `adapters/resumption/spawn-interactive.ts#runInteractive` e `env.ts
+  #buildResumptionEnv`** — o mesmo `stdio: 'inherit'` (docs/spikes/H-retomada-interativa.md) e a
+  mesma sanitização de ambiente (D-017), sem duplicar nenhum dos dois. Import de adapter para
+  adapter, permitido pela matriz (só `application/`, `cli/` e `scheduler/` são restritos ao
+  acessar `adapters/`).
+- **`adapters/harness/args.ts#buildOpenArgs`** monta `--add-dir <dir...> --` sempre que há algum
+  diretório associado — o gotcha que `docs/spikes/N-adocao-de-sessao.md` mediu (`--add-dir` é
+  variádico e engole o próximo argumento posicional sem um `--` explícito terminando a lista).
+  `open` nunca passa um prompt depois, mas termina a lista mesmo assim: um argumento futuro nessa
+  posição não pode reintroduzir o mesmo bug.
 
 ## Fusos e horários
 

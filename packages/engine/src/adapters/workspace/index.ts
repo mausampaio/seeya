@@ -40,6 +40,19 @@ function manifestPath(root: string, projectId: string): string {
   return path.join(root, projectId, 'seeya.json');
 }
 
+/** Shared by `writeProjectSkeleton` and `writeProjectManifest` (V2-T28) — the one place that
+ * serializes a `ProjectManifest` to `seeya.json`, atomically. */
+async function writeManifestFile(
+  root: string,
+  projectId: string,
+  manifest: ProjectManifest,
+): Promise<void> {
+  await writeFileAtomic(
+    manifestPath(root, projectId),
+    JSON.stringify(serializeProjectManifestDocument(manifest), null, 2) + '\n',
+  );
+}
+
 /** Reads and validates one `seeya.json` — throws on anything malformed (bad JSON, schema
  * mismatch, unsupported `schemaVersion`), `null` only when the file doesn't exist at all (D-025).
  * Shared by `readProjectManifest` (throws straight to its caller, a single explicit lookup) and
@@ -150,10 +163,17 @@ export class FsWorkspaceRepository implements WorkspaceRepository {
     for (const file of skeleton.files) {
       await writeFileAtomic(path.join(projectDir, file.relativePath), file.content);
     }
-    await writeFileAtomic(
-      manifestPath(root, projectId),
-      JSON.stringify(serializeProjectManifestDocument(skeleton.manifest), null, 2) + '\n',
-    );
+    await writeManifestFile(root, projectId, skeleton.manifest);
+  }
+
+  /** V2-T28: overwrites only `seeya.json` — `add-repo` is the one caller, right after reading the
+   * current manifest and appending one `AssociatedRepository` to `repositories`. */
+  async writeProjectManifest(
+    root: string,
+    projectId: string,
+    manifest: ProjectManifest,
+  ): Promise<void> {
+    await writeManifestFile(root, projectId, manifest);
   }
 
   async commitAll(root: string, message: string): Promise<void> {

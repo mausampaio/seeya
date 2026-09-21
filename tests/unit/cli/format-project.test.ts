@@ -87,7 +87,14 @@ describe('formatShowProjectReport', () => {
       manifest: {
         ...EMPTY_MANIFEST,
         defaultHarness: 'claude',
-        repositories: [{ name: 'api', remote: 'https://example.com/a.git' }],
+        repositories: [
+          {
+            hasRemote: true,
+            name: 'api',
+            remote: 'https://host/acme-widgets/a.git',
+            identity: null,
+          },
+        ],
         trackers: [{ type: 'gitlab', project: 'acme/app' }],
       },
       root: 'C:\\workspace\\auth-hardening',
