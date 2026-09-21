@@ -5517,7 +5517,7 @@ texto, mas não são a fila.
       da tarefa** — instalar de verdade no Linux e no Windows do mantenedor e repetir os passos que
       só ele pode confirmar (menu, aba, daemon pela janela, clique no aviso prévio).
 
-- [~] **V2-T9 — A sessão que mudou de diretório: detectar, mostrar e deixar escolher onde
+- [x] **V2-T9 — A sessão que mudou de diretório: detectar, mostrar e deixar escolher onde
       retomar (D-024, D-025, D-039).** Especificada pelo PO em 2026-09-19 a partir de um achado do
       mantenedor no mesmo dia; aprovada e despachada pelo mantenedor no mesmo dia, com o item 4
       incluído (um segundo achado dele, na mesma linha do painel); **mesclada na `main` em
