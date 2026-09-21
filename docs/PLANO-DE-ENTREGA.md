@@ -7974,6 +7974,18 @@ trabalho nasce como repositório git local, e o remoto é assunto próprio.
       `defaultHarness` nasce `null` em vez do `"claude"` do exemplo do rumo (D-025: nada foi
       escolhido ainda). Nenhuma outra pendência.
 
+      **Mesclada na `main` em 2026-09-21** (portão na worktree do PO: 211 arquivos, 2.182 testes
+      passando, 4 pulados; cobertura 96,49%/92,51%/95,22%/96,83%). Revisão sem ajustes, com dois
+      elogios que ficam registrados porque são o padrão a repetir: a fronteira do item 4 foi provada
+      **por execução** (arquivos operacionais falsos gravados antes, `git ls-files` depois, e a
+      constatação de que o `.git` do espaço de trabalho não é a raiz de `~/.seeya/`, então nada de
+      fora PODE ser rastreado); e a cobertura abaixo do piso foi fechada com **testes de falha
+      real**, não baixando o piso.
+
+      **Pendência que nasce aqui e vence na tarefa de sincronização:** git não versiona diretório
+      vazio, então as seis pastas do esqueleto existem só neste dispositivo. Sem remoto isso não
+      tem efeito; com remoto, vira decisão (arquivo marcador em cada pasta, ou aceitar que a pasta
+      nasce quando algo é escrito nela). Fica em `[~]` até o aceite do mantenedor.
 ## Definição de pronto (vale para toda tarefa)
 
 1. Código implementa exatamente a spec; divergência virou questão, não improviso.
