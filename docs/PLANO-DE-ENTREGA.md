@@ -7449,6 +7449,22 @@ texto, mas não são a fila.
       escrito para não virar surpresa — rotação é trabalho próprio, e só se pagará se alguém
       medir o arquivo grande de verdade. Fica em `[~]` até o aceite do mantenedor.
 
+      **Aceite do mantenedor em 2026-09-21 (Windows), conferido pelo PO no registro real.** Depois
+      de desligar e ligar o autostart pela janela, a tarefa `SeeyaDaemonAutostart` ficou com a
+      ação `cmd.exe /c "set ELECTRON_RUN_AS_NODE=1&& conhost.exe --headless <seeya.exe> <cli>
+      daemon >> <~/.seeya>utostart.log 2>&1"`. **A fotografia do ambiente sumiu** — nenhuma
+      variável da sessão foi para o registro — e a saída do processo agora tem destino.
+
+      **Achado da conferência: o `PATH` não foi, e por um motivo que o teste não pegava.** A lista
+      é `['ELECTRON_RUN_AS_NODE', 'PATH']` comparada com diferença de maiúsculas, e no Windows a
+      variável se chama `Path`. Resultado: no Windows ela é sempre descartada. **Na prática isso
+      acerta por acidente** — uma tarefa agendada no logon recebe o ambiente vivo do usuário,
+      inclusive o `Path` atual, então não congelar é melhor do que congelar, e o daemon continua
+      achando `claude` e `git`. Mas o código afirma uma coisa e faz outra, e isso não pode ficar
+      por acidente: na próxima tarefa que tocar o autostart, tornar a regra explícita (no Windows,
+      não carregar o `Path`, com o porquê ao lado; nos outros sistemas, carregar `PATH`) e testar
+      com o nome real de cada sistema.
+
 - [ ] **V2-T24 (precisa de decisão do mantenedor antes de virar tarefa) — No macOS a notificação
       se apresenta como "Editor de Scripts", e clicar nela abre o editor.** Medido pelo mantenedor
       em 2026-09-20, com captura: o aviso prévio chegou na hora certa e com o texto certo, mas com
