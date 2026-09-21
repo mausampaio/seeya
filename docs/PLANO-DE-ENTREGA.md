@@ -7767,6 +7767,93 @@ texto, mas não são a fila.
       fazer: **a subida do app INSTALADO**, que não passa pelo lançamento a partir de
       `node_modules`. Só depois dessa comparação é que uma tarefa de otimização tem alvo — hoje ela
       teria palpite.
+### Projetos — o recorte (PO, 2026-09-21)
+
+O passo 4 do `docs/V2-RUMO.md` é grande demais para uma tarefa. O recorte, na ordem em que
+desbloqueia:
+
+- **V2-T26 (spike)** — medir o que a adoção de sessão precisa, antes de qualquer desenho.
+- **V2-T27** — o espaço de trabalho e `seeya project create`/`list`/`show`.
+- **V2-T28** — `add-repo` e `open`: identidade do repositório associado e o mapa por dispositivo.
+- **V2-T29** — adotar uma sessão existente ao criar um projeto (D-045 item 4), depois do spike.
+- **V2-T30** — a lateral da janela agrupa as sessões por projeto.
+
+Sincronização entre dispositivos (passo 7 do rumo) **não entra em nenhuma delas**: o espaço de
+trabalho nasce como repositório git local, e o remoto é assunto próprio.
+
+- [ ] **V2-T26 (spike) — O que a adoção de sessão precisa, medido antes de desenhar.** Especificada
+      pelo PO em 2026-09-21. **Spike: mede e escreve, não entrega comportamento.** Existe porque a
+      D-045 item 4 depende de duas premissas técnicas que ninguém nunca mediu, e desenhar a adoção
+      sem elas seria inventar.
+
+      **O que medir, cada uma com a saída bruta no relatório:**
+      1. **Retomar com acesso de escrita a um diretório fora do da sessão.** O Claude Code tem um
+         parâmetro de diretórios adicionais; ele nunca foi medido **junto com `--resume`**. A
+         pergunta exata: uma sessão retomada consegue escrever num diretório de projeto que não é o
+         `cwd` dela? Com quais limites (permissão pedida na hora? recusa silenciosa? caminho
+         relativo?).
+      2. **Entregar uma instrução inicial na retomada.** Já sabemos que o prompt vai por argumento
+         e que ele tem teto (D-015, V2-T7). A pergunta aqui é outra: **qual o menor texto útil** que
+         faz a sessão entender que deve externalizar a própria memória para arquivos, e o que
+         acontece quando ela é retomada com esse texto — ela escreve, pergunta, ou ignora?
+      3. **O Codex aceita mensagem inicial na retomada?** Ele tem um comando de retomada próprio;
+         a mensagem inicial nunca foi medida. Se não aceitar, a saída da D-045 já está decidida
+         (gerar o texto para a pessoa colar) — o spike só confirma qual dos dois caminhos vale.
+
+      **Como medir sem sujar nada:** sessões descartáveis, criadas pelo próprio spike num diretório
+      temporário fora do repositório, com `SEEYA_APP_HOME_OVERRIDE`/home descartável quando o
+      seeya entrar na conta. **Nunca** usar uma sessão real do mantenedor, nunca escrever no
+      `~/.claude` real. Cada medição custa tokens de verdade: meça uma vez, registre a saída, não
+      repita para "confirmar".
+
+      **Entrega:** `docs/spikes/N-adocao-de-sessao.md` em português, com método, saída bruta e uma
+      seção final **"o que isto decide"** — para cada um dos três pontos, o que a V2-T29 pode
+      assumir e o que ela não pode. Nenhuma mudança em `packages/`.
+
+      **Aceite do mantenedor:** ler o spike e concordar com a leitura, ou apontar o que ficou sem
+      medir.
+
+- [ ] **V2-T27 — O espaço de trabalho e `seeya project create`/`list`/`show`.** Especificada pelo
+      PO em 2026-09-21, a partir do `docs/V2-RUMO.md` (§ "Projeto persistente", § "Um repositório
+      para todos os projetos"). É a primeira tarefa em que o projeto vira coisa em disco.
+
+      **Vocabulário, fixado antes do código** (D-027/D-028 — entra no glossário do `AGENTS.md` na
+      primeira leva de commits): espaço de trabalho → `workspace`; projeto → `project`; repositório
+      associado → `associatedRepository`; identificador do projeto → `projectId` (o nome do
+      diretório, minúsculas e hífens). Em disco: `seeya.json` por projeto, com `schemaVersion`,
+      `id`, `name`, `defaultHarness`, `repositories`, `trackers` — os nomes do rumo, não outros.
+
+      **O que entra:**
+      1. **Onde o espaço de trabalho mora**, perguntado uma vez e guardado em `~/.seeya/`
+         (chave nova, glossário antes do código). Padrão: uma pasta dentro do próprio `~/.seeya/`.
+         **Nasce como repositório git local**, sem remoto e sem sincronização — o remoto é da
+         tarefa de sincronização, e a instalação com zero projetos é o estado normal, não erro.
+      2. **`seeya project create <id>`** cria o diretório do projeto dentro do espaço de trabalho
+         com o esqueleto do rumo: `AGENTS.md`, `CLAUDE.md` apontando para ele, `INDEX.md`,
+         `seeya.json`, e as pastas `context/`, `decisions/`, `plans/`, `status/`, `journal/`,
+         `references/`. O conteúdo inicial é curto e honesto: diz o que é o projeto, que está
+         vazio, e por onde um agente deve começar. **Nada de texto inventado sobre o trabalho** —
+         quem preenche é a V2-T29 ou a pessoa.
+      3. **`seeya project list` e `seeya project show <id>`**, texto simples, com o mesmo cuidado
+         de sempre: dizer o que se sabe e o que não se sabe (projeto sem repositório associado diz
+         isso, não omite).
+      4. **O git do espaço de trabalho é do seeya**, e ele commita o que cria — mas **nunca** entra
+         aí nada de `~/.seeya/` (estado operacional, locks, config do dispositivo). A separação é
+         explícita e testada.
+
+      **O que não entra:** `add-repo`, `open`, adoção de sessão, remoto/sincronização, interface —
+      cada uma tem tarefa própria. Nada de harness nesta tarefa: ela só escreve arquivos.
+
+      **Cuidados:** o motor não conhece git de projeto — o acesso ao mundo passa por porta
+      (`docs/ARQUITETURA.md`, matriz exaustiva: a porta nova entra lá antes do código); escrever
+      **só** dentro do espaço de trabalho e de `~/.seeya/` (D-027); nomes de chave em disco no
+      glossário antes de existirem; nenhuma dependência nova sem perguntar (para git, o projeto já
+      tem um adaptador — reuse em vez de trazer biblioteca).
+
+      **Aceite do mantenedor:** criar dois projetos, ver o esqueleto em disco, `list` e `show`
+      dizendo a verdade sobre os dois, e o histórico do espaço de trabalho com um commit por
+      criação.
+
 ## Definição de pronto (vale para toda tarefa)
 
 1. Código implementa exatamente a spec; divergência virou questão, não improviso.
