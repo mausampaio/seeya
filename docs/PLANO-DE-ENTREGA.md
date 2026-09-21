@@ -7781,7 +7781,7 @@ desbloqueia:
 Sincronização entre dispositivos (passo 7 do rumo) **não entra em nenhuma delas**: o espaço de
 trabalho nasce como repositório git local, e o remoto é assunto próprio.
 
-- [ ] **V2-T26 (spike) — O que a adoção de sessão precisa, medido antes de desenhar.** Especificada
+- [~] **V2-T26 (spike) — O que a adoção de sessão precisa, medido antes de desenhar.** Especificada
       pelo PO em 2026-09-21. **Spike: mede e escreve, não entrega comportamento.** Existe porque a
       D-045 item 4 depende de duas premissas técnicas que ninguém nunca mediu, e desenhar a adoção
       sem elas seria inventar.
@@ -7812,6 +7812,33 @@ trabalho nasce como repositório git local, e o remoto é assunto próprio.
 
       **Aceite do mantenedor:** ler o spike e concordar com a leitura, ou apontar o que ficou sem
       medir.
+
+      **Relatório.** `docs/spikes/N-adocao-de-sessao.md`, medido no Windows contra `claude` 2.1.278
+      e `codex-cli` 0.154.0, com sessões descartáveis fora do repositório. As três respostas:
+
+      1. **Escrita fora do `cwd`, com `--resume`:** funciona — `--add-dir` combinado com `--resume`
+         aceita caminho absoluto e relativo dentro do diretório adicionado. O achado que muda o
+         desenho: **por padrão, o modo headless (`-p`) nega toda escrita, inclusive no próprio
+         `cwd` da sessão** — sem `--permission-mode` explícito (`acceptEdits` foi o testado),
+         ninguém aprova o pedido e nada é escrito. Com `acceptEdits`, escreve dentro do `cwd` e do
+         `--add-dir`, e continua negando fora dos dois. Gotcha de invocação registrado: `--add-dir`
+         é variádico e engole um prompt posicional que venha logo depois — precisa de `--` entre
+         os dois.
+      2. **A instrução mínima:** nomear os arquivos-alvo (`AGENTS.md`, `INDEX.md`) funciona numa
+         única retomada — a sessão escreveu os dois, com conteúdo correto, e sinalizou sozinha uma
+         inconsistência nos fatos em vez de inventar. Um texto vago sobre "externalizar memória",
+         sem nomear arquivo, foi um lugar-comum: a sessão usou o mecanismo de auto-memória do
+         próprio `claude` (fora do projeto, em `~/.claude/`) em vez de escrever nos arquivos do
+         projeto — satisfez a letra do pedido, não a intenção.
+      3. **O Codex:** aceita mensagem inicial em `codex exec resume <id> "<mensagem>"` — medido com
+         contexto real da conversa original, não só documentado no `--help`. Isso derruba a
+         premissa por trás do plano de contingência da D-045 (gerar texto para colar) para o
+         caminho headless; a V2-T29 pode tratar Codex e Claude Code de forma simétrica nesse ponto.
+         Não medido: `codex resume` interativo (picker, sem `exec`) e a retomada interativa de
+         verdade nos dois harnesses (sem TTY, mesma reserva do spike H).
+
+      Nenhuma mudança em `packages/`; portão rodado só com `format:check` e o guard de termos
+      locais.
 
 - [ ] **V2-T27 — O espaço de trabalho e `seeya project create`/`list`/`show`.** Especificada pelo
       PO em 2026-09-21, a partir do `docs/V2-RUMO.md` (§ "Projeto persistente", § "Um repositório
