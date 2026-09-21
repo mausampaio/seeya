@@ -20,6 +20,8 @@ import type {
   EarlyWarningState,
   GeneratedUnderstanding,
   Handoff,
+  ProjectManifest,
+  ProjectSkeleton,
   ProtocolScheme,
   SessionFacts,
 } from './types.js';
@@ -431,6 +433,25 @@ export interface Storage {
    * being asked a second time, D-045's own "não pergunta de novo" for EITHER answer).
    */
   saveDaemonOwnershipTransitionAnswer(answer: DaemonOwnershipTransitionAnswer): Promise<void>;
+
+  /**
+   * V2-T27: where the workspace (the single git repository `WorkspaceRepository` manages, holding
+   * every project) lives on THIS device — `docs/PLANO-DE-ENTREGA.md`'s own words: "onde o espaço
+   * de trabalho mora, perguntado uma vez e guardado em `~/.seeya/`". `null` when nothing has been
+   * resolved yet on this machine (D-025) — `application/workspace.ts#resolveWorkspaceRoot` is what
+   * turns that into the default path and persists it via `saveWorkspaceRoot`, the one time this
+   * matters; this port only ever reports what's on disk, never invents a default itself.
+   */
+  readWorkspaceRoot(): Promise<string | null>;
+
+  /**
+   * Persists `root` to `~/.seeya/workspace.json`, atomically. Called once, by
+   * `application/workspace.ts#resolveWorkspaceRoot`, the first time any `seeya project` command
+   * runs on a machine with no workspace location recorded yet — never called again afterward on
+   * the same machine (same "decided once" contract `saveActiveProtocolScheme`'s neighbors on this
+   * port already follow for their own one-shot markers).
+   */
+  saveWorkspaceRoot(root: string): Promise<void>;
 }
 
 /**
@@ -975,4 +996,91 @@ export type AppInstallationStatus =
  */
 export interface AppInstallation {
   find(): Promise<AppInstallationStatus>;
+}
+
+/**
+ * V2-T27: write access to the workspace — the single git repository `docs/V2-RUMO.md` § "Um
+ * repositório para todos os projetos" describes, holding every project as a subdirectory.
+ * Implemented by `adapters/workspace/index.ts#FsWorkspaceRepository`, over the SAME `runGit`
+ * (`adapters/git/run-git.ts`) `GitReader` already uses — reused, not a new git dependency
+ * (`docs/PLANO-DE-ENTREGA.md`'s own instruction: "para git, o projeto já tem um adaptador —
+ * reuse"). Deliberately separate from `GitReader`: that port reads facts about a SESSION's own
+ * repository (never writes); this one writes to the workspace `seeya` itself owns — two different
+ * repositories, two different responsibilities, same underlying `git` binary.
+ *
+ * Also separate from `Storage`: `Storage`'s whole contract is `~/.seeya/` (D-027); the workspace
+ * is a second, distinct root a `seeya project` command is allowed to write inside
+ * (`docs/PLANO-DE-ENTREGA.md`: "escrever só dentro do espaço de trabalho e de `~/.seeya/`") — its
+ * own root path happens to default INSIDE `~/.seeya/` (`Storage.readWorkspaceRoot`'s own
+ * docstring), but is not assumed to be there by anything in this port.
+ *
+ * Every method takes `root` explicitly (never reads `Storage` itself) — same reasoning
+ * `GitReader.readFacts(cwd: string)` already follows: the port stays a pure "operate on this
+ * directory" contract, and `application/workspace.ts` is the one layer that resolves which
+ * directory that is.
+ */
+export interface WorkspaceRepository {
+  /** True when `root` is already a git working tree (has a `.git` entry) — never creates
+   * anything; false both when `root` doesn't exist yet and when it exists but isn't a repository
+   * yet, the two situations `application/workspace.ts#createProject` treats identically (both mean
+   * "call `initialize` first"). */
+  isInitialized(root: string): Promise<boolean>;
+
+  /** `git init` at `root`, creating `root` itself first if it doesn't exist. Only ever called
+   * after `isInitialized` reported false — this method doesn't re-check on its own, the same
+   * "caller already knows" contract `ProcessControl.terminateGracefully`'s neighbors follow. */
+  initialize(root: string): Promise<void>;
+
+  /** True when `root/projectId` already holds a `seeya.json` — the same test `listProjects`
+   * below uses to decide what counts as a project, so a directory a person created by hand for
+   * some other reason is never mistaken for one (D-025: no `seeya.json`, no claim either way about
+   * "is this a project"). */
+  projectExists(root: string, projectId: string): Promise<boolean>;
+
+  /**
+   * Writes every file and creates every directory `skeleton` describes
+   * (`core/project-skeleton.ts#buildProjectSkeleton`), relative to `root/projectId`, plus
+   * `root/projectId/seeya.json` itself, serialized from `skeleton.manifest` with the adapter's own
+   * `schemaVersion` (the same split `Storage.saveConfig` already draws between `Config`, the
+   * domain type, and `config-schema.ts`, the on-disk shape). Each file is written atomically
+   * (`adapters/storage/atomic-write.ts#writeFileAtomic`, reused — same "temporário + rename"
+   * AGENTS.md requires for `~/.seeya/`, applied here to the workspace instead). Never commits —
+   * `commitAll` below is a separate, explicit step, so a caller can write several projects (or a
+   * project plus an unrelated change) before choosing to commit once.
+   */
+  writeProjectSkeleton(root: string, projectId: string, skeleton: ProjectSkeleton): Promise<void>;
+
+  /**
+   * `git add -A && git commit -m message` at `root`, using `seeya`'s own author/committer identity
+   * (never the operator's real `git config user.*` — the same reasoning
+   * `tests/integration/git/_fixtures.ts#commitAt` already documents for why a commit's identity
+   * shouldn't depend on whatever happens to be configured on the machine running it). **A no-op,
+   * not an empty commit, when nothing is staged after `git add -A`** — `application/
+   * workspace.ts#createProject` calls this right after `writeProjectSkeleton`, but a future
+   * caller re-running the same operation idempotently (nothing changed) must not grow the
+   * workspace's history with a commit that carries no diff.
+   */
+  commitAll(root: string, message: string): Promise<void>;
+
+  /**
+   * D-022's "both sides", for the workspace's own collection of projects: every immediate
+   * subdirectory of `root` holding a `seeya.json` that parses, plus every one that doesn't (bad
+   * JSON, a schema mismatch, an unsupported `schemaVersion`) as a `RejectedDiscoveryRecord` — same
+   * shape `Storage.listHandoffs` already returns for the identical reason. A subdirectory with NO
+   * `seeya.json` at all (e.g. `.git` itself, or something a person created by hand) is silently
+   * skipped — neither accepted nor rejected, D-025: this port makes no claim about a directory
+   * that never looked like a project to begin with.
+   */
+  listProjects(
+    root: string,
+  ): Promise<{ manifests: ProjectManifest[]; rejected: RejectedDiscoveryRecord[] }>;
+
+  /**
+   * A single, explicit lookup (`seeya project show <id>`) — unlike `listProjects`, this is NOT a
+   * collection scan, so D-022's per-item tolerance doesn't apply: a malformed `seeya.json` throws
+   * (same split `Storage.readHandoff`/`listHandoffs` already draw for the identical reason, see
+   * that adapter's own docstring). `null` only when `root/projectId` has no `seeya.json` at all
+   * (D-025: the project genuinely doesn't exist, not a parse failure).
+   */
+  readProjectManifest(root: string, projectId: string): Promise<ProjectManifest | null>;
 }

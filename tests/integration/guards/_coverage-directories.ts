@@ -103,6 +103,11 @@ export const DECLARED_COVERAGE_DIRECTORIES: readonly DeclaredCoverageDirectory[]
     path: 'packages/engine/src/adapters/transcript',
     expectation: { kind: 'covered', threshold: 80 },
   },
+  {
+    // V2-T27: FsWorkspaceRepository, the one adapter behind core/ports.ts#WorkspaceRepository.
+    path: 'packages/engine/src/adapters/workspace',
+    expectation: { kind: 'covered', threshold: 80 },
+  },
   { path: 'packages/cli/src', expectation: { kind: 'covered', threshold: 80 } },
   // V2-T2: same single-flat-entry shape as packages/cli/src above — packages/app/src has no
   // internal layer subdirectory of its own either. packages/app/src/electron/** carries no floor

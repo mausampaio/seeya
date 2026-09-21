@@ -1036,3 +1036,85 @@ export type DaemonOwner =
  * — nothing was touched; the person keeps running the CLI's daemon/autostart by hand.
  */
 export type DaemonOwnershipTransitionAnswer = 'accepted' | 'declined';
+
+/**
+ * V2-T27: a repository of the person's own code that a `project` (below) points at —
+ * `docs/V2-RUMO.md` § "Vários repositórios": "o `seeya.json` associa a frente aos repositórios e
+ * trackers que ela atravessa". `seeya` only ever reads it (never writes inside it) — the
+ * workspace/project's own git history is what `WorkspaceRepository` manages, a completely
+ * different repository. `name` is the short label the project uses for it (`"api"`, `"frontend"`
+ * in the rumo's own example); `remote` is the identity the rumo says a `seeya.json` should carry
+ * — literally what `git remote get-url` returned when `add-repo` (V2-T28) recorded it.
+ *
+ * **Empty for now.** V2-T27 only creates empty projects (`docs/PLANO-DE-ENTREGA.md`: "o que não
+ * entra: add-repo" — that command is V2-T28's own scope); this type exists so `seeya.json`'s
+ * `repositories` field has a real shape to validate against instead of `unknown[]`.
+ */
+export interface AssociatedRepository {
+  readonly name: string;
+  readonly remote: string;
+}
+
+/**
+ * V2-T27: one issue tracker a project is wired to (`docs/V2-RUMO.md`'s own `seeya.json` example:
+ * `{ "type": "gitlab", "project": "acme/app", "labels": ["security"] }`). `type` is deliberately a
+ * bare `string`, not an enum — the rumo never fixes the set of trackers `seeya` will support, and
+ * inventing one now would be exactly the kind of unspecified behavior AGENTS.md § "Quando parar e
+ * perguntar" warns against. `labels` is optional (D-021: a field that only narrows a query, safe
+ * to omit).
+ */
+export interface ProjectTracker {
+  readonly type: string;
+  readonly project: string;
+  readonly labels?: readonly string[];
+}
+
+/**
+ * V2-T27: the parsed shape of one project's `seeya.json` (`docs/V2-RUMO.md` § "Vários
+ * repositórios" — `id`/`name`/`defaultHarness`/`repositories`/`trackers` are the rumo's own field
+ * names, fixed in AGENTS.md's glossary before this type existed, D-027/D-028). `schemaVersion`
+ * itself is NOT a field here, same convention `Config` already follows — it's the on-disk
+ * document's own concern (`adapters/workspace/project-manifest-schema.ts`), resolved and stripped
+ * before a caller ever sees a `ProjectManifest`.
+ *
+ * **`defaultHarness: string | null`, not a bare `string`.** `seeya project create <id>` (this
+ * task) never asks which harness a fresh, empty project prefers — nothing was chosen yet, and
+ * D-025 forbids turning that absence into a guess (the rumo's own `"claude"` example describes an
+ * already-configured project, not a newly created one). A later `project open --with <harness>`
+ * or an explicit setter is what turns this non-`null` — out of scope here.
+ */
+export interface ProjectManifest {
+  readonly id: string;
+  readonly name: string;
+  readonly defaultHarness: string | null;
+  readonly repositories: readonly AssociatedRepository[];
+  readonly trackers: readonly ProjectTracker[];
+}
+
+/**
+ * V2-T27: one file `WorkspaceRepository.writeProjectSkeleton` (`core/ports.ts`) writes into a
+ * fresh project directory, relative to the project's own root (never the workspace root) — e.g.
+ * `{ relativePath: 'AGENTS.md', content: '...' }`. `core/project-skeleton.ts#buildProjectSkeleton`
+ * is the one (pure) producer; `seeya.json` is NOT one of these — the adapter serializes the
+ * `ProjectManifest` itself (schema + `schemaVersion` are the adapter's job, same split `Config`
+ * already has between `core/types.ts` and `adapters/storage/config-schema.ts`).
+ */
+export interface WorkspaceProjectFile {
+  readonly relativePath: string;
+  readonly content: string;
+}
+
+/**
+ * V2-T27: what a freshly created, empty project looks like on disk before any file is written —
+ * `core/project-skeleton.ts#buildProjectSkeleton`'s own return shape. `directories` are created
+ * even though they start empty (`docs/V2-RUMO.md`'s own layout: `context/`, `decisions/`,
+ * `plans/`, `status/`, `journal/`, `references/`) — git itself never tracks an empty directory, so
+ * they only survive on THIS device until something is written into one of them; that's a known,
+ * accepted limitation (AGENTS.md § "Comentários": "diga onde o guarda-corpo termina"), not a bug
+ * this task fixes.
+ */
+export interface ProjectSkeleton {
+  readonly manifest: ProjectManifest;
+  readonly files: readonly WorkspaceProjectFile[];
+  readonly directories: readonly string[];
+}

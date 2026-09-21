@@ -22,6 +22,7 @@ import {
   buildConfigContext,
   buildDaemonContext,
   buildEndDayContext,
+  buildProjectContext,
   buildSnoozeContext,
   buildStartDayContext,
   resolveCliDaemonOwner,
@@ -48,6 +49,11 @@ import {
   runConfigPolicyCommand,
   runConfigSetCommand,
 } from './config-command.js';
+import {
+  runProjectCreateCommand,
+  runProjectListCommand,
+  runProjectShowCommand,
+} from './project-command.js';
 import { DAEMON_CHILD_ENV_VAR } from '@seeya-ai/engine/adapters/process/daemon-launch.js';
 import { captureObservedProcStart } from '@seeya-ai/engine/adapters/process/proc-start.js';
 import { processExists } from '@seeya-ai/engine/adapters/process/existence.js';
@@ -339,6 +345,43 @@ configCommand
         ...(options.deepCapture !== undefined ? { deepCapture: options.deepCapture } : {}),
       }),
     );
+  });
+
+const projectCommand = program
+  .command('project')
+  .description(
+    'Manage the workspace (V2-T27): a single local git repository holding every project — a ' +
+      'persistent context directory (AGENTS.md, CLAUDE.md, INDEX.md, seeya.json, ' +
+      'decisions/plans/status/journal/references) that outlives any one harness session.',
+  );
+
+projectCommand
+  .command('create')
+  .description(
+    'Create a new, empty project in the workspace: writes its skeleton and commits it. The ' +
+      'workspace itself is created (as a local git repository, no remote) the first time this runs.',
+  )
+  .argument('<id>', 'Lowercase letters, digits and hyphens only, e.g. "auth-hardening".')
+  .action(async (id: string) => {
+    const context = buildProjectContext();
+    console.log(await runProjectCreateCommand(context, id));
+  });
+
+projectCommand
+  .command('list')
+  .description('List every project in the workspace. Read-only.')
+  .action(async () => {
+    const context = buildProjectContext();
+    console.log(await runProjectListCommand(context));
+  });
+
+projectCommand
+  .command('show')
+  .description('Show one project: its default harness, associated repositories and trackers.')
+  .argument('<id>', 'The project id, e.g. "auth-hardening".')
+  .action(async (id: string) => {
+    const context = buildProjectContext();
+    console.log(await runProjectShowCommand(context, id));
   });
 
 program.parseAsync(process.argv).catch((error: unknown) => {

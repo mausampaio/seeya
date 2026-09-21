@@ -16,6 +16,7 @@ import type {
   SessionProvider,
   SessionResumer,
   Storage,
+  WorkspaceRepository,
 } from '@seeya-ai/engine/core/ports.js';
 import type { Config, DaemonOwner } from '@seeya-ai/engine/core/types.js';
 import type { PathPlatformHint } from '@seeya-ai/engine/core/cwd-normalization.js';
@@ -24,6 +25,7 @@ import { systemClock } from '@seeya-ai/engine/adapters/clock/index.js';
 import { StorageAdapter } from '@seeya-ai/engine/adapters/storage/index.js';
 import { FsDirectoryExistence } from '@seeya-ai/engine/adapters/filesystem/index.js';
 import { buildAutostart } from '@seeya-ai/engine/adapters/autostart/index.js';
+import { FsWorkspaceRepository } from '@seeya-ai/engine/adapters/workspace/index.js';
 import { buildAppInstallation } from '@seeya-ai/engine/adapters/installation/index.js';
 import { resolveDaemonOwner } from '@seeya-ai/engine/application/daemon-ownership.js';
 import {
@@ -386,4 +388,26 @@ export function buildAutostartContext(homeDir: string = os.homedir()): Autostart
 export async function resolveCliDaemonOwner(): Promise<DaemonOwner> {
   const status = await buildAppInstallation().find();
   return resolveDaemonOwner(status);
+}
+
+export interface ProjectContext {
+  readonly storage: Storage;
+  readonly workspace: WorkspaceRepository;
+  readonly seeyaHome: string;
+}
+
+/**
+ * `seeya project create | list | show`'s own composition (V2-T27): `Storage` (for
+ * `Storage.readWorkspaceRoot`/`saveWorkspaceRoot`) and `WorkspaceRepository`
+ * (`FsWorkspaceRepository`, the only concrete adapter this port has — D-020 means naming it here
+ * is this file's job, not `application/workspace.ts`'s). No config read: unlike every other
+ * `build*Context` above, none of the three commands needs `config.json` for anything.
+ */
+export function buildProjectContext(homeDir: string = os.homedir()): ProjectContext {
+  const home = resolveCliHome(homeDir);
+  return {
+    storage: buildStorage(home),
+    workspace: new FsWorkspaceRepository(),
+    seeyaHome: home.seeyaHome,
+  };
 }
