@@ -8529,3 +8529,34 @@ quantas vezes o processo é recriado. A faixa registrada (335,6–338,0 MiB; 0,3
 núcleo) continua sendo três números com variação real entre si, só que a variação captura
 "quanto isto muda ao longo do tempo parado" em vez de "quanto isto muda a cada reinício" — uma
 leitura diferente, não uma ausente.
+
+## Q-085 — V2-T27 (o espaço de trabalho e `seeya project create`/`list`/`show`): "perguntado uma
+vez" virou default resolvido, não pergunta interativa; `defaultHarness` nasce `null`
+
+**Contexto.** O item 1 da tarefa pede: "onde o espaço de trabalho mora, perguntado uma vez e
+guardado em `~/.seeya/`... Padrão: uma pasta dentro do próprio `~/.seeya/`." A tarefa também
+proíbe fronteira nova de harness/interativa ("Nada de harness nesta tarefa: ela só escreve
+arquivos") e o `docs/V2-RUMO.md` descreve uma instalação guiada bem maior (remoto, identidade do
+dispositivo) que já tem tarefa própria e está explicitamente fora do recorte da V2-T27
+("Sincronização entre dispositivos... não entra em nenhuma delas").
+
+**A leitura adotada.** `application/workspace.ts#resolveWorkspaceRoot` resolve e persiste o
+caminho padrão (`<seeyaHome>/workspace`) na primeira vez que qualquer comando `seeya project`
+precisa dele, sem perguntar nada por stdin — "perguntado" leu como "decidido pelo sistema, uma
+vez, e gravado", não como uma pergunta de verdade a uma pessoa. Uma pergunta real (o padrão vs.
+escolher outro caminho) é exatamente o que `seeya init` (S5-T2, já adiado para "a fronteira da v2"
+no plano de entrega) existe para fazer — construir uma segunda pergunta interativa aqui duplicaria
+esse trabalho antes da hora.
+
+**Efeito, se a leitura estiver errada:** pequeno e reversível — a pessoa que quiser outro caminho
+não tem, hoje, como escolher antes da primeira criação (só resolveria isso um `seeya init` real ou
+um comando de configuração dedicado, nenhum dos dois pedido nesta tarefa). `Storage.
+readWorkspaceRoot`/`saveWorkspaceRoot` já existem como porta, então adicionar essa pergunta depois
+não muda nenhuma decisão de disco já tomada.
+
+**Uma segunda leitura menor, mesma tarefa:** o `seeya.json` de um projeto recém-criado grava
+`defaultHarness: null`, não `"claude"` (o exemplo do rumo). `seeya project create <id>` não recebe
+flag de harness nenhuma, e gravar `"claude"` sem a pessoa ter escolhido nada seria exatamente a
+afirmação inventada que a D-025 proíbe — o exemplo do rumo descreve um projeto já configurado, não
+o estado inicial. `core/types.ts#ProjectManifest.defaultHarness: string | null` já deixa esse
+"ainda não escolhido" representável no tipo.

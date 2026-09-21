@@ -7840,7 +7840,7 @@ trabalho nasce como repositório git local, e o remoto é assunto próprio.
       Nenhuma mudança em `packages/`; portão rodado só com `format:check` e o guard de termos
       locais.
 
-- [ ] **V2-T27 — O espaço de trabalho e `seeya project create`/`list`/`show`.** Especificada pelo
+- [~] **V2-T27 — O espaço de trabalho e `seeya project create`/`list`/`show`.** Especificada pelo
       PO em 2026-09-21, a partir do `docs/V2-RUMO.md` (§ "Projeto persistente", § "Um repositório
       para todos os projetos"). É a primeira tarefa em que o projeto vira coisa em disco.
 
@@ -7880,6 +7880,99 @@ trabalho nasce como repositório git local, e o remoto é assunto próprio.
       **Aceite do mantenedor:** criar dois projetos, ver o esqueleto em disco, `list` e `show`
       dizendo a verdade sobre os dois, e o histórico do espaço de trabalho com um commit por
       criação.
+
+      **Relatório.** Branch `tarefa/V2-T27-espaco-de-trabalho`. Porta nova:
+      `WorkspaceRepository` (`core/ports.ts`) — `isInitialized`/`initialize` (`git init`),
+      `projectExists`/`writeProjectSkeleton`, `commitAll` (`git add -A` + `git commit`, identidade
+      própria do `seeya`, no-op sem diff), `listProjects`/`readProjectManifest` (D-022: coleção
+      item a item, leitura única lança) — implementada por
+      `adapters/workspace/index.ts#FsWorkspaceRepository`, reusando `adapters/git/run-git.ts#runGit`
+      (ganhou um terceiro parâmetro `env` opcional, só para a identidade do commit) e
+      `adapters/storage/atomic-write.ts#writeFileAtomic`; documentada em
+      `docs/ARQUITETURA.md` § "Portas" e § `workspace/`. `Storage` ganhou
+      `readWorkspaceRoot`/`saveWorkspaceRoot` (`~/.seeya/workspace.json` / `root`) para "onde o
+      espaço de trabalho mora neste dispositivo" — resolvido e persistido uma vez por
+      `application/workspace.ts#resolveWorkspaceRoot` (default `<seeyaHome>/workspace`), sem
+      pergunta interativa (Q-085).
+
+      O esqueleto em disco, exatamente como criado:
+      ```text
+      <workspace>/auth-hardening/
+      ├── AGENTS.md
+      ├── CLAUDE.md
+      ├── INDEX.md
+      ├── seeya.json          # { schemaVersion: 1, id, name, defaultHarness: null, repositories: [], trackers: [] }
+      ├── context/
+      ├── decisions/
+      ├── journal/
+      ├── plans/
+      ├── references/
+      └── status/
+      ```
+      (as seis pastas nascem vazias — git não as versiona até algo ser escrito dentro; limitação
+      conhecida, sem efeito no aceite desta tarefa.)
+
+      Os três comandos, rodados de verdade contra um `homeDir` descartável:
+      ```
+      $ seeya project create auth-hardening
+      Created project "auth-hardening" at <workspace>/auth-hardening.
+
+      $ seeya project create auth-hardening   # de novo
+      Project "auth-hardening" already exists.
+
+      $ seeya project list
+      Workspace: <workspace>
+      2 projects found.
+
+      - auth-hardening — auth-hardening
+          default harness: not set | repositories: none
+      - billing-v2 — billing-v2
+          default harness: not set | repositories: none
+
+      $ seeya project show auth-hardening
+      Project "auth-hardening" — auth-hardening
+        path: <workspace>/auth-hardening
+        default harness: not set
+        repositories: none
+        trackers: none
+
+      $ seeya project show ghost
+      Project "ghost" not found.
+
+      $ seeya project create "Not Valid"
+      seeya: "Not Valid" is not a valid project id — use lowercase letters, digits and hyphens only, e.g. "auth-hardening".
+      ```
+      `.git/logs/HEAD` do espaço de trabalho, depois das duas criações: dois commits, um por
+      criação (`commit (initial): Create project auth-hardening`, depois
+      `commit: Create project billing-v2`) — o aceite do item 4 completo.
+
+      **Como o item 4 (nada de `~/.seeya/` no git do espaço de trabalho) foi provado, não só
+      argumentado:** `tests/integration/application/workspace-boundary.test.ts` grava
+      `config.json`/`estado.json`/`daemon.lock` sintéticos em `~/.seeya/` **antes** de criar o
+      primeiro projeto, roda `createProject` de verdade, e então inspeciona `git ls-files` dentro
+      do repositório do espaço de trabalho — todo arquivo rastreado começa com `auth-hardening/`,
+      nenhum dos três nomes operacionais aparece, o `.git` do espaço de trabalho vive só em
+      `<seeyaHome>/workspace/.git` (nunca em `<seeyaHome>/.git`), e `workspace.json` fica fora da
+      árvore que o `git` rastreia.
+
+      **Portão:** `npm run verificar` verde (tipos, lint, `dependencias`, build, `cobertura`).
+      `adapters/workspace/**` ficou em 96.47%/88.13% linhas/branches na primeira medição — abaixo
+      do piso de 80% de branches na primeira passada (72.88%), corrigido acrescentando testes de
+      falha real (git init sobre `.git` inválido, `git add`/`git commit` recusando fora de um repo
+      ou com mensagem vazia, leitura recusando um diretório-como-arquivo) em vez de relaxar o
+      piso. `tests/integration/guards/coverage-directories.test.ts` e o `_coverage-directories.ts`
+      correspondente ganharam a entrada nova. 84 testes novos, em 9 arquivos, todos os 211
+      arquivos/2186 testes do portão passando. `tests/integration/workspace/fs-workspace-repository.test.ts` e
+      `tests/integration/application/workspace-boundary.test.ts` entraram em
+      `REAL_CHILD_PROCESS_GIT_AND_STORAGE_FILES` (`vitest.config.ts`) — mesma classe de teste que
+      spawna `git` de verdade que `git-adapter.test.ts`/`primitives.test.ts` já tinham lá, mesmo
+      cuidado preventivo do S4-T11 aplicado de saída, não depois de um sintoma de CI.
+
+      **Questões abertas:** Q-085 registra duas leituras mínimas onde a spec ficou aberta — "onde
+      o espaço de trabalho mora" virou default resolvido e persistido na primeira vez (não uma
+      pergunta interativa de verdade, que é o escopo do futuro `seeya init`, S5-T2), e
+      `defaultHarness` nasce `null` em vez do `"claude"` do exemplo do rumo (D-025: nada foi
+      escolhido ainda). Nenhuma outra pendência.
 
 ## Definição de pronto (vale para toda tarefa)
 

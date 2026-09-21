@@ -18,6 +18,7 @@ import type {
   TranscriptListingInfo,
   TranscriptReader,
   TranscriptReadResult,
+  WorkspaceRepository,
 } from '@seeya-ai/engine/core/ports.js';
 import type {
   Config,
@@ -28,6 +29,8 @@ import type {
   GeneratedUnderstanding,
   Handoff,
   PrimaryResumeAttempt,
+  ProjectManifest,
+  ProjectSkeleton,
   ProtocolScheme,
   ResumeFallbackReason,
   ResumeOutcome,
@@ -349,6 +352,81 @@ export class FakeStorage implements Storage {
   saveWorkspaceRoot(root: string): ReturnType<Storage['saveWorkspaceRoot']> {
     void root;
     return Promise.reject(new Error('FakeStorage.saveWorkspaceRoot is not exercised by endDay'));
+  }
+}
+
+/**
+ * V2-T27: `application/workspace.ts#resolveWorkspaceRoot`'s own in-memory `Storage` double —
+ * `FakeStorage`'s `readWorkspaceRoot`/`saveWorkspaceRoot` reject by default (not exercised by
+ * `endDay`), same extension pattern `tests/unit/cli/_fakes.ts#InMemoryScheduleStorage` already
+ * uses for `readState`/`saveState`. Shared by `tests/unit/application/workspace.test.ts` and
+ * `tests/unit/cli/project-command.test.ts` rather than each defining its own copy.
+ */
+export class InMemoryWorkspaceStorage extends FakeStorage {
+  private root: string | null = null;
+
+  override readWorkspaceRoot(): Promise<string | null> {
+    return Promise.resolve(this.root);
+  }
+
+  override saveWorkspaceRoot(root: string): Promise<void> {
+    this.root = root;
+    return Promise.resolve();
+  }
+}
+
+/**
+ * V2-T27: an in-memory `WorkspaceRepository` — a real project map, minus any real filesystem or
+ * `git` call (`tests/integration/workspace/fs-workspace-repository.test.ts` is where the real
+ * adapter is proven against a real `git` binary). Records every `commitAll` message so a test can
+ * assert exactly what `application/workspace.ts#createProject` committed, and how many times.
+ */
+export class FakeWorkspaceRepository implements WorkspaceRepository {
+  private readonly initializedRoots = new Set<string>();
+  private readonly projectsByRoot = new Map<string, Map<string, ProjectManifest>>();
+  readonly commitMessages: string[] = [];
+
+  private projectsOf(root: string): Map<string, ProjectManifest> {
+    let projects = this.projectsByRoot.get(root);
+    if (projects === undefined) {
+      projects = new Map();
+      this.projectsByRoot.set(root, projects);
+    }
+    return projects;
+  }
+
+  isInitialized(root: string): Promise<boolean> {
+    return Promise.resolve(this.initializedRoots.has(root));
+  }
+
+  initialize(root: string): Promise<void> {
+    this.initializedRoots.add(root);
+    return Promise.resolve();
+  }
+
+  projectExists(root: string, projectId: string): Promise<boolean> {
+    return Promise.resolve(this.projectsOf(root).has(projectId));
+  }
+
+  writeProjectSkeleton(root: string, projectId: string, skeleton: ProjectSkeleton): Promise<void> {
+    this.projectsOf(root).set(projectId, skeleton.manifest);
+    return Promise.resolve();
+  }
+
+  commitAll(root: string, message: string): Promise<void> {
+    void root;
+    this.commitMessages.push(message);
+    return Promise.resolve();
+  }
+
+  listProjects(
+    root: string,
+  ): Promise<{ manifests: ProjectManifest[]; rejected: RejectedDiscoveryRecord[] }> {
+    return Promise.resolve({ manifests: [...this.projectsOf(root).values()], rejected: [] });
+  }
+
+  readProjectManifest(root: string, projectId: string): Promise<ProjectManifest | null> {
+    return Promise.resolve(this.projectsOf(root).get(projectId) ?? null);
   }
 }
 

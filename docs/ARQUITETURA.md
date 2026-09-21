@@ -168,6 +168,16 @@ interface DirectoryExistence { // V2-T9, adapters/filesystem/
 interface AppInstallation { // V2-T13, adapters/installation/ (D-045 item 2)
   find(): Promise<AppInstallationStatus>; // installed (com o caminho) / notInstalled / unknown
 }
+
+interface WorkspaceRepository { // V2-T27, adapters/workspace/
+  isInitialized(root: string): Promise<boolean>;
+  initialize(root: string): Promise<void>; // git init
+  projectExists(root: string, projectId: string): Promise<boolean>;
+  writeProjectSkeleton(root: string, projectId: string, skeleton: ProjectSkeleton): Promise<void>;
+  commitAll(root: string, message: string): Promise<void>; // git add -A + commit; no-op sem diff
+  listProjects(root: string): Promise<{ manifests: ProjectManifest[]; rejected: RejectedDiscoveryRecord[] }>;
+  readProjectManifest(root: string, projectId: string): Promise<ProjectManifest | null>;
+}
 ```
 
 Nos testes, cada porta tem um duplo em memória. Nenhum teste unitário toca disco.
@@ -271,6 +281,30 @@ lido passa por zod. `schemaVersion` em todo documento persistido, com migração
 ### `clock/`
 Um único módulo produz `now()`. Nenhum outro arquivo do projeto pode chamar `new Date()`,
 `Date.now()` ou `setTimeout` com prazo longo — imposto por regra de lint.
+
+### `workspace/` (V2-T27)
+
+Escreve no espaço de trabalho — o repositório git que o `seeya` cria e administra
+(`docs/V2-RUMO.md` § "Um repositório para todos os projetos"), distinto do repositório da própria
+sessão (`git/`, só leitura) e distinto de `~/.seeya/` (`storage/`). Um adaptador só
+(`FsWorkspaceRepository`), sem escolha por plataforma:
+
+- **Reusa `adapters/git/run-git.ts#runGit`** para `init`/`add`/`diff`/`commit` — nenhuma
+  dependência nova de git. `runGit` ganhou um terceiro parâmetro opcional (`env`), só para o
+  `commitAll` poder fixar a identidade do commit (`GIT_AUTHOR_NAME`/`_EMAIL` etc., sempre
+  `seeya`/`seeya@localhost`, nunca o `git config user.*` da máquina) sem tocar nos chamadores
+  existentes, que continuam com dois argumentos.
+- **`commitAll` nunca cria commit vazio.** `git add -A`, depois `git diff --cached --quiet`: saída
+  0 é "nada mudou" (retorna sem commitar); qualquer outra coisa segue para o commit de verdade.
+- **`listProjects` segue D-022**: cada subdiretório do espaço de trabalho com um `seeya.json` é
+  lido e validado individualmente; um que não parseia vira `RejectedDiscoveryRecord`, os outros
+  continuam. Um subdiretório sem `seeya.json` nenhum não é projeto — nem aceito, nem rejeitado
+  (D-025).
+- **`readProjectManifest` (leitura única, `seeya project show`) não segue D-022**: um `seeya.json`
+  malformado lança, em vez de virar rejeição silenciosa — mesma distinção que `storage/`'s own
+  `readHandoff`/`listHandoffs` já fazem para o mesmo par leitura-única/coleção.
+- **Reusa `adapters/storage/atomic-write.ts#writeFileAtomic`** para cada arquivo do esqueleto —
+  mesma escrita atômica que `~/.seeya/` já tem, aplicada aqui ao espaço de trabalho.
 
 ## Fusos e horários
 

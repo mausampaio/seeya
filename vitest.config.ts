@@ -154,6 +154,14 @@ const REAL_CHILD_PROCESS_GIT_AND_STORAGE_FILES = [
   'tests/integration/git/git-adapter.test.ts',
   'tests/integration/git/primitives.test.ts',
   'tests/integration/storage/atomic-write.test.ts',
+  // V2-T27: `FsWorkspaceRepository`'s own real-`git` fixture (`init`/`add`/`diff`/`commit` per
+  // test, several tests) is the same shape of load as `git-adapter.test.ts`/`primitives.test.ts`
+  // above — added here preemptively rather than waiting for the same CI symptom S4-T11 measured
+  // for those two to show up a third time.
+  'tests/integration/workspace/fs-workspace-repository.test.ts',
+  // V2-T27: same real-`git` shape, through `createProject` end to end (item 4's own boundary
+  // test) rather than through `FsWorkspaceRepository` directly.
+  'tests/integration/application/workspace-boundary.test.ts',
 ];
 
 /**
@@ -298,6 +306,13 @@ const PRODUCTION_DIRECTORY_THRESHOLDS = {
     lines: 80,
   },
   'packages/engine/src/adapters/transcript/**': {
+    statements: 80,
+    branches: 80,
+    functions: 80,
+    lines: 80,
+  },
+  // V2-T27: FsWorkspaceRepository, the one adapter behind core/ports.ts#WorkspaceRepository.
+  'packages/engine/src/adapters/workspace/**': {
     statements: 80,
     branches: 80,
     functions: 80,
