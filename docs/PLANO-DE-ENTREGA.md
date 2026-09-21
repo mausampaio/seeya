@@ -7986,6 +7986,62 @@ trabalho nasce como repositório git local, e o remoto é assunto próprio.
       vazio, então as seis pastas do esqueleto existem só neste dispositivo. Sem remoto isso não
       tem efeito; com remoto, vira decisão (arquivo marcador em cada pasta, ou aceitar que a pasta
       nasce quando algo é escrito nela). Fica em `[~]` até o aceite do mantenedor.
+- [ ] **V2-T28 — `seeya project add-repo` e `seeya project open`: o projeto ligado aos
+      repositórios de verdade, e aberto com o harness.** Especificada pelo PO em 2026-09-21, a
+      partir do `docs/V2-RUMO.md` (§ "Abertura das sessões", § "Vários repositórios") e do spike
+      V2-T26 (`docs/spikes/N-adocao-de-sessao.md`), que mediu o `--add-dir`.
+
+      **Vocabulário, fixado antes do código** (glossário do `AGENTS.md` na primeira leva de
+      commits, D-027/D-028): identidade do repositório → `RepositoryIdentity` (`host`, `owner`,
+      `repository`); mapa de repositórios do dispositivo → arquivo `repository-map.json` em
+      `~/.seeya/`, que guarda, por identidade, o caminho local **neste** dispositivo. No
+      `seeya.json` do projeto, cada item de `repositories` passa a carregar a identidade e o
+      `remote` como foi visto — **nunca um caminho local**, que só vale numa máquina.
+
+      **O que entra:**
+      1. **`seeya project add-repo <id> <caminho>`.** Lê o remoto daquele clone (o adaptador de
+         git que já existe), grava a identidade no `seeya.json` do projeto (commit no espaço de
+         trabalho, como o `create`) e o caminho no mapa deste dispositivo. **A identidade é
+         canônica, não a URL literal**: `git@host:dono/repo.git` e `https://host/dono/repo.git`
+         são o mesmo repositório (§ "A identidade é canônica" do rumo) — função pura, com teste das
+         duas formas e de um provedor desconhecido (normalização conservadora). Adicionar o mesmo
+         repositório duas vezes não duplica; diz que já estava.
+      2. **Repositório sem remoto** fica registrado só neste dispositivo, e o projeto passa a dizer
+         isso com todas as letras: em outra máquina ele não tem como ser resolvido (D-025). Não
+         inventar identidade a partir do caminho.
+      3. **`seeya project open <id> [--with <harness>]`.** Abre o harness com o **diretório do
+         projeto** como `cwd` e cada repositório associado liberado por `--add-dir` — o spike mediu
+         que isso funciona, e mediu também a armadilha: `--add-dir` é variádico e engole o que
+         vier depois, então a montagem dos argumentos termina a lista explicitamente e tem teste
+         disso. Ambiente montado sem as variáveis de sessão herdadas (D-017). Sem `--with`, usa o
+         `defaultHarness` do projeto; se ele for `null` (V2-T27), **recusa com uma linha dizendo
+         como escolher** — nunca assume `claude`.
+      4. **`open` diz o que falta, em vez de fingir.** Repositório associado cujo caminho não está
+         no mapa deste dispositivo, ou cujo caminho não existe mais: o `open` avisa qual é e como
+         registrar (`add-repo` com o caminho), e **abre mesmo assim** com os que existem — um
+         repositório faltando não impede trabalhar no projeto. Oferecer clonar fica de fora: clonar
+         é ação da pessoa (rumo), e o `open` não baixa nada.
+      5. **Só `claude` nesta tarefa.** Pedir outro harness responde que ainda não é suportado. O
+         spike mediu que o Codex aceita retomada com mensagem, mas **não** mediu o equivalente ao
+         `--add-dir` nele — suportar sem medir seria inventar. Registrado como limite, com o que
+         falta medir.
+
+      **O que não entra:** abrir o projeto numa aba da janela (é da V2-T30, junto com a lateral
+      agrupando por projeto — esta tarefa é motor e CLI); clonar; trackers; sincronização; retomar
+      sessão (isso é a adoção, V2-T29).
+
+      **Cuidados:** o harness é lançado por porta, nunca direto do `application/` (nada de Claude
+      Code fora de `adapters/`); spawn com array de argumentos e `shell: false` (os caminhos têm
+      espaço e acento); nada escreve dentro dos repositórios associados — o seeya só **lê** o
+      remoto deles; nomes em disco no glossário antes do código; nenhuma dependência nova. Nenhum
+      agente abre o `claude` de verdade contra uma sessão do mantenedor: a montagem dos argumentos
+      e do ambiente é testada com dublê, e, se a verificação manual lançar o harness, é num
+      diretório descartável.
+
+      **Aceite do mantenedor:** criar um projeto, associar dois repositórios de código seus (um por
+      SSH, outro por HTTPS, se tiver), abrir com `--with claude` e ver o Claude Code subir no
+      diretório do projeto enxergando os dois repositórios.
+
 ## Definição de pronto (vale para toda tarefa)
 
 1. Código implementa exatamente a spec; divergência virou questão, não improviso.
