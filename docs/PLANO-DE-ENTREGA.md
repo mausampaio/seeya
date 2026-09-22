@@ -7986,7 +7986,7 @@ trabalho nasce como repositório git local, e o remoto é assunto próprio.
       vazio, então as seis pastas do esqueleto existem só neste dispositivo. Sem remoto isso não
       tem efeito; com remoto, vira decisão (arquivo marcador em cada pasta, ou aceitar que a pasta
       nasce quando algo é escrito nela). Fica em `[~]` até o aceite do mantenedor.
-- [ ] **V2-T28 — `seeya project add-repo` e `seeya project open`: o projeto ligado aos
+- [~] **V2-T28 — `seeya project add-repo` e `seeya project open`: o projeto ligado aos
       repositórios de verdade, e aberto com o harness.** Especificada pelo PO em 2026-09-21, a
       partir do `docs/V2-RUMO.md` (§ "Abertura das sessões", § "Vários repositórios") e do spike
       V2-T26 (`docs/spikes/N-adocao-de-sessao.md`), que mediu o `--add-dir`.
@@ -8041,6 +8041,104 @@ trabalho nasce como repositório git local, e o remoto é assunto próprio.
       **Aceite do mantenedor:** criar um projeto, associar dois repositórios de código seus (um por
       SSH, outro por HTTPS, se tiver), abrir com `--with claude` e ver o Claude Code subir no
       diretório do projeto enxergando os dois repositórios.
+
+      **Relatório.** Branch `tarefa/V2-T28-add-repo-e-open`, a partir da `main` em `cafb442`
+      (V2-T27 mesclada). Commits: `c696dc8` (glossário, antes do código), `ef1c8b9` (núcleo,
+      portas, adapters, orquestração), `cc1ab31` (fiação na CLI), `a0f8af2`/`1cebf7f`/`d817422`
+      (testes).
+
+      **Normalização de identidade** (`core/repository-identity.ts#normalizeRepositoryIdentity`,
+      pura): reconhece a forma scp-like (`git@host:dono/repo.git`) e qualquer `scheme://` (https,
+      http, ssh, git); host em minúsculas, `owner`/`repository` preservam o caso da URL, `.git`
+      final removido do nome do repositório. Testada (`tests/unit/core/repository-identity.test.ts`):
+      SSH e HTTPS do mesmo repositório caem na mesma identidade; um provedor desconhecido com grupo
+      aninhado (`https://<host>/team/sub/service.git`) normaliza pelo mesmo algoritmo genérico —
+      "conservadora" significa nenhum tratamento por provedor, não um algoritmo mais frouxo; um
+      caminho local (`./local-only-repo`, `C:\code\app-api`) devolve `null`, nunca uma identidade
+      inventada. `repositoryIdentitiesEqual` compara os três campos.
+
+      **Formato em disco**, `seeya.json` de um projeto (exemplo fictício):
+      ```jsonc
+      {
+        "schemaVersion": 1,
+        "id": "auth-hardening",
+        "name": "auth-hardening",
+        "defaultHarness": "claude",
+        "repositories": [
+          {
+            "name": "app-api",
+            "remote": "git@host:acme-widgets/app-api.git",
+            "identity": { "host": "host", "owner": "acme-widgets", "repository": "app-api" }
+          },
+          { "name": "legacy-scripts", "remote": null, "identity": null }
+        ],
+        "trackers": []
+      }
+      ```
+      `~/.seeya/repository-map.json` (novo arquivo, schema próprio,
+      `adapters/storage/repository-map-schema.ts`), com as duas formas de entrada que
+      `core/types.ts#RepositoryMapEntry` distingue (D-024, `hasIdentity`):
+      ```jsonc
+      {
+        "schemaVersion": 1,
+        "entries": [
+          {
+            "identity": { "host": "host", "owner": "acme-widgets", "repository": "app-api" },
+            "path": "C:\\code\\app-api"
+          },
+          { "projectId": "auth-hardening", "name": "legacy-scripts", "path": "C:\\code\\legacy-scripts" }
+        ]
+      }
+      ```
+      Um repositório com identidade é chaveado globalmente por ela (o mesmo remoto pode servir
+      mais de um projeto neste dispositivo); um sem identidade é chaveado por `projectId`+`name`,
+      o único par que `add-repo` tinha para ele — `core/repository-map.ts#findRepositoryMapEntry`/
+      `upsertRepositoryMapEntry` (puras) implementam as duas buscas.
+
+      **Os argumentos exatos que `open` monta** (`adapters/harness/args.ts#buildOpenArgs`):
+      sem repositório associado resolvível, `[]` — nenhum `--add-dir`, nada a terminar. Com um ou
+      mais, `['--add-dir', <dir1>, <dir2>, ..., '--']` — a lista sempre termina com `--` explícito
+      (o gotcha do spike N), mesmo `open` nunca passando um prompt depois: um argumento futuro
+      nessa posição não pode reintroduzir o bug. `tests/unit/adapters/harness/args.test.ts` tem o
+      teste que falharia sem o terminador (compara o último elemento do array, não só
+      `toContain('--')`). `ClaudeHarnessLauncher` (`adapters/harness/index.ts`) reusa
+      `adapters/resumption/spawn-interactive.ts#runInteractive`/`env.ts#buildResumptionEnv` — mesmo
+      `stdio: 'inherit'` e mesma sanitização D-017 que a retomada interativa já tem, provado contra
+      um `claude` falso de verdade em `tests/integration/harness/harness-launcher.test.ts`
+      (reusando a mesma fixture compilada de `tests/integration/resumption/`).
+
+      **O que `open` diz quando falta harness ou repositório.** Sem `--with` e `defaultHarness`
+      `null`: `Project "<id>" has no default harness set — pass --with <harness> (e.g. --with
+      claude) to choose one for this session.` — nunca assume `claude`. Harness diferente de
+      `claude`: `seeya: harness "<x>" is not supported yet — only "claude" is, for now.` (item 5:
+      Codex não suportado aqui — o spike mediu retomada com mensagem, nunca o equivalente ao
+      `--add-dir`, então suportar seria inventar). Repositório sem entrada no mapa deste
+      dispositivo: `Repository "<name>" is not registered on this device — run "seeya project
+      add-repo <id> <path>" to add it. Continuing without it.` — escrito em `io.stdout` **antes**
+      do harness ser lançado (`application/project-open.ts#openProject`'s own `onBeforeLaunch`
+      callback), para a pessoa ver o aviso enquanto ainda pode agir, não só depois que o `claude`
+      já fechou. Caminho registrado mas que sumiu: mesma ideia, citando o caminho antigo. Os dois
+      casos nunca abortam a abertura — `open` segue com os repositórios que existem (D-025).
+
+      **Questões abertas:** Q-086 registra quatro leituras mínimas onde a spec não resolvia:
+      de onde vem o `name` de um repositório (`add-repo` não recebe um terceiro argumento — o
+      nome é o último segmento do caminho local dado); "sem remoto" cobre "não é repositório git"
+      e "é, mas sem `origin`" da mesma forma; deduplicação de um repositório sem remoto compara por
+      `name` (única chave disponível); e `add-repo` recusa um caminho local que não existe
+      (`pathNotFound`), checagem defensiva não pedida explicitamente mas de efeito pequeno e
+      reversível.
+
+      **Portão:** `npm run verificar` verde na worktree do agente — `format:check`, `tsc`, `lint`,
+      `build`, `dependencias` (400 módulos, 1090 dependências, sem violação) e `cobertura` (220
+      arquivos de teste, 2273 testes passando, 4 pulados; 96,55%/92,68%/95,33%/96,88%
+      statements/branches/functions/lines agregados; `core/` 99,49%/98,33% — acima do piso de 95%;
+      `adapters/harness/` novo, 100%/88,88%; `adapters/git/`, `adapters/storage/`,
+      `adapters/workspace/` e `application/` todos acima do piso de 80%). `tests/integration/
+      app/daemon-launch.test.ts` (dois testes, não tocados por esta tarefa) falhou na primeira
+      rodada de `npm test` porque `packages/*/dist` ainda não existia neste checkout (esse arquivo
+      spawna o CLI compilado) — passou limpo depois de `npm run build`, e voltou a passar dentro do
+      `npm run verificar` completo; não é a instabilidade Q-081 mencionada no despacho
+      (`tests/integration/app/composition.test.ts`, que não estourou prazo aqui).
 
 ## Definição de pronto (vale para toda tarefa)
 
