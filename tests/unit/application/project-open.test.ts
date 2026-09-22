@@ -17,10 +17,13 @@ import {
   InMemoryDeviceStorage,
 } from './_fakes.js';
 
-const SEEYA_HOME = path.join('C:', 'seeya-home-fixture');
+// Absolute on every OS on purpose: `path.join('C:', ...)` was absolute only on Windows, so on
+// Linux/macOS the code under test (which `path.resolve`s the local path it is given) turned it
+// into `<cwd>/C:/...` and every lookup missed -- green locally on Windows, red on CI (V2-T28).
+const SEEYA_HOME = path.resolve(path.sep, 'seeya-home-fixture');
 const WORKSPACE_ROOT = path.join(SEEYA_HOME, 'workspace');
 const PROJECT_DIR = path.join(WORKSPACE_ROOT, 'auth-hardening');
-const REPO_PATH = path.join('C:', 'code', 'app-api');
+const REPO_PATH = path.resolve(path.sep, 'code', 'app-api');
 
 describe('openProject', () => {
   let storage: InMemoryDeviceStorage;
