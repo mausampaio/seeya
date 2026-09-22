@@ -8245,6 +8245,67 @@ trabalho nasce como repositório git local, e o remoto é assunto próprio.
       **Aceite do mantenedor:** clicar em "Start daemon", ver o botão em "carregando" por um
       instante e virar "Stop daemon" sozinho, sem esperar o ciclo.
 
+- [ ] **V2-T29 — Adotar uma sessão existente num projeto: a sessão escreve a própria memória, e a
+      pessoa aprova cada escrita.** Especificada pelo PO em 2026-09-22, implementando a **D-045
+      item 4**, com três insumos: o spike V2-T26 (`docs/spikes/N-adocao-de-sessao.md`), o relato do
+      mantenedor sobre o que a compactação apaga (seção "Projetos — o recorte" deste plano), e a
+      **decisão do mantenedor no mesmo dia**: a sessão é retomada de forma **interativa**, e ele
+      aprova cada escrita na hora — nunca com permissão automática. O motivo, medido no spike: a
+      permissão automática vale também para o diretório original da sessão, que pode ser a pasta
+      pessoal ou um repositório de código, e não só para o projeto.
+
+      **Recorte:** esta tarefa é motor e CLI. Adotar pela janela (um botão na lista de sessões,
+      abrindo numa aba) fica para a **V2-T30**, junto com a lateral agrupada por projeto — o mesmo
+      modelo de aprovação, outra superfície.
+
+      **O que entra:**
+      1. **`seeya project adopt <sessão> <projectId>`** — a sessão escolhida pelo nome que o
+         `seeya sessions` já mostra (nunca exigir o id cru). Se o projeto não existe, é criado como
+         na V2-T27; se existe, a adoção escreve nele. Sessão aberta agora (viva) é recusada com uma
+         linha: retomar o que está rodando abriria uma segunda cópia.
+      2. **A retomada é interativa, no diretório original da sessão**, com o diretório do projeto
+         liberado por `--add-dir` (mesma montagem da V2-T28, com o `--` já provado no aceite dela)
+         e **sem nenhum modo de permissão automática** — o Claude Code pede aprovação a cada escrita
+         e a pessoa decide ali.
+      3. **A instrução**, curta, num lugar só do código (texto voltado à pessoa concentrado, e dentro
+         do teto de argumento medido na V2-T7, D-015). O spike mostrou que o texto decide tudo, então
+         ela é específica e cobre quatro coisas:
+         - **nomear os arquivos pelo caminho**: `AGENTS.md`, `INDEX.md`, o estado atual em
+           `status/`, as decisões em `decisions/` — e **nunca** usar a palavra "memória" sem destino
+           (a sessão do spike entendeu como a memória do próprio Claude Code e escreveu fora do
+           projeto);
+         - **o saber-fazer, pelo nome**: como se opera naquele trabalho — ferramentas e skills usadas,
+           caminhos de acesso, configuração por ambiente, convenções — num arquivo próprio dentro de
+           `context/` (nome fixado no glossário antes do código). É o que o relato do mantenedor
+           mostrou que a compactação apaga primeiro;
+         - **o caminho, nunca o segredo**: dizer onde está e como se chega (a skill, o arquivo de
+           configuração), nunca o valor de credencial, token ou senha;
+         - **o que não se sabe fica marcado como incerto**, e nada é escrito fora do diretório do
+           projeto.
+      4. **Nada é commitado sem a pessoa.** Quando a sessão termina, a CLI mostra os arquivos que
+         mudaram dentro do projeto e pergunta se commita. Recusando, os arquivos ficam no disco, sem
+         commit, e a pessoa pode revisar e commitar depois. É a segunda barreira contra algo sensível
+         ir para o repositório — a primeira é a própria instrução.
+      5. **Só `claude`**, pelo mesmo motivo da V2-T28 (o equivalente ao `--add-dir` no Codex não
+         foi medido). O spike mostrou que o Codex aceita mensagem inicial na retomada; quando o
+         `--add-dir` dele for medido, entra.
+
+      **O que não entra:** adotar pela janela (V2-T30); gancho antes da compactação (candidato a
+      spike do passo 5); qualquer escrita automática; editar os arquivos que a sessão escreveu.
+
+      **Cuidados:** nenhuma dependência nova; o harness passa pela porta `HarnessLauncher` (ou uma
+      irmã dela), nunca direto do `application/`; ambiente limpo das variáveis de sessão (D-017);
+      nomes em disco no glossário antes do código. **Nenhum agente retoma uma sessão real do
+      mantenedor** — a montagem de argumentos, a instrução e o fluxo de aceite do commit se provam
+      com dublês; se a verificação manual retomar alguma sessão, é uma criada pelo próprio agente,
+      descartável, e sem gastar tokens à toa (o spike custou cerca de US$ 0,50 medindo o que
+      precisava).
+
+      **Aceite do mantenedor:** adotar uma sessão real dele num projeto novo, aprovar as escritas
+      que fizerem sentido, e ver o projeto com `AGENTS.md`, `INDEX.md`, estado e o saber-fazer
+      preenchidos pela própria sessão — e depois abrir o projeto numa sessão limpa (`project open`)
+      e ver se ela sabe como operar sem ser lembrada.
+
 ## Definição de pronto (vale para toda tarefa)
 
 1. Código implementa exatamente a spec; divergência virou questão, não improviso.
