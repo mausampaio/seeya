@@ -7880,7 +7880,7 @@ trabalho nasce como repositório git local, e o remoto é assunto próprio.
       Nenhuma mudança em `packages/`; portão rodado só com `format:check` e o guard de termos
       locais.
 
-- [~] **V2-T27 — O espaço de trabalho e `seeya project create`/`list`/`show`.** Especificada pelo
+- [x] **V2-T27 — O espaço de trabalho e `seeya project create`/`list`/`show`.** Especificada pelo
       PO em 2026-09-21, a partir do `docs/V2-RUMO.md` (§ "Projeto persistente", § "Um repositório
       para todos os projetos"). É a primeira tarefa em que o projeto vira coisa em disco.
 
@@ -8026,7 +8026,7 @@ trabalho nasce como repositório git local, e o remoto é assunto próprio.
       vazio, então as seis pastas do esqueleto existem só neste dispositivo. Sem remoto isso não
       tem efeito; com remoto, vira decisão (arquivo marcador em cada pasta, ou aceitar que a pasta
       nasce quando algo é escrito nela). Fica em `[~]` até o aceite do mantenedor.
-- [~] **V2-T28 — `seeya project add-repo` e `seeya project open`: o projeto ligado aos
+- [x] **V2-T28 — `seeya project add-repo` e `seeya project open`: o projeto ligado aos
       repositórios de verdade, e aberto com o harness.** Especificada pelo PO em 2026-09-21, a
       partir do `docs/V2-RUMO.md` (§ "Abertura das sessões", § "Vários repositórios") e do spike
       V2-T26 (`docs/spikes/N-adocao-de-sessao.md`), que mediu o `--add-dir`.
@@ -8198,6 +8198,12 @@ trabalho nasce como repositório git local, e o remoto é assunto próprio.
       o do agente e o do PO — rodam no Windows**, então só a CI podia pegar. Corrigido nos três
       arquivos de teste com um caminho absoluto em qualquer sistema e um comentário explicando por
       que não voltar ao anterior.
+
+      **Aceita pelo mantenedor em 2026-09-22** — e com ela a V2-T27, exercitada no mesmo fluxo. Ele
+      criou um projeto, associou um repositório, abriu com `--with claude` e pediu à sessão que
+      explicasse o que entendeu do repositório: a sessão leu o código pelo diretório liberado, a
+      partir do diretório do projeto. **Isso fecha o ponto que só o aceite provava:** o Claude Code
+      real aceita o `--` sozinho no fim da lista do `--add-dir`, no modo interativo.
 
 - [ ] **V2-T31 — Correção: "Start daemon" responde antes de o daemon existir.** Especificada pelo
       PO em 2026-09-21 a partir do aceite da V2-T21 pelo mantenedor, no mesmo dia. Pequena, e com
