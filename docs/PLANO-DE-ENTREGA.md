@@ -8263,10 +8263,22 @@ trabalho nasce como repositório git local, e o remoto é assunto próprio.
          `seeya sessions` já mostra (nunca exigir o id cru). Se o projeto não existe, é criado como
          na V2-T27; se existe, a adoção escreve nele. Sessão aberta agora (viva) é recusada com uma
          linha: retomar o que está rodando abriria uma segunda cópia.
-      2. **A retomada é interativa, no diretório original da sessão**, com o diretório do projeto
-         liberado por `--add-dir` (mesma montagem da V2-T28, com o `--` já provado no aceite dela)
-         e **sem nenhum modo de permissão automática** — o Claude Code pede aprovação a cada escrita
-         e a pessoa decide ali.
+      2. **A adoção roda numa CÓPIA da sessão, nunca na original** (acrescentado pelo PO em
+         2026-09-22, a partir do receio do mantenedor: *"uma adoção incorreta, no projeto errado por
+         engano... sujando aquela sessão para sempre, ou até corromper o transcript"*). A retomada
+         usa `--fork-session`, que o seeya já usa na captura desde a S2-T2: o Claude Code copia o
+         transcript para uma sessão nova e **a original não recebe uma linha sequer**. O fork é
+         registrado em `~/.seeya/forks.json` (D-012) — some da descoberta e é apagado depois de
+         `forkCleanupDays` como qualquer fork do seeya, porque o que a adoção produz de valor são os
+         arquivos do projeto, não a conversa de adoção. Adoção errada, então, custa só descartar: a
+         sessão original segue intocada, pronta para ser retomada como sempre. A retomada é
+         **interativa**, no diretório original da sessão, com o diretório do projeto liberado por
+         `--add-dir` (mesma montagem da V2-T28, com o `--` já provado no aceite dela) e **sem nenhum
+         modo de permissão automática** — o Claude Code pede aprovação a cada escrita.
+         **Medir antes de implementar**, com uma sessão descartável criada pelo agente: o spike
+         mediu `--fork-session` em modo automático e `--add-dir` em interativo, **nunca os dois
+         juntos em interativo**. Se não funcionarem juntos, parar e registrar — não cair de volta
+         na sessão original sem o mantenedor decidir.
       3. **A instrução**, curta, num lugar só do código (texto voltado à pessoa concentrado, e dentro
          do teto de argumento medido na V2-T7, D-015). O spike mostrou que o texto decide tudo, então
          ela é específica e cobre quatro coisas:
@@ -8305,6 +8317,35 @@ trabalho nasce como repositório git local, e o remoto é assunto próprio.
       que fizerem sentido, e ver o projeto com `AGENTS.md`, `INDEX.md`, estado e o saber-fazer
       preenchidos pela própria sessão — e depois abrir o projeto numa sessão limpa (`project open`)
       e ver se ela sabe como operar sem ser lembrada.
+
+- [ ] **V2-T32 — Desfazer: `seeya project remove` e `seeya project remove-repo`.** Especificada
+      pelo PO em 2026-09-22, a partir de uma pergunta do mantenedor no mesmo dia (*"criamos
+      remove/delete project?"*). Não criamos: hoje o projeto só tem `create`, `list`, `show`,
+      `add-repo` e `open`, e nada que desfaça.
+
+      **O que entra:**
+      1. **`seeya project remove <id>`** apaga o diretório do projeto do espaço de trabalho e
+         **commita a remoção**. Como o espaço de trabalho é um repositório git, remover não é
+         destruir: o conteúdo continua no histórico, e a saída do comando diz em uma linha como
+         recuperar (o commit anterior). Pede confirmação antes, com o nome do projeto e quantos
+         arquivos ele tem.
+      2. **`seeya project remove-repo <id> <nome>`** tira o repositório do `seeya.json` e commita.
+         A entrada no mapa do dispositivo (`repository-map.json`) só sai se nenhum outro projeto
+         usar a mesma identidade.
+      3. **Nada toca fora do espaço de trabalho e do `~/.seeya/`.** Remover um projeto nunca apaga
+         repositório associado, sessão ou transcript — o seeya só é dono do que ele criou.
+
+      **O que não entra:** "mover" uma sessão adotada para outro projeto — com a adoção em cópia
+      (V2-T29 item 2), não há vínculo a desfazer: a sessão original nunca foi mexida, e adotá-la de
+      novo em outro projeto é só fazer outra adoção. Os arquivos que ficaram no projeto errado saem
+      com `remove` ou à mão, e o histórico guarda tudo.
+
+      **Cuidados:** nenhuma dependência nova; confirmação obrigatória no `remove`; testes com
+      espaço de trabalho descartável.
+
+      **Aceite do mantenedor:** remover o projeto de teste criado no aceite da V2-T28, ver que o
+      repositório associado continua intacto, e recuperar o projeto pelo histórico seguindo a linha
+      que o comando imprime.
 
 ## Definição de pronto (vale para toda tarefa)
 
