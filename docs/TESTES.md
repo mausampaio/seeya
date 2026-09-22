@@ -788,6 +788,18 @@ por fast-forward. O `npm ci` no checkout principal fica para depois de fechar a 
 esta é a primeira fricção medida dele — quando houver instalador, a interface do dia a dia roda
 do pacote instalado, não do checkout, e a regra deixa de ser necessária.
 
+**O portão do PO não mede cobertura (decisão do mantenedor, 2026-09-22).** Medido: com a
+cobertura ligada e dois processos de teste, o portão do PO foi encerrado por falta de memória
+várias vezes numa máquina de 16 GB com uso normal (inclusive com a sessão do PO rodando dentro da
+própria interface). O pico vem da cobertura — cada processo guarda o mapa de linhas de mais de 200
+arquivos, e a junção no fim acontece de uma vez só no processo principal — somada aos testes de
+integração que sobem processos reais (git, Node, o Electron como daemon). E a rodada do PO era a
+**terceira** a medir cobertura na mesma mudança: o agente já roda `npm run verificar` completo na
+worktree dele, e a CI roda de novo nos três sistemas. **Regra:** o portão do PO roda formatação,
+tipos, lint, build, fronteiras de camada e **todos** os testes, com `--maxWorkers 1` e **sem**
+`--coverage`. A cobertura continua sendo cobrada duas vezes — no agente e na CI —, e uma queda de
+cobertura depois da mesclagem aparece na CI antes de qualquer instalador ser construído.
+
 ## O build quebrou com erros de `rootDir` e ninguém mexeu no código? Procure sobras de guard
 
 **2026-09-17, V2-T5a.** `npm run app` (que roda `npm run build` primeiro) falhou com dezenas de

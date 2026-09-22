@@ -8180,6 +8180,17 @@ trabalho nasce como repositório git local, e o remoto é assunto próprio.
       `npm run verificar` completo; não é a instabilidade Q-081 mencionada no despacho
       (`tests/integration/app/composition.test.ts`, que não estourou prazo aqui).
 
+      **Mesclada na `main` em 2026-09-22** (portão do PO no formato novo, sem cobertura e com um
+      processo de teste — `docs/TESTES.md`: 220 arquivos, 2.273 testes passando, 4 pulados; a
+      cobertura de 96,55% é a do portão completo do agente). Revisão sem ajustes. **O que só o aceite
+      prova:** o `open` fecha a lista do `--add-dir` com um `--` mesmo sem nada depois dele. O
+      spike mediu o `--` **com** prompt, no modo automático; no `open` ele fica sozinho no fim, no
+      modo interativo, e foi provado só contra um `claude` falso. Se o Claude Code real recusar um
+      `--` final, o `open` não abre. **Registro de escolha:** a identidade preserva maiúsculas de
+      dono e repositório, então num provedor que não as distingue o mesmo repositório escrito de
+      dois jeitos vira dois — a normalização conservadora que a spec pediu. Fica em `[~]` até o
+      aceite do mantenedor.
+
 - [ ] **V2-T31 — Correção: "Start daemon" responde antes de o daemon existir.** Especificada pelo
       PO em 2026-09-21 a partir do aceite da V2-T21 pelo mantenedor, no mesmo dia. Pequena, e com
       a causa localizada.
