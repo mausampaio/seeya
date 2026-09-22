@@ -18,11 +18,15 @@ import {
   runProjectShowCommand,
 } from '../../../packages/cli/src/project-command.js';
 import type { ProjectContext } from '../../../packages/cli/src/composition.js';
+import type { ProjectOpenDeps } from '@seeya-ai/engine/application/project-open.js';
 import {
+  ControllableProcessControl,
   DEFAULT_TEST_CONFIG,
+  FakeClock,
   FakeDirectoryExistence,
   FakeGitReaderWithRemote,
   FakeHarnessLauncher,
+  FakeProjectLock,
   FakeWorkspaceRepository,
   InMemoryDeviceStorage,
 } from '../application/_fakes.js';
@@ -40,9 +44,21 @@ function buildContext(overrides: Partial<ProjectContext> = {}): ProjectContext {
     gitReader: new FakeGitReaderWithRemote(),
     directoryExistence: new FakeDirectoryExistence(),
     harnessLauncher: new FakeHarnessLauncher(),
+    projectLock: new FakeProjectLock(),
+    processControl: new ControllableProcessControl(),
+    clock: new FakeClock(new Date('2026-09-22T10:00:00.000Z')),
     seeyaHome: SEEYA_HOME,
+    sessionId: undefined,
     ...overrides,
   };
+}
+
+/** `runProjectOpenCommand` takes `ProjectOpenDeps`, not `ProjectContext` (its own docstring: the
+ * real `pid`/`procStart` capture belongs to `index.ts`'s `.action()` alone, never this test) —
+ * adds a fixed, fake pid onto an EXISTING context (same port instances, so whatever `create`/
+ * `add-repo` already wrote through it is still visible) rather than building a fresh one. */
+function buildOpenDeps(context: ProjectContext): ProjectOpenDeps {
+  return { ...context, pid: 4242, procStart: undefined };
 }
 
 /** Same `PassThrough` + `'data'` accumulation `start-day-command.test.ts#makeIo` already uses —
@@ -142,7 +158,14 @@ describe('runProjectOpenCommand', () => {
     const context = buildContext();
     await runProjectCreateCommand(context, 'auth-hardening');
     const { stdout, output } = collectStdout();
-    const exitCode = await runProjectOpenCommand(context, 'auth-hardening', undefined, { stdout });
+    const exitCode = await runProjectOpenCommand(
+      buildOpenDeps(context),
+      'auth-hardening',
+      undefined,
+      {
+        stdout,
+      },
+    );
     expect(exitCode).toBe(1);
     expect(output()).toContain('no default harness set');
   });
@@ -176,7 +199,14 @@ describe('runProjectOpenCommand', () => {
       },
     );
     const { stdout, output } = collectStdout();
-    const exitCode = await runProjectOpenCommand(context, 'auth-hardening', 'claude', { stdout });
+    const exitCode = await runProjectOpenCommand(
+      buildOpenDeps(context),
+      'auth-hardening',
+      'claude',
+      {
+        stdout,
+      },
+    );
     expect(exitCode).toBe(0);
     const text = output();
     expect(text).toContain('Repository "frontend" is not registered on this device');

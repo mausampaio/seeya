@@ -13,9 +13,26 @@ import { mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { StorageAdapter } from '@seeya-ai/engine/adapters/storage/index.js';
-import { FsWorkspaceRepository } from '@seeya-ai/engine/adapters/workspace/index.js';
+import { FsWorkspaceRepository, FsProjectLock } from '@seeya-ai/engine/adapters/workspace/index.js';
+import { processControl } from '@seeya-ai/engine/adapters/process/index.js';
 import { runGit } from '@seeya-ai/engine/adapters/git/run-git.js';
 import { createProject } from '@seeya-ai/engine/application/workspace.js';
+import type { WorkspaceCommandDeps } from '@seeya-ai/engine/application/workspace.js';
+
+function buildDeps(
+  storage: StorageAdapter,
+  workspace: FsWorkspaceRepository,
+  seeyaHome: string,
+): WorkspaceCommandDeps {
+  return {
+    storage,
+    workspace,
+    projectLock: new FsProjectLock(),
+    processControl,
+    seeyaHome,
+    sessionId: undefined,
+  };
+}
 
 async function makeTmpDir(): Promise<string> {
   return mkdtemp(path.join(tmpdir(), 'seeya-workspace-boundary-'));
@@ -60,7 +77,7 @@ describe('the workspace repository never tracks ~/.seeya/ operational state', ()
 
     const storage = new StorageAdapter(seeyaHome);
     const workspace = new FsWorkspaceRepository();
-    const result = await createProject({ storage, workspace, seeyaHome }, 'auth-hardening');
+    const result = await createProject(buildDeps(storage, workspace, seeyaHome), 'auth-hardening');
     expect(result.kind).toBe('created');
 
     const workspaceRoot = path.join(seeyaHome, 'workspace');
@@ -74,23 +91,26 @@ describe('the workspace repository never tracks ~/.seeya/ operational state', ()
       .split(/\r?\n/)
       .filter((line: string) => line.length > 0);
 
-    // Every tracked path belongs to the project just created, nothing else.
+    // Every tracked path belongs to the project just created, except `.gitignore` itself — the
+    // one shared, workspace-root file `commitAll` also stages (V2-T33, D-047 item 2: it's what
+    // keeps `.seeya-lock` out of every project's own commits, so it has to be tracked too).
     expect(trackedFiles.length).toBeGreaterThan(0);
     for (const file of trackedFiles) {
-      expect(file.startsWith('auth-hardening/')).toBe(true);
+      expect(file === '.gitignore' || file.startsWith('auth-hardening/')).toBe(true);
     }
     // The operational files by name, explicitly — the strongest form of this assertion.
     expect(trackedFiles).not.toContain('config.json');
     expect(trackedFiles).not.toContain('estado.json');
     expect(trackedFiles).not.toContain('daemon.lock');
     expect(trackedFiles).not.toContain('workspace.json');
+    expect(trackedFiles).toContain('.gitignore');
   });
 
   it('the workspace git repository root is the workspace/ subdirectory, not ~/.seeya/ itself', async () => {
     seeyaHome = await makeTmpDir();
     const storage = new StorageAdapter(seeyaHome);
     const workspace = new FsWorkspaceRepository();
-    await createProject({ storage, workspace, seeyaHome }, 'auth-hardening');
+    await createProject(buildDeps(storage, workspace, seeyaHome), 'auth-hardening');
 
     // `.git` lives one level down — ~/.seeya/ itself is never a git working tree, so nothing
     // outside workspace/ could ever be tracked no matter what a future writeProjectSkeleton call
@@ -103,7 +123,7 @@ describe('the workspace repository never tracks ~/.seeya/ operational state', ()
     seeyaHome = await makeTmpDir();
     const storage = new StorageAdapter(seeyaHome);
     const workspace = new FsWorkspaceRepository();
-    await createProject({ storage, workspace, seeyaHome }, 'auth-hardening');
+    await createProject(buildDeps(storage, workspace, seeyaHome), 'auth-hardening');
 
     expect(await pathExists(path.join(seeyaHome, 'workspace.json'))).toBe(true);
     expect(await pathExists(path.join(seeyaHome, 'workspace', 'workspace.json'))).toBe(false);

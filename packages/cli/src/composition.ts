@@ -15,6 +15,7 @@ import type {
   HarnessLauncher,
   Notifier,
   ProcessControl,
+  ProjectLock,
   SessionProvider,
   SessionResumer,
   Storage,
@@ -23,11 +24,13 @@ import type {
 import type { Config, DaemonOwner } from '@seeya-ai/engine/core/types.js';
 import type { PathPlatformHint } from '@seeya-ai/engine/core/cwd-normalization.js';
 import { processControl as realProcessControl } from '@seeya-ai/engine/adapters/process/index.js';
+import { captureObservedProcStart } from '@seeya-ai/engine/adapters/process/proc-start.js';
+import { processExists } from '@seeya-ai/engine/adapters/process/existence.js';
 import { systemClock } from '@seeya-ai/engine/adapters/clock/index.js';
 import { StorageAdapter } from '@seeya-ai/engine/adapters/storage/index.js';
 import { FsDirectoryExistence } from '@seeya-ai/engine/adapters/filesystem/index.js';
 import { buildAutostart } from '@seeya-ai/engine/adapters/autostart/index.js';
-import { FsWorkspaceRepository } from '@seeya-ai/engine/adapters/workspace/index.js';
+import { FsWorkspaceRepository, FsProjectLock } from '@seeya-ai/engine/adapters/workspace/index.js';
 import { buildAppInstallation } from '@seeya-ai/engine/adapters/installation/index.js';
 import { resolveDaemonOwner } from '@seeya-ai/engine/application/daemon-ownership.js';
 import {
@@ -48,7 +51,18 @@ import {
   buildNotifier,
 } from '@seeya-ai/engine/adapters/notification/index.js';
 import type { EndDayDeps } from '@seeya-ai/engine/application/types.js';
+import type { ProjectOpenDeps } from '@seeya-ai/engine/application/project-open.js';
 import type { DaemonDeps } from '@seeya-ai/engine/scheduler/index.js';
+
+/** D-047: the same `CLAUDE_CODE_SESSION_ID` D-017's own table already strips from a SPAWNED
+ * `claude`'s environment (`adapters/generation/env.ts#INHERITED_SESSION_VARS`) — here it's read,
+ * not stripped, because `seeya`'s OWN invocation (never a child it spawns) is what needs to know
+ * which session it's running under, for the project lock and the two commit trailers
+ * (`core/project-lock.ts`/`core/project-commit.ts`). `undefined` outside a Claude Code session
+ * (D-025) — read only here, in the composition root, never inside `application/`. */
+function readCurrentSessionId(): string | undefined {
+  return process.env['CLAUDE_CODE_SESSION_ID'];
+}
 
 export interface CliHome {
   readonly claudeHome: string;
@@ -402,11 +416,19 @@ export interface ProjectContext {
   readonly directoryExistence: DirectoryExistence;
   /** V2-T28: `open`'s own harness spawn. */
   readonly harnessLauncher: HarnessLauncher;
+  /** V2-T33 (D-047 item 1): `open`'s own lock take/check/release; `show`'s own lock status. */
+  readonly projectLock: ProjectLock;
+  /** V2-T33: the lock's vivacity check — the SAME `ProcessControl` `daemon.lock` already uses. */
+  readonly processControl: ProcessControl;
+  /** V2-T33: `open`'s own `acquiredAt` (`ProjectLockInfo`). */
+  readonly clock: Clock;
   readonly seeyaHome: string;
+  /** V2-T33: `readCurrentSessionId()`'s own docstring above. */
+  readonly sessionId: string | undefined;
 }
 
 /**
- * `seeya project create | list | show | add-repo | open`'s own composition (V2-T27/V2-T28):
+ * `seeya project create | list | show | add-repo | open`'s own composition (V2-T27/V2-T28/V2-T33):
  * `Storage` (for `Storage.readWorkspaceRoot`/`saveWorkspaceRoot`/`readRepositoryMap`/
  * `saveRepositoryMap`) and `WorkspaceRepository` (`FsWorkspaceRepository`, the only concrete
  * adapter this port has — D-020 means naming it here is this file's job, not
@@ -421,6 +443,25 @@ export function buildProjectContext(homeDir: string = os.homedir()): ProjectCont
     gitReader: new GitAdapter({ clock: systemClock }),
     directoryExistence: new FsDirectoryExistence(),
     harnessLauncher: new ClaudeHarnessLauncher(),
+    projectLock: new FsProjectLock(),
+    processControl: realProcessControl,
+    clock: systemClock,
     seeyaHome: home.seeyaHome,
+    sessionId: readCurrentSessionId(),
   };
+}
+
+/**
+ * `seeya project open`'s own extra composition (V2-T33, D-047 items 1/4): `ProjectContext` plus
+ * THIS INVOCATION's own `pid`/`procStart` — captured here, not in `buildProjectContext`, because
+ * every other `seeya project` subcommand never needs a `procStart` capture at all (S4-T3b's own
+ * `powershell.exe` cost on Windows, 500-880ms even warm, `adapters/process/proc-start.ts`'s own
+ * measurement — paying it for `list`/`show`/`create`/`add-repo` would be pure waste). Same
+ * composition-root-only self-capture `cli/index.ts`'s daemon `worker` branch already does for
+ * `daemon.lock` (D-020) — reused, not reimplemented.
+ */
+export async function buildProjectOpenDeps(context: ProjectContext): Promise<ProjectOpenDeps> {
+  const procStartCapture = await captureObservedProcStart(process.pid, processExists);
+  const procStart = procStartCapture.kind === 'value' ? procStartCapture.value : undefined;
+  return { ...context, pid: process.pid, procStart };
 }

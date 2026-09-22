@@ -6,15 +6,18 @@
  */
 import type { RejectedDiscoveryRecord } from '@seeya-ai/engine/core/ports.js';
 import type { ProjectManifest } from '@seeya-ai/engine/core/types.js';
+import type { ProjectLockInfo } from '@seeya-ai/engine/core/project-lock.js';
 import type {
   CreateProjectResult,
   ListProjectsResult,
+  ProjectLockStatus,
   ShowProjectResult,
 } from '@seeya-ai/engine/application/workspace.js';
 import type { AddRepositoryResult } from '@seeya-ai/engine/application/repository-association.js';
 import type {
   MissingRepositoryRecord,
   OpenProjectResult,
+  ProjectOpenLockOutcome,
 } from '@seeya-ai/engine/application/project-open.js';
 
 function formatInvalidIdLine(projectId: string): string {
@@ -90,6 +93,30 @@ export function formatProjectsReport(result: ListProjectsResult): string {
   return lines.join('\n');
 }
 
+/** "session &lt;id&gt;" when the lock's holder is known, "an unidentified session" otherwise (D-025:
+ * `ProjectLockInfo.sessionId` is absent, not a guessed identity — see that field's own docstring).
+ * Shared by `formatShowProjectReport`'s lock line and `formatProjectLockWarningLines` below. */
+function formatLockHolderDescription(lock: ProjectLockInfo): string {
+  const holder =
+    lock.sessionId === undefined ? 'an unidentified session' : `session ${lock.sessionId}`;
+  return `${holder} (pid ${lock.pid}) since ${lock.acquiredAt.toISOString()}`;
+}
+
+/** `seeya project show <id>`'s own lock line (V2-T33, D-047 item 5) — three states, matching
+ * `ProjectLockStatus` (never flattened, D-024): `unlocked` says so plainly; `staleLock` still
+ * names who last held it (useful diagnostic — the lock file is still ON DISK), but says clearly
+ * that it's reclaimable; `heldByLiveSession` is the one that actually blocks a second `open`. */
+function formatLockStatusLine(status: ProjectLockStatus): string {
+  switch (status.kind) {
+    case 'unlocked':
+      return 'lock: none';
+    case 'staleLock':
+      return `lock: stale (last held by ${formatLockHolderDescription(status.lock)}) — reclaimable`;
+    case 'heldByLiveSession':
+      return `lock: held by ${formatLockHolderDescription(status.lock)}`;
+  }
+}
+
 export function formatShowProjectReport(result: ShowProjectResult): string {
   switch (result.kind) {
     case 'invalidId':
@@ -103,6 +130,7 @@ export function formatShowProjectReport(result: ShowProjectResult): string {
         `  default harness: ${formatDefaultHarness(result.manifest.defaultHarness)}`,
         `  repositories: ${formatRepositoriesSummary(result.manifest)}`,
         `  trackers: ${formatTrackersSummary(result.manifest)}`,
+        `  ${formatLockStatusLine(result.lockStatus)}`,
       ].join('\n');
   }
 }
@@ -141,6 +169,34 @@ function formatMissingRepositoryLine(projectId: string, missing: MissingReposito
     `longer exists — run "seeya project add-repo ${projectId} <new-path>" to update it. ` +
     'Continuing without it.'
   );
+}
+
+/** `seeya project open`'s own lock warning (V2-T33, D-047 item 4) — printed BEFORE the harness
+ * takes over the terminal, same "the person needs to see this while they can still act on it"
+ * timing `formatMissingRepositoryLines` already gets. `acquired` with no `reclaimedStale` prints
+ * nothing (the ordinary case: a genuinely free lock needs no comment); `acquired` with
+ * `reclaimedStale` set names the stale lock it just took over, so a silently-abandoned lock never
+ * looks like nothing happened. `readOnly` is the one that matters most: this session did NOT get
+ * the lock, so it can look but "não escreve" — the guard that enforces that is V2-T34's, this is
+ * only the warning half (`ProjectOpenLockOutcome`'s own docstring). */
+export function formatProjectLockWarningLines(
+  projectId: string,
+  lock: ProjectOpenLockOutcome,
+): string[] {
+  if (lock.kind === 'readOnly') {
+    return [
+      `Project "${projectId}" is locked by ${formatLockHolderDescription(lock.heldBy)} — ` +
+        'opening for reading only. Work in your own code, but changes to this project itself ' +
+        'will not be recorded here until that session releases the lock.',
+    ];
+  }
+  if (lock.reclaimedStale === null) {
+    return [];
+  }
+  return [
+    `Project "${projectId}"'s lock was stale (last held by ` +
+      `${formatLockHolderDescription(lock.reclaimedStale)}) — reclaimed.`,
+  ];
 }
 
 export function formatMissingRepositoryLines(

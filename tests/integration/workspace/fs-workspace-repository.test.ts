@@ -9,6 +9,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FsWorkspaceRepository } from '@seeya-ai/engine/adapters/workspace/index.js';
+import { runGit } from '@seeya-ai/engine/adapters/git/run-git.js';
 import { buildProjectSkeleton } from '@seeya-ai/engine/core/project-skeleton.js';
 
 async function makeTmpDir(): Promise<string> {
@@ -123,7 +124,7 @@ describe('FsWorkspaceRepository', () => {
       'auth-hardening',
       buildProjectSkeleton('auth-hardening'),
     );
-    await workspace.commitAll(root, 'Create project auth-hardening');
+    await workspace.commitAll(root, 'auth-hardening', 'Create project auth-hardening');
 
     const manifest = await workspace.readProjectManifest(root, 'auth-hardening');
     expect(manifest?.id).toBe('auth-hardening');
@@ -138,11 +139,68 @@ describe('FsWorkspaceRepository', () => {
       'auth-hardening',
       buildProjectSkeleton('auth-hardening'),
     );
-    await workspace.commitAll(root, 'Create project auth-hardening');
+    await workspace.commitAll(root, 'auth-hardening', 'Create project auth-hardening');
     // Second call, nothing written since — must not throw and must not add a second commit.
     await expect(
-      workspace.commitAll(root, 'Create project auth-hardening'),
+      workspace.commitAll(root, 'auth-hardening', 'Create project auth-hardening'),
     ).resolves.toBeUndefined();
+  });
+
+  it("commitAll only ever stages the one project it was called for (D-047 item 3, regression: this used to be `git add -A`, so a commit for one project also carried the other's pending change — reverting one used to undo both)", async () => {
+    root = await makeTmpDir();
+    const workspace = new FsWorkspaceRepository();
+    await workspace.initialize(root);
+    await workspace.writeProjectSkeleton(
+      root,
+      'auth-hardening',
+      buildProjectSkeleton('auth-hardening'),
+    );
+    await workspace.commitAll(root, 'auth-hardening', 'Create project auth-hardening');
+    await workspace.writeProjectSkeleton(root, 'billing-v2', buildProjectSkeleton('billing-v2'));
+    await workspace.commitAll(root, 'billing-v2', 'Create project billing-v2');
+
+    // Pending, UNCOMMITTED changes in BOTH projects at once.
+    await writeFile(path.join(root, 'auth-hardening', 'INDEX.md'), 'auth notes\n', 'utf8');
+    await writeFile(path.join(root, 'billing-v2', 'INDEX.md'), 'billing notes\n', 'utf8');
+
+    await workspace.commitAll(root, 'auth-hardening', 'Update auth-hardening notes');
+
+    const log = await runGit(root, ['log', '-1', '--name-only', '--pretty=format:']);
+    expect(log.ran && log.exitCode === 0).toBe(true);
+    const committedFiles = log.ran ? log.stdout.trim().split('\n') : [];
+    expect(committedFiles).toEqual([path.posix.join('auth-hardening', 'INDEX.md')]);
+
+    // billing-v2's own pending change is still sitting there, untouched — not staged, not
+    // committed, exactly what "um projeto por commit" (D-047 item 3) promises.
+    const status = await runGit(root, ['status', '--porcelain', '--', 'billing-v2']);
+    // Not `.trim()`'d on purpose: porcelain's leading column ("M" staged vs " M" unstaged-only)
+    // IS the fact this assertion exists to prove — trimming it away would hide a regression where
+    // this ends up staged instead of merely modified.
+    expect(status.ran && status.stdout.replace(/\r?\n$/, '')).toBe(' M billing-v2/INDEX.md');
+  });
+
+  it('commitAll never stages .seeya-lock, even for a workspace initialized before this task had a .gitignore rule for it', async () => {
+    root = await makeTmpDir();
+    const workspace = new FsWorkspaceRepository();
+    await workspace.initialize(root);
+    await workspace.writeProjectSkeleton(
+      root,
+      'auth-hardening',
+      buildProjectSkeleton('auth-hardening'),
+    );
+    // A lock file dropped in by hand, standing in for `FsProjectLock#write` — commitAll must
+    // never pick this up, first commit or any later one.
+    await writeFile(path.join(root, 'auth-hardening', '.seeya-lock'), '{}', 'utf8');
+
+    await workspace.commitAll(root, 'auth-hardening', 'Create project auth-hardening');
+
+    const log = await runGit(root, ['log', '-1', '--name-only', '--pretty=format:']);
+    const committedFiles = log.ran ? log.stdout.trim().split('\n') : [];
+    expect(committedFiles).not.toContain(path.posix.join('auth-hardening', '.seeya-lock'));
+    const status = await runGit(root, ['status', '--porcelain']);
+    // Untracked but ignored (git status --porcelain omits ignored files entirely by default) —
+    // never reported as a pending change either.
+    expect(status.ran && status.stdout).not.toMatch(/\.seeya-lock/);
   });
 
   it('listProjects returns every project this workspace knows, both sides of D-022', async () => {
@@ -236,11 +294,11 @@ describe('FsWorkspaceRepository', () => {
 
   it('commitAll throws when root is not a git repository at all', async () => {
     root = await makeTmpDir();
-    // Deliberately never initialized — `git add -A` here fails for real ("not a git repository").
+    // Deliberately never initialized — `git add` here fails for real ("not a git repository").
     const workspace = new FsWorkspaceRepository();
-    await expect(workspace.commitAll(root, 'Create project auth-hardening')).rejects.toThrow(
-      /git add failed/,
-    );
+    await expect(
+      workspace.commitAll(root, 'auth-hardening', 'Create project auth-hardening'),
+    ).rejects.toThrow(/git add failed/);
   });
 
   it('commitAll throws when git itself refuses the commit (an empty message)', async () => {
@@ -255,7 +313,9 @@ describe('FsWorkspaceRepository', () => {
     // A real git refusal, not a contrived one: `git commit -m ""` aborts with "empty commit
     // message" — this project's own commitAll never builds an empty message itself, but the
     // failure path still has to surface faithfully if git ever refuses for any reason.
-    await expect(workspace.commitAll(root, '')).rejects.toThrow(/git commit failed/);
+    await expect(workspace.commitAll(root, 'auth-hardening', '')).rejects.toThrow(
+      /git commit failed/,
+    );
   });
 
   it('listProjects reports a rejection (not a silent empty list) when root is a file, not a directory', async () => {

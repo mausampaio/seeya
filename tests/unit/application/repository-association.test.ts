@@ -5,12 +5,17 @@
  */
 import path from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
+import type { AddRepositoryDeps } from '@seeya-ai/engine/application/repository-association.js';
 import { addRepository } from '@seeya-ai/engine/application/repository-association.js';
 import { createProject } from '@seeya-ai/engine/application/workspace.js';
+import type { DirectoryExistence, GitReader } from '@seeya-ai/engine/core/ports.js';
+import { buildProjectCommitMessage } from '@seeya-ai/engine/core/project-commit.js';
 import {
+  ControllableProcessControl,
   DEFAULT_TEST_CONFIG,
   FakeDirectoryExistence,
   FakeGitReaderWithRemote,
+  FakeProjectLock,
   FakeWorkspaceRepository,
   InMemoryDeviceStorage,
 } from './_fakes.js';
@@ -22,6 +27,24 @@ const SEEYA_HOME = path.resolve(path.sep, 'seeya-home-fixture');
 const WORKSPACE_ROOT = path.join(SEEYA_HOME, 'workspace');
 const REPO_PATH = path.resolve(path.sep, 'code', 'app-api');
 
+/** Same idea as `application/workspace.test.ts#buildDeps` — one place threading
+ * `AddRepositoryDeps`'s V2-T33 additions (`sessionId`) through every call in this file. */
+function buildAddRepoDeps(
+  storage: InMemoryDeviceStorage,
+  workspace: FakeWorkspaceRepository,
+  gitReader: GitReader,
+  directoryExistence: DirectoryExistence,
+): AddRepositoryDeps {
+  return {
+    storage,
+    workspace,
+    gitReader,
+    directoryExistence,
+    seeyaHome: SEEYA_HOME,
+    sessionId: undefined,
+  };
+}
+
 describe('addRepository', () => {
   let storage: InMemoryDeviceStorage;
   let workspace: FakeWorkspaceRepository;
@@ -29,18 +52,27 @@ describe('addRepository', () => {
   beforeEach(async () => {
     storage = new InMemoryDeviceStorage(DEFAULT_TEST_CONFIG);
     workspace = new FakeWorkspaceRepository();
-    await createProject({ storage, workspace, seeyaHome: SEEYA_HOME }, 'auth-hardening');
+    await createProject(
+      {
+        storage,
+        workspace,
+        projectLock: new FakeProjectLock(),
+        processControl: new ControllableProcessControl(),
+        seeyaHome: SEEYA_HOME,
+        sessionId: undefined,
+      },
+      'auth-hardening',
+    );
   });
 
   it('refuses an invalid project id without touching any port', async () => {
     const result = await addRepository(
-      {
+      buildAddRepoDeps(
         storage,
         workspace,
-        gitReader: new FakeGitReaderWithRemote(),
-        directoryExistence: new FakeDirectoryExistence(new Set([REPO_PATH])),
-        seeyaHome: SEEYA_HOME,
-      },
+        new FakeGitReaderWithRemote(),
+        new FakeDirectoryExistence(new Set([REPO_PATH])),
+      ),
       'Not Valid',
       REPO_PATH,
     );
@@ -49,13 +81,12 @@ describe('addRepository', () => {
 
   it('reports projectNotFound for an id never created', async () => {
     const result = await addRepository(
-      {
+      buildAddRepoDeps(
         storage,
         workspace,
-        gitReader: new FakeGitReaderWithRemote(),
-        directoryExistence: new FakeDirectoryExistence(new Set([REPO_PATH])),
-        seeyaHome: SEEYA_HOME,
-      },
+        new FakeGitReaderWithRemote(),
+        new FakeDirectoryExistence(new Set([REPO_PATH])),
+      ),
       'ghost',
       REPO_PATH,
     );
@@ -64,13 +95,12 @@ describe('addRepository', () => {
 
   it('reports pathNotFound when the given local path does not exist', async () => {
     const result = await addRepository(
-      {
+      buildAddRepoDeps(
         storage,
         workspace,
-        gitReader: new FakeGitReaderWithRemote(),
-        directoryExistence: new FakeDirectoryExistence(),
-        seeyaHome: SEEYA_HOME,
-      },
+        new FakeGitReaderWithRemote(),
+        new FakeDirectoryExistence(),
+      ),
       'auth-hardening',
       REPO_PATH,
     );
@@ -79,15 +109,12 @@ describe('addRepository', () => {
 
   it('adds a repository with a remote: identity derived, name from the path, committed', async () => {
     const result = await addRepository(
-      {
+      buildAddRepoDeps(
         storage,
         workspace,
-        gitReader: new FakeGitReaderWithRemote(
-          new Map([[REPO_PATH, 'git@host:acme-widgets/app-api.git']]),
-        ),
-        directoryExistence: new FakeDirectoryExistence(new Set([REPO_PATH])),
-        seeyaHome: SEEYA_HOME,
-      },
+        new FakeGitReaderWithRemote(new Map([[REPO_PATH, 'git@host:acme-widgets/app-api.git']])),
+        new FakeDirectoryExistence(new Set([REPO_PATH])),
+      ),
       'auth-hardening',
       REPO_PATH,
     );
@@ -106,8 +133,13 @@ describe('addRepository', () => {
         identity: { host: 'host', owner: 'acme-widgets', repository: 'app-api' },
       },
     ]);
+    // V2-T33 (D-047 item 4): subject plus both trailers, built by `buildProjectCommitMessage`.
     expect(workspace.commitMessages.at(-1)).toBe(
-      'Add repository app-api to project auth-hardening',
+      buildProjectCommitMessage(
+        'Add repository app-api to project auth-hardening',
+        'auth-hardening',
+        undefined,
+      ),
     );
     expect(await storage.readRepositoryMap()).toEqual([
       {
@@ -120,13 +152,12 @@ describe('addRepository', () => {
 
   it('adds a repository with no remote: hasRemote false, keyed in the map by projectId+name', async () => {
     const result = await addRepository(
-      {
+      buildAddRepoDeps(
         storage,
         workspace,
-        gitReader: new FakeGitReaderWithRemote(),
-        directoryExistence: new FakeDirectoryExistence(new Set([REPO_PATH])),
-        seeyaHome: SEEYA_HOME,
-      },
+        new FakeGitReaderWithRemote(),
+        new FakeDirectoryExistence(new Set([REPO_PATH])),
+      ),
       'auth-hardening',
       REPO_PATH,
     );
@@ -144,15 +175,12 @@ describe('addRepository', () => {
   });
 
   it('adding the same repository (same remote identity) twice reports alreadyAssociated, never duplicates', async () => {
-    const deps = {
+    const deps = buildAddRepoDeps(
       storage,
       workspace,
-      gitReader: new FakeGitReaderWithRemote(
-        new Map([[REPO_PATH, 'git@host:acme-widgets/app-api.git']]),
-      ),
-      directoryExistence: new FakeDirectoryExistence(new Set([REPO_PATH])),
-      seeyaHome: SEEYA_HOME,
-    };
+      new FakeGitReaderWithRemote(new Map([[REPO_PATH, 'git@host:acme-widgets/app-api.git']])),
+      new FakeDirectoryExistence(new Set([REPO_PATH])),
+    );
     await addRepository(deps, 'auth-hardening', REPO_PATH);
     const second = await addRepository(deps, 'auth-hardening', REPO_PATH);
     expect(second).toEqual({
@@ -166,18 +194,17 @@ describe('addRepository', () => {
 
   it('the SAME remote reached from a different local path (SSH vs HTTPS clone) is also alreadyAssociated', async () => {
     const secondPath = path.resolve(path.sep, 'code', 'app-api-clone-2');
-    const deps = {
+    const deps = buildAddRepoDeps(
       storage,
       workspace,
-      gitReader: new FakeGitReaderWithRemote(
+      new FakeGitReaderWithRemote(
         new Map([
           [REPO_PATH, 'git@host:acme-widgets/app-api.git'],
           [secondPath, 'https://host/acme-widgets/app-api.git'],
         ]),
       ),
-      directoryExistence: new FakeDirectoryExistence(new Set([REPO_PATH, secondPath])),
-      seeyaHome: SEEYA_HOME,
-    };
+      new FakeDirectoryExistence(new Set([REPO_PATH, secondPath])),
+    );
     await addRepository(deps, 'auth-hardening', REPO_PATH);
     const second = await addRepository(deps, 'auth-hardening', secondPath);
     expect(second.kind).toBe('alreadyAssociated');

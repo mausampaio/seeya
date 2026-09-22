@@ -12,12 +12,14 @@ import {
 } from '@seeya-ai/engine/application/workspace.js';
 import { addRepository } from '@seeya-ai/engine/application/repository-association.js';
 import { openProject } from '@seeya-ai/engine/application/project-open.js';
+import type { ProjectOpenDeps } from '@seeya-ai/engine/application/project-open.js';
 import type { ProjectContext } from './composition.js';
 import {
   formatAddRepoReport,
   formatCreateProjectReport,
   formatMissingRepositoryLines,
   formatOpenProjectReport,
+  formatProjectLockWarningLines,
   formatProjectsReport,
   formatShowProjectReport,
 } from './format-project.js';
@@ -64,21 +66,31 @@ export interface ProjectOpenIo {
 /**
  * `seeya project open <id> [--with <harness>]` — unlike the other four commands, `open` spawns a
  * real interactive session (`stdio: 'inherit'`, `core/ports.ts#HarnessLauncher`'s own docstring).
- * Any "repository X is missing" warning is written to `io.stdout` BEFORE the harness launches
+ * Any "repository X is missing"/lock warning is written to `io.stdout` BEFORE the harness launches
  * (V2-T28 item 4: the person needs to see it while they can still act, not after `claude` has
  * already exited) — `openProject`'s own `onBeforeLaunch` callback is what makes that possible
  * without this function polling the result for it after the fact. Returns an exit code, same
  * convention `start-day-command.ts#runStartDayCommand` already uses for a command that writes
  * progressively instead of returning one final string.
+ *
+ * **Takes `ProjectOpenDeps` directly, not `ProjectContext` like the other four commands** —
+ * `deps.pid`/`deps.procStart` need a real, per-invocation capture (`composition.ts
+ * #buildProjectOpenDeps`, S4-T3b's own `powershell.exe` cost on Windows), which only `index.ts`'s
+ * own `.action()` for `open` should ever pay for; the four commands above never need it at all.
+ * Keeping that capture OUT of this function is what lets this command's own tests inject a fully
+ * fake `ProjectOpenDeps` with no real process I/O, same as every other command in this file.
  */
 export async function runProjectOpenCommand(
-  context: ProjectContext,
+  deps: ProjectOpenDeps,
   projectId: string,
   harness: string | undefined,
   io: ProjectOpenIo,
 ): Promise<number> {
-  const result = await openProject(context, projectId, harness, (missing) => {
-    const lines = formatMissingRepositoryLines(projectId, missing);
+  const result = await openProject(deps, projectId, harness, ({ missing, lock }) => {
+    const lines = [
+      ...formatMissingRepositoryLines(projectId, missing),
+      ...formatProjectLockWarningLines(projectId, lock),
+    ];
     for (const line of lines) {
       io.stdout.write(`${line}\n`);
     }
