@@ -7794,6 +7794,30 @@ desbloqueia:
 - **V2-T29** — adotar uma sessão existente ao criar um projeto (D-045 item 4), depois do spike.
 - **V2-T30** — a lateral da janela agrupa as sessões por projeto.
 
+**Insumo do mantenedor, 2026-09-21 — o que a compactação apaga.** Um relato do uso real dele, que
+vira critério para a V2-T29 e para o `checkpoint`/`pause` do passo 5. Uma sessão longa, aberta na
+pasta pessoal (sem projeto por trás), conduzia um trabalho de operação de infraestrutura. Ela já
+sabia **como operar ali**: qual skill usar para chegar ao banco, qual CLI e qual arquivo de
+configuração para cada ambiente, quais namespaces. Depois de uma compactação de contexto, esqueceu
+tudo isso: tentou achar credenciais em manifestos e variáveis de ambiente, começou a escrever um
+script novo, e disse não ter acesso a algo que tinha. Lembrada da skill, pediu desculpas e usou.
+
+**O que isso ensina, e por que importa para o desenho:**
+
+- **O que se perde primeiro não é a narrativa, é o saber-fazer.** A sessão lembrava o que estava
+  fazendo; esqueceu **como** se faz as coisas naquele trabalho — ferramentas, caminhos de acesso,
+  convenções. É esse o conteúdo que o projeto precisa guardar, e o esqueleto da V2-T27 não tem um
+  lugar com esse nome. `context/` caberia, mas a instrução de adoção (V2-T29) tem de **pedir isso
+  explicitamente** — o spike V2-T26 já mostrou que instrução vaga produz nada.
+- **Guardar o caminho, nunca o segredo.** "Use a skill X para o banco; o acesso ao ambiente Y é
+  pelo arquivo de configuração Z" — sim. A credencial em si — nunca. O aceite humano antes do commit
+  (D-045 item 4) é a segunda barreira, não a primeira: a instrução já tem de dizer isso.
+- **A compactação é o momento certo de escrever.** O Claude Code tem gancho que dispara antes de
+  compactar. Um gancho **no diretório do projeto** (que é do seeya, dentro do espaço de trabalho —
+  nunca em `~/.claude`) poderia pedir à sessão que atualize o estado e o saber-fazer antes de
+  perder o contexto. **Não medido**: se o gancho consegue fazer a sessão agir antes da compactação,
+  e com qual custo. Candidato a spike quando o passo 5 for especificado.
+
 Sincronização entre dispositivos (passo 7 do rumo) **não entra em nenhuma delas**: o espaço de
 trabalho nasce como repositório git local, e o remoto é assunto próprio.
 
