@@ -59,4 +59,10 @@ de texto pode não rodar no shell real); nada no `~/.seeya` real.
 **Aceite do mantenedor:** numa sessão aberta pelo `open`, pedir ao agente que commite sem o
 identificador e ver o git recusar; pedir `--no-verify` e ver o harness recusar; e rodar
 `seeya project audit` depois de um commit feito à mão, por fora, e vê-lo apontado.
+
+**Pré-requisito vindo da revisão da V2-T33 (PO, 2026-09-22):** antes das guardas compararem "quem
+commita" com "quem segura o lock", o `open` precisa gravar no lock o identificador da sessão do
+`claude` que ele lança — hoje, aberto de um terminal comum, o lock fica sem `sessionId` (Q-087).
+Gerar o identificador no `open`, passá-lo com `--session-id <uuid>` e gravá-lo no lock; medir antes
+que `--session-id` funciona numa sessão **interativa** nova (a S2-T2 mediu com `--resume` e fork).
 <!-- SECTION:DESCRIPTION:END -->
