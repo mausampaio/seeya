@@ -23,6 +23,7 @@ import { runGit } from './run-git.js';
 import { parseWorktreeListPorcelain, type WorktreeListEntry } from './worktree-list.js';
 import { canonicalPath, sameCanonicalPath } from './canonical-path.js';
 import { findRepoRoot } from './repo-roots.js';
+import { readRemoteUrl } from './remote.js';
 
 /**
  * Unlike the main `cwd` path (which uses `readModifiedFiles`, graceful on any failure, D-025),
@@ -251,5 +252,9 @@ export class GitAdapter implements GitReader {
     });
 
     return { repositories, filesOutsideRepository, reposNotVisited };
+  }
+
+  readRemoteUrl(cwd: string): Promise<string | null> {
+    return readRemoteUrl(cwd);
   }
 }

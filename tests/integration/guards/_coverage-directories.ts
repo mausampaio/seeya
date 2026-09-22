@@ -74,6 +74,11 @@ export const DECLARED_COVERAGE_DIRECTORIES: readonly DeclaredCoverageDirectory[]
   },
   { path: 'packages/engine/src/adapters/git', expectation: { kind: 'covered', threshold: 80 } },
   {
+    // V2-T28: ClaudeHarnessLauncher, the one adapter behind core/ports.ts#HarnessLauncher.
+    path: 'packages/engine/src/adapters/harness',
+    expectation: { kind: 'covered', threshold: 80 },
+  },
+  {
     // V2-T9 item 1: FsDirectoryExistence, the one adapter behind core/ports.ts#DirectoryExistence.
     path: 'packages/engine/src/adapters/filesystem',
     expectation: { kind: 'covered', threshold: 80 },

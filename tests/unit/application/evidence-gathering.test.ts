@@ -171,6 +171,10 @@ describe('gatherEvidence — D-035 threads maxGitRootsToVisit through to the Git
       return Promise.reject(new Error('not exercised'));
     }
 
+    readRemoteUrl(): Promise<string | null> {
+      return Promise.reject(new Error('not exercised'));
+    }
+
     readEvidenceAcrossRepos(
       _cwd: string,
       _touchedFiles: readonly string[],

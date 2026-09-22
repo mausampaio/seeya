@@ -23,6 +23,7 @@ import type {
   ProjectManifest,
   ProjectSkeleton,
   ProtocolScheme,
+  RepositoryMapEntry,
   SessionFacts,
 } from './types.js';
 
@@ -452,6 +453,19 @@ export interface Storage {
    * port already follow for their own one-shot markers).
    */
   saveWorkspaceRoot(root: string): Promise<void>;
+
+  /**
+   * V2-T28: `~/.seeya/repository-map.json` — where every repository `add-repo` has recorded is
+   * checked out on THIS device (`core/types.ts#RepositoryMapEntry`'s own docstring on the two key
+   * shapes). Empty when nothing has been registered yet (D-025), never an error.
+   */
+  readRepositoryMap(): Promise<readonly RepositoryMapEntry[]>;
+
+  /** Replaces `repository-map.json`'s entire contents with `entries` — the caller
+   * (`application/repository-association.ts#addRepository`) always reads first, upserts one entry
+   * with `core/repository-map.ts#upsertRepositoryMapEntry`, and writes the whole result back; this
+   * method itself doesn't merge. */
+  saveRepositoryMap(entries: readonly RepositoryMapEntry[]): Promise<void>;
 }
 
 /**
@@ -623,6 +637,15 @@ export interface GitReader {
     touchedFiles: readonly string[],
     maxRootsToVisit?: number,
   ): Promise<GitEvidenceAcrossRepos>;
+
+  /**
+   * V2-T28: `git remote get-url origin` at `cwd` — what `seeya project add-repo` reads to derive a
+   * repository's identity. `null` covers every ordinary "no resolvable remote" case alike
+   * (`cwd` isn't a git repository at all, it is one but has no `origin` configured, or the command
+   * simply fails) — `docs/PLANO-DE-ENTREGA.md` V2-T28 item 2 treats all of these the same way, as
+   * "repositório sem remoto", never a thrown error a caller has to catch. Never throws.
+   */
+  readRemoteUrl(cwd: string): Promise<string | null>;
 }
 
 /**
@@ -1051,6 +1074,18 @@ export interface WorkspaceRepository {
   writeProjectSkeleton(root: string, projectId: string, skeleton: ProjectSkeleton): Promise<void>;
 
   /**
+   * V2-T28: overwrites `root/projectId/seeya.json` alone with `manifest` — everything else the
+   * skeleton wrote (`AGENTS.md`, the six empty directories, etc.) is untouched. `addRepository`
+   * (`application/repository-association.ts`) is the one caller: read the manifest, append the new
+   * `AssociatedRepository`, write it back, `commitAll` — the same read-modify-write-commit shape
+   * `writeProjectSkeleton` + `commitAll` already give `createProject`, minus the skeleton files a
+   * project already has by the time this runs. Never called for a project that doesn't exist yet
+   * (`writeProjectSkeleton` is that path); this port doesn't re-check `projectExists` on its own,
+   * same "caller already knows" contract this interface's other methods already follow.
+   */
+  writeProjectManifest(root: string, projectId: string, manifest: ProjectManifest): Promise<void>;
+
+  /**
    * `git add -A && git commit -m message` at `root`, using `seeya`'s own author/committer identity
    * (never the operator's real `git config user.*` — the same reasoning
    * `tests/integration/git/_fixtures.ts#commitAt` already documents for why a commit's identity
@@ -1083,4 +1118,33 @@ export interface WorkspaceRepository {
    * (D-025: the project genuinely doesn't exist, not a parse failure).
    */
   readProjectManifest(root: string, projectId: string): Promise<ProjectManifest | null>;
+}
+
+/**
+ * `HarnessLauncher.open()`'s own outcome (V2-T28) — a discriminated union, not a bare exit code
+ * with a magic sentinel (D-024, same reasoning `adapters/git/run-git.ts#GitCommandResult` already
+ * applies): `failedToStart` is "the process never ran at all" (missing binary, missing `cwd`);
+ * `opened` is "it ran, for however long, and closed" — `exitCode` is whatever it closed with, not
+ * itself a success/failure signal (the harness is a real interactive session; a person typing
+ * `/exit` seconds in is not a failure this port has any business judging).
+ */
+export type HarnessOpenResult =
+  { readonly kind: 'opened'; readonly exitCode: number } | { readonly kind: 'failedToStart' };
+
+/**
+ * V2-T28: opens a harness fresh (never `--resume` — that's `SessionResumer`'s job) in a project's
+ * own directory, with every associated repository still resolvable on this device released via
+ * `--add-dir` — `docs/PLANO-DE-ENTREGA.md` V2-T28 item 3, `docs/V2-RUMO.md` § "Abertura das
+ * sessões": "No começo, `open` só executa o CLI do harness escolhido com o projeto como diretório
+ * de trabalho." `application/project-open.ts#openProject` is the one caller, and decides BEFORE
+ * calling this port whether the requested harness is supported at all (item 5: only `claude` this
+ * task) — this port has exactly one implementation
+ * (`adapters/harness/index.ts#ClaudeHarnessLauncher`), so it never takes a harness name.
+ *
+ * Same `stdio: 'inherit'` contract `SessionResumer` already established
+ * (docs/spikes/H-retomada-interativa.md) — `open` is a genuine interactive session too, never
+ * headless.
+ */
+export interface HarnessLauncher {
+  open(cwd: string, addDirs: readonly string[]): Promise<HarnessOpenResult>;
 }

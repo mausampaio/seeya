@@ -1038,21 +1038,82 @@ export type DaemonOwner =
 export type DaemonOwnershipTransitionAnswer = 'accepted' | 'declined';
 
 /**
- * V2-T27: a repository of the person's own code that a `project` (below) points at —
+ * V2-T28: the canonical identity of a git remote — `docs/V2-RUMO.md` § "A identidade é canônica":
+ * `git@host:owner/repo.git` and `https://host/owner/repo.git` are the same repository, and a
+ * `seeya.json` that stored the URL literally would treat them as two. `core/repository-identity.ts
+ * #normalizeRepositoryIdentity` is the one (pure) function that derives this from a raw remote URL
+ * — conservatively, for any provider, not just the ones this project happens to know by name.
+ */
+export interface RepositoryIdentity {
+  readonly host: string;
+  readonly owner: string;
+  readonly repository: string;
+}
+
+/**
+ * V2-T27/V2-T28: a repository of the person's own code that a `project` (below) points at —
  * `docs/V2-RUMO.md` § "Vários repositórios": "o `seeya.json` associa a frente aos repositórios e
  * trackers que ela atravessa". `seeya` only ever reads it (never writes inside it) — the
  * workspace/project's own git history is what `WorkspaceRepository` manages, a completely
- * different repository. `name` is the short label the project uses for it (`"api"`, `"frontend"`
- * in the rumo's own example); `remote` is the identity the rumo says a `seeya.json` should carry
- * — literally what `git remote get-url` returned when `add-repo` (V2-T28) recorded it.
+ * different repository.
  *
- * **Empty for now.** V2-T27 only creates empty projects (`docs/PLANO-DE-ENTREGA.md`: "o que não
- * entra: add-repo" — that command is V2-T28's own scope); this type exists so `seeya.json`'s
- * `repositories` field has a real shape to validate against instead of `unknown[]`.
+ * **Discriminated union on `hasRemote`, not an optional `remote` (D-024).** The rumo's own text:
+ * "repositório sem remoto... o seeya registra isso e declara, em outro dispositivo, que aquele
+ * repositório não pode ser resolvido lá — em vez de fingir que existe" (D-025). A `remote?:
+ * string` would let a caller read `identity` off a repository that was never given one; here,
+ * `AssociatedRepositoryWithoutRemote` doesn't have a `remote` or `identity` field to misread at
+ * all. `identity` on the `hasRemote: true` side is still `RepositoryIdentity | null` (not
+ * guaranteed non-null) — `normalizeRepositoryIdentity` can fail even on a URL that IS a real
+ * remote (an unparseable local-filesystem `origin`, for instance); that failure is a fact about
+ * the URL's shape, not about whether a remote exists at all, so it doesn't get its own union
+ * member.
  */
-export interface AssociatedRepository {
+export type AssociatedRepository =
+  AssociatedRepositoryWithRemote | AssociatedRepositoryWithoutRemote;
+
+export interface AssociatedRepositoryWithRemote {
+  readonly hasRemote: true;
+  /** Short label — `add-repo` (V2-T28) derives it from the local path's own last segment; the
+   * rumo's own example (`"api"`, `"frontend"`) is illustrative, not a naming scheme this type
+   * enforces. */
   readonly name: string;
+  /** Exactly what `git remote get-url origin` returned when `add-repo` recorded it — never a local
+   * path (D-027's own "nunca um caminho local, que só vale numa máquina"). */
   readonly remote: string;
+  readonly identity: RepositoryIdentity | null;
+}
+
+export interface AssociatedRepositoryWithoutRemote {
+  readonly hasRemote: false;
+  readonly name: string;
+}
+
+/**
+ * V2-T28: one entry of `repository-map.json` (`~/.seeya/`) — where a repository the workspace
+ * knows about (by its `seeya.json` entry) actually sits on THIS device. `docs/V2-RUMO.md`: "cada
+ * dispositivo guarda, em `~/.seeya/`, onde aquele remoto está nele".
+ *
+ * **Discriminated union on `hasIdentity`, not `AssociatedRepository` reused directly (D-024).** A
+ * repository WITH an identity is keyed globally by that identity — the same remote can back more
+ * than one project's association on this device, and the map only needs to remember one local
+ * clone per identity. A repository WITHOUT one (no remote at all) has no identity to key by at
+ * all, so its entry carries `projectId`/`name` instead — the only handle `add-repo` had for it —
+ * and `core/repository-map.ts#findRepositoryMapEntry` looks up each shape differently, never
+ * inventing an identity out of the pair (D-025).
+ */
+export type RepositoryMapEntry = RepositoryMapEntryWithIdentity | RepositoryMapEntryWithoutIdentity;
+
+export interface RepositoryMapEntryWithIdentity {
+  readonly hasIdentity: true;
+  readonly identity: RepositoryIdentity;
+  readonly path: string;
+}
+
+export interface RepositoryMapEntryWithoutIdentity {
+  readonly hasIdentity: false;
+  readonly projectId: string;
+  readonly name: string;
+  readonly path: string;
 }
 
 /**

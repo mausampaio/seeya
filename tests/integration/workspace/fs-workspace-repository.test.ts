@@ -86,6 +86,34 @@ describe('FsWorkspaceRepository', () => {
     expect(await workspace.projectExists(root, 'auth-hardening')).toBe(true);
   });
 
+  it('writeProjectManifest (V2-T28) overwrites only seeya.json — the rest of the skeleton stays', async () => {
+    root = await makeTmpDir();
+    const workspace = new FsWorkspaceRepository();
+    await workspace.initialize(root);
+    const skeleton = buildProjectSkeleton('auth-hardening');
+    await workspace.writeProjectSkeleton(root, 'auth-hardening', skeleton);
+    const projectDir = path.join(root, 'auth-hardening');
+    const agentsMdBefore = await readFile(path.join(projectDir, 'AGENTS.md'), 'utf8');
+
+    const updatedManifest = {
+      ...skeleton.manifest,
+      repositories: [
+        {
+          hasRemote: true as const,
+          name: 'api',
+          remote: 'git@host:acme-widgets/app-api.git',
+          identity: { host: 'host', owner: 'acme-widgets', repository: 'app-api' },
+        },
+      ],
+    };
+    await workspace.writeProjectManifest(root, 'auth-hardening', updatedManifest);
+
+    const manifest = await workspace.readProjectManifest(root, 'auth-hardening');
+    expect(manifest?.repositories).toEqual(updatedManifest.repositories);
+    const agentsMdAfter = await readFile(path.join(projectDir, 'AGENTS.md'), 'utf8');
+    expect(agentsMdAfter).toBe(agentsMdBefore);
+  });
+
   it('commitAll creates a real commit that readProjectManifest can then read back', async () => {
     root = await makeTmpDir();
     const workspace = new FsWorkspaceRepository();

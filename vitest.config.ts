@@ -153,6 +153,8 @@ const PROCESS_HEAVY_INTEGRATION_FILES = [
 const REAL_CHILD_PROCESS_GIT_AND_STORAGE_FILES = [
   'tests/integration/git/git-adapter.test.ts',
   'tests/integration/git/primitives.test.ts',
+  // V2-T28: `readRemoteUrl` spawns real `git` too, same load shape as the two above.
+  'tests/integration/git/remote.test.ts',
   'tests/integration/storage/atomic-write.test.ts',
   // V2-T27: `FsWorkspaceRepository`'s own real-`git` fixture (`init`/`add`/`diff`/`commit` per
   // test, several tests) is the same shape of load as `git-adapter.test.ts`/`primitives.test.ts`
@@ -267,6 +269,13 @@ const PRODUCTION_DIRECTORY_THRESHOLDS = {
     lines: 80,
   },
   'packages/engine/src/adapters/git/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
+  // V2-T28: ClaudeHarnessLauncher, the one adapter behind core/ports.ts#HarnessLauncher.
+  'packages/engine/src/adapters/harness/**': {
+    statements: 80,
+    branches: 80,
+    functions: 80,
+    lines: 80,
+  },
   // V2-T9 item 1: FsDirectoryExistence, the one adapter behind core/ports.ts#DirectoryExistence.
   'packages/engine/src/adapters/filesystem/**': {
     statements: 80,

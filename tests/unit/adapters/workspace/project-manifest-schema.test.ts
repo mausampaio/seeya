@@ -14,6 +14,8 @@ const MINIMAL_DOCUMENT = {
   trackers: [],
 };
 
+const IDENTITY = { host: 'host', owner: 'acme-widgets', repository: 'app-api' };
+
 describe('parseProjectManifestDocument', () => {
   it('parses a minimal, empty manifest', () => {
     expect(parseProjectManifestDocument(MINIMAL_DOCUMENT)).toEqual({
@@ -25,25 +27,46 @@ describe('parseProjectManifestDocument', () => {
     });
   });
 
-  it("parses a fully populated manifest, the rumo's own example shape", () => {
+  it('parses a fully populated manifest, both repository shapes (V2-T28)', () => {
     const document = {
       ...MINIMAL_DOCUMENT,
       name: 'Auth hardening',
       defaultHarness: 'claude',
       repositories: [
-        { name: 'api', remote: 'https://example.com/acme/app-api.git' },
-        { name: 'frontend', remote: 'https://example.com/acme/app-web.git' },
+        { name: 'api', remote: 'https://host/acme-widgets/app-api.git', identity: IDENTITY },
+        { name: 'legacy-scripts', remote: null, identity: null },
       ],
       trackers: [{ type: 'gitlab', project: 'acme/app', labels: ['security'] }],
     };
     const manifest = parseProjectManifestDocument(document);
     expect(manifest.defaultHarness).toBe('claude');
     expect(manifest.repositories).toEqual([
-      { name: 'api', remote: 'https://example.com/acme/app-api.git' },
-      { name: 'frontend', remote: 'https://example.com/acme/app-web.git' },
+      {
+        hasRemote: true,
+        name: 'api',
+        remote: 'https://host/acme-widgets/app-api.git',
+        identity: IDENTITY,
+      },
+      { hasRemote: false, name: 'legacy-scripts' },
     ]);
     expect(manifest.trackers).toEqual([
       { type: 'gitlab', project: 'acme/app', labels: ['security'] },
+    ]);
+  });
+
+  it('a with-remote entry whose identity was never given defaults to null, never omitted (D-021)', () => {
+    const document = {
+      ...MINIMAL_DOCUMENT,
+      repositories: [{ name: 'api', remote: 'https://host/acme-widgets/app-api.git' }],
+    };
+    const manifest = parseProjectManifestDocument(document);
+    expect(manifest.repositories).toEqual([
+      {
+        hasRemote: true,
+        name: 'api',
+        remote: 'https://host/acme-widgets/app-api.git',
+        identity: null,
+      },
     ]);
   });
 
@@ -65,7 +88,14 @@ describe('parseProjectManifestDocument', () => {
   it('tolerates an unknown field on a repository entry', () => {
     const document = {
       ...MINIMAL_DOCUMENT,
-      repositories: [{ name: 'api', remote: 'https://example.com/a.git', addedBy: 'someone' }],
+      repositories: [
+        {
+          name: 'api',
+          remote: 'https://host/acme-widgets/a.git',
+          identity: null,
+          addedBy: 'someone',
+        },
+      ],
     };
     expect(() => parseProjectManifestDocument(document)).not.toThrow();
   });
@@ -85,11 +115,26 @@ describe('parseProjectManifestDocument', () => {
     const document = { ...MINIMAL_DOCUMENT, repositories: 'none' };
     expect(() => parseProjectManifestDocument(document)).toThrow();
   });
+
+  it('throws when a repository entry has an identity but remote is null (D-025: no identity without a source)', () => {
+    const document = {
+      ...MINIMAL_DOCUMENT,
+      repositories: [{ name: 'orphan', remote: null, identity: IDENTITY }],
+    };
+    expect(() => parseProjectManifestDocument(document)).toThrow();
+  });
 });
 
 describe('serializeProjectManifestDocument', () => {
-  it('round-trips through parse', () => {
-    const manifest = parseProjectManifestDocument(MINIMAL_DOCUMENT);
+  it('round-trips through parse, both repository shapes', () => {
+    const document = {
+      ...MINIMAL_DOCUMENT,
+      repositories: [
+        { name: 'api', remote: 'https://host/acme-widgets/app-api.git', identity: IDENTITY },
+        { name: 'legacy-scripts', remote: null, identity: null },
+      ],
+    };
+    const manifest = parseProjectManifestDocument(document);
     const serialized = serializeProjectManifestDocument(manifest);
     expect(parseProjectManifestDocument(serialized)).toEqual(manifest);
   });
@@ -99,5 +144,16 @@ describe('serializeProjectManifestDocument', () => {
     expect(serializeProjectManifestDocument(manifest).schemaVersion).toBe(
       PROJECT_MANIFEST_SCHEMA_VERSION,
     );
+  });
+
+  it('serializes a without-remote repository as remote: null, identity: null — never omitted', () => {
+    const manifest = parseProjectManifestDocument({
+      ...MINIMAL_DOCUMENT,
+      repositories: [{ name: 'legacy-scripts', remote: null, identity: null }],
+    });
+    const serialized = serializeProjectManifestDocument(manifest);
+    expect(serialized.repositories).toEqual([
+      { name: 'legacy-scripts', remote: null, identity: null },
+    ]);
   });
 });

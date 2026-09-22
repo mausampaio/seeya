@@ -16,6 +16,7 @@ import type {
   EarlyWarningState,
   Handoff,
   ProtocolScheme,
+  RepositoryMapEntry,
 } from '../../core/types.js';
 import type { DaemonLockInfo } from '../../core/daemon-lock.js';
 import { EMPTY_EARLY_WARNING_STATE } from '../../core/early-warnings.js';
@@ -65,6 +66,11 @@ import {
   parseWorkspaceRootDocument,
   serializeWorkspaceRootDocument,
 } from './workspace-root-schema.js';
+import {
+  REPOSITORY_MAP_SCHEMA_VERSION,
+  parseRepositoryMapDocument,
+  serializeRepositoryMapDocument,
+} from './repository-map-schema.js';
 import { resolveSchemaVersion, type SchemaMigration } from './schema-version.js';
 import { writeFileAtomic } from './atomic-write.js';
 
@@ -448,6 +454,30 @@ export class StorageAdapter implements Storage {
     await writeFileAtomic(
       this.workspaceRootPath(),
       JSON.stringify(serializeWorkspaceRootDocument(root)),
+    );
+  }
+
+  /** `~/.seeya/repository-map.json` (V2-T28). */
+  private repositoryMapPath(): string {
+    return path.join(this.seeyaHome, 'repository-map.json');
+  }
+
+  async readRepositoryMap(): Promise<readonly RepositoryMapEntry[]> {
+    const resolved = await readVersionedDocument(
+      this.repositoryMapPath(),
+      REPOSITORY_MAP_SCHEMA_VERSION,
+    );
+    if (resolved === null) {
+      // Nothing registered on this device yet (D-025), not an error.
+      return [];
+    }
+    return parseRepositoryMapDocument(resolved);
+  }
+
+  async saveRepositoryMap(entries: readonly RepositoryMapEntry[]): Promise<void> {
+    await writeFileAtomic(
+      this.repositoryMapPath(),
+      JSON.stringify(serializeRepositoryMapDocument(entries), null, 2) + '\n',
     );
   }
 }

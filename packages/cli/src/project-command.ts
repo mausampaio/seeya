@@ -10,9 +10,14 @@ import {
   listProjects,
   showProject,
 } from '@seeya-ai/engine/application/workspace.js';
+import { addRepository } from '@seeya-ai/engine/application/repository-association.js';
+import { openProject } from '@seeya-ai/engine/application/project-open.js';
 import type { ProjectContext } from './composition.js';
 import {
+  formatAddRepoReport,
   formatCreateProjectReport,
+  formatMissingRepositoryLines,
+  formatOpenProjectReport,
   formatProjectsReport,
   formatShowProjectReport,
 } from './format-project.js';
@@ -36,4 +41,48 @@ export async function runProjectShowCommand(
 ): Promise<string> {
   const result = await showProject(context, projectId);
   return formatShowProjectReport(result);
+}
+
+export async function runProjectAddRepoCommand(
+  context: ProjectContext,
+  projectId: string,
+  localPath: string,
+): Promise<string> {
+  const result = await addRepository(context, projectId, localPath);
+  return formatAddRepoReport(result);
+}
+
+/** Where `runProjectOpenCommand` writes the missing-repository warnings — always `process.stdout`
+ * in production (`index.ts`), a `node:stream` `PassThrough` in tests, same injection
+ * `start-day-command.ts#StartDayIo` already uses for the identical reason: the harness itself
+ * takes over stdio right after, so these lines have to be written for real, not returned as part
+ * of a string this function's caller only prints once everything else is done. */
+export interface ProjectOpenIo {
+  readonly stdout: NodeJS.WritableStream;
+}
+
+/**
+ * `seeya project open <id> [--with <harness>]` — unlike the other four commands, `open` spawns a
+ * real interactive session (`stdio: 'inherit'`, `core/ports.ts#HarnessLauncher`'s own docstring).
+ * Any "repository X is missing" warning is written to `io.stdout` BEFORE the harness launches
+ * (V2-T28 item 4: the person needs to see it while they can still act, not after `claude` has
+ * already exited) — `openProject`'s own `onBeforeLaunch` callback is what makes that possible
+ * without this function polling the result for it after the fact. Returns an exit code, same
+ * convention `start-day-command.ts#runStartDayCommand` already uses for a command that writes
+ * progressively instead of returning one final string.
+ */
+export async function runProjectOpenCommand(
+  context: ProjectContext,
+  projectId: string,
+  harness: string | undefined,
+  io: ProjectOpenIo,
+): Promise<number> {
+  const result = await openProject(context, projectId, harness, (missing) => {
+    const lines = formatMissingRepositoryLines(projectId, missing);
+    for (const line of lines) {
+      io.stdout.write(`${line}\n`);
+    }
+  });
+  io.stdout.write(`${formatOpenProjectReport(result)}\n`);
+  return result.kind === 'opened' ? 0 : 1;
 }

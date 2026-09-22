@@ -8560,3 +8560,41 @@ flag de harness nenhuma, e gravar `"claude"` sem a pessoa ter escolhido nada ser
 afirmação inventada que a D-025 proíbe — o exemplo do rumo descreve um projeto já configurado, não
 o estado inicial. `core/types.ts#ProjectManifest.defaultHarness: string | null` já deixa esse
 "ainda não escolhido" representável no tipo.
+
+## Q-086 — V2-T28 (`add-repo`/`open`): quatro leituras mínimas onde a spec ficou silenciosa
+
+**Contexto.** `seeya project add-repo <id> <path>` (a assinatura do rumo, dois argumentos
+posicionais) não recebe um nome para o repositório — só o `projectId` e o caminho local. A spec
+também não diz o que fazer quando o caminho dado não existe, nem como decidir se um repositório
+sem remoto é "o mesmo" de uma tentativa anterior, nem se "não é um repositório git de jeito
+nenhum" deve ser tratado diferente de "é um repositório git, mas sem `origin`".
+
+**1. De onde vem o `name` de `AssociatedRepository`.** Adotado: o último segmento do caminho
+local resolvido (`path.basename`) — `add-repo ../app-api` vira `name: "app-api"`. É diretamente
+derivável do que a pessoa já digitou, não uma invenção (D-025 é sobre inventar fatos, não sobre
+escolher uma projeção óbvia de um valor já dado). O exemplo do rumo (`"name": "api"`) é só
+ilustrativo, não literal — a spec nunca pede um terceiro argumento para `add-repo`.
+
+**2. "Sem remoto" cobre "não é um repositório git" e "é, mas sem `origin`" igualmente.**
+`GitReader.readRemoteUrl` devolve `null` nos dois casos (e num terceiro: o comando `git` falhou
+por qualquer outro motivo) — `add-repo` os trata da mesma forma, `hasRemote: false`. Distinguir os
+três exigiria um segundo comando git só para essa distinção, que nenhum item da tarefa pede; D-025
+já orienta "o estado menos específico que a evidência sustenta", e os três casos sustentam
+exatamente o mesmo estado: "não há remoto para registrar agora".
+
+**3. Deduplicação de um repositório sem remoto.** "Adicionar o mesmo repositório duas vezes não
+duplica" (item 1) não diz como comparar dois repositórios sem identidade. Adotado:
+`core/associated-repository.ts#findAssociatedRepository` compara por `name` nesse caso — o único
+identificador que existe sem remoto. Efeito, se estiver errado: pequeno — dois repositórios locais
+diferentes com o mesmo nome de pasta (raro, já que `add-repo` roda por projeto) colidiriam; a
+pessoa perceberia na hora (`alreadyAssociated` reportado, ela pode checar `seeya project show`).
+
+**4. `add-repo` recusa um caminho que não existe (`pathNotFound`), não pedido explicitamente.**
+A spec não lista esse caso, mas registrar um caminho inexistente no `repository-map.json` sem
+aviso seria pior do que recusar — `open` (item 4) já precisa lidar com "caminho que sumiu depois",
+e deixar `add-repo` aceitar um caminho que nunca existiu misturaria os dois casos. Efeito pequeno e
+reversível: se a leitura for julgada excessiva, é uma checagem a menos para remover, não uma
+migração de dado.
+
+**Nenhuma das quatro muda formato em disco nem contrato de porta** — todas são decisões de
+`application/repository-association.ts`, revisáveis sem tocar `seeya.json`/`repository-map.json`.
