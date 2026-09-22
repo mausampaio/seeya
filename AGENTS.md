@@ -17,7 +17,9 @@ uma no fim do dia, gera um plano para o dia seguinte e retoma as sessões no dia
 1. `docs/DECISOES.md` — decisões travadas. **Você não altera este arquivo.**
 2. `docs/ESPECIFICACAO.md` — o comportamento a implementar. **Você não altera este arquivo.**
 3. `docs/ARQUITETURA.md` — as fronteiras. Alteração só com aprovação.
-4. `docs/PLANO-DE-ENTREGA.md` — a tarefa da vez. Você marca progresso aqui.
+4. `backlog/` — a tarefa da vez, **um arquivo por tarefa** ([Backlog.md](https://github.com/MrLesk/Backlog.md),
+   D-048). Você marca progresso na própria tarefa. `docs/PLANO-DE-ENTREGA.md` é o histórico das
+   tarefas até 2026-09-22 — consulte, não escreva nele.
 5. `docs/TESTES.md` — o que testar em cada faixa.
 
 Conflito entre este arquivo e um doc acima: o doc vence, e você registra a inconsistência em
@@ -25,10 +27,13 @@ Conflito entre este arquivo e um doc acima: o doc vence, e você registra a inco
 
 ## Como trabalhar
 
-- **Uma tarefa por vez**, na ordem do plano de entrega. Não agrupe, não adiante, não pule.
+- **Uma tarefa por vez**, na ordem do backlog e respeitando as dependências declaradas em cada
+  tarefa. Não agrupe, não adiante, não pule.
 - Antes de começar: releia a tarefa e o trecho da spec que ela implementa.
-- Ao terminar: rode `npm run verificar`, marque a tarefa como `[~]` e **pare**. Quem move para
-  `[x]` é o review.
+- Ao terminar: rode `npm run verificar`, escreva o relatório **na própria tarefa** (seção de notas
+  de implementação: `backlog task edit <id> --notes "..."`, ou editando o arquivo sem apagar os
+  marcadores `<!-- SECTION:... -->`), mova-a para `Review` (`backlog task edit <id> -s Review`) e
+  **pare**. Quem move para `Done` é o review.
 - Branch por tarefa: `tarefa/S1-T3-descoberta`. Commits pequenos, em português.
 - **Commite antes de terminar a tarefa.** Duas quedas de API já pegaram agentes com trabalho só
   no disco. Trabalho não commitado é trabalho que a próxima queda leva.

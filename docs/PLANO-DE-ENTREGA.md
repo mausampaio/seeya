@@ -1,5 +1,11 @@
 # Plano de entrega
 
+> **Arquivo histórico desde 2026-09-22 (D-048).** As tarefas abertas e as que aguardam aceite
+> migraram para `backlog/`, uma por arquivo, com a especificação inteira copiada. Este documento
+> guarda as tarefas fechadas e os relatórios até aqui — consulte, não escreva. Única exceção: a
+> V2-T33, despachada antes da migração, ainda reporta aqui; o relatório dela é movido para a tarefa
+> no backlog na mesclagem.
+
 Uma tarefa por vez, na ordem. Cada tarefa é um branch (`tarefa/S1-T3-descoberta`) e termina
 com os testes da sua faixa passando e os guards verdes.
 

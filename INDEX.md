@@ -47,19 +47,20 @@ mantenedor. O rumo da v2 está em [`docs/V2-RUMO.md`](docs/V2-RUMO.md) — é ru
 
 ## Mapa dos documentos — leia sob demanda
 
-| Arquivo                                                | O que tem                                                            | Quando ler                                         |
-| ------------------------------------------------------ | -------------------------------------------------------------------- | -------------------------------------------------- |
-| [`docs/ESTADO-ATUAL.md`](docs/ESTADO-ATUAL.md)         | Onde estamos, o que está pendente, próximo passo                     | **Sempre, logo depois deste**                      |
-| [`AGENTS.md`](AGENTS.md)                               | Contrato do agente de desenvolvimento; glossário das chaves em disco | Antes de despachar ou revisar                      |
-| [`docs/DECISOES.md`](docs/DECISOES.md)                 | D-001 a D-039                                                        | Antes de propor qualquer mudança de comportamento  |
-| [`docs/ESPECIFICACAO.md`](docs/ESPECIFICACAO.md)       | O comportamento da v1                                                | Quando a dúvida é "o que deveria acontecer"        |
-| [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md)           | Camadas e fronteiras                                                 | Quando a dúvida é "onde isto mora"                 |
-| [`docs/PLANO-DE-ENTREGA.md`](docs/PLANO-DE-ENTREGA.md) | Tarefas e relatórios dos agentes                                     | Grande: busque pela tarefa (`S4-T7`)               |
-| [`docs/QUESTOES.md`](docs/QUESTOES.md)                 | Q-001 a Q-063                                                        | Enorme: busque pelo número                         |
-| [`docs/TESTES.md`](docs/TESTES.md)                     | O que testar, e métodos de diagnóstico                               | Portão vermelho sem defeito, custo real de chamada |
-| [`docs/FLUXO-DE-AGENTES.md`](docs/FLUXO-DE-AGENTES.md) | Como despachar e revisar                                             | Antes do primeiro despacho                         |
-| [`docs/spikes/`](docs/spikes/)                         | Medições que embasam decisões                                        | Quando uma decisão cita um spike                   |
-| [`docs/V2-RUMO.md`](docs/V2-RUMO.md)                   | A direção da v2                                                      | Quando o assunto for v2                            |
+| Arquivo                                                | O que tem                                                                                   | Quando ler                                          |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| [`docs/ESTADO-ATUAL.md`](docs/ESTADO-ATUAL.md)         | Onde estamos, o que está pendente, próximo passo                                            | **Sempre, logo depois deste**                       |
+| [`AGENTS.md`](AGENTS.md)                               | Contrato do agente de desenvolvimento; glossário das chaves em disco                        | Antes de despachar ou revisar                       |
+| [`docs/DECISOES.md`](docs/DECISOES.md)                 | D-001 a D-039                                                                               | Antes de propor qualquer mudança de comportamento   |
+| [`docs/ESPECIFICACAO.md`](docs/ESPECIFICACAO.md)       | O comportamento da v1                                                                       | Quando a dúvida é "o que deveria acontecer"         |
+| [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md)           | Camadas e fronteiras                                                                        | Quando a dúvida é "onde isto mora"                  |
+| [`backlog/`](backlog/)                                 | Tarefas abertas, uma por arquivo (Backlog.md, D-048) — `backlog board` ou `backlog browser` | Status, marco, dependências no topo de cada arquivo |
+| [`docs/PLANO-DE-ENTREGA.md`](docs/PLANO-DE-ENTREGA.md) | Histórico das tarefas e relatórios até 2026-09-22 (congelado)                               | Grande: busque pela tarefa (`S4-T7`)                |
+| [`docs/QUESTOES.md`](docs/QUESTOES.md)                 | Q-001 a Q-063                                                                               | Enorme: busque pelo número                          |
+| [`docs/TESTES.md`](docs/TESTES.md)                     | O que testar, e métodos de diagnóstico                                                      | Portão vermelho sem defeito, custo real de chamada  |
+| [`docs/FLUXO-DE-AGENTES.md`](docs/FLUXO-DE-AGENTES.md) | Como despachar e revisar                                                                    | Antes do primeiro despacho                          |
+| [`docs/spikes/`](docs/spikes/)                         | Medições que embasam decisões                                                               | Quando uma decisão cita um spike                    |
+| [`docs/V2-RUMO.md`](docs/V2-RUMO.md)                   | A direção da v2                                                                             | Quando o assunto for v2                             |
 
 ## Mantenha isto vivo
 

@@ -1653,3 +1653,33 @@ novo. Harness sem cópia medida não adota até haver uma forma que não toque a
 **O que não muda:** a D-045 (quem é dono do daemon) e a separação entre `~/.seeya/` e o espaço de
 trabalho (V2-T27).
 
+---
+
+## D-048 — As tarefas saem do plano em Markdown único e vão para o Backlog.md
+
+**Decisão do mantenedor, em 2026-09-22.** O `docs/PLANO-DE-ENTREGA.md` passou de oito mil linhas,
+com especificação e relatório de cada tarefa no mesmo arquivo, e deixou de ser lido: *"hoje eu nem
+leio mais aquele arquivo"*. O que ele pediu: algo aberto e simples, com bloqueio entre tarefas e
+agrupamento por épico — sem expor uma lista de issues num repositório público e sem servidor.
+
+**A escolha: [Backlog.md](https://github.com/MrLesk/Backlog.md)**, licença MIT, local, sem conta
+nem telemetria. Cada tarefa é um arquivo Markdown em `backlog/tasks/`, com status, marco,
+dependências, tipo e prioridade no cabeçalho — versionado com o código, legível pelos agentes como o
+plano era, e navegável num quadro (`backlog board` no terminal, `backlog browser` no navegador).
+Testada pelo PO e pelo mantenedor antes de adotar, com tarefas reais da fila.
+
+**Como fica:**
+- **Marcos** fazem o papel de épico: Projetos, Interface, Daemon, Instalador, Fronteira da v1.
+- **Status**: `To Do` → `In Progress` → `Review` (entregue, aguardando o aceite do mantenedor —
+  o antigo `[~]`) → `Done`. Quem move para `Done` é o review.
+- **O nome da tarefa continua `V2-T<n>`** no título, porque é por ele que código, decisões e
+  documentos a citam. O identificador interno do Backlog.md (`TASK-<n>`) é só dele.
+- **Nada se perde na migração:** as tarefas abertas e as em aceite foram copiadas com a
+  especificação inteira; as fechadas ficam no `docs/PLANO-DE-ENTREGA.md`, congelado como histórico.
+- **A ferramenta é instalada na máquina, não como dependência do projeto** — o `package.json` não
+  muda. Ela é configurada para nunca commitar sozinha nem ler outras branches: quem commita segue
+  sendo quem já commitava.
+
+**O que não muda:** `docs/DECISOES.md` continua sendo o registro das decisões (o Backlog.md tem
+pasta própria para isso, mas o código inteiro cita `D-0XX` a partir daqui).
+
