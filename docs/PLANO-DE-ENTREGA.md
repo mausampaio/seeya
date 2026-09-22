@@ -8191,6 +8191,14 @@ trabalho nasce como repositório git local, e o remoto é assunto próprio.
       dois jeitos vira dois — a normalização conservadora que a spec pediu. Fica em `[~]` até o
       aceite do mantenedor.
 
+      **Regressão pega pela CI, corrigida pelo PO no mesmo dia:** a CI falhou no Linux e no macOS,
+      passando no Windows. Os testes usavam `path.join('C:', ...)` como caminho de exemplo — absoluto
+      só no Windows; nos outros dois sistemas ele é relativo, e o código sob teste (que resolve o
+      caminho recebido) o transformava em `<cwd>/C:/...`, errando toda consulta. **Os dois portões —
+      o do agente e o do PO — rodam no Windows**, então só a CI podia pegar. Corrigido nos três
+      arquivos de teste com um caminho absoluto em qualquer sistema e um comentário explicando por
+      que não voltar ao anterior.
+
 - [ ] **V2-T31 — Correção: "Start daemon" responde antes de o daemon existir.** Especificada pelo
       PO em 2026-09-21 a partir do aceite da V2-T21 pelo mantenedor, no mesmo dia. Pequena, e com
       a causa localizada.
