@@ -8598,3 +8598,39 @@ migração de dado.
 
 **Nenhuma das quatro muda formato em disco nem contrato de porta** — todas são decisões de
 `application/repository-association.ts`, revisáveis sem tocar `seeya.json`/`repository-map.json`.
+
+## Q-087 — V2-T33 (fundação da D-047, parte 1): de onde vem "o identificador da sessão" quando a
+spec só diz que ele existe
+
+**Contexto.** D-047 item 1 diz que o lock do projeto "guarda a identidade do processo da sessão"
+(pid + `procStart`) e um identificador da sessão; item 4 diz que "todo commit diz de quem é e de
+qual projeto". Nenhum dos dois diz **de onde** vem esse identificador — a spec nunca nomeia
+`CLAUDE_CODE_SESSION_ID` nem qualquer outra fonte concreta.
+
+**1. Adotado: `process.env.CLAUDE_CODE_SESSION_ID`, lido uma vez em
+`packages/cli/src/composition.ts#readCurrentSessionId`.** É a mesma variável que D-017 já lista
+(`adapters/generation/env.ts#INHERITED_SESSION_VARS`) para *remover* do ambiente de um `claude`
+spawnado — aqui ela é *lida*, não removida, porque desta vez quem precisa saber "qual sessão sou
+eu" é o próprio `seeya`, não um processo filho. Quando `seeya project open`/`create`/`add-repo`
+roda dentro do shell de uma sessão real do Claude Code, a variável está lá; rodando de um terminal
+comum, não está — e o valor vira `undefined` (D-025), nunca uma sessão inventada.
+
+**2. O trailer `Seeya-Session-Id` precisa de um valor mesmo quando `sessionId` é `undefined`**
+(D-047 item 4 não abre exceção — "todo commit"). Adotado: a string literal `unknown`
+(`core/project-commit.ts#UNKNOWN_SESSION_TRAILER_VALUE`) — honesto ("não sei"), nunca um id
+forjado. Efeito se a fonte estiver errada: pequeno e reversível — os commits feitos fora de uma
+sessão real do Claude Code (rodando `seeya` num terminal comum) ficam com `unknown` em vez de um
+identificador de verdade; nada em disco muda de formato para corrigir isso depois.
+
+**3. Qual processo/pid o lock rastreia para vivacidade.** D-047 item 2 fala em "a identidade do
+processo da sessão", mas `seeya project open` é uma invocação síncrona: o processo do `seeya`
+bloqueia (`stdio: 'inherit'`) pelo tempo inteiro que o harness interativo roda, e só retorna quando
+a pessoa sai dele. Adotado: o pid rastreado é o do PRÓPRIO processo `seeya project open`
+(`process.pid`, capturado em `composition.ts#buildProjectOpenDeps`), não um pid do `claude`
+filho nem um pid "da sessão" abstrato — sua vivacidade é exatamente a vivacidade do lock (morre
+com ele). Se um dia `open` deixar de bloquear (por exemplo, abrir o harness destacado), este
+mapeamento tem de ser revisto.
+
+**Nenhuma das três muda o formato do `.seeya-lock`/dos trailers em si** (já fixados no glossário do
+`AGENTS.md` antes do código, como a spec pediu) — são decisões sobre a FONTE de um valor que os dois
+já esperavam receber.
