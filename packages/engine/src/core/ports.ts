@@ -1095,7 +1095,16 @@ export interface WorkspaceRepository {
    * caller re-running the same operation idempotently (nothing changed) must not grow the
    * workspace's history with a commit that carries no diff.
    */
-  commitAll(root: string, message: string): Promise<void>;
+  /**
+   * V2-T33: `projectId`, added so this method can scope `git add` to just that project's own
+   * directory (plus `.gitignore`, reasserted right before — see the adapter's own comment) instead
+   * of `git add -A` across the whole workspace (D-047 item 3's own bug fix: mixed-in pending
+   * changes from a second project used to ride along on whichever project committed first, which
+   * made reverting one project's commits also undo the other's). `message` arrives fully built —
+   * `core/project-commit.ts#buildProjectCommitMessage` already folded in both D-047 item 4
+   * trailers — so this method's only job is to run git, never to assemble trailer text itself.
+   */
+  commitAll(root: string, projectId: string, message: string): Promise<void>;
 
   /**
    * D-022's "both sides", for the workspace's own collection of projects: every immediate
@@ -1147,4 +1156,42 @@ export type HarnessOpenResult =
  */
 export interface HarnessLauncher {
   open(cwd: string, addDirs: readonly string[]): Promise<HarnessOpenResult>;
+}
+
+// Own block at the end of the file on purpose (V2-T33), same pattern `HarnessLauncher`/
+// `AppInstallation` above already established: a new interface, appended rather than inserted
+// mid-file, to reduce merge collisions.
+import type { ProjectLockInfo } from './project-lock.js';
+
+/**
+ * D-047 item 1: reads/writes/clears `.seeya-lock`, the project lock — a file INSIDE
+ * `root/projectId` (never `~/.seeya/`, never committed, `AGENTS.md`'s own glossary entry).
+ * Implemented by `adapters/workspace/project-lock.ts#FsProjectLock`, atomically
+ * (`adapters/storage/atomic-write.ts#writeFileAtomic`, reused).
+ *
+ * **Dumb I/O only — the accept/refuse decision is NOT this port's job.**
+ * `core/project-lock.ts#decideProjectLockAcquisition` is what turns `read()`'s result plus a
+ * separate `ProcessControl.isAlive` call into that decision (same split `Storage.readDaemonLock` +
+ * `core/daemon-lock.ts#decideLockAcquisition` already draw for the daemon's own lock);
+ * `application/project-lock.ts` is where the two meet.
+ *
+ * Deliberately its own port, not three more methods on `WorkspaceRepository`: that port's whole
+ * contract is about the workspace's COMMITTED content (`commitAll`'s own docstring); the project
+ * lock is operational state that must never reach a commit at all, and giving it a separate port
+ * makes "this never touches git" a fact about the type, not just a comment on three of
+ * `WorkspaceRepository`'s methods.
+ */
+export interface ProjectLock {
+  /** `null` when no lock has ever been taken for this project (D-025) — not an error. */
+  read(root: string, projectId: string): Promise<ProjectLockInfo | null>;
+  /** Unconditionally overwrites `.seeya-lock` with `lock` — called once, right after
+   * `core/project-lock.ts#decideProjectLockAcquisition` returns `'acquire'`
+   * (`application/project-lock.ts#acquireProjectLock`). Not a create-if-absent primitive; the
+   * accept/refuse decision already happened by the time this runs, same contract
+   * `Storage.writeDaemonLock` already documents for itself. */
+  write(root: string, projectId: string, lock: ProjectLockInfo): Promise<void>;
+  /** Removes `.seeya-lock`, tolerating it already being absent (D-025: releasing a lock that was
+   * never taken, or was already released, is not an error) — called on `seeya project open`'s own
+   * clean exit, after the harness process closed. */
+  clear(root: string, projectId: string): Promise<void>;
 }

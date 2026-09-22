@@ -8,12 +8,14 @@
  * `tests/integration/process/liveness.test.ts` gives `adapters/process` on its own.
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import {
   buildCliContext,
   buildConfigContext,
   buildEndDayContext,
+  buildProjectContext,
+  buildProjectOpenDeps,
   buildSnoozeContext,
   buildStartDayContext,
   resolveCliHome,
@@ -276,5 +278,75 @@ describe('buildConfigContext', () => {
       relevanceHours: 6,
     });
     expect((await context.storage.readConfig()).relevanceHours).toBe(6);
+  });
+});
+
+/**
+ * `buildProjectContext` (V2-T27/V2-T28/V2-T33): proves the V2-T33 wiring specifically —
+ * `FsProjectLock` round-trips through the real filesystem, and `sessionId` really is
+ * `process.env.CLAUDE_CODE_SESSION_ID`, read only here (`readCurrentSessionId`'s own docstring).
+ * Everything else this function wires (`FsWorkspaceRepository`/`GitAdapter`/etc.) already has its
+ * own dedicated integration coverage (`tests/integration/workspace/fs-workspace-repository.test.ts`
+ * and friends) — this is only about the composition itself.
+ */
+describe('buildProjectContext', () => {
+  const ENV_VAR = 'CLAUDE_CODE_SESSION_ID';
+  const originalEnvValue = process.env[ENV_VAR];
+
+  afterEach(() => {
+    if (originalEnvValue === undefined) {
+      delete process.env[ENV_VAR];
+    } else {
+      process.env[ENV_VAR] = originalEnvValue;
+    }
+  });
+
+  it('sessionId is undefined outside a Claude Code session (D-025) and the real value when one is set', async () => {
+    fixture = await createDiscoveryFixture();
+    delete process.env[ENV_VAR];
+    expect(buildProjectContext(fixture.root).sessionId).toBeUndefined();
+
+    process.env[ENV_VAR] = 'real-session-id';
+    expect(buildProjectContext(fixture.root).sessionId).toBe('real-session-id');
+  });
+
+  it('projectLock is a real FsProjectLock — a write really lands on disk and reads back', async () => {
+    fixture = await createDiscoveryFixture();
+    const context = buildProjectContext(fixture.root);
+    const workspaceRoot = path.join(fixture.seeyaHome, 'workspace');
+    // The project directory doesn't exist yet on a fresh fixture — `writeProjectSkeleton` would
+    // normally create it before any lock is ever taken for a real project; this test only cares
+    // about the lock file itself, so it creates the bare directory directly.
+    await mkdir(path.join(workspaceRoot, 'auth-hardening'), { recursive: true });
+    const lockInfo = {
+      sessionId: undefined,
+      pid: process.pid,
+      procStart: undefined,
+      acquiredAt: new Date('2026-09-22T10:00:00.000Z'),
+    };
+    await context.projectLock.write(workspaceRoot, 'auth-hardening', lockInfo);
+    expect(await context.projectLock.read(workspaceRoot, 'auth-hardening')).toEqual(lockInfo);
+  });
+});
+
+/**
+ * `buildProjectOpenDeps` (V2-T33): the ONE composition function that pays for a real `procStart`
+ * capture (S4-T3b's own `powershell.exe` cost on Windows) — proven here, not in
+ * `tests/unit/cli/project-command.test.ts`, which deliberately never touches this function at all
+ * (that file's own `buildOpenDeps` docstring).
+ */
+describe('buildProjectOpenDeps', () => {
+  it("captures this process's own real pid/procStart, spreading the rest of the context through unchanged", async () => {
+    fixture = await createDiscoveryFixture();
+    const context = buildProjectContext(fixture.root);
+
+    const deps = await buildProjectOpenDeps(context);
+
+    expect(deps.pid).toBe(process.pid);
+    expect(deps.seeyaHome).toBe(context.seeyaHome);
+    expect(deps.workspace).toBe(context.workspace);
+    // `procStart` capture is best-effort (D-025): either a real captured value, or `undefined` if
+    // this platform's capture strategy genuinely failed — never anything else.
+    expect(deps.procStart === undefined || typeof deps.procStart === 'string').toBe(true);
   });
 });

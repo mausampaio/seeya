@@ -7,18 +7,34 @@
  * on its own.
  */
 import path from 'node:path';
-import type { RejectedDiscoveryRecord, Storage, WorkspaceRepository } from '../core/ports.js';
+import type {
+  ProcessControl,
+  ProjectLock,
+  RejectedDiscoveryRecord,
+  Storage,
+  WorkspaceRepository,
+} from '../core/ports.js';
 import type { ProjectManifest } from '../core/types.js';
 import { isValidProjectId } from '../core/project-id.js';
 import { buildProjectSkeleton } from '../core/project-skeleton.js';
+import { buildProjectCommitMessage } from '../core/project-commit.js';
+import { describeProjectLockStatus, type ProjectLockStatus } from './project-lock.js';
+
+export type { ProjectLockStatus };
 
 export interface WorkspaceCommandDeps {
   readonly storage: Storage;
   readonly workspace: WorkspaceRepository;
+  readonly projectLock: ProjectLock;
+  readonly processControl: ProcessControl;
   /** `CliHome.seeyaHome` (`packages/cli/src/composition.ts`) — only ever used to build the
    * DEFAULT workspace root (`path.join(seeyaHome, 'workspace')`) the first time this runs on a
    * device; once a root is persisted, `resolveWorkspaceRoot` never looks at this again. */
   readonly seeyaHome: string;
+  /** V2-T33: `process.env.CLAUDE_CODE_SESSION_ID`, read only at the composition root (D-047) —
+   * `undefined` when `seeya` runs outside a Claude Code session (D-025). Every commit this module
+   * makes carries it as the `Seeya-Session-Id` trailer (`core/project-commit.ts`). */
+  readonly sessionId: string | undefined;
 }
 
 /**
@@ -75,7 +91,12 @@ export async function createProject(
   }
   const skeleton = buildProjectSkeleton(projectId);
   await deps.workspace.writeProjectSkeleton(root, projectId, skeleton);
-  await deps.workspace.commitAll(root, `Create project ${projectId}`);
+  const message = buildProjectCommitMessage(
+    `Create project ${projectId}`,
+    projectId,
+    deps.sessionId,
+  );
+  await deps.workspace.commitAll(root, projectId, message);
   return { kind: 'created', projectId, root: path.join(root, projectId) };
 }
 
@@ -98,16 +119,22 @@ export async function listProjects(deps: WorkspaceCommandDeps): Promise<ListProj
  * `ProjectManifest | null` that would collapse "bad id" and "no such project" into the same
  * `null`. */
 export type ShowProjectResult =
-  | { readonly kind: 'found'; readonly manifest: ProjectManifest; readonly root: string }
+  | {
+      readonly kind: 'found';
+      readonly manifest: ProjectManifest;
+      readonly root: string;
+      /** D-047 item 5: "passa a dizer se o projeto está com lock, de quem e desde quando." */
+      readonly lockStatus: ProjectLockStatus;
+    }
   | { readonly kind: 'notFound'; readonly projectId: string }
   | { readonly kind: 'invalidId'; readonly projectId: string };
 
 /**
- * `seeya project show <id>` (item 3). A malformed `seeya.json` is deliberately NOT one of
- * `ShowProjectResult`'s cases — `WorkspaceRepository.readProjectManifest`'s own docstring says
- * this single, explicit lookup throws on that (unlike `listProjects`'s D-022 collection
- * tolerance), and this function lets that propagate rather than inventing a fourth, silent case
- * for it.
+ * `seeya project show <id>` (item 3, lock status added V2-T33 item 5). A malformed `seeya.json` is
+ * deliberately NOT one of `ShowProjectResult`'s cases — `WorkspaceRepository.readProjectManifest`'s
+ * own docstring says this single, explicit lookup throws on that (unlike `listProjects`'s D-022
+ * collection tolerance), and this function lets that propagate rather than inventing a fourth,
+ * silent case for it.
  */
 export async function showProject(
   deps: WorkspaceCommandDeps,
@@ -121,5 +148,6 @@ export async function showProject(
   if (manifest === null) {
     return { kind: 'notFound', projectId };
   }
-  return { kind: 'found', manifest, root: path.join(root, projectId) };
+  const lockStatus = await describeProjectLockStatus(deps, root, projectId);
+  return { kind: 'found', manifest, root: path.join(root, projectId), lockStatus };
 }

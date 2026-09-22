@@ -11,6 +11,7 @@ import { isValidProjectId } from '../core/project-id.js';
 import { normalizeRepositoryIdentity } from '../core/repository-identity.js';
 import { findAssociatedRepository } from '../core/associated-repository.js';
 import { upsertRepositoryMapEntry } from '../core/repository-map.js';
+import { buildProjectCommitMessage } from '../core/project-commit.js';
 import { resolveWorkspaceRoot } from './workspace.js';
 
 export interface AddRepositoryDeps {
@@ -19,6 +20,9 @@ export interface AddRepositoryDeps {
   readonly gitReader: GitReader;
   readonly directoryExistence: DirectoryExistence;
   readonly seeyaHome: string;
+  /** V2-T33: same `CLAUDE_CODE_SESSION_ID` source as `application/workspace.ts
+   * #WorkspaceCommandDeps.sessionId` — see that field's own docstring. */
+  readonly sessionId: string | undefined;
 }
 
 /** D-024: five outcomes worth telling apart, each carrying exactly what its own case needs. */
@@ -65,7 +69,12 @@ async function persistNewRepository(
     repositories: [...manifest.repositories, repository],
   };
   await deps.workspace.writeProjectManifest(root, projectId, updatedManifest);
-  await deps.workspace.commitAll(root, `Add repository ${repository.name} to project ${projectId}`);
+  const message = buildProjectCommitMessage(
+    `Add repository ${repository.name} to project ${projectId}`,
+    projectId,
+    deps.sessionId,
+  );
+  await deps.workspace.commitAll(root, projectId, message);
 
   const map = await deps.storage.readRepositoryMap();
   const mapEntry =

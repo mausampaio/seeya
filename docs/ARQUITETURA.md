@@ -171,17 +171,25 @@ interface AppInstallation { // V2-T13, adapters/installation/ (D-045 item 2)
 
 interface WorkspaceRepository { // V2-T27/V2-T28, adapters/workspace/
   isInitialized(root: string): Promise<boolean>;
-  initialize(root: string): Promise<void>; // git init
+  initialize(root: string): Promise<void>; // git init + .gitignore com o padrão do lock do projeto
   projectExists(root: string, projectId: string): Promise<boolean>;
   writeProjectSkeleton(root: string, projectId: string, skeleton: ProjectSkeleton): Promise<void>;
   writeProjectManifest(root: string, projectId: string, manifest: ProjectManifest): Promise<void>; // V2-T28: só seeya.json
-  commitAll(root: string, message: string): Promise<void>; // git add -A + commit; no-op sem diff
+  commitAll(root: string, projectId: string, message: string): Promise<void>; // V2-T33: git add <projectId> .gitignore, nunca -A; message já traz os trailers (core/project-commit.ts); no-op sem diff
   listProjects(root: string): Promise<{ manifests: ProjectManifest[]; rejected: RejectedDiscoveryRecord[] }>;
   readProjectManifest(root: string, projectId: string): Promise<ProjectManifest | null>;
 }
 
 interface HarnessLauncher { // V2-T28, adapters/harness/
   open(cwd: string, addDirs: readonly string[]): Promise<HarnessOpenResult>; // stdio inherit, nunca headless
+}
+
+interface ProjectLock { // V2-T33, adapters/workspace/ (D-047 item 1) — arquivo DENTRO do projeto, nunca commitado
+  read(root: string, projectId: string): Promise<ProjectLockInfo | null>;
+  write(root: string, projectId: string, lock: ProjectLockInfo): Promise<void>;
+  clear(root: string, projectId: string): Promise<void>;
+  // vivacidade não é desta porta: core/project-lock.ts#decideProjectLockAcquisition decide,
+  // sobre ProcessControl.isAlive(lock.pid, lock.procStart) — a MESMA checagem do daemon.lock
 }
 ```
 
@@ -323,6 +331,16 @@ sessão (`git/`, só leitura) e distinto de `~/.seeya/` (`storage/`). Um adaptad
 - **`writeProjectManifest` (V2-T28)** reescreve só o `seeya.json` de um projeto que já existe —
   extrai o mesmo trecho de serialização que `writeProjectSkeleton` já usava para esse arquivo, sem
   tocar nos outros arquivos do esqueleto nem recriar diretórios.
+- **`commitAll` toca um projeto só (V2-T33, D-047 item 3's bug fix)**: `git add <projectId>
+  .gitignore` no lugar de `git add -A` — mudança pendente num segundo projeto nunca mais entra no
+  commit do primeiro. `.gitignore` é reafirmado (criado ou atualizado, nunca substituído) antes de
+  todo `git add`, para que `.seeya-lock` nunca seja staged por acidente num espaço de trabalho
+  inicializado antes desta tarefa.
+- **`ProjectLock` (V2-T33, D-047 item 1) é a mesma classe de adapter, `FsProjectLock`**, num
+  arquivo próprio (`adapters/workspace/project-lock.ts`) — lê/escreve/limpa `<root>/<projectId>/
+  .seeya-lock`, sempre por `writeFileAtomic`. A decisão de tomar/recusar (vivacidade pid +
+  `procStart`) é pura, em `core/project-lock.ts`, e reusa a MESMA forma de
+  `core/daemon-lock.ts#decideLockAcquisition` — nada de checagem de vivacidade nova.
 
 ### `harness/` (V2-T28)
 

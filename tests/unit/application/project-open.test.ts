@@ -1,18 +1,26 @@
 /**
- * `openProject` (V2-T28, `application/project-open.ts`) — against the same named doubles
- * `repository-association.test.ts` uses, plus `FakeHarnessLauncher`.
+ * `openProject` (V2-T28, `application/project-open.ts`; lock take/release V2-T33, D-047 items
+ * 1/4) — against the same named doubles `repository-association.test.ts` uses, plus
+ * `FakeHarnessLauncher`, `FakeProjectLock` and `ControllableProcessControl`.
  */
 import path from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { openProject } from '@seeya-ai/engine/application/project-open.js';
+import type { ProjectOpenDeps } from '@seeya-ai/engine/application/project-open.js';
 import { addRepository } from '@seeya-ai/engine/application/repository-association.js';
 import { createProject } from '@seeya-ai/engine/application/workspace.js';
-import type { MissingRepositoryRecord } from '@seeya-ai/engine/application/project-open.js';
+import type {
+  MissingRepositoryRecord,
+  ProjectOpenLockOutcome,
+} from '@seeya-ai/engine/application/project-open.js';
 import {
+  ControllableProcessControl,
   DEFAULT_TEST_CONFIG,
+  FakeClock,
   FakeDirectoryExistence,
   FakeGitReaderWithRemote,
   FakeHarnessLauncher,
+  FakeProjectLock,
   FakeWorkspaceRepository,
   InMemoryDeviceStorage,
 } from './_fakes.js';
@@ -24,6 +32,36 @@ const SEEYA_HOME = path.resolve(path.sep, 'seeya-home-fixture');
 const WORKSPACE_ROOT = path.join(SEEYA_HOME, 'workspace');
 const PROJECT_DIR = path.join(WORKSPACE_ROOT, 'auth-hardening');
 const REPO_PATH = path.resolve(path.sep, 'code', 'app-api');
+const NOW = new Date('2026-09-22T10:00:00.000Z');
+const THIS_PID = 4242;
+
+/** Every `openProject` call in this file takes the SAME shape — one place threading V2-T33's own
+ * `projectLock`/`processControl`/`clock`/`sessionId`/`pid`/`procStart` through, same idea
+ * `application/workspace.test.ts#buildDeps` already established. `processLiveness` defaults to
+ * "nothing is alive" (no prior lock holder to collide with); a test proving the `readOnly`/stale
+ * paths passes its own. */
+function buildOpenDeps(
+  storage: InMemoryDeviceStorage,
+  workspace: FakeWorkspaceRepository,
+  overrides: Partial<ProjectOpenDeps> = {},
+): ProjectOpenDeps {
+  return {
+    storage,
+    workspace,
+    directoryExistence: new FakeDirectoryExistence(),
+    harnessLauncher: new FakeHarnessLauncher(),
+    projectLock: new FakeProjectLock(),
+    processControl: new ControllableProcessControl(),
+    clock: new FakeClock(NOW),
+    seeyaHome: SEEYA_HOME,
+    sessionId: undefined,
+    pid: THIS_PID,
+    procStart: undefined,
+    ...overrides,
+  };
+}
+
+const ACQUIRED_FREE: ProjectOpenLockOutcome = { kind: 'acquired', reclaimedStale: null };
 
 describe('openProject', () => {
   let storage: InMemoryDeviceStorage;
@@ -32,19 +70,23 @@ describe('openProject', () => {
   beforeEach(async () => {
     storage = new InMemoryDeviceStorage(DEFAULT_TEST_CONFIG);
     workspace = new FakeWorkspaceRepository();
-    await createProject({ storage, workspace, seeyaHome: SEEYA_HOME }, 'auth-hardening');
+    await createProject(
+      {
+        storage,
+        workspace,
+        projectLock: new FakeProjectLock(),
+        processControl: new ControllableProcessControl(),
+        seeyaHome: SEEYA_HOME,
+        sessionId: undefined,
+      },
+      'auth-hardening',
+    );
   });
 
   it('refuses an invalid project id without touching any port', async () => {
     const harnessLauncher = new FakeHarnessLauncher();
     const result = await openProject(
-      {
-        storage,
-        workspace,
-        directoryExistence: new FakeDirectoryExistence(),
-        harnessLauncher,
-        seeyaHome: SEEYA_HOME,
-      },
+      buildOpenDeps(storage, workspace, { harnessLauncher }),
       'Not Valid',
     );
     expect(result).toEqual({ kind: 'invalidId', projectId: 'Not Valid' });
@@ -52,58 +94,24 @@ describe('openProject', () => {
   });
 
   it('reports notFound for an id never created', async () => {
-    const result = await openProject(
-      {
-        storage,
-        workspace,
-        directoryExistence: new FakeDirectoryExistence(),
-        harnessLauncher: new FakeHarnessLauncher(),
-        seeyaHome: SEEYA_HOME,
-      },
-      'ghost',
-    );
+    const result = await openProject(buildOpenDeps(storage, workspace), 'ghost');
     expect(result).toEqual({ kind: 'notFound', projectId: 'ghost' });
   });
 
   it('reports noHarnessChosen when the project has no defaultHarness and none is given', async () => {
-    const result = await openProject(
-      {
-        storage,
-        workspace,
-        directoryExistence: new FakeDirectoryExistence(),
-        harnessLauncher: new FakeHarnessLauncher(),
-        seeyaHome: SEEYA_HOME,
-      },
-      'auth-hardening',
-    );
+    const result = await openProject(buildOpenDeps(storage, workspace), 'auth-hardening');
     expect(result).toEqual({ kind: 'noHarnessChosen', projectId: 'auth-hardening' });
   });
 
   it('reports unsupportedHarness for anything other than claude (item 5)', async () => {
-    const result = await openProject(
-      {
-        storage,
-        workspace,
-        directoryExistence: new FakeDirectoryExistence(),
-        harnessLauncher: new FakeHarnessLauncher(),
-        seeyaHome: SEEYA_HOME,
-      },
-      'auth-hardening',
-      'codex',
-    );
+    const result = await openProject(buildOpenDeps(storage, workspace), 'auth-hardening', 'codex');
     expect(result).toEqual({ kind: 'unsupportedHarness', harness: 'codex' });
   });
 
   it('opens claude with the project directory as cwd and no --add-dir when there are no repositories', async () => {
     const harnessLauncher = new FakeHarnessLauncher();
     const result = await openProject(
-      {
-        storage,
-        workspace,
-        directoryExistence: new FakeDirectoryExistence(),
-        harnessLauncher,
-        seeyaHome: SEEYA_HOME,
-      },
+      buildOpenDeps(storage, workspace, { harnessLauncher }),
       'auth-hardening',
       'claude',
     );
@@ -114,6 +122,7 @@ describe('openProject', () => {
       exitCode: 0,
       addedDirs: [],
       missing: [],
+      lock: ACQUIRED_FREE,
     });
     expect(harnessLauncher.calls).toEqual([{ cwd: PROJECT_DIR, addDirs: [] }]);
   });
@@ -124,14 +133,21 @@ describe('openProject', () => {
     );
     const directoryExistence = new FakeDirectoryExistence(new Set([REPO_PATH]));
     await addRepository(
-      { storage, workspace, gitReader, directoryExistence, seeyaHome: SEEYA_HOME },
+      {
+        storage,
+        workspace,
+        gitReader,
+        directoryExistence,
+        seeyaHome: SEEYA_HOME,
+        sessionId: undefined,
+      },
       'auth-hardening',
       REPO_PATH,
     );
 
     const harnessLauncher = new FakeHarnessLauncher();
     const result = await openProject(
-      { storage, workspace, directoryExistence, harnessLauncher, seeyaHome: SEEYA_HOME },
+      buildOpenDeps(storage, workspace, { directoryExistence, harnessLauncher }),
       'auth-hardening',
       'claude',
     );
@@ -153,16 +169,10 @@ describe('openProject', () => {
     const harnessLauncher = new FakeHarnessLauncher();
     let observedBeforeLaunch: readonly MissingRepositoryRecord[] | undefined;
     const result = await openProject(
-      {
-        storage,
-        workspace,
-        directoryExistence: new FakeDirectoryExistence(),
-        harnessLauncher,
-        seeyaHome: SEEYA_HOME,
-      },
+      buildOpenDeps(storage, workspace, { harnessLauncher }),
       'auth-hardening',
       'claude',
-      (missing) => {
+      ({ missing }) => {
         observedBeforeLaunch = missing;
       },
     );
@@ -189,6 +199,7 @@ describe('openProject', () => {
         gitReader,
         directoryExistence: new FakeDirectoryExistence(new Set([REPO_PATH])),
         seeyaHome: SEEYA_HOME,
+        sessionId: undefined,
       },
       'auth-hardening',
       REPO_PATH,
@@ -198,13 +209,7 @@ describe('openProject', () => {
     // `FakeDirectoryExistence` for `open` reproduces exactly that.
     const harnessLauncher = new FakeHarnessLauncher();
     const result = await openProject(
-      {
-        storage,
-        workspace,
-        directoryExistence: new FakeDirectoryExistence(),
-        harnessLauncher,
-        seeyaHome: SEEYA_HOME,
-      },
+      buildOpenDeps(storage, workspace, { harnessLauncher }),
       'auth-hardening',
       'claude',
     );
@@ -217,13 +222,7 @@ describe('openProject', () => {
   it('reports failedToStart when the harness never actually spawned', async () => {
     const harnessLauncher = new FakeHarnessLauncher({ kind: 'failedToStart' });
     const result = await openProject(
-      {
-        storage,
-        workspace,
-        directoryExistence: new FakeDirectoryExistence(),
-        harnessLauncher,
-        seeyaHome: SEEYA_HOME,
-      },
+      buildOpenDeps(storage, workspace, { harnessLauncher }),
       'auth-hardening',
       'claude',
     );
@@ -237,17 +236,121 @@ describe('openProject', () => {
   it('--with overrides defaultHarness for this call only — never persisted', async () => {
     const harnessLauncher = new FakeHarnessLauncher();
     await openProject(
-      {
-        storage,
-        workspace,
-        directoryExistence: new FakeDirectoryExistence(),
-        harnessLauncher,
-        seeyaHome: SEEYA_HOME,
-      },
+      buildOpenDeps(storage, workspace, { harnessLauncher }),
       'auth-hardening',
       'claude',
     );
     const manifest = await workspace.readProjectManifest(WORKSPACE_ROOT, 'auth-hardening');
     expect(manifest?.defaultHarness).toBeNull();
+  });
+
+  describe('the project lock (V2-T33, D-047 items 1/4)', () => {
+    it('acquires a genuinely free lock, and releases it once the harness closes', async () => {
+      const projectLock = new FakeProjectLock();
+      const result = await openProject(
+        buildOpenDeps(storage, workspace, { projectLock }),
+        'auth-hardening',
+        'claude',
+      );
+      expect(result.kind).toBe('opened');
+      if (result.kind === 'opened') {
+        expect(result.lock).toEqual(ACQUIRED_FREE);
+      }
+      // Released by the time `open` returns — nothing left over for the next `show`/`open` to
+      // trip on (D-047 item 4: "libera... ao sair").
+      expect(await projectLock.read(WORKSPACE_ROOT, 'auth-hardening')).toBeNull();
+    });
+
+    it('reclaims a stale (dead-process) lock, with a warning naming who held it', async () => {
+      const projectLock = new FakeProjectLock();
+      await projectLock.write(WORKSPACE_ROOT, 'auth-hardening', {
+        sessionId: 'stale-session',
+        pid: 9999,
+        procStart: undefined,
+        acquiredAt: new Date('2026-09-01T00:00:00.000Z'),
+      });
+      // 9999 is absent from `aliveByPid` — `ControllableProcessControl` answers `false` (dead).
+      const processControl = new ControllableProcessControl();
+      let observedLock: ProjectOpenLockOutcome | undefined;
+      const result = await openProject(
+        buildOpenDeps(storage, workspace, { projectLock, processControl }),
+        'auth-hardening',
+        'claude',
+        ({ lock }) => {
+          observedLock = lock;
+        },
+      );
+      const expectedLock: ProjectOpenLockOutcome = {
+        kind: 'acquired',
+        reclaimedStale: {
+          sessionId: 'stale-session',
+          pid: 9999,
+          procStart: undefined,
+          acquiredAt: new Date('2026-09-01T00:00:00.000Z'),
+        },
+      };
+      expect(observedLock).toEqual(expectedLock);
+      if (result.kind === 'opened') {
+        expect(result.lock).toEqual(expectedLock);
+      }
+      // Reclaimed AND released — this session's own acquisition still gets cleared on exit.
+      expect(await projectLock.read(WORKSPACE_ROOT, 'auth-hardening')).toBeNull();
+    });
+
+    it('a lock held by a LIVE session opens read-only: the harness still runs, the lock file is untouched', async () => {
+      const projectLock = new FakeProjectLock();
+      await projectLock.write(WORKSPACE_ROOT, 'auth-hardening', {
+        sessionId: 'other-session',
+        pid: 555,
+        procStart: undefined,
+        acquiredAt: new Date('2026-09-20T09:00:00.000Z'),
+      });
+      const processControl = new ControllableProcessControl(new Map([[555, true]]));
+      const harnessLauncher = new FakeHarnessLauncher();
+      let observedLock: ProjectOpenLockOutcome | undefined;
+      const result = await openProject(
+        buildOpenDeps(storage, workspace, { projectLock, processControl, harnessLauncher }),
+        'auth-hardening',
+        'claude',
+        ({ lock }) => {
+          observedLock = lock;
+        },
+      );
+      const expectedLock: ProjectOpenLockOutcome = {
+        kind: 'readOnly',
+        heldBy: {
+          sessionId: 'other-session',
+          pid: 555,
+          procStart: undefined,
+          acquiredAt: new Date('2026-09-20T09:00:00.000Z'),
+        },
+      };
+      expect(observedLock).toEqual(expectedLock);
+      expect(result.kind).toBe('opened');
+      if (result.kind === 'opened') {
+        expect(result.lock).toEqual(expectedLock);
+      }
+      // `open` still ran the harness — item 4: "abre para leitura", never refuses to open at all.
+      expect(harnessLauncher.calls).toEqual([{ cwd: PROJECT_DIR, addDirs: [] }]);
+      // The OTHER session's lock is exactly as this process found it — never touched, never
+      // released by a session that never held it.
+      expect(await projectLock.read(WORKSPACE_ROOT, 'auth-hardening')).toEqual({
+        sessionId: 'other-session',
+        pid: 555,
+        procStart: undefined,
+        acquiredAt: new Date('2026-09-20T09:00:00.000Z'),
+      });
+    });
+
+    it('a failed-to-start harness still releases the lock this session acquired', async () => {
+      const projectLock = new FakeProjectLock();
+      const harnessLauncher = new FakeHarnessLauncher({ kind: 'failedToStart' });
+      await openProject(
+        buildOpenDeps(storage, workspace, { projectLock, harnessLauncher }),
+        'auth-hardening',
+        'claude',
+      );
+      expect(await projectLock.read(WORKSPACE_ROOT, 'auth-hardening')).toBeNull();
+    });
   });
 });

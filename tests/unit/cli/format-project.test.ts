@@ -4,10 +4,19 @@ import {
   formatCreateProjectReport,
   formatMissingRepositoryLines,
   formatOpenProjectReport,
+  formatProjectLockWarningLines,
   formatProjectsReport,
   formatShowProjectReport,
 } from '../../../packages/cli/src/format-project.js';
 import type { ProjectManifest } from '@seeya-ai/engine/core/types.js';
+import type { ProjectLockInfo } from '@seeya-ai/engine/core/project-lock.js';
+
+const SOME_LOCK: ProjectLockInfo = {
+  sessionId: 'abc123',
+  pid: 9999,
+  procStart: undefined,
+  acquiredAt: new Date('2026-09-20T09:00:00.000Z'),
+};
 
 const EMPTY_MANIFEST: ProjectManifest = {
   id: 'auth-hardening',
@@ -101,11 +110,82 @@ describe('formatShowProjectReport', () => {
         trackers: [{ type: 'gitlab', project: 'acme/app' }],
       },
       root: 'C:\\workspace\\auth-hardening',
+      lockStatus: { kind: 'unlocked' },
     });
     expect(text).toContain('C:\\workspace\\auth-hardening');
     expect(text).toContain('default harness: claude');
     expect(text).toContain('repositories: api');
     expect(text).toContain('trackers: gitlab:acme/app');
+    expect(text).toContain('lock: none');
+  });
+
+  it('found names who holds a live lock and since when (V2-T33, D-047 item 5)', () => {
+    const text = formatShowProjectReport({
+      kind: 'found',
+      manifest: EMPTY_MANIFEST,
+      root: 'C:\\workspace\\auth-hardening',
+      lockStatus: { kind: 'heldByLiveSession', lock: SOME_LOCK },
+    });
+    expect(text).toContain('lock: held by session abc123');
+    expect(text).toContain('pid 9999');
+    expect(text).toContain('2026-09-20T09:00:00.000Z');
+  });
+
+  it('found names a stale lock as reclaimable, not as currently held', () => {
+    const text = formatShowProjectReport({
+      kind: 'found',
+      manifest: EMPTY_MANIFEST,
+      root: 'C:\\workspace\\auth-hardening',
+      lockStatus: { kind: 'staleLock', lock: SOME_LOCK },
+    });
+    expect(text).toContain('lock: stale');
+    expect(text).toContain('reclaimable');
+    expect(text).toContain('session abc123');
+  });
+
+  it('found describes an unidentified holder (no CLAUDE_CODE_SESSION_ID) without inventing an id (D-025)', () => {
+    const text = formatShowProjectReport({
+      kind: 'found',
+      manifest: EMPTY_MANIFEST,
+      root: 'C:\\workspace\\auth-hardening',
+      lockStatus: {
+        kind: 'heldByLiveSession',
+        lock: { ...SOME_LOCK, sessionId: undefined },
+      },
+    });
+    expect(text).toContain('an unidentified session');
+    expect(text).not.toContain('undefined');
+  });
+});
+
+describe('formatProjectLockWarningLines', () => {
+  it('a genuinely free acquisition prints nothing — no lock ever existed to comment on', () => {
+    const lines = formatProjectLockWarningLines('auth-hardening', {
+      kind: 'acquired',
+      reclaimedStale: null,
+    });
+    expect(lines).toEqual([]);
+  });
+
+  it('reclaiming a stale lock names who it took it from', () => {
+    const lines = formatProjectLockWarningLines('auth-hardening', {
+      kind: 'acquired',
+      reclaimedStale: SOME_LOCK,
+    });
+    expect(lines.join('\n')).toContain('was stale');
+    expect(lines.join('\n')).toContain('session abc123');
+    expect(lines.join('\n')).toContain('reclaimed');
+  });
+
+  it('readOnly names who holds the project and warns that writes will not be recorded', () => {
+    const lines = formatProjectLockWarningLines('auth-hardening', {
+      kind: 'readOnly',
+      heldBy: SOME_LOCK,
+    });
+    const text = lines.join('\n');
+    expect(text).toContain('"auth-hardening"');
+    expect(text).toContain('locked by session abc123');
+    expect(text).toContain('reading only');
   });
 });
 
@@ -225,6 +305,7 @@ describe('formatOpenProjectReport', () => {
       exitCode: 0,
       addedDirs: ['C:\\code\\app-api'],
       missing: [],
+      lock: { kind: 'acquired', reclaimedStale: null },
     });
     expect(text).toContain('"auth-hardening"');
     expect(text).toContain('claude');

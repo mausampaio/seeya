@@ -23,6 +23,7 @@ import {
   buildDaemonContext,
   buildEndDayContext,
   buildProjectContext,
+  buildProjectOpenDeps,
   buildSnoozeContext,
   buildStartDayContext,
   resolveCliDaemonOwner,
@@ -410,7 +411,8 @@ projectCommand
   .option('--with <harness>', "Harness to open instead of the project's own default.")
   .action(async (id: string, options: { with?: string }) => {
     const context = buildProjectContext();
-    const exitCode = await runProjectOpenCommand(context, id, options.with, {
+    const deps = await buildProjectOpenDeps(context);
+    const exitCode = await runProjectOpenCommand(deps, id, options.with, {
       stdout: process.stdout,
     });
     if (exitCode !== 0) {

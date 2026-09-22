@@ -13,6 +13,7 @@ import type {
   HarnessLauncher,
   HarnessOpenResult,
   ProcessControl,
+  ProjectLock,
   RejectedDiscoveryRecord,
   SessionProvider,
   SessionResumer,
@@ -22,6 +23,7 @@ import type {
   TranscriptReadResult,
   WorkspaceRepository,
 } from '@seeya-ai/engine/core/ports.js';
+import type { ProjectLockInfo } from '@seeya-ai/engine/core/project-lock.js';
 import type {
   Config,
   DaemonOwnershipTransitionAnswer,
@@ -491,8 +493,9 @@ export class FakeWorkspaceRepository implements WorkspaceRepository {
     return Promise.resolve();
   }
 
-  commitAll(root: string, message: string): Promise<void> {
+  commitAll(root: string, projectId: string, message: string): Promise<void> {
     void root;
+    void projectId;
     this.commitMessages.push(message);
     return Promise.resolve();
   }
@@ -729,6 +732,63 @@ export class FakeProcessControl implements ProcessControl {
     return Promise.reject(
       new Error('FakeProcessControl.terminateAbruptly is not exercised by endDay'),
     );
+  }
+}
+
+/** `ProcessControl` double (V2-T33) whose `isAlive` is controllable per pid, unlike
+ * `FakeProcessControl` above (whose `isAlive` always rejects — accurate for `endDay`, which never
+ * calls it, but `application/project-lock.ts` calls it on every lock check). Does NOT replicate
+ * the real recycled-pid tie-break (`procStart` is recorded in `isAliveCalls` but ignored when
+ * answering) — that logic already has its own real-process coverage
+ * (`tests/integration/scheduler/lock.test.ts`, reused for the project lock by
+ * `tests/integration/application/project-lock.test.ts`, same technique). What this fake proves is
+ * narrower: that the calling code passes `pid`/`procStart` through at all. */
+export class ControllableProcessControl implements ProcessControl {
+  readonly isAliveCalls: Array<{ pid: number; procStart: string | undefined }> = [];
+
+  constructor(private readonly aliveByPid: ReadonlyMap<number, boolean> = new Map()) {}
+
+  isAlive(pid: number, procStart?: string): Promise<boolean> {
+    this.isAliveCalls.push({ pid, procStart });
+    return Promise.resolve(this.aliveByPid.get(pid) ?? false);
+  }
+
+  terminateGracefully(): Promise<boolean> {
+    return Promise.reject(
+      new Error('ControllableProcessControl.terminateGracefully is not exercised here'),
+    );
+  }
+
+  terminateAbruptly(): Promise<void> {
+    return Promise.reject(
+      new Error('ControllableProcessControl.terminateAbruptly is not exercised here'),
+    );
+  }
+}
+
+/** `ProjectLock` double (V2-T33, D-047 item 1) — an in-memory `.seeya-lock`, keyed by
+ * `root`+`projectId` so a test can hold locks for more than one project at once without them
+ * colliding. `FsProjectLock` is proven for real against the filesystem by
+ * `tests/integration/workspace/project-lock.test.ts`. */
+export class FakeProjectLock implements ProjectLock {
+  private readonly locks = new Map<string, ProjectLockInfo>();
+
+  private key(root: string, projectId: string): string {
+    return `${root}\u0000${projectId}`;
+  }
+
+  read(root: string, projectId: string): Promise<ProjectLockInfo | null> {
+    return Promise.resolve(this.locks.get(this.key(root, projectId)) ?? null);
+  }
+
+  write(root: string, projectId: string, lock: ProjectLockInfo): Promise<void> {
+    this.locks.set(this.key(root, projectId), lock);
+    return Promise.resolve();
+  }
+
+  clear(root: string, projectId: string): Promise<void> {
+    this.locks.delete(this.key(root, projectId));
+    return Promise.resolve();
   }
 }
 

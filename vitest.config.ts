@@ -112,6 +112,9 @@ const PROCESS_HEAVY_INTEGRATION_FILES = [
   'tests/integration/process/liveness.test.ts',
   'tests/integration/process/termination.test.ts',
   'tests/integration/scheduler/lock.test.ts',
+  // V2-T33: same real-spawned-child-process shape as scheduler/lock.test.ts above, reused for the
+  // project lock's own recycled-pid tie-break (D-047 item 2: "a mesma checagem de vivacidade").
+  'tests/integration/application/project-lock.test.ts',
   // V2-T5b: the same real-daemon-plus-real-CLI-subprocess shape as
   // tests/integration/cli/daemon-command.test.ts above, now exercised through
   // AppContext#startDaemon/#stopDaemon instead of the CLI's own runDaemonLauncher/runDaemonStop.

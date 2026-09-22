@@ -22,6 +22,9 @@ import {
   parseProjectManifestDocument,
   serializeProjectManifestDocument,
 } from './project-manifest-schema.js';
+import { PROJECT_LOCK_FILE_NAME } from './project-lock.js';
+
+export { FsProjectLock } from './project-lock.js';
 
 /** `seeya`'s own author/committer identity for every commit it makes in the workspace — never the
  * operator's real `git config user.*` (this file's own module comment; same technique
@@ -38,6 +41,37 @@ const COMMIT_IDENTITY_ENV: NodeJS.ProcessEnv = {
 
 function manifestPath(root: string, projectId: string): string {
   return path.join(root, projectId, 'seeya.json');
+}
+
+const GITIGNORE_FILE_NAME = '.gitignore';
+
+/**
+ * D-047 item 2: "o lock nunca é commitado: entra no `.gitignore` do espaço de trabalho, criado ou
+ * atualizado pelo próprio seeya." Called at the start of every `commitAll`, not only once at
+ * `initialize()` — a workspace created before this task never got the line, and `.gitignore`
+ * without a leading/trailing slash on `PROJECT_LOCK_FILE_NAME` matches that name at ANY depth
+ * (git's own pattern rule), so one line covers every project's own `.seeya-lock`, present or
+ * future. Idempotent: a `.gitignore` that already has the line is left untouched (no rewrite, no
+ * extra commit).
+ */
+async function ensureWorkspaceGitignoreIgnoresProjectLock(root: string): Promise<void> {
+  const gitignorePath = path.join(root, GITIGNORE_FILE_NAME);
+  let current: string;
+  try {
+    current = await readFile(gitignorePath, 'utf8');
+  } catch (error) {
+    if (!isEnoent(error)) {
+      throw new Error(`reading ${gitignorePath} failed: ${String(error)}`);
+    }
+    current = '';
+  }
+  const alreadyPresent = current.split('\n').some((line) => line.trim() === PROJECT_LOCK_FILE_NAME);
+  if (alreadyPresent) {
+    return;
+  }
+  const withTrailingNewline =
+    current.length === 0 || current.endsWith('\n') ? current : `${current}\n`;
+  await writeFileAtomic(gitignorePath, `${withTrailingNewline}${PROJECT_LOCK_FILE_NAME}\n`);
 }
 
 /** Shared by `writeProjectSkeleton` and `writeProjectManifest` (V2-T28) — the one place that
@@ -176,8 +210,12 @@ export class FsWorkspaceRepository implements WorkspaceRepository {
     await writeManifestFile(root, projectId, manifest);
   }
 
-  async commitAll(root: string, message: string): Promise<void> {
-    const add = await runGit(root, ['add', '-A']);
+  async commitAll(root: string, projectId: string, message: string): Promise<void> {
+    // D-047 item 3's own bug fix: `git add <projectId> .gitignore`, never `-A` — a second
+    // project's own pending change must never ride along on this commit (see this method's own
+    // regression test, "commitAll only ever stages the one project it was called for").
+    await ensureWorkspaceGitignoreIgnoresProjectLock(root);
+    const add = await runGit(root, ['add', projectId, GITIGNORE_FILE_NAME]);
     if (!add.ran || add.exitCode !== 0) {
       throw new Error(
         `git add failed in workspace at "${root}": ${add.ran ? `exit ${add.exitCode}` : add.reason}`,
