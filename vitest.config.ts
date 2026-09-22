@@ -153,6 +153,8 @@ const PROCESS_HEAVY_INTEGRATION_FILES = [
 const REAL_CHILD_PROCESS_GIT_AND_STORAGE_FILES = [
   'tests/integration/git/git-adapter.test.ts',
   'tests/integration/git/primitives.test.ts',
+  // V2-T28: `readRemoteUrl` spawns real `git` too, same load shape as the two above.
+  'tests/integration/git/remote.test.ts',
   'tests/integration/storage/atomic-write.test.ts',
   // V2-T27: `FsWorkspaceRepository`'s own real-`git` fixture (`init`/`add`/`diff`/`commit` per
   // test, several tests) is the same shape of load as `git-adapter.test.ts`/`primitives.test.ts`
