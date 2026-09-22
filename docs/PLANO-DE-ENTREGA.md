@@ -7794,6 +7794,23 @@ desbloqueia:
 - **V2-T29** — adotar uma sessão existente ao criar um projeto (D-045 item 4), depois do spike.
 - **V2-T30** — a lateral da janela agrupa as sessões por projeto.
 
+**A fila, reorganizada pelo PO em 2026-09-22 depois da D-047** (uma sessão escrevendo o projeto
+por vez, e o que precisa valer sempre garantido por código). V2-T26, V2-T27 e V2-T28 estão feitas
+e aceitas. O que falta, na ordem em que uma desbloqueia a outra:
+
+1. **V2-T33** — o lock do projeto, e os commits do seeya tocando um projeto só e dizendo de qual
+   sessão são. Sem isso nada do resto é seguro.
+2. **V2-T34** — as guardas determinísticas da D-047 item 5: ganchos de git no espaço de trabalho,
+   gancho do harness no diretório do projeto, e a auditoria.
+3. **V2-T29** — a adoção, agora pegando o lock e rodando numa cópia que vira a sessão do projeto.
+4. **V2-T32** — desfazer: remover projeto e repositório, e reverter uma adoção pelos commits da
+   sessão.
+5. **V2-T30** — a janela: lateral por projeto, `open` numa aba, adotar pela lista de sessões.
+
+Fora dessa sequência: **V2-T31** (o "Start daemon" que responde antes de o daemon existir) é
+pequena e independente, entra quando o mantenedor quiser; **V2-T19** e **V2-T24** seguem paradas
+por decisão dele.
+
 **Insumo do mantenedor, 2026-09-21 — o que a compactação apaga.** Um relato do uso real dele, que
 vira critério para a V2-T29 e para o `checkpoint`/`pause` do passo 5. Uma sessão longa, aberta na
 pasta pessoal (sem projeto por trás), conduzia um trabalho de operação de infraestrutura. Ela já
@@ -8254,6 +8271,11 @@ trabalho nasce como repositório git local, e o remoto é assunto próprio.
       permissão automática vale também para o diretório original da sessão, que pode ser a pasta
       pessoal ou um repositório de código, e não só para o projeto.
 
+      **Depende da V2-T33 e da V2-T34, e segue a D-047:** adotar é **tomar o lock do projeto**
+      (projeto com lock de outra sessão viva recusa a adoção), e os commits da adoção passam pelas
+      guardas — um projeto por commit, com o identificador da sessão. Onde esta entrada disser
+      outra coisa, vale a D-047.
+
       **Recorte:** esta tarefa é motor e CLI. Adotar pela janela (um botão na lista de sessões,
       abrindo numa aba) fica para a **V2-T30**, junto com a lateral agrupada por projeto — o mesmo
       modelo de aprovação, outra superfície.
@@ -8267,11 +8289,14 @@ trabalho nasce como repositório git local, e o remoto é assunto próprio.
          2026-09-22, a partir do receio do mantenedor: *"uma adoção incorreta, no projeto errado por
          engano... sujando aquela sessão para sempre, ou até corromper o transcript"*). A retomada
          usa `--fork-session`, que o seeya já usa na captura desde a S2-T2: o Claude Code copia o
-         transcript para uma sessão nova e **a original não recebe uma linha sequer**. O fork é
-         registrado em `~/.seeya/forks.json` (D-012) — some da descoberta e é apagado depois de
-         `forkCleanupDays` como qualquer fork do seeya, porque o que a adoção produz de valor são os
-         arquivos do projeto, não a conversa de adoção. Adoção errada, então, custa só descartar: a
-         sessão original segue intocada, pronta para ser retomada como sempre. A retomada é
+         transcript para uma sessão nova e **a original não recebe uma linha sequer**. **Corrigido pela D-047 item 6:** o
+         fork **não** é descartável quando a adoção é aceita — ele vira a sessão do projeto, porque é
+         ele que tem o histórico e sabe o que escreveu; a original fica intocada como ponto de
+         restauração e é marcada como já adotada, para não ser adotada de novo. Isso exige separar,
+         no registro de forks (D-012), a cópia de captura (descartável, escondida, apagada em
+         `forkCleanupDays`) da cópia de adoção aceita (promovida: aparece na descoberta e nunca é
+         apagada pelo seeya). Adoção recusada antes do commit: a cópia é apagada e nada fica
+         registrado. A retomada é
          **interativa**, no diretório original da sessão, com o diretório do projeto liberado por
          `--add-dir` (mesma montagem da V2-T28, com o `--` já provado no aceite dela) e **sem nenhum
          modo de permissão automática** — o Claude Code pede aprovação a cada escrita.
@@ -8332,13 +8357,19 @@ trabalho nasce como repositório git local, e o remoto é assunto próprio.
       2. **`seeya project remove-repo <id> <nome>`** tira o repositório do `seeya.json` e commita.
          A entrada no mapa do dispositivo (`repository-map.json`) só sai se nenhum outro projeto
          usar a mesma identidade.
-      3. **Nada toca fora do espaço de trabalho e do `~/.seeya/`.** Remover um projeto nunca apaga
+      3. **`seeya project revert-adoption <id>`** (acrescentado pela D-047 item 4): lista os commits
+         da sessão adotada naquele projeto — é o identificador de sessão que cada commit carrega
+         desde a V2-T33 que torna isso possível —, mostra, pede confirmação e reverte do mais novo
+         para o mais antigo. **Recusa e diz qual** se algum commit posterior de outra sessão mexeu
+         nos mesmos arquivos: nunca reverte pela metade. Depois de reverter, apaga a cópia de
+         adoção e desmarca a sessão original, que volta a poder ser adotada. **Depende da V2-T33 e
+         da V2-T29.**
+      4. **Nada toca fora do espaço de trabalho e do `~/.seeya/`.** Remover um projeto nunca apaga
          repositório associado, sessão ou transcript — o seeya só é dono do que ele criou.
 
-      **O que não entra:** "mover" uma sessão adotada para outro projeto — com a adoção em cópia
-      (V2-T29 item 2), não há vínculo a desfazer: a sessão original nunca foi mexida, e adotá-la de
-      novo em outro projeto é só fazer outra adoção. Os arquivos que ficaram no projeto errado saem
-      com `remove` ou à mão, e o histórico guarda tudo.
+      **O que não entra:** "mover" uma sessão adotada para outro projeto como operação própria —
+      pela D-047, uma sessão não é adotada por dois projetos; mudar de projeto é reverter a adoção
+      (item 3) e adotar de novo.
 
       **Cuidados:** nenhuma dependência nova; confirmação obrigatória no `remove`; testes com
       espaço de trabalho descartável.
@@ -8346,6 +8377,85 @@ trabalho nasce como repositório git local, e o remoto é assunto próprio.
       **Aceite do mantenedor:** remover o projeto de teste criado no aceite da V2-T28, ver que o
       repositório associado continua intacto, e recuperar o projeto pelo histórico seguindo a linha
       que o comando imprime.
+
+- [ ] **V2-T33 — Fundação da D-047, parte 1: o lock do projeto, e commits de um projeto só e com
+      dono.** Especificada pelo PO em 2026-09-22. Primeira da fila de projetos depois da D-047 — a
+      adoção (V2-T29) e o desfazer (V2-T32) dependem dela.
+
+      **Vocabulário, fixado antes do código** (glossário do `AGENTS.md` na primeira leva): lock do
+      projeto → um arquivo **dentro do diretório do projeto** (nome fixado no glossário), com o
+      identificador da sessão, o `pid`, o `procStart` e o instante em que foi tomado; identificador
+      da sessão no commit → um trailer na mensagem (nome fixado no glossário), mais outro com o
+      `projectId`.
+
+      **O que entra:**
+      1. **Tomar, conferir e liberar o lock**, por porta. Tomar um lock livre funciona; tomar um lock
+         de sessão **viva** recusa, dizendo quem o segura e desde quando; lock de processo **morto** é
+         velho e pode ser tomado, com aviso. A vivacidade é a **mesma** checagem do `daemon.lock`
+         (pid + `procStart`, `scheduler/daemon-state.ts#checkLiveLock` e companhia) — reusar, não
+         reescrever. Liberar lock que não é seu recusa.
+      2. **O lock nunca é commitado**: entra no `.gitignore` do espaço de trabalho, criado ou
+         atualizado pelo próprio seeya.
+      3. **O commit do seeya passa a tocar um projeto só.** Hoje `WorkspaceRepository.commitAll` faz
+         `git add -A` no espaço de trabalho inteiro — se dois projetos tiverem mudança pendente,
+         viram um commit, e reverter um desfaz o outro. Passa a adicionar só o diretório do projeto
+         da operação, e todo commit do seeya leva os dois trailers. Teste de regressão: com mudança
+         pendente em dois projetos, o commit de um não leva o outro.
+      4. **`seeya project open` toma o lock** ao abrir e **libera ao sair** (o `open` já espera o
+         harness terminar, V2-T28). Com o lock de outra sessão viva, o `open` avisa quem o segura e
+         abre **para leitura** — a sessão pode trabalhar no código dela, mas é avisada de que não
+         escreve no projeto. Registrar o limite: "para leitura" é instrução nesta tarefa; a guarda
+         que impede escrever é da V2-T34.
+      5. **`seeya project show`** passa a dizer se o projeto está com lock, de quem e desde quando.
+
+      **O que não entra:** os ganchos de git e do harness, e a auditoria (V2-T34); qualquer
+      mudança na adoção.
+
+      **Cuidados:** o lock é arquivo dentro do espaço de trabalho, escrito de forma atômica como tudo
+      o mais; `process.platform` só nas raízes de composição; nenhuma dependência nova; testes com
+      espaço de trabalho descartável e processos de verdade onde a vivacidade precisar ser provada
+      (o mesmo cuidado dos testes do `daemon.lock`).
+
+      **Aceite do mantenedor:** abrir um projeto numa sessão, tentar abrir o mesmo projeto em outra
+      e ver o aviso de lock com o nome da primeira; fechar a primeira e ver a segunda conseguir.
+
+- [ ] **V2-T34 — Fundação da D-047, parte 2: as guardas que não dependem de o agente obedecer.**
+      Especificada pelo PO em 2026-09-22. **Depende da V2-T33.** É a D-047 item 5: o que precisa
+      valer sempre é garantido por código.
+
+      **O que entra:**
+      1. **Ganchos de git no repositório do espaço de trabalho**, instalados pelo seeya ao criar o
+         espaço de trabalho e **reafirmados a cada `open`** (um gancho apagado volta sozinho). Eles
+         recusam, cada um com a mensagem dizendo o que faltou e como deveria ser: commit sem os
+         trailers da V2-T33; commit que toca mais de um projeto; commit de uma sessão que não segura
+         o lock daquele projeto; commit que inclua o arquivo de lock. **O gancho não depende de o
+         `seeya` estar no `PATH`**: chama a verificação do próprio seeya pelo caminho absoluto
+         gravado no momento de instalar — e **medir** isso nos três sistemas; no Windows os ganchos
+         rodam no shell que vem com o git.
+      2. **Gancho do harness no diretório do projeto**, onde o harness permitir: no Claude Code, as
+         configurações de projeto dentro do diretório do projeto (que é do seeya, dentro do espaço
+         de trabalho — **nunca** `~/.claude`), recusando os comandos que furam os ganchos de git
+         (`--no-verify`, trocar o diretório de ganchos). **Medir primeiro** se as configurações de
+         projeto valem para uma sessão que só enxerga o projeto por `--add-dir` — é o caso da adoção,
+         cujo diretório de trabalho é o original da sessão. Se não valerem, registrar: nesse caso a
+         segunda camada não protege a adoção, e ela depende da primeira e da terceira.
+      3. **A auditoria**: `seeya project audit <id>` confere o histórico do projeto desde a última
+         auditoria contra as mesmas regras e mostra o que escapou — é a camada que enxerga o
+         contorno deliberado, depois do fato. Chamada também pelo `open`, antes de tomar o lock.
+      4. **Onde o guarda-corpo termina**, escrito no código e no `AGENTS.md` do projeto: cobre o
+         descuido; não cobre quem forja o identificador de outra sessão, nem um harness sem gancho
+         rodando `--no-verify` — isso só a auditoria mostra.
+
+      **O que não entra:** gancho antes da compactação (spike do passo 5); qualquer escrita em
+      `~/.claude`.
+
+      **Cuidados:** nenhuma dependência nova; os ganchos são texto gerado pelo seeya e testado como
+      texto **e** executados de verdade num repositório descartável (um gancho que só passa no teste
+      de texto pode não rodar no shell real); nada no `~/.seeya` real.
+
+      **Aceite do mantenedor:** numa sessão aberta pelo `open`, pedir ao agente que commite sem o
+      identificador e ver o git recusar; pedir `--no-verify` e ver o harness recusar; e rodar
+      `seeya project audit` depois de um commit feito à mão, por fora, e vê-lo apontado.
 
 ## Definição de pronto (vale para toda tarefa)
 
