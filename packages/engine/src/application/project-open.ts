@@ -92,11 +92,19 @@ function resolveHarness(
  * `docs/V2-RUMO.md` § "Abertura das sessões": "`open` só executa o CLI do harness escolhido com o
  * projeto como diretório de trabalho." Never writes anything — `--with` overrides the harness for
  * THIS invocation only, it's never persisted as the project's new `defaultHarness`.
+ *
+ * `onBeforeLaunch`, when given, fires with the resolved `missing` list right before the harness is
+ * actually spawned — `cli/project-command.ts#runProjectOpenCommand` uses it to print "repository X
+ * is missing" warnings BEFORE the interactive session takes over the terminal (item 4: the person
+ * needs to see this while they can still act on it, not after `claude` has already exited). The
+ * final `OpenProjectResult` still carries the same `missing` list, so a caller that doesn't need
+ * the early warning (a future test, for instance) can read it from there instead.
  */
 export async function openProject(
   deps: ProjectOpenDeps,
   projectId: string,
   harnessOverride?: string,
+  onBeforeLaunch?: (missing: readonly MissingRepositoryRecord[]) => void,
 ): Promise<OpenProjectResult> {
   if (!isValidProjectId(projectId)) {
     return { kind: 'invalidId', projectId };
@@ -116,6 +124,7 @@ export async function openProject(
   }
 
   const { addDirs, missing } = await resolveRepositoryDirs(deps, projectId, manifest.repositories);
+  onBeforeLaunch?.(missing);
   const projectDir = path.join(root, projectId);
   const result = await deps.harnessLauncher.open(projectDir, addDirs);
   if (result.kind === 'failedToStart') {

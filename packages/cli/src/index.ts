@@ -50,8 +50,10 @@ import {
   runConfigSetCommand,
 } from './config-command.js';
 import {
+  runProjectAddRepoCommand,
   runProjectCreateCommand,
   runProjectListCommand,
+  runProjectOpenCommand,
   runProjectShowCommand,
 } from './project-command.js';
 import { DAEMON_CHILD_ENV_VAR } from '@seeya-ai/engine/adapters/process/daemon-launch.js';
@@ -382,6 +384,38 @@ projectCommand
   .action(async (id: string) => {
     const context = buildProjectContext();
     console.log(await runProjectShowCommand(context, id));
+  });
+
+projectCommand
+  .command('add-repo')
+  .description(
+    'Associate a local git clone with a project: reads its remote (git remote get-url origin), ' +
+      "records the identity in seeya.json, and the local path in this device's repository map " +
+      '(V2-T28). Adding the same repository twice reports that it is already associated.',
+  )
+  .argument('<id>', 'The project id, e.g. "auth-hardening".')
+  .argument('<path>', 'Local path to the repository clone, e.g. "../app-api".')
+  .action(async (id: string, repoPath: string) => {
+    const context = buildProjectContext();
+    console.log(await runProjectAddRepoCommand(context, id, repoPath));
+  });
+
+projectCommand
+  .command('open')
+  .description(
+    'Open a harness (only "claude" for now) with the project directory as cwd and every ' +
+      'associated repository still resolvable on this device released via --add-dir (V2-T28).',
+  )
+  .argument('<id>', 'The project id, e.g. "auth-hardening".')
+  .option('--with <harness>', "Harness to open instead of the project's own default.")
+  .action(async (id: string, options: { with?: string }) => {
+    const context = buildProjectContext();
+    const exitCode = await runProjectOpenCommand(context, id, options.with, {
+      stdout: process.stdout,
+    });
+    if (exitCode !== 0) {
+      process.exitCode = exitCode;
+    }
   });
 
 program.parseAsync(process.argv).catch((error: unknown) => {

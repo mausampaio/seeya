@@ -11,6 +11,8 @@ import type {
   Autostart,
   Clock,
   DirectoryExistence,
+  GitReader,
+  HarnessLauncher,
   Notifier,
   ProcessControl,
   SessionProvider,
@@ -40,6 +42,7 @@ import {
   DeepHandoffGenerator,
 } from '@seeya-ai/engine/adapters/generation/index.js';
 import { ClaudeSessionResumer } from '@seeya-ai/engine/adapters/resumption/index.js';
+import { ClaudeHarnessLauncher } from '@seeya-ai/engine/adapters/harness/index.js';
 import {
   notifier as realNotifier,
   buildNotifier,
@@ -393,21 +396,31 @@ export async function resolveCliDaemonOwner(): Promise<DaemonOwner> {
 export interface ProjectContext {
   readonly storage: Storage;
   readonly workspace: WorkspaceRepository;
+  /** V2-T28: `add-repo`'s own read of a local clone's remote. */
+  readonly gitReader: GitReader;
+  /** V2-T28: `add-repo`'s path check and `open`'s per-repository liveness check. */
+  readonly directoryExistence: DirectoryExistence;
+  /** V2-T28: `open`'s own harness spawn. */
+  readonly harnessLauncher: HarnessLauncher;
   readonly seeyaHome: string;
 }
 
 /**
- * `seeya project create | list | show`'s own composition (V2-T27): `Storage` (for
- * `Storage.readWorkspaceRoot`/`saveWorkspaceRoot`) and `WorkspaceRepository`
- * (`FsWorkspaceRepository`, the only concrete adapter this port has — D-020 means naming it here
- * is this file's job, not `application/workspace.ts`'s). No config read: unlike every other
- * `build*Context` above, none of the three commands needs `config.json` for anything.
+ * `seeya project create | list | show | add-repo | open`'s own composition (V2-T27/V2-T28):
+ * `Storage` (for `Storage.readWorkspaceRoot`/`saveWorkspaceRoot`/`readRepositoryMap`/
+ * `saveRepositoryMap`) and `WorkspaceRepository` (`FsWorkspaceRepository`, the only concrete
+ * adapter this port has — D-020 means naming it here is this file's job, not
+ * `application/workspace.ts`'s). No config read: unlike every other `build*Context` above, none
+ * of these five commands needs `config.json` for anything.
  */
 export function buildProjectContext(homeDir: string = os.homedir()): ProjectContext {
   const home = resolveCliHome(homeDir);
   return {
     storage: buildStorage(home),
     workspace: new FsWorkspaceRepository(),
+    gitReader: new GitAdapter({ clock: systemClock }),
+    directoryExistence: new FsDirectoryExistence(),
+    harnessLauncher: new ClaudeHarnessLauncher(),
     seeyaHome: home.seeyaHome,
   };
 }
