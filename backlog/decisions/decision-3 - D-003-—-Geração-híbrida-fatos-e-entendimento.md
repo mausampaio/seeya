@@ -1,6 +1,6 @@
 ---
 id: decision-3
-title: 'D-003 — Geração híbrida: fatos determinísticos + entendimento pelo modelo'
+title: D-003 — Geração híbrida: fatos e entendimento
 date: '2026-09-23 10:52'
 status: accepted
 ---

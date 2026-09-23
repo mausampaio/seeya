@@ -37,7 +37,10 @@ interface BacklogFile {
 function readTitle(filePath: string): string {
   const content = fs.readFileSync(filePath, 'utf8');
   const match = /^title:\s*(.+)$/m.exec(content);
-  return match?.[1]?.trim() ?? '';
+  // Backlog.md quotes the title in YAML whenever it contains a character that would need it (a
+  // colon, a `+`), with single or double quotes depending on the value — the quotes are the
+  // format's, never part of the name.
+  return (match?.[1]?.trim() ?? '').replace(/^['"]|['"]$/g, '');
 }
 
 function listBacklogFiles(): readonly BacklogFile[] {
@@ -91,15 +94,12 @@ describe('backlog file and title names (D-048)', () => {
     const drifted = files
       .filter((file) => file.title !== '')
       .filter((file) => {
-        // Milestones quote the title and lowercase the file name; tasks and decisions keep the
-        // title's own case. Comparing case-insensitively, without the quotes, covers both.
-        const slug = file.title
-          .replace(/^"|"$/g, '')
-          .replace(/[^\p{L}\p{N}\-—\s]/gu, '')
-          .trim()
-          .replace(/\s+/g, '-')
-          .toLowerCase();
-        return !file.fileName.toLowerCase().includes(slug);
+        // Compare with punctuation and case removed on both sides: Backlog.md builds the file name
+        // from the title with its own rules (a `+` becomes a dash, a colon disappears), so an exact
+        // slug match would fail on cosmetics instead of on a real drift.
+        const normalize = (value: string): string =>
+          value.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+        return !normalize(file.fileName).includes(normalize(file.title));
       })
       .map((file) => `${file.directory}/${file.fileName} (title: ${file.title})`);
 
