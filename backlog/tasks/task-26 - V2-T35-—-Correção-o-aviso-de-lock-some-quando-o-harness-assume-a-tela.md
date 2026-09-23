@@ -45,8 +45,10 @@ precisa não escrever no projeto é justamente ela.
    é a candidata; a Q-069 já mediu a irmã dela por arquivo). Sem uma forma medida, item registrado
    como não entregue, nunca improvisado. Isso é instrução, não garantia: a guarda que impede
    escrever continua sendo a da V2-T34.
-3. **Ao sair, o `open` diz como ficou**: se o lock foi liberado, se ainda está com o outro, ou se
-   ficou com esta sessão. É a informação que a pessoa perdeu na abertura, dita quando ela volta a
+3. **Ao sair, o `open` repete o que a pessoa não conseguiu ler e diz como ficou**: o aviso que
+   precedeu a abertura (travado por outra sessão, ou lock velho retomado — o mantenedor não
+   conseguiu ler nenhum dos dois, 2026-09-23) e o estado final: lock liberado, ainda com o outro, ou
+   agora com esta sessão. É a informação que a pessoa perdeu na abertura, dita quando ela volta a
    ter tela.
 
 **O que não entra:** impedir a escrita (V2-T34); mudar o formato do lock; qualquer coisa na janela

@@ -3,10 +3,10 @@ id: TASK-20
 title: >-
   V2-T33 — Fundação da D-047, parte 1: o lock do projeto, e commits de um
   projeto só e com dono
-status: Review
+status: Done
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-23 10:18'
+updated_date: '2026-09-23 10:25'
 labels:
   - fundacao
   - d-047
@@ -155,4 +155,16 @@ próprio, nenhum deles bloqueando esta tarefa:
 - **O aviso some quando o harness assume a tela**, e a sessão aberta não fica sabendo do lock →
   V2-T35.
 - **"unidentified session"** é o furo já registrado na Q-087 → pré-requisito da V2-T34.
+
+**Aceite completo em 2026-09-23.** Os dois testes que faltavam, feitos pelo mantenedor:
+
+- **Liberar ao sair:** saindo pelo `/exit` no primeiro terminal, o segundo abriu sem aviso nenhum.
+- **Lock de processo morto:** fechando a janela do terminal sem sair pelo harness, o `show` disse
+  `lock: stale (last held by an unidentified session (pid 16972) since ...) — reclaimable`, e o
+  `open` seguinte tomou o lock avisando `...was stale ... — reclaimed`. É o caso que trava um
+  projeto para sempre se estiver errado, e é o que acontece a cada reinício de máquina.
+
+Fica em `Done`. O que o aceite deixou para outras tarefas: a mensagem de retomada **também** some
+quando o harness assume a tela (V2-T35), e a sessão continua "unidentified" (pré-requisito da
+V2-T34).
 <!-- SECTION:NOTES:END -->
