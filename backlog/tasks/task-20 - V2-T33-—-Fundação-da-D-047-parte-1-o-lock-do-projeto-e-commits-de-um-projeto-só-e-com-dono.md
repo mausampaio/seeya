@@ -3,10 +3,10 @@ id: TASK-20
 title: >-
   V2-T33 — Fundação da D-047, parte 1: o lock do projeto, e commits de um
   projeto só e com dono
-status: Review
+status: Done
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-22 11:47'
+updated_date: '2026-09-23 10:17'
 labels:
   - fundacao
   - d-047
@@ -135,4 +135,17 @@ teria com o que comparar o commit do agente que está dentro. O Claude Code acei
 identificador da sessão já na partida (`--session-id <uuid>`, medido na S2-T2 para os forks da
 captura): o `open` pode **gerar o identificador, passá-lo ao `claude` e gravá-lo no lock** — aí o
 dono do lock é conhecido de forma determinística. Registrado na V2-T34 como pré-requisito.
+
+**Aceita pelo mantenedor em 2026-09-23.** Com dois terminais no mesmo projeto, o segundo mostrou o
+aviso de lock com pid e horário e abriu para leitura. Dois achados do aceite, cada um com destino
+próprio, nenhum deles bloqueando esta tarefa:
+
+- **O `seeya` do `PATH` estava defasado.** Ele aponta para o build do checkout (`npm link`), que era
+  de antes desta tarefa — o primeiro teste abriu os dois terminais sem aviso nenhum porque o
+  executável não tinha uma linha de lock dentro. Reconstruído (`npm run build`), o aviso apareceu.
+  **Lição para os próximos aceites de CLI: reconstruir o checkout faz parte do roteiro**, e a própria
+  CLI avisar quando estiver defasada é candidato a guarda determinística.
+- **O aviso some quando o harness assume a tela**, e a sessão aberta não fica sabendo do lock →
+  V2-T35.
+- **"unidentified session"** é o furo já registrado na Q-087 → pré-requisito da V2-T34.
 <!-- SECTION:NOTES:END -->
