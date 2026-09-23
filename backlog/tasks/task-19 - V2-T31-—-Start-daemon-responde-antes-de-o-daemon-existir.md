@@ -1,9 +1,10 @@
 ---
 id: TASK-19
-title: 'V2-T31 — Correção: "Start daemon" responde antes de o daemon existir'
+title: V2-T31 — Start daemon responde antes de o daemon existir
 status: To Do
 assignee: []
 created_date: '2026-09-22 11:11'
+updated_date: '2026-09-23 10:46'
 labels: []
 milestone: m-1
 dependencies: []

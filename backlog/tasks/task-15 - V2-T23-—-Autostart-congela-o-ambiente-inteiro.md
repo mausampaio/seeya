@@ -1,11 +1,10 @@
 ---
 id: TASK-15
-title: >-
-  V2-T23 — Correção: o autostart congela o ambiente inteiro do app, inclusive
-  coisas que só valem naquele login
+title: V2-T23 — Autostart congela o ambiente inteiro
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
+updated_date: '2026-09-23 10:46'
 labels: []
 milestone: m-1
 dependencies: []

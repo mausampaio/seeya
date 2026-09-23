@@ -1,11 +1,10 @@
 ---
 id: TASK-16
-title: >-
-  V2-T24 (precisa de decisão do mantenedor antes de virar tarefa) — No macOS a
-  notificação se apresenta como "Editor de Scripts", e clicar nela abre o editor
+title: V2-T24 — Notificação do macOS com identidade errada
 status: To Do
 assignee: []
 created_date: '2026-09-22 11:11'
+updated_date: '2026-09-23 10:46'
 labels:
   - parada
   - macos

@@ -1,11 +1,10 @@
 ---
 id: TASK-11
-title: >-
-  V2-T19 (na fila, sem pressa) — Correção: fechar a janela no macOS quebra o
-  processo principal ("Object has been destroyed")
+title: V2-T19 — Fechar a janela no macOS derruba o processo
 status: To Do
 assignee: []
 created_date: '2026-09-22 11:11'
+updated_date: '2026-09-23 10:46'
 labels:
   - parada
   - macos

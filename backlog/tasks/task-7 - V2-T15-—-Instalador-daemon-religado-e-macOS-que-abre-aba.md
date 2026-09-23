@@ -1,11 +1,10 @@
 ---
 id: TASK-7
-title: >-
-  V2-T15 — Instalador: o daemon parado e religado, e o macOS que não abre aba
-  nenhuma
+title: 'V2-T15 — Instalador: daemon religado e macOS que abre aba'
 status: Review
 assignee: []
 created_date: '2026-09-22 11:10'
+updated_date: '2026-09-23 10:46'
 labels: []
 milestone: m-3
 dependencies: []

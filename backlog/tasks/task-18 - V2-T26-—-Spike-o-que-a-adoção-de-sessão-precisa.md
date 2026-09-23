@@ -1,9 +1,10 @@
 ---
 id: TASK-18
-title: 'V2-T26 (spike) — O que a adoção de sessão precisa, medido antes de desenhar'
+title: 'V2-T26 — Spike: o que a adoção de sessão precisa'
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
+updated_date: '2026-09-23 10:46'
 labels: []
 milestone: m-0
 dependencies: []

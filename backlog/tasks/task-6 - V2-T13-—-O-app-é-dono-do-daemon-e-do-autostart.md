@@ -1,9 +1,10 @@
 ---
 id: TASK-6
-title: V2-T13 — O app é dono do daemon e do autostart; a CLI vira cliente (D-045)
+title: V2-T13 — O app é dono do daemon e do autostart
 status: Review
 assignee: []
 created_date: '2026-09-22 11:10'
+updated_date: '2026-09-23 10:46'
 labels: []
 milestone: m-1
 dependencies: []

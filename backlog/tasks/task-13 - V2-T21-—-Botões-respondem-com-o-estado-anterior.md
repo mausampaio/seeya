@@ -1,12 +1,10 @@
 ---
 id: TASK-13
-title: >-
-  V2-T21 — Correção: os botões de ação respondem com o estado anterior
-  (autostart por até um minuto, daemon por até dez segundos); e o painel "Hoje"
-  não diz por que não há nada para marcar
+title: V2-T21 — Botões respondem com o estado anterior
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
+updated_date: '2026-09-23 10:46'
 labels: []
 milestone: m-2
 dependencies: []

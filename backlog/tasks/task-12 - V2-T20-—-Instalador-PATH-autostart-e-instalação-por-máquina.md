@@ -1,11 +1,10 @@
 ---
 id: TASK-12
-title: >-
-  V2-T20 — Instalador, o que sobrou: o `seeya` no `PATH`, a desinstalação
-  removendo o autostart, e a instalação por máquina revisada
+title: 'V2-T20 — Instalador: PATH, autostart e instalação por máquina'
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
+updated_date: '2026-09-23 10:46'
 labels: []
 milestone: m-3
 dependencies: []

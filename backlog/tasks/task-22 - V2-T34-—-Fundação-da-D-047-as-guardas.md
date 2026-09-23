@@ -1,11 +1,10 @@
 ---
 id: TASK-22
-title: >-
-  V2-T34 — Fundação da D-047, parte 2: as guardas que não dependem de o agente
-  obedecer
+title: 'V2-T34 — Fundação da D-047: as guardas'
 status: To Do
 assignee: []
 created_date: '2026-09-22 11:11'
+updated_date: '2026-09-23 10:46'
 labels:
   - fundacao
   - d-047

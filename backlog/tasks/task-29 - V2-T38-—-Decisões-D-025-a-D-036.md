@@ -1,30 +1,31 @@
 ---
-id: TASK-30
-title: 'V2-T39 — Migrar e revisitar as decisões D-037 a D-048, e escrever o índice'
+id: TASK-29
+title: V2-T38 — Decisões D-025 a D-036
 status: To Do
 assignee: []
 created_date: '2026-09-23 10:37'
+updated_date: '2026-09-23 10:46'
 labels:
   - decisoes
   - d-048
 dependencies:
-  - TASK-29
+  - TASK-28
 references:
   - docs/DECISOES.md
 type: chore
-ordinal: 30000
+ordinal: 29000
 ---
 
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-**V2-T39 — Migrar e revisitar as decisões D-037 a D-048, e escrever o índice**
+**V2-T38 — Migrar e revisitar as decisões D-025 a D-036**
 Especificada pelo PO em 2026-09-23, a partir de uma decisão do mantenedor no mesmo dia: migrar as 48
 decisões para `backlog/decisions/`, **adaptando cada uma ao formato Contexto / Decisão /
 Consequências** — e aproveitar a passagem para **revisitar** o que foi decidido. Palavras dele: *"é
 um exercício custoso mas acho que vale muito a pena"*.
 
-**Esta tarefa cobre D-037 a D-048, e o índice em docs/DECISOES.md.** As outras faixas são tarefas irmãs; não avance para fora da sua.
+**Esta tarefa cobre D-025 a D-036.** As outras faixas são tarefas irmãs; não avance para fora da sua.
 
 **O que entra:**
 

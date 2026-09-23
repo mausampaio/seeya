@@ -1,9 +1,10 @@
 ---
 id: TASK-5
-title: 'S5-T8 (candidato, NÃO agendado) — Briefing agrupado por projeto'
+title: S5-T8 — Briefing agrupado por projeto
 status: To Do
 assignee: []
 created_date: '2026-09-22 11:10'
+updated_date: '2026-09-23 10:46'
 labels:
   - adiada
 milestone: m-4

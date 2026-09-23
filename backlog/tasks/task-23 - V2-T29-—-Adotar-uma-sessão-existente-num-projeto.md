@@ -1,11 +1,10 @@
 ---
 id: TASK-23
-title: >-
-  V2-T29 — Adotar uma sessão existente num projeto: a sessão escreve a própria
-  memória, e a pessoa aprova cada escrita
+title: V2-T29 — Adotar uma sessão existente num projeto
 status: To Do
 assignee: []
 created_date: '2026-09-22 11:11'
+updated_date: '2026-09-23 10:46'
 labels:
   - adocao
   - d-047

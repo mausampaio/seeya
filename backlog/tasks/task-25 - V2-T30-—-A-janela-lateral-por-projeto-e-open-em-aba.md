@@ -1,11 +1,10 @@
 ---
 id: TASK-25
-title: >-
-  V2-T30 — A janela: lateral por projeto, open numa aba, adotar pela lista de
-  sessões
+title: 'V2-T30 — A janela: lateral por projeto e open em aba'
 status: To Do
 assignee: []
 created_date: '2026-09-22 11:11'
+updated_date: '2026-09-23 10:46'
 labels: []
 milestone: m-0
 dependencies:

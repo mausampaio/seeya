@@ -1,11 +1,10 @@
 ---
 id: TASK-10
-title: >-
-  V2-T18 — Correção: a caixa de seleção não volta para a sessão retomada, e o
-  painel "Hoje" não se atualiza sozinho
+title: V2-T18 — Caixa de seleção e painel Hoje parado
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
+updated_date: '2026-09-23 10:46'
 labels: []
 milestone: m-2
 dependencies: []

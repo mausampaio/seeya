@@ -1,11 +1,10 @@
 ---
 id: TASK-21
-title: >-
-  V2-T8 — O instalador: a interface instalável no Windows e no Linux, sem
-  checkout (D-041, D-042, D-034)
+title: 'V2-T8 — O instalador: Windows e Linux sem checkout'
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
+updated_date: '2026-09-23 10:46'
 labels: []
 milestone: m-3
 dependencies: []

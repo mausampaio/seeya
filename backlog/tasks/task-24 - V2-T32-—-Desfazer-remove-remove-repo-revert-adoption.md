@@ -1,9 +1,10 @@
 ---
 id: TASK-24
-title: 'V2-T32 — Desfazer: `seeya project remove` e `seeya project remove-repo`'
+title: 'V2-T32 — Desfazer: remove, remove-repo, revert-adoption'
 status: To Do
 assignee: []
 created_date: '2026-09-22 11:11'
+updated_date: '2026-09-23 10:46'
 labels:
   - desfazer
   - d-047

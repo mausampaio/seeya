@@ -1,9 +1,10 @@
 ---
 id: TASK-26
-title: 'V2-T35 — Correção: o aviso de lock some quando o harness assume a tela'
+title: V2-T35 — O aviso de lock some quando o harness abre
 status: To Do
 assignee: []
 created_date: '2026-09-23 10:12'
+updated_date: '2026-09-23 10:46'
 labels:
   - correcao
   - d-047

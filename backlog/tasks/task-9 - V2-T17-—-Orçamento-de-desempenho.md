@@ -1,11 +1,10 @@
 ---
 id: TASK-9
-title: >-
-  V2-T17 — Orçamento de desempenho: quatro números medidos, e a regra de como
-  usá-los
+title: V2-T17 — Orçamento de desempenho
 status: Review
 assignee: []
 created_date: '2026-09-22 11:10'
+updated_date: '2026-09-23 10:46'
 labels: []
 milestone: m-2
 dependencies: []

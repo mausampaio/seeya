@@ -1,11 +1,10 @@
 ---
 id: TASK-17
-title: >-
-  V2-T25 — Correção: a pergunta de transição não sabe de quem é o daemon, e
-  acaba pedindo para o app assumir o que já é dele
+title: V2-T25 — A pergunta de transição não sabe de quem é o daemon
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
+updated_date: '2026-09-23 10:46'
 labels: []
 milestone: m-1
 dependencies: []

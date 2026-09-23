@@ -1,11 +1,10 @@
 ---
 id: TASK-8
-title: >-
-  V2-T16 — Correção: a janela responde com a configuração da subida, não com a
-  que está em disco
+title: V2-T16 — A janela responde com a config da subida
 status: Review
 assignee: []
 created_date: '2026-09-22 11:10'
+updated_date: '2026-09-23 10:46'
 labels: []
 milestone: m-2
 dependencies: []

@@ -1,9 +1,10 @@
 ---
 id: TASK-1
-title: S5-T2 — `seeya init`
+title: 'S5-T2 — seeya init: config guiada'
 status: To Do
 assignee: []
 created_date: '2026-09-22 11:10'
+updated_date: '2026-09-23 10:46'
 labels:
   - adiada
 milestone: m-4

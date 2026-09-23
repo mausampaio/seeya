@@ -1,9 +1,10 @@
 ---
 id: TASK-28
-title: V2-T37 — Migrar e revisitar as decisões D-013 a D-024
+title: V2-T37 — Decisões D-013 a D-024
 status: To Do
 assignee: []
 created_date: '2026-09-23 10:37'
+updated_date: '2026-09-23 10:46'
 labels:
   - decisoes
   - d-048
