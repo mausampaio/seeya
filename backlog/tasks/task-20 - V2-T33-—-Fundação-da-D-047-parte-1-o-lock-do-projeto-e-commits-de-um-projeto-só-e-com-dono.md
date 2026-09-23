@@ -3,10 +3,10 @@ id: TASK-20
 title: >-
   V2-T33 — Fundação da D-047, parte 1: o lock do projeto, e commits de um
   projeto só e com dono
-status: Done
+status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-23 10:17'
+updated_date: '2026-09-23 10:18'
 labels:
   - fundacao
   - d-047
@@ -136,7 +136,14 @@ identificador da sessão já na partida (`--session-id <uuid>`, medido na S2-T2 
 captura): o `open` pode **gerar o identificador, passá-lo ao `claude` e gravá-lo no lock** — aí o
 dono do lock é conhecido de forma determinística. Registrado na V2-T34 como pré-requisito.
 
-**Aceita pelo mantenedor em 2026-09-23.** Com dois terminais no mesmo projeto, o segundo mostrou o
+**Aceite parcial em 2026-09-23 — correção do próprio mantenedor, no mesmo dia:** *"testamos a
+mensagem mas não a guarda do lock"*. Ele está certo, e vale separar as três coisas: **(a)** o aviso,
+visto e correto; **(b)** o resto do comportamento do lock desta tarefa — liberar ao sair, e tomar um
+lock de processo morto —, **não verificado à mão** (só pelos testes de integração com processo de
+verdade); **(c)** impedir de fato a escrita, que **nunca foi desta tarefa**: por desenho (D-047), a
+guarda que recusa é a V2-T34. Esta entrada volta para `Review` até (b) ser testado.
+
+**O que foi testado.** Com dois terminais no mesmo projeto, o segundo mostrou o
 aviso de lock com pid e horário e abriu para leitura. Dois achados do aceite, cada um com destino
 próprio, nenhum deles bloqueando esta tarefa:
 
