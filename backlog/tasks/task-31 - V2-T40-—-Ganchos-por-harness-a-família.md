@@ -37,6 +37,19 @@ matriz vive em `docs/` e é o que impede alguém supor que o que vale para um va
 vazia para ferramenta que ninguém usa aqui. O primeiro é o Claude Code (V2-T41). Codex e outros
 entram quando alguém for usá-los de verdade neste projeto.
 
+**O limite desta família, fixado pelo mantenedor em 2026-09-23: o seeya nunca compacta nada.**
+Preocupação dele, nas palavras dele: *"não sei se o harness pode fazer isso sem autorização, parece
+meio perigoso"*. Quem compacta hoje é o harness sozinho, quando o contexto enche, ou a pessoa, pelo
+comando dele. O seeya não tem — e não deve ganhar — como mandar uma sessão compactar. O papel dele
+são três verbos, nenhum destrutivo: **lembrar** (pelo gancho, se o spike disser que ele consegue
+fazer a sessão agir), **escrever** (com aceite humano, como na adoção) e, no máximo, **sugerir** que
+aquele é um bom momento para compactar.
+
+**E a ordem não se inverte:** escrever, conferir que está em disco, e só então sugerir. Compactar
+antes de escrever é o pior caso — a sessão perde o contexto e produz um registro pior do que teria
+produzido um minuto antes. Qualquer proposta que dispare compactação automaticamente está fora
+desta família por decisão, não por esquecimento.
+
 **O que não entra:** implementar o gancho (é do filho); escrever em configuração global de qualquer
 harness — a regra do projeto continua: nada fora de `~/.seeya/` e do espaço de trabalho.
 <!-- SECTION:DESCRIPTION:END -->
