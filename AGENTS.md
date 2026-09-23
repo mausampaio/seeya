@@ -30,6 +30,11 @@ Conflito entre este arquivo e um doc acima: o doc vence, e você registra a inco
 - **Uma tarefa por vez**, na ordem do backlog e respeitando as dependências declaradas em cada
   tarefa. Não agrupe, não adiante, não pule.
 - Antes de começar: releia a tarefa e o trecho da spec que ela implementa.
+- **Notas de implementação são do agente; o que vem depois vira comentário** (D-048, ajuste do
+  mantenedor em 2026-09-23). O relatório da entrega fica na seção de notas e **não é reescrito**
+  depois; revisão, aceite e achados posteriores entram como comentário na tarefa
+  (`backlog task edit <id> --comment "..." --comment-author "..."`), que guarda data e hora e deixa a
+  ordem dos fatos legível.
 - Ao terminar: rode `npm run verificar`, escreva o relatório **na própria tarefa** (seção de notas
   de implementação: `backlog task edit <id> --notes "..."`, ou editando o arquivo sem apagar os
   marcadores `<!-- SECTION:... -->`), mova-a para `Review` (`backlog task edit <id> -s Review`) e

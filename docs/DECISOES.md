@@ -1680,6 +1680,11 @@ Testada pelo PO e pelo mantenedor antes de adotar, com tarefas reais da fila.
   muda. Ela é configurada para nunca commitar sozinha nem ler outras branches: quem commita segue
   sendo quem já commitava.
 
+**Ajuste do mantenedor em 2026-09-23, depois de ver a primeira tarefa fechar:** as **notas de
+implementação são do agente e param quando ele entrega**. Revisão, aceite e achados posteriores
+viram **comentário** na tarefa — o Backlog.md carimba data e hora em cada um, e a leitura de cima a
+baixo passa a contar a história na ordem em que aconteceu. Reescrever as notas a cada evento, como o
+PO fez na V2-T33, embaralha implementação com aceite.
+
 **O que não muda:** `docs/DECISOES.md` continua sendo o registro das decisões (o Backlog.md tem
 pasta própria para isso, mas o código inteiro cita `D-0XX` a partir daqui).
-

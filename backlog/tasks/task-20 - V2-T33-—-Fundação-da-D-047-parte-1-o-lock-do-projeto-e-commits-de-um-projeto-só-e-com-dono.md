@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-23 10:25'
+updated_date: '2026-09-23 10:28'
 labels:
   - fundacao
   - d-047
@@ -122,8 +122,14 @@ composição, `undefined`/`unknown` quando ausente (D-025), nunca uma sessão in
 `dependencias` (410 módulos, 0 violação) e `cobertura` (2322 testes, 4 pulados; `core/`
 99.5%, `application/` 100%, `adapters/workspace/` 94.07%, `cli/src` 96.65% — todos acima do
 próprio piso). Fica em `[~]` até o aceite do mantenedor.
+<!-- SECTION:NOTES:END -->
 
+## Comments
 
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-23 10:28
+---
 **Revisão do PO (2026-09-22) — mesclada na `main`.** Portão do PO no formato sem cobertura
 (`docs/TESTES.md`); a cobertura é a do portão completo do agente. Revisão sem ajustes no código.
 
@@ -135,7 +141,11 @@ teria com o que comparar o commit do agente que está dentro. O Claude Code acei
 identificador da sessão já na partida (`--session-id <uuid>`, medido na S2-T2 para os forks da
 captura): o `open` pode **gerar o identificador, passá-lo ao `claude` e gravá-lo no lock** — aí o
 dono do lock é conhecido de forma determinística. Registrado na V2-T34 como pré-requisito.
+---
 
+author: PO
+created: 2026-09-23 10:28
+---
 **Aceite parcial em 2026-09-23 — correção do próprio mantenedor, no mesmo dia:** *"testamos a
 mensagem mas não a guarda do lock"*. Ele está certo, e vale separar as três coisas: **(a)** o aviso,
 visto e correto; **(b)** o resto do comportamento do lock desta tarefa — liberar ao sair, e tomar um
@@ -155,7 +165,11 @@ próprio, nenhum deles bloqueando esta tarefa:
 - **O aviso some quando o harness assume a tela**, e a sessão aberta não fica sabendo do lock →
   V2-T35.
 - **"unidentified session"** é o furo já registrado na Q-087 → pré-requisito da V2-T34.
+---
 
+author: PO
+created: 2026-09-23 10:28
+---
 **Aceite completo em 2026-09-23.** Os dois testes que faltavam, feitos pelo mantenedor:
 
 - **Liberar ao sair:** saindo pelo `/exit` no primeiro terminal, o segundo abriu sem aviso nenhum.
@@ -167,4 +181,5 @@ próprio, nenhum deles bloqueando esta tarefa:
 Fica em `Done`. O que o aceite deixou para outras tarefas: a mensagem de retomada **também** some
 quando o harness assume a tela (V2-T35), e a sessão continua "unidentified" (pré-requisito da
 V2-T34).
-<!-- SECTION:NOTES:END -->
+---
+<!-- COMMENTS:END -->
