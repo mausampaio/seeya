@@ -48,6 +48,14 @@ um exercício custoso mas acho que vale muito a pena"*.
    ou a decisão que a supera). **Não altere o conteúdo da decisão por causa de um achado** — quem
    decide é o mantenedor, e a emenda vira decisão nova, como a D-046 fez com a D-036.
 
+5. **Os três status, e só eles** (fixado pelo PO em 2026-09-23, D-048): `accepted` para toda decisão
+   vigente — é o caso das 48; `superseded` só para a que foi substituída **por inteiro** por outra
+   mais nova, com o ponteiro no corpo; `proposed` para decisão escrita e ainda não confirmada pelo
+   mantenedor (não é o caso de nenhuma aqui). **"Emendada" não é status:** quando uma decisão nova
+   muda um pedaço de outra (a D-046 fez isso com a D-036; a D-043 com a D-020), a antiga continua
+   `accepted` e ganha uma linha no corpo dizendo o que foi emendado e por quem — marcar
+   `superseded` jogaria fora a parte que continua valendo.
+
 **O que não entra:** mexer em `docs/DECISOES.md` (o índice é feito no fim, pela última faixa);
 mudar `AGENTS.md` ou a ordem de autoridade; corrigir código por causa de um achado.
 

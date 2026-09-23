@@ -1686,5 +1686,11 @@ viram **comentário** na tarefa — o Backlog.md carimba data e hora em cada um,
 baixo passa a contar a história na ordem em que aconteceu. Reescrever as notas a cada evento, como o
 PO fez na V2-T33, embaralha implementação com aceite.
 
+**Os status das decisões, fixados em 2026-09-23** (o Backlog.md aceita texto livre; o vocabulário
+é nosso): `accepted` — vigente; `superseded` — substituída por inteiro, com o ponteiro para a nova;
+`proposed` — escrita e ainda não confirmada pelo mantenedor. **"Emendada" não é status**: a decisão
+emendada continua `accepted` e ganha no corpo a linha dizendo o que mudou e por qual decisão, porque
+ela ainda governa tudo o que a emenda não tocou.
+
 **O que não muda:** `docs/DECISOES.md` continua sendo o registro das decisões (o Backlog.md tem
 pasta própria para isso, mas o código inteiro cita `D-0XX` a partir daqui).
