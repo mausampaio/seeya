@@ -30,6 +30,11 @@ Conflito entre este arquivo e um doc acima: o doc vence, e você registra a inco
 - **Uma tarefa por vez**, na ordem do backlog e respeitando as dependências declaradas em cada
   tarefa. Não agrupe, não adiante, não pule.
 - Antes de começar: releia a tarefa e o trecho da spec que ela implementa.
+- **Título de tarefa e de decisão é nome, não frase: no máximo 72 caracteres** (D-048). O nome do
+  arquivo sai do título, e um título longo demais já impediu um `git worktree add` de rodar no
+  Windows (`Filename too long`, 2026-09-23). A frase inteira vai na descrição. Trocar o título
+  **não** renomeia o arquivo: renomeie junto, com `git mv`. Quem cobra é
+  `tests/integration/guards/backlog-names.test.ts`, não a boa memória de ninguém.
 - **Notas de implementação são do agente; o que vem depois vira comentário** (D-048, ajuste do
   mantenedor em 2026-09-23). O relatório da entrega fica na seção de notas e **não é reescrito**
   depois; revisão, aceite e achados posteriores entram como comentário na tarefa

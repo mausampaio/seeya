@@ -1686,6 +1686,15 @@ viram **comentário** na tarefa — o Backlog.md carimba data e hora em cada um,
 baixo passa a contar a história na ordem em que aconteceu. Reescrever as notas a cada evento, como o
 PO fez na V2-T33, embaralha implementação com aceite.
 
+**Título é nome, não frase — no máximo 72 caracteres, e o arquivo renomeado junto** (2026-09-23).
+O Backlog.md monta o nome do arquivo a partir do título e **não** renomeia o arquivo quando o
+título muda. Medido nesta máquina: um título escrito como frase inteira virou um nome de 204
+caracteres, e o `git worktree add` — como cada agente recebe a cópia isolada dele — falhou com
+`Filename too long` antes de qualquer trabalho começar. `core.longpaths` ficou ligado no
+repositório, mas o limite de 72 é a regra, cobrada por
+`tests/integration/guards/backlog-names.test.ts` (D-047 item 5: o que precisa valer sempre é
+garantido por código).
+
 **Os status das decisões, fixados em 2026-09-23** (o Backlog.md aceita texto livre; o vocabulário
 é nosso): `accepted` — vigente; `superseded` — substituída por inteiro, com o ponteiro para a nova;
 `proposed` — escrita e ainda não confirmada pelo mantenedor. **"Emendada" não é status**: a decisão
