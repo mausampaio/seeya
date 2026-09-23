@@ -1,9 +1,10 @@
 ---
 id: TASK-27
 title: V2-T36 — Migrar e revisitar as decisões D-001 a D-012
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-09-23 10:37'
+updated_date: '2026-09-23 10:46'
 labels:
   - decisoes
   - d-048
