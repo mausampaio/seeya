@@ -171,3 +171,21 @@ npm run dist:windows   # raiz do monorepo
 # packages/app/dist-installer/seeya-<versão>-x64.exe
 # packages/app/dist-installer/win-unpacked/
 ```
+
+## Observação, não medida: Linux contra Windows (2026-09-24)
+
+No aceite da V2-T8 no Ubuntu de uso diário do mantenedor (22.04, `.deb`), ele relatou a janela
+abrindo **de forma praticamente instantânea** e o **Enable autostart** respondendo **em
+milissegundos** — "absurdamente mais rápido" que no Windows. **Não é número**: ninguém mediu com o
+método deste documento no Linux, e ele não substitui a linha de base acima.
+
+O que já se sabe e explica boa parte da diferença, medido na V2-T46: no Windows, as operações que o
+mantenedor sente como lentas passam por um `powershell.exe` novo a cada chamada — a consulta ao
+agendador de tarefas (o status do autostart) custa **1,3–4 s por chamada**, porque o módulo
+`ScheduledTasks` recarrega em cada processo, e a leitura do registro (a detecção de instalação),
+**~0,4 s aquecido / ~3 s no primeiro processo**. No Linux, os equivalentes são um `systemctl --user` e
+a leitura de um arquivo.
+
+Se virar tarefa, são duas: medir o Linux com o mesmo método (as quatro medidas), e atacar no Windows
+o custo de subir o PowerShell nas operações que a pessoa espera na janela — com o número antes e
+depois, como manda a régua.
