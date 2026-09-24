@@ -1,10 +1,10 @@
 ---
 id: TASK-35
 title: V2-T45 — Atualização por máquina desliga autostart e não religa
-status: Review
+status: Done
 assignee: []
 created_date: '2026-09-24 11:12'
-updated_date: '2026-09-24 14:27'
+updated_date: '2026-09-24 14:39'
 labels: []
 milestone: m-3
 dependencies: []
@@ -228,5 +228,11 @@ author: PO
 created: 2026-09-24 14:27
 ---
 Revisão do PO (2026-09-24), segunda rodada. Mesclado no po-gate e provado com os comandos reais: npm run dist:windows exit 0 a partir de dist-installer vazio, sem aviso do makensis, instalador de 117.616.967 bytes às 11:26; o executável sai NotSigned (as linhas 'signing with signtool.exe' do electron-builder são o passo vazio, sem certificado — o relatório dizia 'assinado', e não é). npm run verificar vermelho duas vezes, nos mesmos dois testes de tests/integration/app/composition.test.ts (timeout de 5s), independentes desta tarefa: medidos no main sem ela, 3.180 ms e 4.495 ms isolados. Virou a V2-T46 (task-36). Q-088 fechada: a contradição era do despacho do PO. Segue em Review até o aceite do mantenedor (duas instalações por máquina, a segunda prova o item 1; ler ~/.seeya/installer.log). Não coberto pelo aceite: instalação por usuário — o religamento ali chama a Function direto (sem UAC_AsUser_Call), provado por teste de texto e compilação, não em execução.
+---
+
+author: PO
+created: 2026-09-24 14:39
+---
+Aceite do mantenedor em 2026-09-24 (Windows, por máquina), conferido pelo PO no ~/.seeya/installer.log e na máquina. Primeira instalação (11:33:22 → 11:35:03): o religamento já funcionou — original parou o daemon, elevated reaproveitou o estado (1), as-user religou (pid 16132). Segunda instalação por cima (11:36:08 → 11:37:43): old-uninstaller registrou 'Skipping autostart/protocol cleanup: this uninstall is part of an update' e as-user religou (pid 2396); daemon.lock com launchedBy do Program Files; 'seeya autostart status' = enabled. Tempo total caiu de ~4 min para ~1min35s; o maior trecho (82 s, entre 11:36:21 e 11:37:43) é a cópia dos arquivos, fora do nosso código. Achados cosméticos no log, que viram a V2-T47: o travessão da saída da CLI sai como 'â€”' (UTF-8 gravado como ANSI) e cada saída deixa uma linha em branco depois.
 ---
 <!-- COMMENTS:END -->
