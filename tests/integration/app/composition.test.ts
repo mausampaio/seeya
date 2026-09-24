@@ -217,6 +217,19 @@ describe('buildAppContext', () => {
   // its exact value (`'app'`/`'cli'`/`'unknown'`) depends on whether THIS machine has seeya
   // installed, so this only asserts the shape, never a specific outcome (portable across every
   // machine this suite runs on, including one where the real app happens to be installed).
+  //
+  // V2-T46: deliberately the ONE test in this file that still calls buildAppContext with no
+  // `appInstallation` override — proving the real wiring is the whole point, so there's nothing
+  // to fake here (unlike every other test above/below). That real cost is a fresh `powershell.exe`
+  // registry query: ~400ms once "warm", ~3s on a cold spawn, measured alone
+  // (tests/integration/app/composition.test.ts run by itself). Inside the FULL suite
+  // (`npm run verificar`'s own `cobertura` step, ~226 test files/processes contending for CPU and
+  // disk), the same query measured 5.3s-6.3s across four separate runs — legitimate cost, not a
+  // regression to chase: it was always there, just previously masked by running alongside the
+  // OTHER test that used to pay a second, larger real cost of its own
+  // ("checkDaemonOwnershipTransitionOffer resolves to a boolean without throwing", now faked) and
+  // therefore never got its own timing measured in isolation. 15s leaves roughly 2.4x headroom
+  // over the slowest of those four measured runs.
   it('daemonOwner is resolved for real, one of the three D-024 states', async () => {
     fixture = await createDiscoveryFixture();
     const context = await buildAppContext(fixture.root);
@@ -225,7 +238,7 @@ describe('buildAppContext', () => {
     if (context.daemonOwner.kind === 'app') {
       expect(typeof context.daemonOwner.launchPath).toBe('string');
     }
-  });
+  }, 15_000);
 
   it('checkDaemonOwnershipTransitionOffer resolves to a boolean without throwing', async () => {
     fixture = await createDiscoveryFixture();
