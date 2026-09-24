@@ -4,7 +4,7 @@ title: 'V2-T8 — O instalador: Windows e Linux sem checkout'
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-24 17:53'
+updated_date: '2026-09-24 17:59'
 labels: []
 milestone: m-3
 dependencies: []
@@ -205,5 +205,11 @@ author: PO
 created: 2026-09-24 17:53
 ---
 Diagnóstico do clique no Ubuntu (2026-09-24): marcador presente (activeScheme seeya), xdg-mime aponta para seeya.desktop, xdg-open seeya://open traz a janela — mas notify-send é 0.7.9, abaixo do piso 0.7.10 desta tarefa, então o aviso sai sem ação por projeto. Comportamento conforme a especificação; a lacuna (Ubuntu 22.04 nunca tem clique) virou a V2-T49.
+---
+
+author: PO
+created: 2026-09-24 17:59
+---
+Aceite do Linux em 2026-09-24 (Ubuntu do mantenedor, build de 1ba6dac, .deb): abriu pelo menu de aplicativos, abriu uma aba de claude, subiu o daemon pela janela. O clique no aviso prévio não funciona no notify-send 0.7.9 (Ubuntu 22.04), abaixo do piso desta tarefa — comportamento especificado; a lacuna é a V2-T49. Falta só o Windows: o clique no toast, que não dá para testar hoje porque o fim do dia já rodou (testar amanhã, antes do horário de encerramento).
 ---
 <!-- COMMENTS:END -->
