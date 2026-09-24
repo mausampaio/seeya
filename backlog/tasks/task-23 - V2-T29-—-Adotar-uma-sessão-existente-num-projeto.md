@@ -4,7 +4,7 @@ title: V2-T29 — Adotar uma sessão existente num projeto
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-24 20:35'
+updated_date: '2026-09-24 20:59'
 labels:
   - adocao
   - d-047
@@ -203,5 +203,11 @@ author: PO
 created: 2026-09-24 20:35
 ---
 Revisão do PO em 2026-09-24: mesclado no po-gate, portão verde (2419 testes). Conferido: sessão resolvida pelo nome; viva ou já adotada é recusada; lock tomado com o id da CÓPIA (gerado pelo seeya, como o open da V2-T35); cópia registrada em forks.json antes de lançar; retomada interativa sem permission-mode, no diretório original, com --add-dir só para o projeto; no fim, descarte (nada mudou / recusado) ou promoção (fora de forks.json, dentro de adoptions.json). Prova forte de que a original não muda: SHA-256 idêntico antes e depois, numa sessão descartável (Q-090). Q-091 aceita e Q-092 corrigida pelo PO (AGENTS.md dizia commits em português). Falta o aceite do mantenedor, cujo PRIMEIRO passo é confirmar em terminal real que as quatro flags funcionam juntas no modo interativo.
+---
+
+author: PO
+created: 2026-09-24 20:59
+---
+Aceite do mantenedor em 2026-09-24 — FALHOU, volta para correção. Ele criou um projeto novo e rodou o adopt: a sessão abriu no diretório original dela (que era o do terminal dele — correto por projeto, o --resume só acha o histórico lá), mas a instrução manda escrever em 'the project directory' e cita AGENTS.md/INDEX.md/context/know-how.md sem nunca dizer ONDE o projeto fica. Para a sessão, o diretório do projeto é o dela; não achou arquivo nenhum. No spike N a sessão de teste já rodava dentro do projeto, e a ambiguidade não apareceu — a revisão do PO também não pegou. Correção: (1) a instrução passa a trazer o caminho absoluto do projeto e a nomear cada arquivo a partir dele, e 'escreva só dentro de <caminho>'; (2) antes de lançar, a CLI diz em uma linha onde a cópia vai abrir e onde fica o projeto; (3) prova em modo -p com uma sessão descartável cujo diretório original é DIFERENTE do projeto — o caso exato que falhou — e os arquivos aparecendo no projeto.
 ---
 <!-- COMMENTS:END -->
