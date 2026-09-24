@@ -6,7 +6,10 @@
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { adoptSession } from '@seeya-ai/engine/application/project-adopt.js';
-import type { AdoptSessionDeps } from '@seeya-ai/engine/application/project-adopt.js';
+import type {
+  AdoptSessionCallbacks,
+  AdoptSessionDeps,
+} from '@seeya-ai/engine/application/project-adopt.js';
 import { createSessionWithPid } from '../core/_fixtures.js';
 import {
   ControllableProcessControl,
@@ -47,6 +50,16 @@ function buildAdoptDeps(
     pid: THIS_PID,
     procStart: undefined,
     forkSessionId: FORK_SESSION_ID,
+    ...overrides,
+  };
+}
+
+/** Item 8's own gate defaults to `'proceed'` for every test that isn't specifically about that
+ * gate — same idea `project-open.test.ts` uses passing `confirmReadOnlyOpen` explicitly whenever a
+ * test needs to get past a `readOnly` lock. */
+function buildCallbacks(overrides: Partial<AdoptSessionCallbacks> = {}): AdoptSessionCallbacks {
+  return {
+    confirmLaunch: () => Promise.resolve('proceed'),
     ...overrides,
   };
 }
@@ -130,11 +143,82 @@ describe('adoptSession', () => {
     expect(adoptionLauncher.calls).toHaveLength(0);
   });
 
+  describe('item 8: confirmed BEFORE anything is created', () => {
+    it('asks confirmLaunch with originalCwd/projectDir/projectId, before the project exists', async () => {
+      const storage = new InMemoryDeviceStorage(DEFAULT_TEST_CONFIG);
+      const workspace = new FakeWorkspaceRepository();
+      let observed: { originalCwd: string; projectDir: string; projectId: string } | undefined;
+
+      await adoptSession(
+        buildAdoptDeps(storage, workspace),
+        ORIGINAL_ENDED,
+        'auth-hardening',
+        buildCallbacks({
+          confirmLaunch: (info) => {
+            observed = { ...info };
+            // Observed synchronously, from INSIDE the callback — proves the project did not exist
+            // yet at the moment this question was asked.
+            return Promise.resolve('proceed');
+          },
+        }),
+      );
+
+      expect(observed).toEqual({
+        originalCwd: ORIGINAL_ENDED.cwd,
+        projectDir: PROJECT_DIR,
+        projectId: 'auth-hardening',
+      });
+    });
+
+    it('declined: nothing created — no project, no lock, no fork registered', async () => {
+      const storage = new InMemoryDeviceStorage(DEFAULT_TEST_CONFIG);
+      const workspace = new FakeWorkspaceRepository();
+      const forkRegistration = new FakeForkRegistration();
+      const adoptionLauncher = new FakeSessionAdoptionLauncher();
+
+      const result = await adoptSession(
+        buildAdoptDeps(storage, workspace, { forkRegistration, adoptionLauncher }),
+        ORIGINAL_ENDED,
+        'auth-hardening',
+        buildCallbacks({ confirmLaunch: () => Promise.resolve('decline') }),
+      );
+
+      expect(result).toEqual({ kind: 'launchConfirmationDeclined', projectId: 'auth-hardening' });
+      expect(await workspace.projectExists(WORKSPACE_ROOT, 'auth-hardening')).toBe(false);
+      expect(forkRegistration.registerCalls).toEqual([]);
+      expect(adoptionLauncher.calls).toHaveLength(0);
+    });
+
+    it('no confirmLaunch callback at all: refuses unavailable, nothing created (D-025 — never a silent proceed)', async () => {
+      const storage = new InMemoryDeviceStorage(DEFAULT_TEST_CONFIG);
+      const workspace = new FakeWorkspaceRepository();
+      const adoptionLauncher = new FakeSessionAdoptionLauncher();
+
+      const result = await adoptSession(
+        buildAdoptDeps(storage, workspace, { adoptionLauncher }),
+        ORIGINAL_ENDED,
+        'auth-hardening',
+      );
+
+      expect(result).toEqual({
+        kind: 'launchConfirmationUnavailable',
+        projectId: 'auth-hardening',
+      });
+      expect(await workspace.projectExists(WORKSPACE_ROOT, 'auth-hardening')).toBe(false);
+      expect(adoptionLauncher.calls).toHaveLength(0);
+    });
+  });
+
   it('creates the project first when it does not exist yet (item 1)', async () => {
     const storage = new InMemoryDeviceStorage(DEFAULT_TEST_CONFIG);
     const workspace = new FakeWorkspaceRepository();
 
-    await adoptSession(buildAdoptDeps(storage, workspace), ORIGINAL_ENDED, 'auth-hardening');
+    await adoptSession(
+      buildAdoptDeps(storage, workspace),
+      ORIGINAL_ENDED,
+      'auth-hardening',
+      buildCallbacks(),
+    );
 
     expect(await workspace.projectExists(WORKSPACE_ROOT, 'auth-hardening')).toBe(true);
   });
@@ -142,7 +226,12 @@ describe('adoptSession', () => {
   it('writes into an existing project without recreating it — no second "Create project" commit', async () => {
     const storage = new InMemoryDeviceStorage(DEFAULT_TEST_CONFIG);
     const workspace = new FakeWorkspaceRepository();
-    await adoptSession(buildAdoptDeps(storage, workspace), ORIGINAL_ENDED, 'auth-hardening');
+    await adoptSession(
+      buildAdoptDeps(storage, workspace),
+      ORIGINAL_ENDED,
+      'auth-hardening',
+      buildCallbacks(),
+    );
     const commitCountBefore = workspace.commitMessages.length;
 
     await adoptSession(
@@ -152,6 +241,7 @@ describe('adoptSession', () => {
         processIsAlive: false,
       }),
       'auth-hardening',
+      buildCallbacks(),
     );
 
     const createCommits = workspace.commitMessages.filter((message) =>
@@ -166,7 +256,12 @@ describe('adoptSession', () => {
     const storage = new InMemoryDeviceStorage(DEFAULT_TEST_CONFIG);
     const workspace = new FakeWorkspaceRepository();
     const projectLock = new FakeProjectLock();
-    await adoptSession(buildAdoptDeps(storage, workspace), ORIGINAL_ENDED, 'auth-hardening');
+    await adoptSession(
+      buildAdoptDeps(storage, workspace),
+      ORIGINAL_ENDED,
+      'auth-hardening',
+      buildCallbacks(),
+    );
     await projectLock.write(WORKSPACE_ROOT, 'auth-hardening', {
       sessionId: 'other-session',
       pid: 555,
@@ -180,6 +275,7 @@ describe('adoptSession', () => {
       buildAdoptDeps(storage, workspace, { projectLock, processControl, adoptionLauncher }),
       ORIGINAL_ENDED,
       'auth-hardening',
+      buildCallbacks(),
     );
 
     expect(result).toEqual({
@@ -216,6 +312,7 @@ describe('adoptSession', () => {
       }),
       ORIGINAL_ENDED,
       'auth-hardening',
+      buildCallbacks(),
     );
 
     expect(observedLockSessionId).toBe(FORK_SESSION_ID);
@@ -231,33 +328,18 @@ describe('adoptSession', () => {
       buildAdoptDeps(storage, workspace, { forkRegistration, adoptionLauncher }),
       ORIGINAL_ENDED,
       'auth-hardening',
+      buildCallbacks(),
     );
 
     expect(forkRegistration.registerCalls).toEqual([FORK_SESSION_ID]);
     expect(adoptionLauncher.calls).toEqual([
       {
         originalCwd: ORIGINAL_ENDED.cwd,
-        addDirs: [PROJECT_DIR],
+        projectDir: PROJECT_DIR,
         originalSessionId: ORIGINAL_SESSION_ID,
         forkSessionId: FORK_SESSION_ID,
       },
     ]);
-  });
-
-  it('onBeforeLaunch fires with the projectId and forkSessionId before the launcher is called', async () => {
-    const storage = new InMemoryDeviceStorage(DEFAULT_TEST_CONFIG);
-    const workspace = new FakeWorkspaceRepository();
-    const adoptionLauncher = new FakeSessionAdoptionLauncher();
-    let observed: { projectId: string; forkSessionId: string } | undefined;
-
-    await adoptSession(
-      buildAdoptDeps(storage, workspace, { adoptionLauncher }),
-      ORIGINAL_ENDED,
-      'auth-hardening',
-      { onBeforeLaunch: (info) => (observed = { ...info }) },
-    );
-
-    expect(observed).toEqual({ projectId: 'auth-hardening', forkSessionId: FORK_SESSION_ID });
   });
 
   it('failedToStart: unregisters the fork and releases the lock', async () => {
@@ -271,6 +353,7 @@ describe('adoptSession', () => {
       buildAdoptDeps(storage, workspace, { forkRegistration, projectLock, adoptionLauncher }),
       ORIGINAL_ENDED,
       'auth-hardening',
+      buildCallbacks(),
     );
 
     expect(result).toEqual({ kind: 'failedToStart', projectId: 'auth-hardening' });
@@ -289,6 +372,7 @@ describe('adoptSession', () => {
       buildAdoptDeps(storage, workspace, { forkRegistration, forkCleanup, projectLock }),
       ORIGINAL_ENDED,
       'auth-hardening',
+      buildCallbacks(),
     );
 
     expect(result).toEqual({
@@ -307,7 +391,12 @@ describe('adoptSession', () => {
     const forkRegistration = new FakeForkRegistration();
     const forkCleanup = new FakeForkCleanup();
 
-    await adoptSession(buildAdoptDeps(storage, workspace), ORIGINAL_ENDED, 'auth-hardening');
+    await adoptSession(
+      buildAdoptDeps(storage, workspace),
+      ORIGINAL_ENDED,
+      'auth-hardening',
+      buildCallbacks(),
+    );
     workspace.setChangedFiles('auth-hardening', ['auth-hardening/context/know-how.md']);
     const commitsBefore = workspace.commitMessages.length;
 
@@ -318,7 +407,7 @@ describe('adoptSession', () => {
         processIsAlive: false,
       }),
       'auth-hardening',
-      { confirmCommit: () => Promise.resolve('decline') },
+      buildCallbacks({ confirmCommit: () => Promise.resolve('decline') }),
     );
 
     expect(result).toEqual({
@@ -336,14 +425,20 @@ describe('adoptSession', () => {
   it('confirmationUnavailable: no way to ask — nothing committed, nothing deleted, fork stays registered', async () => {
     const storage = new InMemoryDeviceStorage(DEFAULT_TEST_CONFIG);
     const workspace = new FakeWorkspaceRepository();
-    await adoptSession(buildAdoptDeps(storage, workspace), ORIGINAL_ENDED, 'auth-hardening');
+    await adoptSession(
+      buildAdoptDeps(storage, workspace),
+      ORIGINAL_ENDED,
+      'auth-hardening',
+      buildCallbacks(),
+    );
     workspace.setChangedFiles('auth-hardening', ['auth-hardening/status/README.md']);
     const commitsBefore = workspace.commitMessages.length;
     const forkRegistration = new FakeForkRegistration();
     const forkCleanup = new FakeForkCleanup();
 
-    // No `confirmCommit` callback at all — same "never a silent default" D-025 rule
-    // `application/project-open.ts#confirmReadOnlyOpen` already applies.
+    // `confirmLaunch` still proceeds (item 8's own gate), but `confirmCommit` is never given —
+    // same "never a silent default" D-025 rule `application/project-open.ts#confirmReadOnlyOpen`
+    // already applies, now for the LATER commit confirmation.
     const result = await adoptSession(
       buildAdoptDeps(storage, workspace, { forkRegistration, forkCleanup }),
       createSessionWithPid({
@@ -351,6 +446,7 @@ describe('adoptSession', () => {
         processIsAlive: false,
       }),
       'auth-hardening',
+      buildCallbacks(),
     );
 
     expect(result).toEqual({
@@ -371,6 +467,7 @@ describe('adoptSession', () => {
       buildAdoptDeps(storage, workspace, { sessionId: 'caller-session' }),
       ORIGINAL_ENDED,
       'auth-hardening',
+      buildCallbacks(),
     );
     workspace.setChangedFiles('auth-hardening', [
       'auth-hardening/AGENTS.md',
@@ -390,7 +487,7 @@ describe('adoptSession', () => {
         processIsAlive: false,
       }),
       'auth-hardening',
-      { confirmCommit: () => Promise.resolve('commit') },
+      buildCallbacks({ confirmCommit: () => Promise.resolve('commit') }),
     );
 
     expect(result).toEqual({

@@ -1295,11 +1295,33 @@ export interface ForkRegistration {
  * session measured while implementing this task (docs/QUESTOES.md Q-090): the fork's `.jsonl` came
  * out named exactly `forkSessionId`, and the original session's own transcript file was
  * byte-for-byte unchanged afterward.
+ *
+ * **`originalCwd`, not `projectDir`, is where the fork is actually resumed — a deliberate choice,
+ * not an accident of `--resume`'s own search behavior (never measured either way,
+ * docs/QUESTOES.md Q-090's own scope).** The maintainer's own reasoning (2026-09-24): the Claude
+ * Code loads, by working directory, that directory's own `CLAUDE.md`, its auto-memory, local
+ * configuration and skills — resuming in the session's OWN directory is what gives the fork all of
+ * that; resumed in the project instead, it would have only the transcript. `adopt-instruction.ts
+ * #buildAdoptionInstruction` asks the session to carry into the project whatever, from what's
+ * locally available to it, belongs to this specific work.
+ *
+ * **`projectDir`, a single absolute string, not an `addDirs` list.** This flow only ever releases
+ * one directory — the project's own — and `adapters/harness/adopt-args.ts#buildAdoptArgs` folds
+ * this SAME value into the resumed session's first message
+ * (`adopt-instruction.ts#buildAdoptionInstruction`), so the session is told exactly where it is,
+ * never just "the project directory" with nothing naming it. Fixes a real gap the maintainer's own
+ * acceptance run found (task-23 comment #2): the fork opens in `originalCwd`, never `projectDir`
+ * — a session told to write into "the project directory" with no path attached reads that as its
+ * own `cwd` and finds nothing there. `docs/spikes/N-adocao-de-sessao.md`'s own test session ran
+ * FROM INSIDE the project directory, so this ambiguity never had a chance to surface in that
+ * measurement. Confirmed fixed with a disposable session whose original directory is DIFFERENT
+ * from the project directory (docs/QUESTOES.md Q-093): the files landed inside `projectDir`, none
+ * outside it.
  */
 export interface SessionAdoptionLauncher {
   adopt(
     originalCwd: string,
-    addDirs: readonly string[],
+    projectDir: string,
     originalSessionId: string,
     forkSessionId: string,
   ): Promise<HarnessOpenResult>;

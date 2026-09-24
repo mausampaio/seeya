@@ -2,11 +2,16 @@
  * `seeya project adopt <session> <projectId>`'s own orchestration (V2-T29, D-045 item 4, D-047
  * item 6). Runs the adoption on a FORK of the chosen session, never the original — `--fork-session`
  * (already used by the deep capture generator since S2-T2) copies the transcript to a new file; the
- * original never receives a line. The fork is resumed interactively, in ITS OWN original directory,
- * with the project released via `--add-dir` — the person approves every write on the spot, per
- * D-047's own reasoning for choosing interactive resumption over any headless
- * `--permission-mode` (docs/spikes/N-adocao-de-sessao.md's own "a V2-T29 não pode assumir que
- * retomar basta para poder escrever").
+ * original never receives a line. The fork is resumed interactively, in ITS OWN original directory
+ * — a deliberate choice, not an accident (maintainer's own reasoning, 2026-09-24): the Claude Code
+ * loads that directory's own `CLAUDE.md`, auto-memory, configuration and skills by working
+ * directory, so opening there is what gives the fork all of that; opened in the project instead, it
+ * would have only the transcript. The project itself is released via `--add-dir`, and
+ * `adapters/harness/adopt-instruction.ts#buildAdoptionInstruction` asks the session to carry over
+ * into the project whatever, from what's locally available to it, belongs to this specific work.
+ * The person approves every write on the spot, per D-047's own reasoning for choosing interactive
+ * resumption over any headless `--permission-mode` (docs/spikes/N-adocao-de-sessao.md's own "a
+ * V2-T29 não pode assumir que retomar basta para poder escrever").
  *
  * Same shape `application/project-open.ts#openProject` already established for a command that
  * takes the project lock, blocks for an entire interactive `claude` lifetime, and releases the
@@ -74,11 +79,29 @@ export type ConfirmAdoptionCommit = (
   changedFiles: readonly string[],
 ) => Promise<ConfirmAdoptionAnswer>;
 
+/** Same three-way shape as `ConfirmAdoptionAnswer` (D-025), for the OTHER confirmation this task
+ * needs: before anything is created at all, not after the fork already ran. */
+export type ConfirmAdoptionLaunchAnswer = 'proceed' | 'decline' | 'unavailable';
+
+export type ConfirmAdoptionLaunch = (info: {
+  readonly originalCwd: string;
+  readonly projectDir: string;
+  readonly projectId: string;
+}) => Promise<ConfirmAdoptionLaunchAnswer>;
+
 export interface AdoptSessionCallbacks {
-  readonly onBeforeLaunch?: (info: {
-    readonly projectId: string;
-    readonly forkSessionId: string;
-  }) => void;
+  /**
+   * Asked BEFORE the project is created, the lock is taken, or the fork is registered — same
+   * "explain, then wait for an explicit answer" shape `application/project-open.ts
+   * #ConfirmReadOnlyOpen` already established for a locked project, now for a different problem
+   * (task-23 comment, the second acceptance round): the interactive harness takes over the
+   * terminal right after this, so whatever it's told has to be read and understood BEFORE that
+   * happens, not printed and immediately scrolled past. `cli/project-command.ts` renders the
+   * explanation (where the fork opens and why, where the project lives, and the `project open`
+   * follow-up) and asks. `undefined` behaves exactly like `'unavailable'` (D-025: never a silent
+   * proceed) — every production caller always supplies one.
+   */
+  readonly confirmLaunch?: ConfirmAdoptionLaunch;
   /** `undefined` behaves exactly like `'unavailable'` (D-025: never a silent commit) — every
    * production caller (`cli/project-command.ts`) always supplies one. */
   readonly confirmCommit?: ConfirmAdoptionCommit;
@@ -98,6 +121,13 @@ export type AdoptSessionResult =
       readonly projectId: string;
       readonly adoptedAt: Date;
     }
+  /** Item 8: the person was shown the explanation and explicitly said no — nothing was created,
+   * nothing registered (`forks.json` never even sees this attempt). */
+  | { readonly kind: 'launchConfirmationDeclined'; readonly projectId: string }
+  /** Item 8: no interactive terminal to ask through — same D-025 refusal
+   * `application/project-open.ts#OpenProjectResult`'s own `lockConfirmationUnavailable` already
+   * gives a locked `open`, applied here before anything is created at all. */
+  | { readonly kind: 'launchConfirmationUnavailable'; readonly projectId: string }
   | { readonly kind: 'projectLocked'; readonly projectId: string; readonly heldBy: ProjectLockInfo }
   | { readonly kind: 'failedToStart'; readonly projectId: string }
   /** Nothing was written inside the project — nothing to show, nothing to confirm. Same cleanup as
@@ -203,6 +233,21 @@ async function commitAdoption(
   return { kind: 'adopted', projectId, forkSessionId: deps.forkSessionId, changedFiles };
 }
 
+/** Asks `callbacks.confirmLaunch`, or resolves `'unavailable'` when none was given (D-025 — same
+ * "never a silent default" `application/project-open.ts#confirmReadOnlyOpen` already applies).
+ * Item 8's own gate, asked before anything is created. */
+async function confirmAdoptionLaunch(
+  callbacks: AdoptSessionCallbacks | undefined,
+  originalCwd: string,
+  projectDir: string,
+  projectId: string,
+): Promise<ConfirmAdoptionLaunchAnswer> {
+  if (callbacks?.confirmLaunch === undefined) {
+    return 'unavailable';
+  }
+  return callbacks.confirmLaunch({ originalCwd, projectDir, projectId });
+}
+
 /** Asks `callbacks.confirmCommit`, or resolves `'unavailable'` when none was given (D-025 — same
  * "never a silent default" `application/project-open.ts#confirmReadOnlyOpen` already applies). */
 async function confirmCommit(
@@ -282,7 +327,7 @@ async function launchAdoptionFork(
   await deps.forkRegistration.register(deps.forkSessionId, now);
   const launch = await deps.adoptionLauncher.adopt(
     original.cwd,
-    [projectDir],
+    projectDir,
     original.sessionId,
     deps.forkSessionId,
   );
@@ -314,7 +359,22 @@ export async function adoptSession(
     return refusal;
   }
 
+  // Item 8: explained and confirmed BEFORE anything is created — the project doesn't exist yet,
+  // no lock is taken, no fork is registered. `resolveWorkspaceRoot` alone is not "creating the
+  // copy" (it only resolves/persists WHERE the workspace lives on this device, the same read
+  // every other `seeya project` command does freely) — needed here only to compute `projectDir`
+  // for the explanation text.
   const root = await resolveWorkspaceRoot(deps.storage, deps.seeyaHome);
+  const projectDir = path.join(root, projectId);
+  const confirmation = await confirmAdoptionLaunch(callbacks, original.cwd, projectDir, projectId);
+  if (confirmation !== 'proceed') {
+    return {
+      kind:
+        confirmation === 'decline' ? 'launchConfirmationDeclined' : 'launchConfirmationUnavailable',
+      projectId,
+    };
+  }
+
   await ensureProjectExists(deps, projectId);
 
   const lock = await acquireProjectLock(
@@ -328,8 +388,6 @@ export async function adoptSession(
     return { kind: 'projectLocked', projectId, heldBy: lock.decision.heldBy };
   }
 
-  callbacks?.onBeforeLaunch?.({ projectId, forkSessionId: deps.forkSessionId });
-  const projectDir = path.join(root, projectId);
   const launch = await launchAdoptionFork(deps, projectDir, original, now);
   if (launch.kind === 'failedToStart') {
     await releaseProjectLock(deps, root, projectId, deps.pid);
