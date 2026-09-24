@@ -13,6 +13,7 @@
  * exist.
  */
 import type {
+  AdoptionRecord,
   Config,
   Day,
   DaemonOwnershipTransitionAnswer,
@@ -466,6 +467,19 @@ export interface Storage {
    * with `core/repository-map.ts#upsertRepositoryMapEntry`, and writes the whole result back; this
    * method itself doesn't merge. */
   saveRepositoryMap(entries: readonly RepositoryMapEntry[]): Promise<void>;
+
+  /**
+   * V2-T29: `~/.seeya/adoptions.json` — every accepted adoption on this device
+   * (`core/types.ts#AdoptionRecord`'s own docstring). Empty when nothing has been adopted here yet
+   * (D-025), never an error. `application/project-adopt.ts#adoptSession` is the only caller that
+   * reads this to refuse re-adopting an original session (`core/adoption-registry.ts
+   * #findAdoptionRecord`).
+   */
+  readAdoptions(): Promise<readonly AdoptionRecord[]>;
+
+  /** Replaces `adoptions.json`'s entire contents with `records` — same append-by-read-then-write
+   * contract `saveRepositoryMap` already has above; this method itself doesn't merge. */
+  saveAdoptions(records: readonly AdoptionRecord[]): Promise<void>;
 }
 
 /**
@@ -737,6 +751,17 @@ export interface ForkCleanupResult {
  */
 export interface ForkCleanup {
   cleanup(forkCleanupDays: number): Promise<ForkCleanupResult>;
+
+  /**
+   * V2-T29: deletes ONE fork's transcript file immediately, by `sessionId` — never age-based
+   * (`cleanup` above is what `forkCleanupDays` drives). `application/project-adopt.ts
+   * #adoptSession` is the only caller, and only for a fork it created itself moments earlier: an
+   * adoption declined before the commit (V2-T29 item 2: "a cópia é apagada e nada fica
+   * registrado"). Same D-012 exception `cleanup` already documents — this never touches
+   * `forks.json` itself, that's `ForkRegistration.unregister`'s job, kept separate so accepting an
+   * adoption can drop the registry entry WITHOUT deleting the transcript it's about to promote.
+   */
+  deleteFork(sessionId: string): Promise<ForkCleanupOutcome>;
 }
 
 /**
@@ -1127,6 +1152,18 @@ export interface WorkspaceRepository {
    * (D-025: the project genuinely doesn't exist, not a parse failure).
    */
   readProjectManifest(root: string, projectId: string): Promise<ProjectManifest | null>;
+
+  /**
+   * V2-T29: the project's own uncommitted changes, scoped to `root/projectId` only — the same
+   * `git add <projectId>` scoping `commitAll` already uses (D-047 item 3), read instead of
+   * written. `application/project-adopt.ts#adoptSession` calls this right after the interactive
+   * fork session closes, to show the person what it wrote before asking whether to commit (V2-T29
+   * item 4: "nada é commitado sem a pessoa"). One path per changed/added/removed file, relative to
+   * `root` (git's own `status --porcelain` output, unparsed beyond stripping the two-character
+   * status prefix) — empty when the session wrote nothing, which `adoptSession` reads as "nothing
+   * to confirm".
+   */
+  listChangedFiles(root: string, projectId: string): Promise<readonly string[]>;
 }
 
 /**
@@ -1210,4 +1247,60 @@ export interface ProjectLock {
    * never taken, or was already released, is not an error) — called on `seeya project open`'s own
    * clean exit, after the harness process closed. */
   clear(root: string, projectId: string): Promise<void>;
+}
+
+// Own block at the end of the file on purpose (V2-T29), same pattern `ProjectLock`/`HarnessLauncher`
+// above already established.
+
+/**
+ * V2-T29: add/remove one `sessionId` in `forks.json` (D-012) from `application/`, which can't
+ * import `adapters/discovery/fork-registry.ts` directly (the layer matrix forbids
+ * `application` → `adapters`, D-020). Deliberately narrow — two methods, not the read/cleanup
+ * surface `ForkCleanup` already owns — `application/project-adopt.ts#adoptSession` is the only
+ * caller, and it only ever needs to hide a fork it's about to spawn (before `claude` runs, so the
+ * registration survives a crash the same way `adapters/generation/fork-registration.ts#registerFork`'s
+ * own docstring already argues for captures) and later remove that same entry — on decline
+ * (nothing should stay registered) or on an accepted commit (a promoted fork stops being a
+ * "capture fork" someone could later delete by age; it's tracked in `adoptions.json` instead,
+ * `core/types.ts#AdoptionRecord`).
+ *
+ * Implemented by `adapters/generation/fork-registration.ts#GenerationForkRegistration`, over the
+ * SAME `registerFork`/`unregisterFork` functions `deep-generator.ts` already calls directly
+ * (adapter-to-adapter is allowed) — this class only exists to give `application/` a port to depend
+ * on instead of that file's concrete functions.
+ */
+export interface ForkRegistration {
+  register(sessionId: string, createdAt: Date): Promise<void>;
+  unregister(sessionId: string): Promise<void>;
+}
+
+/**
+ * V2-T29: `seeya project adopt <session> <projectId>`'s own harness spawn — a sibling of
+ * `HarnessLauncher`, not a third method on it (`HarnessLauncher.open`'s own docstring: "never
+ * `--resume` — that's `SessionResumer`'s job", and this isn't `SessionResumer` either, since it
+ * also needs `--fork-session`/`--add-dir`, which no other port combines). Implemented by
+ * `adapters/harness/session-adoption.ts#ClaudeSessionAdoptionLauncher`, reusing the same
+ * `adapters/resumption/spawn-interactive.ts#runInteractive`/`env.ts#buildResumptionEnv` (D-017)
+ * every other interactive spawn in this project already shares — never headless (`-p`):
+ * D-047's own text is explicit that the maintainer chose interactive, on-the-spot approval for
+ * every write, over any `--permission-mode` flag (docs/spikes/N-adocao-de-sessao.md's own
+ * "A V2-T29 não pode assumir: que retomar basta para poder escrever").
+ *
+ * `originalSessionId` is what `--resume` looks up; `forkSessionId` is chosen by the caller BEFORE
+ * calling this port (`packages/cli/src/composition.ts`, `node:crypto#randomUUID`) so it can be
+ * registered in `forks.json` (`ForkRegistration.register`) ahead of the call — same ordering
+ * `adapters/generation/args.ts#DeepGenerationArgsOptions.forkSessionId`'s own docstring already
+ * establishes for the capture path, and confirmed for this exact three-flag combination
+ * (`--resume` + `--fork-session` + `--session-id`, together with `--add-dir`) by a disposable
+ * session measured while implementing this task (docs/QUESTOES.md Q-090): the fork's `.jsonl` came
+ * out named exactly `forkSessionId`, and the original session's own transcript file was
+ * byte-for-byte unchanged afterward.
+ */
+export interface SessionAdoptionLauncher {
+  adopt(
+    originalCwd: string,
+    addDirs: readonly string[],
+    originalSessionId: string,
+    forkSessionId: string,
+  ): Promise<HarnessOpenResult>;
 }

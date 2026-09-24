@@ -1179,3 +1179,25 @@ export interface ProjectSkeleton {
   readonly files: readonly WorkspaceProjectFile[];
   readonly directories: readonly string[];
 }
+
+/**
+ * V2-T29: one row of `~/.seeya/adoptions.json` (D-047 item 6) — the "already adopted" marker for
+ * `originalSessionId`, and the record of which fork became a project's own session.
+ * `application/project-adopt.ts#adoptSession` writes one of these ONLY after the person confirmed
+ * the commit (never on decline, never while the interactive fork session is still running) —
+ * that's what "a original fica marcada como já adotada" means in code: a record here, not a flag
+ * on the original session itself (`DiscoveredSession` is read-only external data, D-025, nothing
+ * this project owns to mark).
+ *
+ * `forkSessionId` is the same id `application/project-adopt.ts` generated up front and passed to
+ * `claude --session-id` (`adapters/harness/session-adoption.ts`) — once a record exists here, that
+ * fork is no longer tracked in `forks.json` (D-012's registry): `ForkRegistration.unregister`
+ * removes it there in the same commit step that writes this record, so the fork stops being hidden
+ * from discovery and is never touched by `forkCleanupDays` again (D-047 item 6: "promovida").
+ */
+export interface AdoptionRecord {
+  readonly originalSessionId: string;
+  readonly forkSessionId: string;
+  readonly projectId: string;
+  readonly adoptedAt: Date;
+}
