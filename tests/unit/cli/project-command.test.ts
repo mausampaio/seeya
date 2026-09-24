@@ -91,6 +91,27 @@ function buildOpenIo(stdout: PassThrough): {
   return { stdin: new PassThrough(), stdout, isTTY: false };
 }
 
+/**
+ * Writes `answer` to `stdin` only once `marker` shows up on `stdout` — for a command that asks
+ * MORE than one question over the same `readline` interface (`runProjectAdoptCommand`: the launch
+ * confirmation, then the commit confirmation). Writing every answer up front, before any prompt
+ * exists, loses everything past the first line (measured — see the two tests that use this).
+ */
+function answerPromptWhenSeen(
+  stdout: PassThrough,
+  stdin: PassThrough,
+  marker: string,
+  answer: string,
+): void {
+  const handler = (chunk: Buffer): void => {
+    if (chunk.toString('utf8').includes(marker)) {
+      stdout.removeListener('data', handler);
+      stdin.write(answer);
+    }
+  };
+  stdout.on('data', handler);
+}
+
 describe('runProjectCreateCommand', () => {
   it('creates a project and reports its path', async () => {
     const context = buildContext();
@@ -401,26 +422,6 @@ describe('runProjectAdoptCommand', () => {
     expect(text).toContain(second.sessionId);
   });
 
-  it('resolves by display name, creates the project, and reports noChanges when the fork wrote nothing', async () => {
-    const context = buildContext();
-    const sessionProvider = new FakeSessionProvider({ sessions: [ORIGINAL], rejected: [] });
-    const { stdout, output } = collectStdout();
-    const exitCode = await runProjectAdoptCommand(
-      sessionProvider,
-      buildAdoptDeps(context),
-      ORIGINAL.name,
-      'auth-hardening',
-      buildOpenIo(stdout),
-    );
-    expect(exitCode).toBe(0);
-    const text = output();
-    expect(text).toContain(`Adopting "${ORIGINAL.name}" into project "auth-hardening"`);
-    expect(text).toContain('nothing to commit');
-    expect(
-      await context.workspace.projectExists(path.join(SEEYA_HOME, 'workspace'), 'auth-hardening'),
-    ).toBe(true);
-  });
-
   it('a running session refuses without launching the fork at all', async () => {
     const context = buildContext();
     const running: DiscoveredSession = { ...ORIGINAL, processIsAlive: true };
@@ -439,13 +440,94 @@ describe('runProjectAdoptCommand', () => {
     expect(adoptionLauncher.calls).toHaveLength(0);
   });
 
-  it('with a TTY and an explicit "y", commits — the fork id lands in the trailer', async () => {
-    const workspace = new FakeWorkspaceRepository();
-    const context = buildContext({ workspace });
-    workspace.setChangedFiles('auth-hardening', ['auth-hardening/AGENTS.md']);
+  describe('item 8: confirmed BEFORE anything is created', () => {
+    it('no TTY at all: refuses unavailable, never creates the project or launches the fork', async () => {
+      const context = buildContext();
+      const sessionProvider = new FakeSessionProvider({ sessions: [ORIGINAL], rejected: [] });
+      const adoptionLauncher = new FakeSessionAdoptionLauncher();
+      const { stdout, output } = collectStdout();
+
+      const exitCode = await runProjectAdoptCommand(
+        sessionProvider,
+        buildAdoptDeps(context, { adoptionLauncher }),
+        ORIGINAL.name,
+        'auth-hardening',
+        buildOpenIo(stdout),
+      );
+
+      expect(exitCode).toBe(1);
+      expect(output()).toContain('no interactive terminal');
+      expect(
+        await context.workspace.projectExists(path.join(SEEYA_HOME, 'workspace'), 'auth-hardening'),
+      ).toBe(false);
+      expect(adoptionLauncher.calls).toHaveLength(0);
+    });
+
+    it('a TTY with an explicit "n": cancels — nothing created, exit 0 (a real decision, not a failure)', async () => {
+      const context = buildContext();
+      const sessionProvider = new FakeSessionProvider({ sessions: [ORIGINAL], rejected: [] });
+      const adoptionLauncher = new FakeSessionAdoptionLauncher();
+      const stdin = new PassThrough();
+      stdin.write('n\n');
+      const { stdout, output } = collectStdout();
+
+      const exitCode = await runProjectAdoptCommand(
+        sessionProvider,
+        buildAdoptDeps(context, { adoptionLauncher }),
+        ORIGINAL.name,
+        'auth-hardening',
+        { stdin, stdout, isTTY: true },
+      );
+
+      expect(exitCode).toBe(0);
+      expect(output()).toContain('cancelled');
+      expect(
+        await context.workspace.projectExists(path.join(SEEYA_HOME, 'workspace'), 'auth-hardening'),
+      ).toBe(false);
+      expect(adoptionLauncher.calls).toHaveLength(0);
+    });
+
+    it('a TTY with a blank answer proceeds — the block names both directories and the project-open follow-up, shown BEFORE the fork launches', async () => {
+      const context = buildContext();
+      const sessionProvider = new FakeSessionProvider({ sessions: [ORIGINAL], rejected: [] });
+      const stdin = new PassThrough();
+      stdin.write('\n');
+      const inspectingLauncher = new FakeSessionAdoptionLauncher();
+      const originalAdopt = inspectingLauncher.adopt.bind(inspectingLauncher);
+      const { stdout, output } = collectStdout();
+      let outputAtLaunchTime = '';
+      inspectingLauncher.adopt = async (...args) => {
+        outputAtLaunchTime = output();
+        return originalAdopt(...args);
+      };
+
+      const exitCode = await runProjectAdoptCommand(
+        sessionProvider,
+        buildAdoptDeps(context, { adoptionLauncher: inspectingLauncher }),
+        ORIGINAL.name,
+        'auth-hardening',
+        { stdin, stdout, isTTY: true },
+      );
+
+      const projectDir = path.join(SEEYA_HOME, 'workspace', 'auth-hardening');
+      expect(exitCode).toBe(0);
+      // The maintainer's own acceptance run (task-23 comment) was surprised by the fork's actual
+      // directory — this proves the explanation is on screen BEFORE the interactive harness would
+      // take the terminal, not just present somewhere in the final report.
+      expect(outputAtLaunchTime).toContain(ORIGINAL.cwd);
+      expect(outputAtLaunchTime).toContain(projectDir);
+      expect(outputAtLaunchTime).toContain('seeya project open auth-hardening');
+      expect(
+        await context.workspace.projectExists(path.join(SEEYA_HOME, 'workspace'), 'auth-hardening'),
+      ).toBe(true);
+    });
+  });
+
+  it('resolves by display name, creates the project, and reports noChanges when the fork wrote nothing', async () => {
+    const context = buildContext();
     const sessionProvider = new FakeSessionProvider({ sessions: [ORIGINAL], rejected: [] });
     const stdin = new PassThrough();
-    stdin.write('y\n');
+    stdin.write('\n');
     const stdout = new PassThrough();
     let collected = '';
     stdout.on('data', (chunk: Buffer) => (collected += chunk.toString('utf8')));
@@ -459,21 +541,57 @@ describe('runProjectAdoptCommand', () => {
     );
 
     expect(exitCode).toBe(0);
-    expect(collected).toContain('adopted');
-    expect(collected).toContain('Commit these changes?');
-    expect(workspace.commitMessages.at(-1)).toContain(`Seeya-Session-Id: ${FORK_SESSION_ID}`);
+    expect(collected).toContain('nothing to commit');
+    expect(
+      await context.workspace.projectExists(path.join(SEEYA_HOME, 'workspace'), 'auth-hardening'),
+    ).toBe(true);
   });
 
-  it('with a TTY and a blank answer, declines — nothing committed', async () => {
+  it('with a TTY, proceeds past the launch gate then an explicit "y" for the commit: adopts — the fork id lands in the trailer, and the report repeats "project open" (item 9)', async () => {
     const workspace = new FakeWorkspaceRepository();
     const context = buildContext({ workspace });
     workspace.setChangedFiles('auth-hardening', ['auth-hardening/AGENTS.md']);
     const sessionProvider = new FakeSessionProvider({ sessions: [ORIGINAL], rejected: [] });
     const stdin = new PassThrough();
-    stdin.write('\n');
     const stdout = new PassThrough();
     let collected = '';
     stdout.on('data', (chunk: Buffer) => (collected += chunk.toString('utf8')));
+    // Two questions, one after the other, over the SAME `readline` interface
+    // (`project-command.ts#openConfirmationReader`'s own docstring): answering both with one
+    // `stdin.write` up front — before either prompt exists — loses the second line (measured: the
+    // interface's own internal buffering only surfaces it to the FIRST `question()` call, and the
+    // second one then hangs forever). Each answer is written only once its own prompt is seen.
+    answerPromptWhenSeen(stdout, stdin, 'Continue?', '\n'); // launch confirmation: blank = proceed
+    answerPromptWhenSeen(stdout, stdin, 'Commit these changes?', 'y\n'); // commit confirmation
+
+    const exitCode = await runProjectAdoptCommand(
+      sessionProvider,
+      buildAdoptDeps(context),
+      ORIGINAL.name,
+      'auth-hardening',
+      { stdin, stdout, isTTY: true },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(collected).toContain('adopted');
+    expect(collected).toContain('Commit these changes?');
+    expect(collected).toContain('seeya project open auth-hardening');
+    expect(workspace.commitMessages.at(-1)).toContain(`Seeya-Session-Id: ${FORK_SESSION_ID}`);
+  });
+
+  it('with a TTY, proceeds past the launch gate then a blank commit answer: declines — nothing committed', async () => {
+    const workspace = new FakeWorkspaceRepository();
+    const context = buildContext({ workspace });
+    workspace.setChangedFiles('auth-hardening', ['auth-hardening/AGENTS.md']);
+    const sessionProvider = new FakeSessionProvider({ sessions: [ORIGINAL], rejected: [] });
+    const stdin = new PassThrough();
+    const stdout = new PassThrough();
+    let collected = '';
+    stdout.on('data', (chunk: Buffer) => (collected += chunk.toString('utf8')));
+    // Launch confirmation: blank = proceed. Commit confirmation: blank = decline (that question's
+    // own default, unchanged — only the launch question's default flipped, item 8).
+    answerPromptWhenSeen(stdout, stdin, 'Continue?', '\n');
+    answerPromptWhenSeen(stdout, stdin, 'Commit these changes?', '\n');
 
     const exitCode = await runProjectAdoptCommand(
       sessionProvider,

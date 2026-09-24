@@ -22,6 +22,7 @@ import { adoptSession } from '@seeya-ai/engine/application/project-adopt.js';
 import type {
   AdoptSessionDeps,
   ConfirmAdoptionCommit,
+  ConfirmAdoptionLaunch,
 } from '@seeya-ai/engine/application/project-adopt.js';
 import { resolveSessionReference, toDiscoveredSessionReference } from './session-reference.js';
 import type { ProjectContext } from './composition.js';
@@ -36,8 +37,10 @@ import {
   formatProjectLockWarningLines,
   formatProjectsReport,
   formatShowProjectReport,
+  parseAdoptionLaunchConfirmation,
   parseReadOnlyOpenConfirmation,
   renderAdoptionCommitConfirmation,
+  renderAdoptionLaunchConfirmation,
   renderReadOnlyOpenConfirmation,
 } from './format-project.js';
 
@@ -83,22 +86,42 @@ export interface ProjectOpenIo {
   readonly isTTY: boolean;
 }
 
-/** V2-T35 item 1: `openProject`'s own `ConfirmReadOnlyOpen` — asks over `node:readline/promises`
- * exactly like `start-day-command.ts#makeFallbackConfirmer` does, but never falls back to a
- * default answer when `io.isTTY` is false: it resolves `'unavailable'` and lets `openProject`
- * refuse ("sem entrada interativa, recusa dizendo o porquê"), the one confirmation in this project
- * that does not guess. */
-function makeReadOnlyOpenConfirmer(io: ProjectOpenIo): ConfirmReadOnlyOpen {
+/** A `readline.Interface` reader, or `null` when there's no TTY to ask through at all — the same
+ * shape `askQuestion` below reads from. */
+type ConfirmationReader = ReturnType<typeof createInterface> | null;
+
+/**
+ * Opens ONE `readline` interface for a WHOLE command invocation, never one per question — a
+ * command that can ask more than one question in sequence (`runProjectAdoptCommand`: the launch
+ * confirmation, then, only if it proceeds, the commit confirmation) needs the SAME interface
+ * throughout. Measured: closing an interface after one question and opening a second one on the
+ * same stream loses whatever was already buffered past the first line — the second `question()`
+ * then hangs forever waiting for input that already arrived and was discarded. `null` when
+ * `io.isTTY` is false, so every confirmation reads the same "no way to ask" signal from one place
+ * (AGENTS.md: "nada de duplicação") instead of each checking `io.isTTY` on its own.
+ */
+function openConfirmationReader(io: ProjectOpenIo): ConfirmationReader {
+  return io.isTTY ? createInterface({ input: io.stdin, output: io.stdout }) : null;
+}
+
+/** Asks one question through the SHARED reader `openConfirmationReader` opened — `null` (no TTY)
+ * always resolves `null` here too, never a guessed answer (D-025); the caller decides what `null`
+ * means for its own question. */
+async function askQuestion(reader: ConfirmationReader, prompt: string): Promise<string | null> {
+  if (reader === null) {
+    return null;
+  }
+  return reader.question(`\n${prompt}`);
+}
+
+/** V2-T35 item 1: `openProject`'s own `ConfirmReadOnlyOpen` — never falls back to a default answer
+ * when there's no way to ask: `askQuestion` returning `null` becomes `'unavailable'`, and
+ * `openProject` refuses ("sem entrada interativa, recusa dizendo o porquê"). */
+function makeReadOnlyOpenConfirmer(reader: ConfirmationReader): ConfirmReadOnlyOpen {
   return async (heldBy) => {
-    if (!io.isTTY) {
+    const answer = await askQuestion(reader, renderReadOnlyOpenConfirmation(heldBy));
+    if (answer === null) {
       return 'unavailable';
-    }
-    const rl = createInterface({ input: io.stdin, output: io.stdout });
-    let answer: string;
-    try {
-      answer = await rl.question(`\n${renderReadOnlyOpenConfirmation(heldBy)}`);
-    } finally {
-      rl.close();
     }
     return parseReadOnlyOpenConfirmation(answer) ? 'proceed' : 'decline';
   };
@@ -127,41 +150,59 @@ export async function runProjectOpenCommand(
   harness: string | undefined,
   io: ProjectOpenIo,
 ): Promise<number> {
-  const result = await openProject(deps, projectId, harness, {
-    onBeforeLaunch: ({ missing, lock }) => {
-      const lines = [
-        ...formatMissingRepositoryLines(projectId, missing),
-        ...formatProjectLockWarningLines(projectId, lock),
-      ];
-      for (const line of lines) {
-        io.stdout.write(`${line}\n`);
-      }
-    },
-    confirmReadOnlyOpen: makeReadOnlyOpenConfirmer(io),
-  });
+  const reader = openConfirmationReader(io);
+  let result;
+  try {
+    result = await openProject(deps, projectId, harness, {
+      onBeforeLaunch: ({ missing, lock }) => {
+        const lines = [
+          ...formatMissingRepositoryLines(projectId, missing),
+          ...formatProjectLockWarningLines(projectId, lock),
+        ];
+        for (const line of lines) {
+          io.stdout.write(`${line}\n`);
+        }
+      },
+      confirmReadOnlyOpen: makeReadOnlyOpenConfirmer(reader),
+    });
+  } finally {
+    reader?.close();
+  }
   io.stdout.write(`${formatOpenProjectReport(result)}\n`);
   // V2-T35 item 1: a deliberate decline is not a failure ("Nothing selected — nothing resumed"'s
   // own precedent in `start-day-command.ts`) — everything else non-`opened` is.
   return result.kind === 'opened' || result.kind === 'lockConfirmationDeclined' ? 0 : 1;
 }
 
-/** V2-T29 item 4: `adoptSession`'s own `ConfirmAdoptionCommit` — same shape and same "no TTY, no
- * silent guess" contract `makeReadOnlyOpenConfirmer` above already established, reusing its y/N
- * parsing (`parseReadOnlyOpenConfirmation`): the convention ("anything other than y/yes is a
- * decline") is generic, not specific to the read-only-open question it was first written for. */
-function makeAdoptionCommitConfirmer(io: ProjectOpenIo): ConfirmAdoptionCommit {
+/** V2-T29 item 4: `adoptSession`'s own `ConfirmAdoptionCommit` — same "no TTY, no silent guess"
+ * contract `makeReadOnlyOpenConfirmer` above already established, reusing its y/N parsing
+ * (`parseReadOnlyOpenConfirmation`): the convention ("anything other than y/yes is a decline") is
+ * generic, not specific to the read-only-open question it was first written for. */
+function makeAdoptionCommitConfirmer(reader: ConfirmationReader): ConfirmAdoptionCommit {
   return async (changedFiles) => {
-    if (!io.isTTY) {
+    const answer = await askQuestion(reader, renderAdoptionCommitConfirmation(changedFiles));
+    if (answer === null) {
       return 'unavailable';
     }
-    const rl = createInterface({ input: io.stdin, output: io.stdout });
-    let answer: string;
-    try {
-      answer = await rl.question(`\n${renderAdoptionCommitConfirmation(changedFiles)}`);
-    } finally {
-      rl.close();
-    }
     return parseReadOnlyOpenConfirmation(answer) ? 'commit' : 'decline';
+  };
+}
+
+/** V2-T29 item 8: `adoptSession`'s own `ConfirmAdoptionLaunch` — asked BEFORE anything is created,
+ * with its own y/N default (`parseAdoptionLaunchConfirmation`'s own docstring on why blank means
+ * "continue" here, unlike every other confirmation in this file). Shares the SAME `reader` the
+ * (possible) later `makeAdoptionCommitConfirmer` question uses — `openConfirmationReader`'s own
+ * docstring on why one command invocation never opens more than one. */
+function makeAdoptionLaunchConfirmer(reader: ConfirmationReader): ConfirmAdoptionLaunch {
+  return async ({ originalCwd, projectDir, projectId }) => {
+    const answer = await askQuestion(
+      reader,
+      renderAdoptionLaunchConfirmation(originalCwd, projectDir, projectId),
+    );
+    if (answer === null) {
+      return 'unavailable';
+    }
+    return parseAdoptionLaunchConfirmation(answer) ? 'proceed' : 'decline';
   };
 }
 
@@ -196,18 +237,24 @@ export async function runProjectAdoptCommand(
     return 1;
   }
 
-  const result = await adoptSession(deps, match.item, projectId, {
-    onBeforeLaunch: ({ forkSessionId }) => {
-      io.stdout.write(
-        `Adopting "${match.item.name}" into project "${projectId}" (fork ${forkSessionId})...\n`,
-      );
-    },
-    confirmCommit: makeAdoptionCommitConfirmer(io),
-  });
+  const reader = openConfirmationReader(io);
+  let result;
+  try {
+    result = await adoptSession(deps, match.item, projectId, {
+      confirmLaunch: makeAdoptionLaunchConfirmer(reader),
+      confirmCommit: makeAdoptionCommitConfirmer(reader),
+    });
+  } finally {
+    reader?.close();
+  }
   io.stdout.write(`${formatAdoptSessionReport(result)}\n`);
-  // Same "deliberate outcome vs. refusal" split `runProjectOpenCommand` already draws: `adopted`,
-  // `declined` and `noChanges` are all decisions that completed cleanly; everything else refused.
-  return result.kind === 'adopted' || result.kind === 'declined' || result.kind === 'noChanges'
+  // Same "deliberate outcome vs. refusal" split `runProjectOpenCommand` already draws for
+  // `lockConfirmationDeclined`: a person explicitly saying no (here, `launchConfirmationDeclined`,
+  // item 8) is a decision that completed cleanly, not a failure — everything else IS a refusal.
+  return result.kind === 'adopted' ||
+    result.kind === 'declined' ||
+    result.kind === 'noChanges' ||
+    result.kind === 'launchConfirmationDeclined'
     ? 0
     : 1;
 }

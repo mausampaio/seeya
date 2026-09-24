@@ -272,6 +272,42 @@ export function formatAdoptAmbiguousMatchMessage(
   return lines.join('\n');
 }
 
+/**
+ * V2-T29 item 8 (added after the maintainer's second acceptance round, task-23 comment): the
+ * explanation `adopt` shows and waits on BEFORE creating anything — same "explain, then pause for
+ * an answer" shape `renderReadOnlyOpenConfirmation` already gives a locked `open`, now for a
+ * problem the acceptance run itself found: the interactive harness takes over the terminal right
+ * after this, so whatever it says has to be read before that happens, not printed and immediately
+ * scrolled past. Says, in order: where the copy opens and why (its own directory's instructions
+ * and memory — the reasoning the maintainer gave, 2026-09-24, for choosing that directory over the
+ * project's own); where the project lives, since that's where it will write; and the follow-up for
+ * AFTER adoption (`seeya project open`, where the project's own memory is what applies).
+ */
+export function renderAdoptionLaunchConfirmation(
+  originalCwd: string,
+  projectDir: string,
+  projectId: string,
+): string {
+  const lines = [
+    `The copy will open in ${originalCwd} — that is where its own instructions and memory ` +
+      'live, and it needs them to pass this work on.',
+    `The project lives at ${projectDir}; that is where it will write.`,
+    `Afterward, to work on the project itself, reopen it from there: seeya project open ` +
+      `${projectId} (that is where the project's own memory applies).`,
+    'Continue? [Y/n] ',
+  ];
+  return lines.join('\n');
+}
+
+/** Blank (pressing Enter) means "continue" here — the opposite default of
+ * `parseReadOnlyOpenConfirmation`'s blank-means-no: that question gates opening a project someone
+ * else already holds, this one gates the very thing `seeya project adopt` was invoked to do, so
+ * silence defaults to the action already requested. Only an explicit "n"/"no" declines. */
+export function parseAdoptionLaunchConfirmation(raw: string): boolean {
+  const normalized = raw.trim().toLowerCase();
+  return normalized !== 'n' && normalized !== 'no';
+}
+
 /** V2-T29 item 4: the question `adopt` asks once the fork's interactive session has closed and
  * something inside the project actually changed — one line per changed file, same "show, then
  * ask" order the task's own spec requires ("a CLI mostra os arquivos que mudaram... e pergunta"). */
@@ -314,6 +350,16 @@ export function formatAdoptSessionReport(result: AdoptSessionResult): string {
       return formatAdoptSessionRunning(result);
     case 'alreadyAdopted':
       return formatAdoptAlreadyAdopted(result);
+    // Item 8: the person was asked, and either said no or had no way to answer — nothing was
+    // created (no project, no lock, no fork registered), so neither case has anything else to
+    // report.
+    case 'launchConfirmationDeclined':
+      return `Project "${result.projectId}": adoption cancelled — you chose not to continue.`;
+    case 'launchConfirmationUnavailable':
+      return (
+        `seeya: refusing to adopt into project "${result.projectId}" without a way to ask for ` +
+        'confirmation (no interactive terminal attached). Run this from a real terminal.'
+      );
     case 'projectLocked':
       return (
         `seeya: project "${result.projectId}" is locked by ` +
@@ -341,9 +387,13 @@ export function formatAdoptSessionReport(result: AdoptSessionResult): string {
         `written:\n${formatAdoptedChangedFiles(result.changedFiles)}`
       );
     case 'adopted':
+      // Item 9: repeats the same follow-up the launch confirmation already offered — the person
+      // saw it once before the harness took the terminal; this is the reminder for when they're
+      // looking at the terminal again, after the fact.
       return (
         `Project "${result.projectId}": adopted. The fork (${result.forkSessionId}) is now this ` +
-        `project's own session. Committed:\n${formatAdoptedChangedFiles(result.changedFiles)}`
+        `project's own session. Committed:\n${formatAdoptedChangedFiles(result.changedFiles)}\n` +
+        `Continue the work with: seeya project open ${result.projectId}`
       );
   }
 }
