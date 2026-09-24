@@ -4,7 +4,7 @@ title: V2-T43 — Gancho antes do push
 status: Review
 assignee: []
 created_date: '2026-09-24 10:21'
-updated_date: '2026-09-24 10:49'
+updated_date: '2026-09-24 18:11'
 labels:
   - portao
   - d-049
@@ -53,3 +53,13 @@ recusado com a mensagem certa; corrigir e ver passar.
 <!-- SECTION:NOTES:BEGIN -->
 Implemented `.husky/pre-push` (76 lines), same husky install as pre-commit -- no new
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-24 18:11
+---
+Aceite reescrito pelo PO em 2026-09-24: o original ('quebrar uma formatação e tentar git push') não chega a testar o gancho — o pre-commit já roda prettier --write, eslint --fix e tsc nos arquivos preparados, então a formatação é consertada ou recusada antes de virar commit. O caso que só o pre-push pega é o do backlog: markdown passa pelo pre-commit, e a guarda de nomes só roda no push. Aceite novo: numa branch de teste, criar uma tarefa com título de mais de 72 caracteres (backlog task create "..."), commitar, tentar git push e ver a recusa com a mensagem do D-048; apagar a tarefa, commitar e ver o push passar. O gancho já rodou de verdade em todos os pushes do PO hoje (a saída da guarda aparece antes do push).
+---
+<!-- COMMENTS:END -->
