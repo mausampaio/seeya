@@ -44,7 +44,7 @@ Conflito entre este arquivo e um doc acima: o doc vence, e você registra a inco
   de implementação: `backlog task edit <id> --notes "..."`, ou editando o arquivo sem apagar os
   marcadores `<!-- SECTION:... -->`), mova-a para `Review` (`backlog task edit <id> -s Review`) e
   **pare**. Quem move para `Done` é o review.
-- Branch por tarefa: `tarefa/S1-T3-descoberta`. Commits pequenos, em português.
+- Branch por tarefa: `tarefa/S1-T3-descoberta`. Commits pequenos, em inglês (D-028 — a tabela de idioma abaixo; Q-092).
 - **Commite antes de terminar a tarefa.** Duas quedas de API já pegaram agentes com trabalho só
   no disco. Trabalho não commitado é trabalho que a próxima queda leva.
 

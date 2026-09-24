@@ -8829,3 +8829,14 @@ inglês — a prática bate com a tabela de D-028, não com a linha de "Como tra
 seguiu inglês (a tabela com decisão citada, D-028, e a prática observada) e registra a
 inconsistência aqui em vez de decidir sozinha qual linha do próprio `AGENTS.md` está desatualizada
 — só o PO deveria escolher qual das duas apagar/corrigir.
+
+**Resolução da Q-091 (PO, 2026-09-24).** Aceita a escolha do agente: sem terminal para perguntar
+"commita?", a adoção não commita e não apaga nada. A consequência, dita para não virar surpresa: a
+cópia continua registrada em `forks.json` como pendente, então fica escondida da descoberta e é
+apagada pela limpeza de forks depois de `forkCleanupDays` — o mesmo destino de uma adoção nunca
+aceita. Os arquivos que a sessão escreveu no projeto ficam no disco, sem commit, para a pessoa
+revisar. Como `adopt` só faz sentido rodado por alguém num terminal, o caso é de borda.
+
+**Resolução da Q-092 (PO, 2026-09-24).** Corrigido o `AGENTS.md`: "Como trabalhar" dizia commits
+"em português", contra a tabela da D-028 e contra o histórico real, que é todo em inglês. Agora
+diz inglês e aponta para a tabela.

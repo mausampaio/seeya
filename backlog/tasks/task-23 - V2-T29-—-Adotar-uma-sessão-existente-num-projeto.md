@@ -4,7 +4,7 @@ title: V2-T29 — Adotar uma sessão existente num projeto
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-24 20:30'
+updated_date: '2026-09-24 20:35'
 labels:
   - adocao
   - d-047
@@ -195,3 +195,13 @@ inglês, que bate com o `git log` real).
 de teste, 2419 testes, 4 pulados; `core/` 99.51%, `application/` 100%, `adapters/harness/` 100%,
 `cli/src` 95.27% — todos acima do próprio piso).
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-24 20:35
+---
+Revisão do PO em 2026-09-24: mesclado no po-gate, portão verde (2419 testes). Conferido: sessão resolvida pelo nome; viva ou já adotada é recusada; lock tomado com o id da CÓPIA (gerado pelo seeya, como o open da V2-T35); cópia registrada em forks.json antes de lançar; retomada interativa sem permission-mode, no diretório original, com --add-dir só para o projeto; no fim, descarte (nada mudou / recusado) ou promoção (fora de forks.json, dentro de adoptions.json). Prova forte de que a original não muda: SHA-256 idêntico antes e depois, numa sessão descartável (Q-090). Q-091 aceita e Q-092 corrigida pelo PO (AGENTS.md dizia commits em português). Falta o aceite do mantenedor, cujo PRIMEIRO passo é confirmar em terminal real que as quatro flags funcionam juntas no modo interativo.
+---
+<!-- COMMENTS:END -->
