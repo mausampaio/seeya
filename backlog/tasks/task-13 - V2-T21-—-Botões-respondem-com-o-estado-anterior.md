@@ -4,7 +4,7 @@ title: V2-T21 — Botões respondem com o estado anterior
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-23 10:46'
+updated_date: '2026-09-24 11:12'
 labels: []
 milestone: m-2
 dependencies: []
@@ -164,3 +164,13 @@ prazo do runner, nenhum arquivo tocado), a mesma suíte fecha em 200 arquivos, 2
 passando, 4 pulados, cobertura 96,41%/92,68%/94,97%/96,77% — acima dos pisos por diretório.
 `npm run verificar:linux` não foi rodado (opcional).
 <!-- SECTION:DESCRIPTION:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-24 11:12
+---
+Aceite parcial do mantenedor em 2026-09-24 (Windows, instalado): item 3 confirmado — o status mostra 'End-of-day time: 09:45 local (today: 10:45, after snoozing)'. Item 1, lado do autostart, já tinha sido confirmado antes (o botão vira na hora). Falta o painel 'Hoje' explicar quando não há o que marcar (item 2). O comportamento do botão do daemon é da V2-T31, não desta.
+---
+<!-- COMMENTS:END -->
