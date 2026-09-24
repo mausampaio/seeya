@@ -8682,3 +8682,56 @@ depende desse comando para estar correta" estava errada: o instalador não compi
 ausente no mesmo ponto) e dois testes existentes quebravam. O harness `makensis` à parte, sem as
 defines e a ordem de `!include` reais do `electron-builder`, deu falsa confiança. Lição registrada:
 prova de compilação é o comando real, nunca uma reprodução dele.
+
+## Q-089 — V2-T35: sem terminal de verdade, o agente não confirmou `--session-id`/
+`--append-system-prompt` em sessão interativa real — só em `-p` e num modo degradado sem TTY
+
+**Contexto.** A tarefa pede duas medições antes de depender de comportamento do `claude`: item 2
+("medir qual [forma] antes de escolher") para `--append-system-prompt`, e item 4 ("confirmar com
+sessão descartável que ela vale igual no modo interativo antes de depender dela") para
+`--session-id`. O despacho já previa o caso: "se você não tiver como rodar uma sessão interativa
+(sem terminal de verdade), não improvise: registre como não verificado."
+
+**O que foi tentado.** `winpty` está instalado nesta máquina, mas recusou de saída
+(`stdin is not a tty`) — a ferramenta do agente que roda comandos não tem um console real por
+trás, então nem `winpty` consegue alocar um pseudo-terminal para o `claude` filho. Sem essa saída,
+não há como este agente produzir uma sessão *genuinamente* interativa (TUI, `stdio: 'inherit'`
+herdando um terminal de verdade) — a mesma lacuna que a Q-069 já registrou para o caso de
+`--resume`.
+
+**O que foi medido em vez disso.** Duas sessões descartáveis, `cwd` em
+`%TEMP%\...\v2t35-interactive-probe` (sem git, sem projeto real), rodando o comando **default**
+do `claude` (sem `-p`, sem `--resume` — a mesma família de invocação que `open` usa) com stdin
+**pipeado** (não um TTY): o próprio Spike H já documentou que, sem TTY, esse modo degrada para uma
+resposta única em texto puro e sai — mas ainda assim é uma chamada real ao binário `claude`, na
+família de comando que `open` de fato invoca (diferente do Spike J, que usava `-p` explicitamente).
+
+1. `--session-id 33333333-3333-4333-8333-333333333333` — o arquivo
+   `.jsonl` gravado em `~/.claude/projects/<slug-do-cwd>/` saiu com exatamente esse nome/id.
+2. `--session-id 44444444-...` + `--append-system-prompt 'Project note: PLUM-LOCK-42 is locked by
+   an unidentified session (pid 99999) since 2026-01-01T00:00:00.000Z.'`, perguntando ao modelo
+   qual marcador aparecia no prompt de sistema: a resposta ecoou o texto completo, palavra por
+   palavra — confirma que o texto chega ao contexto de uma sessão **fresca** (nunca `--resume`,
+   cujo "não entrega" é especificamente o que a Q-069 mediu).
+
+**Interpretação, D-025 aplicado.** Isto NÃO é a mesma prova que rodar num terminal de verdade —
+falta confirmar que uma sessão multi-turno de fato interativa (TUI real) se comporta igual. Mas
+também não é uma suposição não testada: é o comando `claude` real, na família de invocação
+correta (comando default, sem `-p`), com as duas flags exatas que `open` usa, uma camada mais
+perto da produção do que o Spike J (que testou só em `-p`). Registrado como o meio-termo entre
+"medido" e "não verificado", nunca como equivalente a testar em modo interativo de verdade.
+
+**Efeito na tarefa.** A V2-T35 foi implementada e testada (unidade/integração) assumindo que as
+duas flags funcionam também em modo interativo genuíno — apoiada nesta medição mais o Spike J
+(que já confirmou `--session-id` na criação de sessão nova, em `-p`) e a Q-069 (que já confirmou
+`--append-system-prompt-file`/`--append-system-prompt` entregando a uma sessão fresca, também em
+`-p`). **Fica para o aceite do mantenedor**, no mesmo teste dos dois terminais que já prova o
+item 1 (abrir um projeto travado e ler o aviso): dentro da sessão aberta, perguntar ao agente se o
+projeto está travado, e confirmar que `claude --session-id <id>` produziu de fato uma sessão cujo
+identificador bate com o do `.seeya-lock`.
+
+**Sessões descartáveis criadas por esta medição** (aparecem na descoberta do `seeya` real, listadas
+para rastreabilidade): `33333333-3333-4333-8333-333333333333` e
+`44444444-4444-4444-8444-444444444444`, ambas em
+`%TEMP%\claude\C--code-seeya\<sessão-do-agente>\scratchpad\v2t35-interactive-probe` (fora de
+qualquer repositório real).

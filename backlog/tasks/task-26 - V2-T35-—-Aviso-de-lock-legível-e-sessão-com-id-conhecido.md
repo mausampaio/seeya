@@ -1,10 +1,10 @@
 ---
 id: TASK-26
 title: V2-T35 — Aviso de lock legível e sessão com id conhecido
-status: To Do
+status: Review
 assignee: []
 created_date: '2026-09-23 10:12'
-updated_date: '2026-09-23 10:46'
+updated_date: '2026-09-24 18:53'
 labels:
   - correcao
   - d-047
@@ -81,3 +81,80 @@ abre o `claude` real contra um projeto do mantenedor.
 harness assumir a tela; e, dentro da sessão aberta, perguntar ao agente se o projeto está travado e
 ele saber responder; e o `.seeya-lock`, enquanto a sessão está aberta, trazer o id dela.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+**Relatório do agente (branch `tarefa/V2-T35-aviso-de-lock-e-id`, worktree isolada, a partir da
+`main`).** Os quatro itens, nesta ordem:
+
+1. **`open` pausa e pergunta quando o lock está travado.** `application/project-open.ts#openProject`
+   ganhou `OpenProjectCallbacks.confirmReadOnlyOpen` (`ConfirmReadOnlyOpen`, três respostas nunca
+   achatadas — `proceed`/`decline`/`unavailable`, D-024), perguntado só quando `lock.kind ===
+   'readOnly'` — lock livre ou reclamado (processo morto) continua abrindo direto, sem pergunta,
+   exatamente como antes. Extraído em `blockedByLock` para `openProject` continuar reto (AGENTS.md §
+   "Retorno cedo"). Sem confirmador (`undefined`), o resultado é `'unavailable'` — nunca um "sim"
+   silencioso (D-025). `cli/project-command.ts#makeReadOnlyOpenConfirmer` implementa por
+   `node:readline/promises`, mesmo padrão de `start-day-command.ts#makeFallbackConfirmer`, mas SEM
+   resposta padrão quando `!io.isTTY`: resolve `'unavailable'` e `open` recusa dizendo o porquê
+   (`OpenProjectResult`'s own `lockConfirmationUnavailable`, exit 1) — um "não" explícito vira
+   `lockConfirmationDeclined` (exit 0, escolha deliberada, não falha).
+2. **A sessão é avisada junto.** O MESMO texto que o terminal mostra
+   (`core/project-lock-message.ts#formatProjectLockWarningLines`, movido de `cli/` para `core/`
+   nesta tarefa — pure, sem I/O, para servir aos dois lados sem violar a matriz de camadas) vira
+   `--append-system-prompt <texto>` do `claude` lançado, só quando há algo para avisar (`null`
+   quando o lock está livre). Medido: **flag confirmada entregando a uma sessão FRESCA** (nunca
+   `--resume`, cujo "não entrega" é especificamente o achado da Q-069) — ver item de medição abaixo,
+   Q-089.
+3. **Ao sair, `open` repete o aviso e diz o estado final do lock.**
+   `OpenProjectResult`'s own `opened.finalLockStatus` (`ProjectLockStatus`, lido de novo por
+   `describeProjectLockStatus` DEPOIS do harness fechar e da liberação — nunca o snapshot
+   pré-lançamento repetido como se ainda valesse). `cli/format-project.ts#formatOpenedReport` repete
+   as mesmas linhas de `formatProjectLockWarningLines` e acrescenta a linha `lock: ...` (reusando
+   `formatLockStatusLine`, já usado por `project show`).
+4. **`open` gera e usa o id da sessão que lança.** `packages/cli/src/composition.ts
+   #buildProjectOpenDeps` gera `launchedSessionId` com `node:crypto#randomUUID()` — aleatoriedade
+   fora de `core/`/`application/`, na raiz de composição, como a tarefa pediu. Esse id vai para
+   `claude --session-id <id>` (`adapters/harness/args.ts#buildOpenArgs`, `--session-id`/
+   `--append-system-prompt` sempre ANTES de `--add-dir`, para nunca ficarem adjacentes à lista
+   variádica que a spike N já flagrou) e é o MESMO id gravado no `.seeya-lock`
+   (`acquireOpenLock` agora usa `deps.launchedSessionId`, nunca mais `deps.sessionId`/
+   `CLAUDE_CODE_SESSION_ID` do chamador) — vale sempre, inclusive quando `open` roda de dentro de
+   outra sessão: o dono do lock é a sessão que `open` abriu, nunca a que chamou. Teste
+   (`tests/unit/application/project-open.test.ts`) confere que o id passado a
+   `harnessLauncher.open` é exatamente o gravado no lock. `deps.sessionId`/`CLAUDE_CODE_SESSION_ID`
+   continua existindo em `ProjectOpenDeps`, mas só para as outras subcomandas de `project` (create/
+   add-repo, trailers de commit) — `open` não o usa mais para nada.
+   Glossário do `AGENTS.md` atualizado: "identidade da sessão que segura o lock/commita" agora diz
+   as duas fontes.
+
+**Ambiente do `claude` lançado continua limpo (D-017)** — nada mudou em
+`adapters/resumption/env.ts#buildResumptionEnv`, já reusado por `ClaudeHarnessLauncher`.
+
+**Medição do item 2 e confirmação do item 4 (Q-089).** Sem terminal de verdade neste agente
+(`winpty` confirmou: recusa com `stdin is not a tty` — a ferramenta de execução do agente não tem
+console real por trás), a confirmação em modo interativo GENUÍNO fica para o aceite do mantenedor,
+como o despacho já previa ("não improvise: registre como não verificado"). O que foi medido em vez
+disso, com duas sessões descartáveis reais (não `-p`, o comando default do `claude`, mesma família
+que `open` invoca, com stdin pipeado — degrada sem TTY, Spike H já documentou isso, mas ainda é o
+binário real): `--session-id` produziu um `.jsonl` com exatamente o id pedido; `--append-system-prompt`
+entregou o texto exato ao contexto do modelo. Registrado com detalhe em Q-089 (`docs/QUESTOES.md`).
+`--session-id` em criação de sessão nova já tinha confirmação prévia, em `-p`, no Spike J;
+`--append-system-prompt`/`-file` entregando a uma sessão FRESCA (nunca `--resume`) já tinha
+confirmação prévia, em `-p`, na Q-069.
+
+**Refatoração de apoio, sem mudança de comportamento:** `ProjectOpenLockOutcome` movido de
+`application/project-open.ts` para `core/project-lock.ts` (re-exportado, mesmo caminho de import
+para quem já usava) — necessário para `core/project-lock-message.ts` descrever o tipo sem
+`application/`/`cli/` se importarem mutuamente (a matriz proíbe as duas direções).
+
+**Portão:** `npm run verificar` passou inteiro (código de saída 0) — `format:check`, `tsc --noEmit`,
+`eslint`, `build`, `dependencias` (412 módulos, 0 violação), `cobertura` (227 arquivos de teste,
+2351 testes, 4 pulados; `core/` 99.51%, `application/` 100%, `adapters/harness/` 100%, `cli/src`
+96.72% — todos acima do próprio piso).
+
+**Não verificado nesta tarefa (fica para o aceite):** confirmação de `--session-id`/
+`--append-system-prompt` numa sessão interativa GENUÍNA (TUI real, `stdio: 'inherit'` herdando um
+terminal de verdade) — ver Q-089. O aceite do mantenedor (dois terminais + perguntar ao agente se o
+projeto está travado + conferir que `.seeya-lock` traz o id da sessão) cobre exatamente isso.
+<!-- SECTION:NOTES:END -->
