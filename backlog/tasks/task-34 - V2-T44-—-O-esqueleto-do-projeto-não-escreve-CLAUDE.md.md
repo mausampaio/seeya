@@ -1,10 +1,10 @@
 ---
 id: TASK-34
 title: V2-T44 — O esqueleto do projeto não escreve CLAUDE.md
-status: Review
+status: Done
 assignee: []
 created_date: '2026-09-24 10:45'
-updated_date: '2026-09-24 17:33'
+updated_date: '2026-09-24 17:37'
 labels: []
 dependencies: []
 references:
@@ -163,5 +163,11 @@ author: PO
 created: 2026-09-24 17:33
 ---
 Revisão do PO em 2026-09-24. Código correto: esqueleto = AGENTS.md + INDEX.md + seis pastas, teste afirma a lista inteira e falhava antes. O PO completou a linha do glossário no AGENTS.md que o despacho pedia e o agente não tocou. INCIDENTE: ao provar pela CLI, o agente usou um SEEYA_HOME que não existe; o comando caiu no home real e criou o projeto v2-t44-proof, com commit, no espaço de trabalho do mantenedor. O mantenedor negou a tentativa seguinte; o PO desfez com o aval dele (reset para aaee62e + remoção das pastas vazias), conferido limpo. Causa registrada como armadilha em docs/FLUXO-DE-AGENTES.md: prova pela CLI só com buildProjectContext(homeDir) ou com USERPROFILE/HOME apontando para temporário. Portão verde no po-gate. Falta o aceite do mantenedor (projeto novo sem CLAUDE.md), que depende de um build novo instalado.
+---
+
+author: PO
+created: 2026-09-24 17:37
+---
+Aceite em 2026-09-24 (PO, a tarefa não pedia passo do mantenedor): a CLI construída a partir de 8175f1d, rodada com USERPROFILE/HOME num diretório temporário, criou o projeto com AGENTS.md, INDEX.md, seeya.json e as seis pastas — sem CLAUDE.md. O espaço de trabalho real do mantenedor foi conferido intocado (mesmo HEAD antes e depois). Portão verde. Done.
 ---
 <!-- COMMENTS:END -->

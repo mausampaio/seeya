@@ -1,10 +1,10 @@
 ---
 id: TASK-14
 title: V2-T22 — O instalador não consegue religar o daemon
-status: Review
+status: Done
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-23 10:46'
+updated_date: '2026-09-24 17:35'
 labels: []
 milestone: m-3
 dependencies: []
@@ -153,3 +153,13 @@ ajuste que faltava na spec: além do rótulo, o botão precisava **aceitar um cl
 após o anterior** — sem isso o texto se corrigiria na hora e o clique seguinte seria engolido
 até o próximo ciclo. Fica em `[~]` até o aceite do mantenedor.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-24 17:35
+---
+Aceite do mantenedor em 2026-09-24, com a evidência do aceite da V2-T45: instalação por cima (por máquina) com o daemon de pé, e o daemon de pé de novo ao fim sem clicar em nada — ~/.seeya/installer.log registra 'as-user ... seeya daemon started (pid 2396)' às 11:37:43, e daemon.lock confirma. Done.
+---
+<!-- COMMENTS:END -->

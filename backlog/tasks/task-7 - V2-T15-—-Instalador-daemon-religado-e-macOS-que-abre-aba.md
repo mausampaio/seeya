@@ -4,7 +4,7 @@ title: 'V2-T15 — Instalador: daemon religado e macOS que abre aba'
 status: Review
 assignee: []
 created_date: '2026-09-22 11:10'
-updated_date: '2026-09-23 10:46'
+updated_date: '2026-09-24 17:35'
 labels: []
 milestone: m-3
 dependencies: []
@@ -322,3 +322,13 @@ original (o `warning 6001` do NSIS, e a recusa `platform === 'win32'` do `electr
 para alvo mac) foram resolvidas dentro do próprio escopo, com a medição registrada em
 comentário perto do código, como o contrato pede.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-24 17:35
+---
+Aceite parcial em 2026-09-24 (Windows, por máquina): instalar por cima com o daemon de pé, sem matar processo à mão, e o daemon de volta ao fim — provado pelo installer.log da V2-T45. Faltam: desinstalar e a pasta ficar vazia (Windows), e a parte do Mac (sem máquina macOS disponível).
+---
+<!-- COMMENTS:END -->

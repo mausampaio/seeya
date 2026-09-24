@@ -1,10 +1,10 @@
 ---
 id: TASK-9
 title: V2-T17 — Orçamento de desempenho
-status: Review
+status: Done
 assignee: []
 created_date: '2026-09-22 11:10'
-updated_date: '2026-09-23 10:46'
+updated_date: '2026-09-24 17:35'
 labels: []
 milestone: m-2
 dependencies: []
@@ -113,3 +113,13 @@ cobertura na máquina real do mantenedor, que é o alvo desta tarefa).
 
 Fica em `[~]` para revisão do PO/mantenedor.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-24 17:35
+---
+Aceite do PO em 2026-09-24: os quatro números e o método estão em docs/DESEMPENHO.md, a régua entrou no AGENTS.md, e já foi aplicada (V2-T48 declara o custo). Não há passo manual do mantenedor nesta tarefa. Done.
+---
+<!-- COMMENTS:END -->
