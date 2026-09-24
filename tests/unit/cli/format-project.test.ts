@@ -9,8 +9,10 @@ import {
   formatOpenProjectReport,
   formatProjectsReport,
   formatShowProjectReport,
+  parseAdoptionLaunchConfirmation,
   parseReadOnlyOpenConfirmation,
   renderAdoptionCommitConfirmation,
+  renderAdoptionLaunchConfirmation,
   renderReadOnlyOpenConfirmation,
 } from '../../../packages/cli/src/format-project.js';
 import type { DiscoveredSession, ProjectManifest } from '@seeya-ai/engine/core/types.js';
@@ -379,6 +381,42 @@ const DISCOVERED_A: DiscoveredSession = {
   hasPid: false,
 };
 
+describe('renderAdoptionLaunchConfirmation', () => {
+  it('names both directories, why, and the project-open follow-up — never leaves the project path out (item 8)', () => {
+    const text = renderAdoptionLaunchConfirmation(
+      'c:\\code\\projeto',
+      'c:\\seeya\\workspace\\auth-hardening',
+      'auth-hardening',
+    );
+    expect(text).toContain('c:\\code\\projeto');
+    expect(text).toContain('instructions and memory');
+    expect(text).toContain('c:\\seeya\\workspace\\auth-hardening');
+    expect(text).toContain('seeya project open auth-hardening');
+    expect(text).toContain('Continue?');
+  });
+});
+
+describe('parseAdoptionLaunchConfirmation', () => {
+  it('blank means continue — the opposite default of parseReadOnlyOpenConfirmation', () => {
+    expect(parseAdoptionLaunchConfirmation('')).toBe(true);
+    expect(parseAdoptionLaunchConfirmation('   ')).toBe(true);
+  });
+
+  it('"y"/"yes" mean continue too', () => {
+    expect(parseAdoptionLaunchConfirmation('y')).toBe(true);
+    expect(parseAdoptionLaunchConfirmation('Yes')).toBe(true);
+  });
+
+  it('only an explicit "n"/"no" declines', () => {
+    expect(parseAdoptionLaunchConfirmation('n')).toBe(false);
+    expect(parseAdoptionLaunchConfirmation('No')).toBe(false);
+  });
+
+  it('anything else is treated as continue, not as an error', () => {
+    expect(parseAdoptionLaunchConfirmation('sure')).toBe(true);
+  });
+});
+
 describe('formatAdoptNoMatchMessage', () => {
   it('names the raw value and the discovered count', () => {
     const text = formatAdoptNoMatchMessage('nothing-like-this', 3);
@@ -425,6 +463,25 @@ describe('formatAdoptSessionReport', () => {
     expect(text).toContain('"projeto-01"');
     expect(text).toContain('running right now (alive)');
     expect(text).toContain('second copy');
+  });
+
+  it('launchConfirmationDeclined says the adoption was cancelled (item 8)', () => {
+    const text = formatAdoptSessionReport({
+      kind: 'launchConfirmationDeclined',
+      projectId: 'auth-hardening',
+    });
+    expect(text).toContain('"auth-hardening"');
+    expect(text).toContain('cancelled');
+  });
+
+  it('launchConfirmationUnavailable refuses and says why, no interactive terminal (item 8)', () => {
+    const text = formatAdoptSessionReport({
+      kind: 'launchConfirmationUnavailable',
+      projectId: 'auth-hardening',
+    });
+    expect(text).toContain('seeya:');
+    expect(text).toContain('"auth-hardening"');
+    expect(text).toContain('no interactive terminal');
   });
 
   it('alreadyAdopted names the existing project and the date', () => {
@@ -503,5 +560,7 @@ describe('formatAdoptSessionReport', () => {
     expect(text).toContain("project's own session");
     expect(text).toContain('auth-hardening/AGENTS.md');
     expect(text).toContain('auth-hardening/context/know-how.md');
+    // Item 9: the follow-up repeated after the fact.
+    expect(text).toContain('seeya project open auth-hardening');
   });
 });

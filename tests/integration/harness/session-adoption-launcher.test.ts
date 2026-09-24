@@ -13,7 +13,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { ClaudeSessionAdoptionLauncher } from '@seeya-ai/engine/adapters/harness/session-adoption.js';
-import { ADOPTION_INSTRUCTION } from '@seeya-ai/engine/adapters/harness/adopt-instruction.js';
+import { buildAdoptionInstruction } from '@seeya-ai/engine/adapters/harness/adopt-instruction.js';
 import {
   createFakeInteractiveClaudeFixture,
   readCapturedInteractiveClaudeCalls,
@@ -59,7 +59,7 @@ describe('ClaudeSessionAdoptionLauncher — V2-T29', () => {
 
     const result = await launcher.adopt(
       ORIGINAL_CWD,
-      [projectDir],
+      projectDir,
       ORIGINAL_SESSION_ID,
       FORK_SESSION_ID,
     );
@@ -76,15 +76,21 @@ describe('ClaudeSessionAdoptionLauncher — V2-T29', () => {
       '--add-dir',
       projectDir,
       '--',
-      ADOPTION_INSTRUCTION,
+      buildAdoptionInstruction(projectDir),
     ]);
   });
 
   it('reports the real exit code the fork closed with, even non-zero — never a "failure"', async () => {
     process.env['FAKE_CLAUDE_EXIT_CODE'] = '7';
     const launcher = new ClaudeSessionAdoptionLauncher({ claudeBinary: fixture.binaryPath });
+    const projectDir = path.join(ORIGINAL_CWD, 'auth-hardening');
 
-    const result = await launcher.adopt(ORIGINAL_CWD, [], ORIGINAL_SESSION_ID, FORK_SESSION_ID);
+    const result = await launcher.adopt(
+      ORIGINAL_CWD,
+      projectDir,
+      ORIGINAL_SESSION_ID,
+      FORK_SESSION_ID,
+    );
 
     expect(result).toStrictEqual({ kind: 'opened', exitCode: 7 });
   });
@@ -93,8 +99,9 @@ describe('ClaudeSessionAdoptionLauncher — V2-T29', () => {
     process.env['FAKE_CLAUDE_EXIT_CODE'] = '0';
     process.env['CLAUDE_CODE_CHILD_SESSION'] = 'contaminated-value';
     const launcher = new ClaudeSessionAdoptionLauncher({ claudeBinary: fixture.binaryPath });
+    const projectDir = path.join(ORIGINAL_CWD, 'auth-hardening');
 
-    await launcher.adopt(ORIGINAL_CWD, [], ORIGINAL_SESSION_ID, FORK_SESSION_ID);
+    await launcher.adopt(ORIGINAL_CWD, projectDir, ORIGINAL_SESSION_ID, FORK_SESSION_ID);
 
     const calls = await readCapturedInteractiveClaudeCalls(fixture);
     expect(calls[0]?.env['CLAUDE_CODE_CHILD_SESSION']).toBeUndefined();
@@ -106,8 +113,14 @@ describe('ClaudeSessionAdoptionLauncher — V2-T29', () => {
       const launcher = new ClaudeSessionAdoptionLauncher({
         claudeBinary: path.join(missingDir, 'no-such-claude-binary'),
       });
+      const projectDir = path.join(ORIGINAL_CWD, 'auth-hardening');
 
-      const result = await launcher.adopt(ORIGINAL_CWD, [], ORIGINAL_SESSION_ID, FORK_SESSION_ID);
+      const result = await launcher.adopt(
+        ORIGINAL_CWD,
+        projectDir,
+        ORIGINAL_SESSION_ID,
+        FORK_SESSION_ID,
+      );
 
       expect(result).toStrictEqual({ kind: 'failedToStart' });
     } finally {

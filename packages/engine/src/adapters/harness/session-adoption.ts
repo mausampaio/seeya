@@ -23,14 +23,14 @@ export class ClaudeSessionAdoptionLauncher implements SessionAdoptionLauncher {
 
   async adopt(
     originalCwd: string,
-    addDirs: readonly string[],
+    projectDir: string,
     originalSessionId: string,
     forkSessionId: string,
   ): Promise<HarnessOpenResult> {
     const claudeBinary = this.options.claudeBinary ?? DEFAULT_CLAUDE_BINARY;
     const result = await runInteractive({
       claudeBinary,
-      args: buildAdoptArgs(originalSessionId, forkSessionId, addDirs),
+      args: buildAdoptArgs(originalSessionId, forkSessionId, projectDir),
       cwd: originalCwd,
       env: buildResumptionEnv(process.env),
     });

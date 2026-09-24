@@ -41,7 +41,7 @@ export class FakeForkRegistration implements ForkRegistration {
 export class FakeSessionAdoptionLauncher implements SessionAdoptionLauncher {
   readonly calls: {
     readonly originalCwd: string;
-    readonly addDirs: readonly string[];
+    readonly projectDir: string;
     readonly originalSessionId: string;
     readonly forkSessionId: string;
   }[] = [];
@@ -50,11 +50,11 @@ export class FakeSessionAdoptionLauncher implements SessionAdoptionLauncher {
 
   adopt(
     originalCwd: string,
-    addDirs: readonly string[],
+    projectDir: string,
     originalSessionId: string,
     forkSessionId: string,
   ): Promise<HarnessOpenResult> {
-    this.calls.push({ originalCwd, addDirs, originalSessionId, forkSessionId });
+    this.calls.push({ originalCwd, projectDir, originalSessionId, forkSessionId });
     return Promise.resolve(this.result);
   }
 }
