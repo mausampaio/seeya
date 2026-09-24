@@ -1,6 +1,6 @@
 ---
 id: TASK-26
-title: V2-T35 — O aviso de lock some quando o harness abre
+title: V2-T35 — Aviso de lock legível e sessão com id conhecido
 status: To Do
 assignee: []
 created_date: '2026-09-23 10:12'
@@ -52,6 +52,23 @@ precisa não escrever no projeto é justamente ela.
    agora com esta sessão. É a informação que a pessoa perdeu na abertura, dita quando ela volta a
    ter tela.
 
+4. **O `open` escolhe o id da sessão que lança** (acrescentado pelo PO em 2026-09-24, fechando o que
+   a Q-087 deixou aberto). Hoje o identificador vem de `CLAUDE_CODE_SESSION_ID`, que só existe quando
+   o `seeya` roda **dentro** de uma sessão — rodando `seeya project open` de um terminal comum (o uso
+   normal), o lock fica "travado por uma sessão não identificada" e os commits saem com
+   `Seeya-Session-Id: unknown`. Como é o próprio `open` que lança o harness, ele gera um id novo e
+   passa `claude --session-id <id>` — flag medida no spike J (`docs/spikes/J-cache-na-captura.md`,
+   que prova que ela funciona também na **criação** de uma sessão nova) e já usada pelo gerador
+   profundo (`adapters/generation/args.ts`), mas só no modo `-p`: **confirmar com sessão descartável
+   que ela vale igual no modo interativo** antes de depender dela. É **esse** id que vai para o `.seeya-lock`. Vale sempre, inclusive quando o `open` roda de
+   dentro de outra sessão: o dono do lock é a sessão que o `open` abriu, nunca a que o chamou.
+   - Gerar o id é aleatoriedade: fica fora de `core/`, entra pela raiz de composição ou por uma porta.
+   - O ambiente do `claude` lançado continua sem as variáveis de sessão herdadas (D-017).
+   - A linha do glossário "identidade da sessão que segura o lock/commita" no `AGENTS.md` passa a
+     dizer as duas fontes: o id gerado pelo `open`, e `CLAUDE_CODE_SESSION_ID` para os outros
+     comandos.
+   - Teste: o id que vai para `--session-id` é o mesmo gravado no lock.
+
 **O que não entra:** impedir a escrita (V2-T34); mudar o formato do lock; qualquer coisa na janela
 (a V2-T30 refaz isso em aba).
 
@@ -62,5 +79,5 @@ abre o `claude` real contra um projeto do mantenedor.
 
 **Aceite do mantenedor:** repetir o teste dos dois terminais e conseguir **ler** o aviso antes de o
 harness assumir a tela; e, dentro da sessão aberta, perguntar ao agente se o projeto está travado e
-ele saber responder.
+ele saber responder; e o `.seeya-lock`, enquanto a sessão está aberta, trazer o id dela.
 <!-- SECTION:DESCRIPTION:END -->
