@@ -4,6 +4,7 @@ title: 'V2-T40 — Ganchos por harness: a família'
 status: To Do
 assignee: []
 created_date: '2026-09-23 11:05'
+updated_date: '2026-09-24 15:08'
 labels: []
 milestone: m-5
 dependencies: []
@@ -53,3 +54,13 @@ desta família por decisão, não por esquecimento.
 **O que não entra:** implementar o gancho (é do filho); escrever em configuração global de qualquer
 harness — a regra do projeto continua: nada fora de `~/.seeya/` e do espaço de trabalho.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-24 15:08
+---
+Caso do mantenedor em 2026-09-24, trazido como mais um exemplo de saber-fazer perdido na compactação: a sessão do PO sabia onde o sistema operacional dele guarda as capturas de tela (vinha buscando lá há dias), perdeu isso numa compactação e respondeu que a captura não tinha chegado. O que o caso acrescenta ao desenho desta família: nem todo saber-fazer tem o mesmo destino. 'Como conectar no banco' (o caso de 2026-09-21) é do projeto; 'onde ficam as capturas' é da máquina e da pessoa, e o mantenedor foi explícito que isso não pertence ao projeto. Um gancho antes da compactação que salve tudo no projeto vaza fato pessoal para arquivo versionado; um que salve tudo na memória pessoal esconde do projeto o que é dele. A matriz de capacidades e o spike (V2-T41) precisam dizer, por harness, se existem os dois destinos e quem decide qual vale para cada fato.
+---
+<!-- COMMENTS:END -->
