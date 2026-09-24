@@ -11,7 +11,7 @@ labels:
 milestone: m-0
 dependencies:
   - TASK-20
-  - TASK-22
+  - TASK-26
 references:
   - docs/PLANO-DE-ENTREGA.md
 type: feature
