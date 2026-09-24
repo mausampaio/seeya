@@ -4,9 +4,11 @@ title: V2-T48 — Barras de rolagem na maximização e no status
 status: To Do
 assignee: []
 created_date: '2026-09-24 14:44'
+updated_date: '2026-09-24 15:12'
 labels: []
 milestone: m-2
-dependencies: []
+dependencies:
+  - TASK-25
 references:
   - packages/app/src/electron
 priority: medium
@@ -52,3 +54,13 @@ item 1 acrescentar observador de tamanho ou ajuste periódico, dizer o custo no 
 janela, terminal inteiro visível; com o autostart ligado, a lateral sem barra horizontal e o caminho
 do autostart quebrado em linhas.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-24 15:12
+---
+Adiada pelo mantenedor em 2026-09-24: tem contorno (desmaximizar e maximizar de novo) e não incomoda no dia a dia; pode esperar a V2-T30 (task-25), a tarefa que desenvolve a interface por projeto, e ser feita junto com ela. Ordem combinada: V2-T46, V2-T44, V2-T34.
+---
+<!-- COMMENTS:END -->
