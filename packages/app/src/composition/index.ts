@@ -55,6 +55,7 @@ import {
   shouldOfferDaemonOwnershipTransition,
 } from '@seeya-ai/engine/application/daemon-ownership.js';
 import type {
+  AppInstallation,
   Autostart,
   AutostartEnableResult,
   Clock,
@@ -290,6 +291,25 @@ function resolveCliDaemonScriptPath(): string {
 }
 
 /**
+ * V2-T46: the two ports `buildAppContext` otherwise builds from the real, per-platform OS
+ * mechanism — a Windows registry query (`AppInstallation`) and a Task Scheduler query
+ * (`Autostart`), each one a fresh `powershell.exe` spawn. Measured on the machine this task
+ * shipped from: the registry query costs ~400ms once "warm" but ~3s on
+ * the very first `powershell.exe` spawn of a test run; the Task Scheduler query costs ~1.3-4s on
+ * EVERY call, because the `ScheduledTasks` PowerShell module has to reload inside a fresh
+ * `powershell.exe` process each time — there is no warm state to fall back on the way the
+ * registry query has. Every real caller (`electron/main.ts`) omits both fields and gets the exact
+ * same real adapters this function has always built; `tests/integration/app/composition.test.ts`
+ * is the only caller that passes either, so its own assertions never depend on — or pay the cost
+ * of — whatever this machine's real installation/autostart state happens to be, except in the one
+ * test whose whole purpose is proving that real wiring.
+ */
+export interface BuildAppContextOverrides {
+  readonly appInstallation?: AppInstallation;
+  readonly autostart?: Autostart;
+}
+
+/**
  * Builds everything `electron/main.ts` needs, reading the real `process.env`/`process.platform`
  * exactly once (mirrors `packages/cli/src/composition.ts#buildCliContext`'s own "read once" shape).
  *
@@ -298,7 +318,10 @@ function resolveCliDaemonScriptPath(): string {
  * this function can't do the same and stay synchronous, so `config` here is read the same way but
  * the whole function returns a `Promise`, awaited once by `electron/main.ts` at startup.
  */
-export async function buildAppContext(homeDir: string = os.homedir()): Promise<AppContext> {
+export async function buildAppContext(
+  homeDir: string = os.homedir(),
+  overrides: BuildAppContextOverrides = {},
+): Promise<AppContext> {
   const home = resolveAppHome(homeDir);
   const clock = systemClock;
   const storage = new StorageAdapter(home.seeyaHome);
@@ -330,7 +353,7 @@ export async function buildAppContext(homeDir: string = os.homedir()): Promise<A
         ? 'inherited'
         : 'login-shell';
   const pathEnv = loginShellPath ?? process.env.PATH;
-  const autostart = buildAutostart(homeDir, home.seeyaHome);
+  const autostart = overrides.autostart ?? buildAutostart(homeDir, home.seeyaHome);
   // V2-T5a item 5: same shape as cli/composition.ts#buildEndDayContext's own generatorOptions —
   // both generators are always built, never chosen here; captureSession (application/
   // capture-session.ts) picks between them per session (see EndDayDeps's own docstring on why).
@@ -377,8 +400,11 @@ export async function buildAppContext(homeDir: string = os.homedir()): Promise<A
     return runDaemonStop({ storage, processControl: realProcessControl, clock });
   }
   // V2-T13, D-045 item 2: the OS's own installation record, asked once at startup — see
-  // AppContext#daemonOwner's own docstring for why this never re-queries mid-session.
-  const daemonOwner = resolveDaemonOwner(await buildAppInstallation(platform).find());
+  // AppContext#daemonOwner's own docstring for why this never re-queries mid-session. V2-T46:
+  // `overrides.appInstallation`, when given, replaces the real per-platform query — see
+  // `BuildAppContextOverrides`'s own docstring.
+  const appInstallation = overrides.appInstallation ?? buildAppInstallation(platform);
+  const daemonOwner = resolveDaemonOwner(await appInstallation.find());
   // V2-T13, D-045 item 4: same target as `startDaemon`'s own `spawnDetachedDaemon` call, reused
   // here as the (nodePath, scriptPath, env) trio `Autostart.enable`'s options now accept.
   function enableAppAutostart(): Promise<AutostartEnableResult> {

@@ -20,6 +20,16 @@ import {
   writeSessionRecord,
   type DiscoveryFixture,
 } from '../discovery/_fixtures.js';
+import { FakeAppInstallation } from './_fake-app-installation.js';
+import { FakeAutostart } from '../../unit/cli/_autostart-fakes.js';
+
+// V2-T46: `buildAppContext` always resolves `daemonOwner` from a real, per-platform
+// `AppInstallation.find()` — on Windows a fresh `powershell.exe` registry query, measured at
+// ~400ms once "warm" but ~3s on the very first spawn of a test run (this task's own notes have
+// the full measurement). Every `buildAppContext` call below passes `{ appInstallation: new
+// FakeAppInstallation() }` EXCEPT "daemonOwner is resolved for real" — the one test whose whole
+// purpose is proving that real wiring — so the other fourteen never depend on, or pay for,
+// whatever this machine's real installation state happens to be.
 
 let fixture: DiscoveryFixture | undefined;
 
@@ -58,7 +68,9 @@ describe('buildAppContext', () => {
       name: 'fixture-session',
     });
 
-    const context = await buildAppContext(fixture.root);
+    const context = await buildAppContext(fixture.root, {
+      appInstallation: new FakeAppInstallation(),
+    });
     const discovery = await context.sessionProvider.list();
 
     expect(discovery.sessions).toHaveLength(1);
@@ -84,7 +96,9 @@ describe('buildAppContext', () => {
         'utf8',
       );
 
-      const context = await buildAppContext(fixture.root);
+      const context = await buildAppContext(fixture.root, {
+        appInstallation: new FakeAppInstallation(),
+      });
 
       expect(context.initialTerminalFontOptions).toEqual({
         fontFamily: 'Fixture Mono',
@@ -96,7 +110,9 @@ describe('buildAppContext', () => {
   it('every other field is built without further I/O', async () => {
     fixture = await createDiscoveryFixture();
 
-    const context = await buildAppContext(fixture.root);
+    const context = await buildAppContext(fixture.root, {
+      appInstallation: new FakeAppInstallation(),
+    });
 
     expect(context.homeDir).toBe(fixture.root);
     expect(context.home.seeyaHome).toBe(fixture.seeyaHome);
@@ -109,7 +125,9 @@ describe('buildAppContext', () => {
     const originalValue = process.env.CLAUDE_CODE_CHILD_SESSION;
     process.env.CLAUDE_CODE_CHILD_SESSION = 'contaminated';
     try {
-      const context = await buildAppContext(fixture.root);
+      const context = await buildAppContext(fixture.root, {
+        appInstallation: new FakeAppInstallation(),
+      });
       expect(context.tabEnv.CLAUDE_CODE_CHILD_SESSION).toBeUndefined();
     } finally {
       if (originalValue === undefined) {
@@ -122,7 +140,9 @@ describe('buildAppContext', () => {
 
   it('buildPtyManager wires the callbacks it is given (no real pty spawned by this alone)', async () => {
     fixture = await createDiscoveryFixture();
-    const context = await buildAppContext(fixture.root);
+    const context = await buildAppContext(fixture.root, {
+      appInstallation: new FakeAppInstallation(),
+    });
     const onData = vi.fn();
     const onExit = vi.fn();
 
@@ -133,7 +153,9 @@ describe('buildAppContext', () => {
 
   it('resolveHarnessCommand resolves against the real PATH (a command every OS in CI actually has)', async () => {
     fixture = await createDiscoveryFixture();
-    const context = await buildAppContext(fixture.root);
+    const context = await buildAppContext(fixture.root, {
+      appInstallation: new FakeAppInstallation(),
+    });
     const realCommand = process.platform === 'win32' ? 'cmd.exe' : 'sh';
 
     const result = await context.resolveHarnessCommand(realCommand, []);
@@ -146,7 +168,9 @@ describe('buildAppContext', () => {
       "'login-shell' or 'inherited' elsewhere (never rejects/throws either way)",
     async () => {
       fixture = await createDiscoveryFixture();
-      const context = await buildAppContext(fixture.root);
+      const context = await buildAppContext(fixture.root, {
+        appInstallation: new FakeAppInstallation(),
+      });
 
       if (process.platform === 'win32') {
         expect(context.loginShellPathSource).toBe('not-applicable');
@@ -164,7 +188,9 @@ describe('buildAppContext', () => {
       'notifier — every port endDay needs beyond what this context already had',
     async () => {
       fixture = await createDiscoveryFixture();
-      const context = await buildAppContext(fixture.root);
+      const context = await buildAppContext(fixture.root, {
+        appInstallation: new FakeAppInstallation(),
+      });
 
       expect(typeof context.transcriptReader.readFacts).toBe('function');
       expect(typeof context.gitReader.readEvidenceAcrossRepos).toBe('function');
@@ -177,7 +203,9 @@ describe('buildAppContext', () => {
 
   it('V2-T9 item 1/2: wires a real DirectoryExistence — proves against a directory that is really there', async () => {
     fixture = await createDiscoveryFixture();
-    const context = await buildAppContext(fixture.root);
+    const context = await buildAppContext(fixture.root, {
+      appInstallation: new FakeAppInstallation(),
+    });
 
     expect(await context.directoryExistence.exists(fixture.root)).toBe(true);
     expect(await context.directoryExistence.exists(path.join(fixture.root, 'never-created'))).toBe(
@@ -189,6 +217,19 @@ describe('buildAppContext', () => {
   // its exact value (`'app'`/`'cli'`/`'unknown'`) depends on whether THIS machine has seeya
   // installed, so this only asserts the shape, never a specific outcome (portable across every
   // machine this suite runs on, including one where the real app happens to be installed).
+  //
+  // V2-T46: deliberately the ONE test in this file that still calls buildAppContext with no
+  // `appInstallation` override — proving the real wiring is the whole point, so there's nothing
+  // to fake here (unlike every other test above/below). That real cost is a fresh `powershell.exe`
+  // registry query: ~400ms once "warm", ~3s on a cold spawn, measured alone
+  // (tests/integration/app/composition.test.ts run by itself). Inside the FULL suite
+  // (`npm run verificar`'s own `cobertura` step, ~226 test files/processes contending for CPU and
+  // disk), the same query measured 5.3s-6.3s across four separate runs — legitimate cost, not a
+  // regression to chase: it was always there, just previously masked by running alongside the
+  // OTHER test that used to pay a second, larger real cost of its own
+  // ("checkDaemonOwnershipTransitionOffer resolves to a boolean without throwing", now faked) and
+  // therefore never got its own timing measured in isolation. 15s leaves roughly 2.4x headroom
+  // over the slowest of those four measured runs.
   it('daemonOwner is resolved for real, one of the three D-024 states', async () => {
     fixture = await createDiscoveryFixture();
     const context = await buildAppContext(fixture.root);
@@ -197,11 +238,20 @@ describe('buildAppContext', () => {
     if (context.daemonOwner.kind === 'app') {
       expect(typeof context.daemonOwner.launchPath).toBe('string');
     }
-  });
+  }, 15_000);
 
   it('checkDaemonOwnershipTransitionOffer resolves to a boolean without throwing', async () => {
     fixture = await createDiscoveryFixture();
-    const context = await buildAppContext(fixture.root);
+    // V2-T46: this is the test that used to pay BOTH real costs at once — `buildAppContext`'s
+    // own `AppInstallation.find()` AND this function's own `autostart.status()`, which on
+    // Windows spawns `Get-ScheduledTask` (measured ~1.3-4s per call, every call, because the
+    // `ScheduledTasks` PowerShell module reloads inside a fresh `powershell.exe` process each
+    // time — no warm state to fall back on). `FakeAutostart`'s default `disabled` status is
+    // enough: this test only asserts the return type, never a specific `boolean` value.
+    const context = await buildAppContext(fixture.root, {
+      appInstallation: new FakeAppInstallation(),
+      autostart: new FakeAutostart(),
+    });
 
     expect(typeof (await context.checkDaemonOwnershipTransitionOffer())).toBe('boolean');
   });
@@ -211,7 +261,9 @@ describe('buildAppContext', () => {
       '~/.seeya, never the real autostart mechanism',
     async () => {
       fixture = await createDiscoveryFixture();
-      const context = await buildAppContext(fixture.root);
+      const context = await buildAppContext(fixture.root, {
+        appInstallation: new FakeAppInstallation(),
+      });
       expect(await context.storage.readDaemonOwnershipTransitionAnswer()).toBeNull();
 
       await context.applyDaemonOwnershipTransition('declined');
@@ -222,7 +274,9 @@ describe('buildAppContext', () => {
 
   it('enableAppAutostart is wired as a callable function (never invoked by this suite — see AGENTS.md)', async () => {
     fixture = await createDiscoveryFixture();
-    const context = await buildAppContext(fixture.root);
+    const context = await buildAppContext(fixture.root, {
+      appInstallation: new FakeAppInstallation(),
+    });
 
     expect(typeof context.enableAppAutostart).toBe('function');
   });
@@ -231,7 +285,9 @@ describe('buildAppContext', () => {
 describe('toEndDayDeps', () => {
   it('maps AppContext fields straight through to EndDayDeps, one for one', async () => {
     fixture = await createDiscoveryFixture();
-    const context = await buildAppContext(fixture.root);
+    const context = await buildAppContext(fixture.root, {
+      appInstallation: new FakeAppInstallation(),
+    });
 
     const deps = toEndDayDeps(context);
 
