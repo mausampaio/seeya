@@ -1,10 +1,10 @@
 ---
 id: TASK-36
 title: V2-T46 — Testes de composição do app no limite de 5s
-status: Review
+status: Done
 assignee: []
 created_date: '2026-09-24 14:27'
-updated_date: '2026-09-24 16:11'
+updated_date: '2026-09-24 16:18'
 labels: []
 dependencies: []
 references:
@@ -129,3 +129,13 @@ foram escritos por esta tarefa.
 **Nada para `docs/QUESTOES.md`** — a spec não foi contradita, nenhuma premissa técnica se provou
 errada; é a mesma correção que o item 2 da própria tarefa já prescrevia.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-24 16:18
+---
+Revisão do PO em 2026-09-24. Causa confirmada pelo agente com medição: buildAppContext consultava o registro do Windows (AppInstallation, ~0,4 s aquecido / ~3 s no primeiro powershell.exe da rodada) e o teste da oferta de transição ainda chamava Autostart.status() de verdade (Get-ScheduledTask, 1,3–4 s por chamada) — os testes liam o estado real desta máquina, que tem o seeya instalado por máquina. Correção: BuildAppContextOverrides (opcional, só o teste passa) e FakeAppInstallation; o único teste que ainda vai ao sistema é 'daemonOwner is resolved for real', de propósito, com timeout de 15 s citando a medição (5,3–6,3 s na suíte cheia). Nenhum custo novo em produção: o app já guarda o status do autostart em cache por 60 s (Q-071). Portão: três rodadas verdes do agente e duas do PO no po-gate, código de saída lido em cada uma. Sem aceite manual — o aceite desta tarefa é o portão; vai para Done com a CI verde.
+---
+<!-- COMMENTS:END -->
