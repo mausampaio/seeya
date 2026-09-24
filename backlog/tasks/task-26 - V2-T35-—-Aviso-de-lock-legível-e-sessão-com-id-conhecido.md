@@ -1,10 +1,10 @@
 ---
 id: TASK-26
 title: V2-T35 — Aviso de lock legível e sessão com id conhecido
-status: Review
+status: Done
 assignee: []
 created_date: '2026-09-23 10:12'
-updated_date: '2026-09-24 19:01'
+updated_date: '2026-09-24 19:23'
 labels:
   - correcao
   - d-047
@@ -166,5 +166,11 @@ author: PO
 created: 2026-09-24 19:01
 ---
 Revisão do PO em 2026-09-24: mesclado no po-gate, portão verde (2351 testes). Conferido: o claude é lançado com shell:false (as aspas do texto do lock chegam intactas pelo --append-system-prompt); o id é gerado na raiz de composição (randomUUID), passado por --session-id antes dos --add-dir e é o mesmo gravado no lock; o texto do aviso subiu para core/project-lock-message.ts (puro) porque CLI e aplicação precisam da mesma frase. Não verificado em TTY real (o agente não tinha console — Q-089); provado com o binário real sem TTY e com as medições anteriores (spike J, Q-069). Fica para o aceite do mantenedor, que precisa de um build novo: dois terminais, ler o aviso e confirmar, perguntar à sessão se o projeto está travado, e o .seeya-lock trazer o id dela.
+---
+
+author: PO
+created: 2026-09-24 19:23
+---
+Aceite do mantenedor em 2026-09-24 (Windows, dois terminais): o segundo open mostrou o aviso e esperou o y antes de abrir (item 1); a sessão soube do lock (item 2, 'tudo funcionou como deveria'); ao sair, repetiu o aviso e mostrou o estado final do lock (item 3); o lock trazia o id da sessão lançada pelo primeiro open, não mais 'sessão não identificada' (item 4). Isso fecha em TTY real o que a Q-089 deixou sem verificar. Achado de texto no aceite, corrigido pelo PO com teste de regressão (falhou antes): a pergunta saía '...for reading only, while session <id> (pid <n>) since <hora>?', frase sem verbo; agora 'Continue and open this project for reading only? (It stays locked by session ...) [y/N]'. Done.
 ---
 <!-- COMMENTS:END -->

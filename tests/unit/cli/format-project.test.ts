@@ -171,6 +171,15 @@ describe('renderReadOnlyOpenConfirmation (V2-T35 item 1)', () => {
     expect(text).toContain('pid 9999');
     expect(text).toContain('Continue and open this project for reading only');
   });
+
+  it('asks a complete question — the holder is never glued on after a dangling "while"', () => {
+    // Maintainer's acceptance run, 2026-09-24: the prompt read "...for reading only, while session
+    // <id> (pid <n>) since <time>?" — the holder description has no verb of its own, so gluing it
+    // after "while" left a sentence that never said what the holder was doing.
+    const text = renderReadOnlyOpenConfirmation(SOME_LOCK);
+    expect(text).not.toContain(', while ');
+    expect(text).toMatch(/for reading only\? \(It stays locked by session abc123 .*\) \[y\/N\] $/);
+  });
 });
 
 describe('parseReadOnlyOpenConfirmation (V2-T35 item 1)', () => {

@@ -8735,3 +8735,8 @@ para rastreabilidade): `33333333-3333-4333-8333-333333333333` e
 `44444444-4444-4444-8444-444444444444`, ambas em
 `%TEMP%\claude\C--code-seeya\<sessão-do-agente>\scratchpad\v2t35-interactive-probe` (fora de
 qualquer repositório real).
+
+**Resolução da Q-089 (PO, 2026-09-24).** Verificado em terminal real no aceite do mantenedor
+(Windows, dois terminais): o `--session-id` gerado pelo `open` foi o id gravado no `.seeya-lock`,
+e o texto passado por `--append-system-prompt` chegou à sessão interativa — ela soube responder que
+o projeto estava travado. Fechada.

@@ -169,11 +169,13 @@ function formatMissingRepositoryLine(projectId: string, missing: MissingReposito
 
 /** V2-T35 item 1: the question `open` asks, right after `formatProjectLockWarningLines`' own
  * warning, before it hands the terminal to the harness — reusing `formatLockHolderDescription` so
- * the answer names the same holder the warning just did. */
+ * the answer names the same holder the warning just did. The holder description has no verb of its
+ * own ("session <id> (pid <n>) since <time>"), so it goes after "locked by", never glued onto the
+ * question — the first wording ("..., while session ...?") read as a sentence that stopped short. */
 export function renderReadOnlyOpenConfirmation(heldBy: ProjectLockInfo): string {
   return (
-    `Continue and open this project for reading only, while ` +
-    `${formatLockHolderDescription(heldBy)}? [y/N] `
+    `Continue and open this project for reading only? ` +
+    `(It stays locked by ${formatLockHolderDescription(heldBy)}.) [y/N] `
   );
 }
 
