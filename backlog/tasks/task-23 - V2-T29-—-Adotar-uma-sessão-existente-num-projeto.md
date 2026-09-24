@@ -1,10 +1,10 @@
 ---
 id: TASK-23
 title: V2-T29 — Adotar uma sessão existente num projeto
-status: To Do
+status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-23 10:46'
+updated_date: '2026-09-24 20:30'
 labels:
   - adocao
   - d-047
@@ -118,3 +118,80 @@ que fizerem sentido, e ver o projeto com `AGENTS.md`, `INDEX.md`, estado e o sab
 preenchidos pela própria sessão — e depois abrir o projeto numa sessão limpa (`project open`)
 e ver se ela sabe como operar sem ser lembrada.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+**Relatório do agente (branch `tarefa/V2-T29-adocao`, worktree isolada, a partir da `main`).**
+
+**Fluxo entregue: `seeya project adopt <sessão> <projectId>`.** `packages/cli/src/project-command.ts#runProjectAdoptCommand`
+resolve `<sessão>` contra a descoberta real (`resolveSessionReference`, o mesmo casamento
+por sessionId/prefixo/nome/cwd que `--session` já usa em `end-day`/`start-day` —
+`session-reference.ts#toDiscoveredSessionReference` extraído para ser compartilhado, em vez de
+duplicado). `application/project-adopt.ts#adoptSession` então: recusa sessão viva (`alive`/`idle`)
+e sessão já adotada (`adoptions.json`); cria o projeto se não existir (reusa `createProject`, nunca
+duplicado); toma o lock do projeto sob o id do FORK (mesmo padrão `launchedSessionId` da V2-T35);
+registra o fork em `forks.json` ANTES de lançar (D-012, sobrevive a uma queda); lança
+`adapters/harness/session-adoption.ts#ClaudeSessionAdoptionLauncher` — `--resume <original>
+--fork-session --session-id <id gerado pelo seeya> --add-dir <diretório do projeto>`, interativo,
+**sem nenhum `--permission-mode`**, no diretório ORIGINAL da sessão, com a instrução fixa
+(`adapters/harness/adopt-instruction.ts#ADOPTION_INSTRUCTION`) como primeiro turno. Ao fechar, lê
+`WorkspaceRepository.listChangedFiles` (novo: `git status --porcelain --untracked-files=all`,
+escopado a um projeto só) e decide: nada mudou → descarta o fork (apaga o transcript,
+`ForkCleanup.deleteFork`, e tira de `forks.json`, `ForkRegistration.unregister`) e reporta
+`noChanges`; recusado → mesmo descarte, reporta `declined`; sem terminal para perguntar → **não
+toca em nada** (fork continua escondido em `forks.json`, arquivos ficam sem commit — Q-091, nunca
+apaga trabalho aprovado por ninguém ainda) e reporta `confirmationUnavailable`; aceito → commita
+(`Seeya-Session-Id` = id do FORK, nunca o do chamador), tira o fork de `forks.json` (promovido —
+nunca mais escondido, nunca mais apagável por idade) e grava em `adoptions.json`.
+
+**Provado sem terminal (Q-090).** Sessão descartável real, `-p` (sem TTY, mesma lacuna da Q-069/
+Q-089): um comando único combinando `--resume` + `--fork-session` + `--session-id <id pedido>` +
+`--add-dir` produziu o fork exatamente com o id pedido, ecoou o contexto da sessão original
+(prova de que carregou o transcript de verdade), e o hash SHA-256 do transcript original ficou
+**idêntico** antes/depois (201.520 bytes, mesmo hash). As três flags nunca tinham sido medidas
+juntas antes desta tarefa.
+
+**Fica para o aceite do mantenedor (interativo genuíno, TUI real):** a confirmação em modo
+interativo de verdade das quatro flags juntas (este agente não tem terminal real, mesma lacuna já
+registrada em Q-069/Q-089); e o fluxo fim a fim — adotar uma sessão real dele, aprovar as escritas
+que fizerem sentido, ver `AGENTS.md`/`INDEX.md`/`status/`/`context/know-how.md` preenchidos, e
+depois `project open` numa sessão limpa para ver se ela sabe operar sem lembrete.
+
+**Nomes novos em disco, todos no glossário do `AGENTS.md` antes desta entrega:** `adoptions.json`
+(raiz de `~/.seeya/`, schemaVersion 1, `originalSessionId`/`forkSessionId`/`projectId`/
+`adoptedAt`); `context/know-how.md` (nome fixado pelo PO em 2026-09-24). **Nenhuma mudança de
+schema em `forks.json`** — a cópia pendente de adoção usa exatamente `registerFork`/
+`unregisterFork` já existentes (D-012), sem campo novo: escondida e limpável por `forkCleanupDays`
+como qualquer fork de captura enquanto pendente; "promovida" é simplesmente a ausência em
+`forks.json` mais a presença em `adoptions.json`.
+
+**Portas novas:** `ForkRegistration` (`register`/`unregister`, para `application/` sem importar
+`adapters/` direto — D-020) e `SessionAdoptionLauncher` (irmã de `HarnessLauncher`, nunca um
+terceiro método nele). `ForkCleanup` ganhou `deleteFork` (deleção imediata por `sessionId`, nunca
+por idade). `WorkspaceRepository` ganhou `listChangedFiles`. `Storage` ganhou `readAdoptions`/
+`saveAdoptions`.
+
+**Conferência do `~/.seeya` real:** `~/.seeya/adoptions.json` não existe (nunca criado — este
+agente nunca rodou o `seeya` real contra o home real); `~/.seeya/forks.json` também não existe
+(idem); `~/.seeya/workspace`'s own HEAD continua em `aaee62e` (o mesmo antes desta tarefa), sem
+commit novo.
+
+**Sessões descartáveis criadas durante o trabalho (Q-090), já apagadas:**
+`55555555-5555-4555-8555-555555555555` (original) e `66666666-6666-4666-8666-666666666666`
+(fork), em `%TEMP%\claude\C--code-seeya\<sessão-do-agente>\scratchpad\v2t29-adoption-probe\
+session-cwd` — nunca uma sessão real do mantenedor.
+
+**Questões abertas registradas:** Q-090 (a medição acima, com o achado colateral de uma pasta
+`memory/` vazia criada sem pedido — Spike N, Pergunta 2, não muda a leitura); Q-091 (o que fazer
+quando não há terminal para confirmar o commit — decisão: não tocar em nada, nunca apagar trabalho
+não aprovado; limite conhecido: rodar `adopt` de novo sem terminal cria um segundo fork pendente,
+não resolvido por esta tarefa); Q-092 (achado incidental: `AGENTS.md` se contradiz sobre o idioma
+da mensagem de commit — "Como trabalhar" diz português, a tabela de D-028 diz inglês; seguido
+inglês, que bate com o `git log` real).
+
+**Portão:** `npm run verificar` passou inteiro (código de saída 0) — `format:check`, `tsc
+--noEmit`, `eslint`, `build`, `dependencias` (424 módulos, 0 violação), `cobertura` (232 arquivos
+de teste, 2419 testes, 4 pulados; `core/` 99.51%, `application/` 100%, `adapters/harness/` 100%,
+`cli/src` 95.27% — todos acima do próprio piso).
+<!-- SECTION:NOTES:END -->
