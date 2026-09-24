@@ -30,10 +30,17 @@ aprova cada escrita na hora — nunca com permissão automática. O motivo, medi
 permissão automática vale também para o diretório original da sessão, que pode ser a pasta
 pessoal ou um repositório de código, e não só para o projeto.
 
-**Depende da V2-T33 e da V2-T34, e segue a D-047:** adotar é **tomar o lock do projeto**
-(projeto com lock de outra sessão viva recusa a adoção), e os commits da adoção passam pelas
-guardas — um projeto por commit, com o identificador da sessão. Onde esta entrada disser
-outra coisa, vale a D-047.
+**Depende da V2-T33 e da V2-T35 (ambas prontas), e segue a D-047:** adotar é **tomar o lock do
+projeto** (projeto com lock de outra sessão viva recusa a adoção, com o mesmo texto de aviso da
+V2-T35), e os commits da adoção são feitos pelo próprio seeya (`WorkspaceRepository.commitAll`) —
+um projeto por commit, com os trailers `Seeya-Project-Id`/`Seeya-Session-Id`. **A V2-T34 (as
+guardas de git e do harness) não é pré-requisito**: o mantenedor a moveu para o fim da fila em
+2026-09-24, e nada aqui depende dela. Onde esta entrada disser outra coisa, vale a D-047.
+
+**Revisão do PO em 2026-09-24**, antes do despacho: dependência da V2-T34 retirada (acima); o id da
+cópia passa a ser escolhido pelo seeya (item 2); a medição em modo interativo passa a ser do aceite
+do mantenedor, porque agente não tem terminal real (V2-T35, Q-089); o nome do arquivo de
+saber-fazer ficou fixado (item 3).
 
 **Recorte:** esta tarefa é motor e CLI. Adotar pela janela (um botão na lista de sessões,
 abrindo numa aba) fica para a **V2-T30**, junto com a lateral agrupada por projeto — o mesmo
@@ -55,24 +62,33 @@ modelo de aprovação, outra superfície.
    no registro de forks (D-012), a cópia de captura (descartável, escondida, apagada em
    `forkCleanupDays`) da cópia de adoção aceita (promovida: aparece na descoberta e nunca é
    apagada pelo seeya). Adoção recusada antes do commit: a cópia é apagada e nada fica
-   registrado. A retomada é
+   registrado. **O id da cópia é escolhido pelo seeya** (acrescentado em 2026-09-24): a retomada
+   passa `--fork-session` **com** `--session-id <id gerado>`, o mesmo par que a captura já usa
+   (`adapters/generation/args.ts`, spike J) — e é **esse** id que vai para o `.seeya-lock` e para o
+   trailer `Seeya-Session-Id` dos commits da adoção, como o `open` faz desde a V2-T35. Gerar o id
+   fica na raiz de composição, como lá. A retomada é
    **interativa**, no diretório original da sessão, com o diretório do projeto liberado por
    `--add-dir` (mesma montagem da V2-T28, com o `--` já provado no aceite dela) e **sem nenhum
    modo de permissão automática** — o Claude Code pede aprovação a cada escrita.
-   **Medir antes de implementar**, com uma sessão descartável criada pelo agente: o spike
-   mediu `--fork-session` em modo automático e `--add-dir` em interativo, **nunca os dois
-   juntos em interativo**. Se não funcionarem juntos, parar e registrar — não cair de volta
-   na sessão original sem o mantenedor decidir.
+   **Medir antes de implementar, até onde um agente consegue**: o spike mediu `--fork-session` em
+   modo automático e `--add-dir` em interativo, **nunca os dois juntos em interativo** — e um
+   agente não tem terminal real para medir o modo interativo (achado da V2-T35, Q-089). Então: o
+   agente prova com uma sessão descartável, sem terminal, que `--fork-session` + `--session-id` +
+   `--add-dir` juntos criam a cópia com o id pedido e deixam o transcript original sem uma linha a
+   mais; a confirmação em modo interativo é **o primeiro passo do aceite do mantenedor**. Se lá não
+   funcionarem juntos, a tarefa volta — nunca cair de volta na sessão original sem o mantenedor
+   decidir.
 3. **A instrução**, curta, num lugar só do código (texto voltado à pessoa concentrado, e dentro
    do teto de argumento medido na V2-T7, D-015). O spike mostrou que o texto decide tudo, então
    ela é específica e cobre quatro coisas:
    - **nomear os arquivos pelo caminho**: `AGENTS.md`, `INDEX.md`, o estado atual em
-     `status/`, as decisões em `decisions/` — e **nunca** usar a palavra "memória" sem destino
+     `status/`, as decisões em `decisions/`, o saber-fazer em `context/know-how.md` — e **nunca** usar a palavra "memória" sem destino
      (a sessão do spike entendeu como a memória do próprio Claude Code e escreveu fora do
      projeto);
    - **o saber-fazer, pelo nome**: como se opera naquele trabalho — ferramentas e skills usadas,
-     caminhos de acesso, configuração por ambiente, convenções — num arquivo próprio dentro de
-     `context/` (nome fixado no glossário antes do código). É o que o relato do mantenedor
+     caminhos de acesso, configuração por ambiente, convenções — em
+     **`context/know-how.md`** (nome fixado pelo PO em 2026-09-24; entra no glossário do
+     `AGENTS.md` antes do código). É o que o relato do mantenedor
      mostrou que a compactação apaga primeiro;
    - **o caminho, nunca o segredo**: dizer onde está e como se chega (a skill, o arquivo de
      configuração), nunca o valor de credencial, token ou senha;
