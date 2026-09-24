@@ -8740,3 +8740,92 @@ qualquer repositório real).
 (Windows, dois terminais): o `--session-id` gerado pelo `open` foi o id gravado no `.seeya-lock`,
 e o texto passado por `--append-system-prompt` chegou à sessão interativa — ela soube responder que
 o projeto estava travado. Fechada.
+
+## Q-090 — V2-T29: `--resume` + `--fork-session` + `--session-id` + `--add-dir` juntos — medido
+sem terminal, com sessões descartáveis
+
+**Contexto.** A tarefa pede, antes de implementar: prove que as três flags que a adoção precisa
+combinar (`--resume <original> --fork-session --session-id <id escolhido>`, junto de
+`--add-dir <projeto>`) funcionam juntas — nunca medidas juntas antes (o Spike N mediu
+`--fork-session`+`--session-id` só em `-p` isolado, sem `--add-dir`; o Spike J mediu
+`--session-id` na criação; nenhum dos dois testou os quatro elementos no mesmo comando) — e que a
+sessão original não recebe uma linha sequer. Como no caso da Q-089, este agente não tem terminal
+de verdade (mesma lacuna, `winpty` recusa por falta de console real por trás), então a medição
+usou `-p` explícito em vez do modo interativo genuíno que a produção usa.
+
+**Método.** Duas sessões descartáveis, sintéticas, num diretório temporário fora de qualquer
+repositório (`%TEMP%\claude\C--code-seeya\<sessão-do-agente>\scratchpad\v2t29-adoption-probe`,
+apagado ao final junto com os dois transcripts): uma sessão original
+(`--session-id 55555555-5555-4555-8555-555555555555`, modelo `haiku`, `--max-budget-usd 0.05`,
+ambiente saneado das seis variáveis de sessão, D-017) pedindo para lembrar em silêncio uma palavra
+sintética ("KIWI-77"); depois, no MESMO `cwd` da sessão original (a produção sempre resume no
+diretório original, nunca no do projeto), um único comando
+`claude -p --model haiku --resume 55555555-... --fork-session --session-id
+66666666-6666-4666-8666-666666666666 --add-dir <diretório-do-projeto> -- "qual era a palavra?"` —
+o exato desenho de `adapters/harness/adopt-args.ts#buildAdoptArgs`, com `--` antes do prompt
+(Achado 1 do Spike N).
+
+**Resultado.** `exit=0`, `session_id` da resposta exatamente `66666666-...`, e o `result` ecoou
+"KIWI-77" — prova que o fork carregou o contexto da sessão original de verdade, não uma sessão
+nova respondendo por acaso. Hash SHA-256 do transcript original (`55555555-....jsonl`) idêntico
+antes e depois do comando de fork (`bab4fb37...`, tamanho 201.520 bytes nos dois momentos) — a
+original não ganhou uma linha. O transcript do fork apareceu exatamente em
+`<sessão-original>.jsonl`'s own diretório, sob o nome `66666666-....jsonl` — o id pedido, não um
+gerado pelo `claude`.
+
+**Achado colateral, não medido antes:** a sessão original deixou uma subpasta `memory/` vazia sob
+o seu próprio diretório de projeto em `~/.claude/projects/` mesmo sem qualquer instrução sobre
+memória — o mecanismo de auto-memory do `claude` parece criar essa pasta por padrão em algumas
+invocações, não só quando o texto menciona a palavra (o achado do Spike N, Pergunta 2). Apagada
+na limpeza junto com o resto; não muda a leitura da Pergunta 2 (o texto de produção continua
+nomeando os arquivos-alvo explicitamente), só registrado para quem for medir de novo.
+
+**Interpretação, D-025 aplicado.** Isto confirma a combinação das quatro flags em modo headless
+(`-p`), a peça que faltava medir — mas não prova o modo interativo genuíno (TUI real,
+`stdio: 'inherit'` herdando um terminal de verdade), a mesma lacuna que a Q-069/Q-089 já
+registraram. A V2-T29 foi implementada assumindo que a combinação vale igual em interativo,
+apoiada nesta medição mais o Spike H (que já mediu `--resume` interativo isolado) e a Q-089 (que
+já mediu `--session-id`+`--add-dir` interativo, sem `--fork-session`). **Fica para o aceite do
+mantenedor**: adotar uma sessão real dele, ver a cópia aparecer com o id certo, e confirmar que a
+sessão original não mudou.
+
+**Sessões descartáveis criadas por esta medição** (aparecem na descoberta do `seeya` real,
+listadas para rastreabilidade, e já apagadas): `55555555-5555-4555-8555-555555555555` (original) e
+`66666666-6666-4666-8666-666666666666` (fork), ambas em
+`%TEMP%\claude\C--code-seeya\<sessão-do-agente>\scratchpad\v2t29-adoption-probe\session-cwd` (fora
+de qualquer repositório real). Custo total: bem abaixo de US$ 0,10 (duas chamadas `haiku`, teto de
+US$ 0,05 cada).
+
+## Q-091 — V2-T29: o que fazer quando a confirmação do commit da adoção está indisponível
+
+**Contexto.** O item 4 da tarefa (nunca commitar sem a pessoa) especifica claramente dois casos —
+a pessoa confirma, ou a pessoa recusa. Não especifica o terceiro caso que os outros fluxos de
+confirmação deste projeto (V2-T35 item 1, `confirmReadOnlyOpen`) já tratam separadamente: e quando
+não há terminal interativo para perguntar?
+
+**Decisão tomada, mínima, registrada aqui em vez de inventada em silêncio (AGENTS.md § "Quando
+parar e perguntar").** `unavailable` NUNCA se comporta como `decline`: recusar por padrão
+apagaria o fork (`ForkCleanup.deleteFork`) — trabalho real, aprovado por ninguém ainda, perdido
+por um acidente de ambiente (rodar de um script, de um cron, sem TTY). Também nunca se comporta
+como `commit`, pelo motivo óbvio (D-047: nada é commitado sem a pessoa, sempre). A escolha foi
+**não tocar em nada**: o fork continua registrado em `forks.json` (escondido, como um fork de
+captura comum), os arquivos ficam no disco do projeto sem commit, e a pessoa reroda
+`seeya project adopt` de um terminal de verdade para decidir. `application/project-adopt.ts
+#AdoptSessionResult`'s own `confirmationUnavailable` reporta isso distintamente de `declined`.
+
+**Limite conhecido, não resolvido por esta tarefa:** rodar `seeya project adopt` de novo para o
+MESMO par sessão/projeto, sem terminal, cria um SEGUNDO fork (a checagem de "já adotada" só
+dispara depois de um commit aceito) — um fork pendente adicional, não um erro, mas um efeito
+colateral que ninguém pediu. Registrado aqui como o "onde o guarda-corpo termina" deste desenho;
+não medido o quão incômodo isso é na prática porque nenhum fluxo real ainda bateu nele.
+
+## Q-092 — `AGENTS.md` se contradiz sobre o idioma da mensagem de commit
+
+**Contexto, achado durante a V2-T29.** § "Como trabalhar" diz "Commits pequenos, em português";
+§ "Idioma" (a tabela travada pela D-028) diz que mensagem de commit é **inglês**. Os commits reais
+mais recentes do repositório (`git log`, antes desta tarefa: "fix(cli): the read-only open prompt
+asks a complete question", "docs: PO review of the V2-T29 spec before dispatch") já seguem
+inglês — a prática bate com a tabela de D-028, não com a linha de "Como trabalhar". Esta tarefa
+seguiu inglês (a tabela com decisão citada, D-028, e a prática observada) e registra a
+inconsistência aqui em vez de decidir sozinha qual linha do próprio `AGENTS.md` está desatualizada
+— só o PO deveria escolher qual das duas apagar/corrigir.
