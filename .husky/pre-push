@@ -1,0 +1,76 @@
+# Pre-push guard (D-049 / V2-T43): the fast subset of `npm run verificar`, so the cheap-to-
+# detect breakage (formatting, types, lint, layer boundaries) is caught on this machine before
+# it reaches the remote, instead of only being caught by CI minutes after the push already
+# landed. D-049's own trigger: two pushes this week only failed in CI (a Windows-path-only test
+# failure, a `.deb` packaging script failure) -- both would have been caught here.
+#
+# What this does NOT run: the full test suite (`npm test`) and coverage (`npm run cobertura`).
+# Those stay expensive on purpose and stay in the PO's own `npm run verificar` and in CI
+# (D-049) -- putting them here would make every push slow enough that people reach for
+# `--no-verify` out of impatience, which defeats the point.
+#
+# Measured on this machine (2026-09-24, `time <command>`, two runs -- cold then warm cache):
+#   format:check                         7.9s / 7.8s
+#   tsc -p tsconfig.json --noEmit        7.5s / 6.4s
+#   lint (eslint .)                     32.1s / 18.5s
+#   dependencias (depcruise)             7.8s / 2.8s
+#   ---------------------------------------------------
+#   total                             ~55.3s / ~35.5s -- comfortably inside the ~90s reference
+#   ceiling the task set.
+#
+# Why the fifth item the task named -- the `guards` vitest project -- is cut from this hook:
+# measured separately at 77.1s / 79.1s ALONE, more than double the other four combined. Two of
+# its files are the reason (vitest.config.ts already documents this, S4-T11 comment above
+# `REAL_FS_IO_HEAVY_INTEGRATION_FILES`): `guards/eslint-restrictions.test.ts` shells out to a
+# REAL `eslint` run on fixture trees (~70s on a loaded CI machine, ~30-40s here isolated), and
+# `guards/dependency-cruiser.test.ts` / `layer-matrix.test.ts` shell out to REAL
+# dependency-cruiser/AST walks (~40s each in that same CI evidence). Including it would put this
+# hook at ~114.6s-132.4s, past the ~90s ceiling -- exactly the "push takes too long, so
+# --no-verify becomes the reflex" failure mode this hook exists to avoid.
+#
+# What running `guards` would additionally catch, beyond what `lint`/`dependencias` above
+# already enforce on the real source tree: that the guard *tooling itself* still rejects bad
+# fixtures the way it's supposed to, backlog title-length/filename conventions
+# (`backlog-names.test.ts`), and that the per-directory coverage-floor declaration stays
+# consistent with the real `src/` tree (`coverage-directories.test.ts`). None of that is source
+# code correctness on the branch being pushed -- it stays covered by `npm run verificar` (the
+# PO's own gate, run before merge) and by CI.
+#
+# Where this guardrail ends: `git push --no-verify` skips this file entirely, and a clone that
+# never ran `npm install` (which runs the `prepare`/`husky` script that wires these hooks up)
+# has no hook installed at all. This only catches the ordinary mistake of an unreviewed `git
+# push`; it was never meant to, and does not, stop someone who deliberately routes around it.
+
+if [ ! -d node_modules ]; then
+  echo "pre-push: node_modules not found -- run 'npm install' at the repo root first." >&2
+  echo "pre-push: refusing to push without being able to run the fast checks (see D-049)." >&2
+  exit 1
+fi
+
+npm run format:check || {
+  echo "" >&2
+  echo "pre-push: formatting check failed." >&2
+  echo "pre-push: run 'npm run format' to fix it, then 'npm run format:check' to confirm." >&2
+  exit 1
+}
+
+npx tsc -p tsconfig.json --noEmit || {
+  echo "" >&2
+  echo "pre-push: type check failed." >&2
+  echo "pre-push: run 'npx tsc -p tsconfig.json --noEmit' to see the errors." >&2
+  exit 1
+}
+
+npm run lint || {
+  echo "" >&2
+  echo "pre-push: lint failed." >&2
+  echo "pre-push: run 'npm run lint' to see the errors." >&2
+  exit 1
+}
+
+npm run dependencias || {
+  echo "" >&2
+  echo "pre-push: dependency-cruiser found a layer boundary violation." >&2
+  echo "pre-push: run 'npm run dependencias' to see it." >&2
+  exit 1
+}

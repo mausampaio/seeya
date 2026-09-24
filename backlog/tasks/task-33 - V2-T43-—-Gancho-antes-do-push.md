@@ -1,9 +1,10 @@
 ---
 id: TASK-33
 title: V2-T43 — Gancho antes do push
-status: To Do
+status: Review
 assignee: []
 created_date: '2026-09-24 10:21'
+updated_date: '2026-09-24 10:49'
 labels:
   - portao
   - d-049
@@ -46,3 +47,9 @@ passar calado.
 **Aceite do mantenedor:** quebrar de propósito uma formatação e tentar `git push`; ver o push ser
 recusado com a mensagem certa; corrigir e ver passar.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented `.husky/pre-push` (76 lines), same husky install as pre-commit -- no new
+<!-- SECTION:NOTES:END -->
