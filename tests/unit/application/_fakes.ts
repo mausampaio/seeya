@@ -25,6 +25,7 @@ import type {
 } from '@seeya-ai/engine/core/ports.js';
 import type { ProjectLockInfo } from '@seeya-ai/engine/core/project-lock.js';
 import type {
+  AdoptionRecord,
   Config,
   DaemonOwnershipTransitionAnswer,
   DayState,
@@ -409,6 +410,17 @@ export class FakeStorage implements Storage {
     void entries;
     return Promise.reject(new Error('FakeStorage.saveRepositoryMap is not exercised by endDay'));
   }
+
+  // V2-T29: `adoptions.json` — never touched by `endDay`/`startDay`/the daemon, same "reject
+  // loudly" convention this fake uses above for every other method outside its own scope.
+  readAdoptions(): ReturnType<Storage['readAdoptions']> {
+    return Promise.reject(new Error('FakeStorage.readAdoptions is not exercised by endDay'));
+  }
+
+  saveAdoptions(records: readonly AdoptionRecord[]): ReturnType<Storage['saveAdoptions']> {
+    void records;
+    return Promise.reject(new Error('FakeStorage.saveAdoptions is not exercised by endDay'));
+  }
 }
 
 /**
@@ -439,6 +451,7 @@ export class InMemoryWorkspaceStorage extends FakeStorage {
  */
 export class InMemoryDeviceStorage extends InMemoryWorkspaceStorage {
   private entries: readonly RepositoryMapEntry[] = [];
+  private adoptions: readonly AdoptionRecord[] = [];
 
   override readRepositoryMap(): Promise<readonly RepositoryMapEntry[]> {
     return Promise.resolve(this.entries);
@@ -446,6 +459,17 @@ export class InMemoryDeviceStorage extends InMemoryWorkspaceStorage {
 
   override saveRepositoryMap(entries: readonly RepositoryMapEntry[]): Promise<void> {
     this.entries = entries;
+    return Promise.resolve();
+  }
+
+  // V2-T29: `adoptions.json` — real in-memory storage, unlike the base `FakeStorage`'s rejecting
+  // stub, for `project-adopt.test.ts`'s own use of this double.
+  override readAdoptions(): Promise<readonly AdoptionRecord[]> {
+    return Promise.resolve(this.adoptions);
+  }
+
+  override saveAdoptions(records: readonly AdoptionRecord[]): Promise<void> {
+    this.adoptions = records;
     return Promise.resolve();
   }
 }
@@ -508,6 +532,21 @@ export class FakeWorkspaceRepository implements WorkspaceRepository {
 
   readProjectManifest(root: string, projectId: string): Promise<ProjectManifest | null> {
     return Promise.resolve(this.projectsOf(root).get(projectId) ?? null);
+  }
+
+  // V2-T29: `project-adopt.test.ts`'s own hook — a test calls `setChangedFiles` to simulate what
+  // the interactive fork session wrote before `adoptSession` asks whether to commit; unset (or a
+  // project id never configured) reads as "nothing changed" (`[]`), the same default a brand-new
+  // project with no writes yet would report for real.
+  private readonly changedFilesByProject = new Map<string, readonly string[]>();
+
+  setChangedFiles(projectId: string, files: readonly string[]): void {
+    this.changedFilesByProject.set(projectId, files);
+  }
+
+  listChangedFiles(root: string, projectId: string): Promise<readonly string[]> {
+    void root;
+    return Promise.resolve(this.changedFilesByProject.get(projectId) ?? []);
   }
 }
 
@@ -696,6 +735,10 @@ export class UnverifiableSaveStorage extends FakeStorage {
  * `endDay`'s own tests aren't about D-012, they only need `EndDayDeps` to type-check with a real
  * implementation of every port (S2-T5 added this one). */
 export class FakeForkCleanup implements ForkCleanup {
+  /** V2-T29: every `sessionId` passed to `deleteFork` — `project-adopt.test.ts`'s own way to
+   * assert a declined adoption's fork was actually deleted (never called at all on accept). */
+  readonly deletedSessionIds: string[] = [];
+
   constructor(private readonly result: ForkCleanupResult = { outcomes: [], rejected: [] }) {}
 
   cleanup(forkCleanupDays: number): Promise<ForkCleanupResult> {
@@ -705,6 +748,11 @@ export class FakeForkCleanup implements ForkCleanup {
     void forkCleanupDays;
     return Promise.resolve(this.result);
   }
+
+  deleteFork(sessionId: string): ReturnType<ForkCleanup['deleteFork']> {
+    this.deletedSessionIds.push(sessionId);
+    return Promise.resolve({ sessionId, outcome: 'deleted' });
+  }
 }
 
 /** A `ForkCleanup` whose `cleanup()` always rejects — for `endDay`'s isolation test: a fork-cleanup
@@ -712,6 +760,10 @@ export class FakeForkCleanup implements ForkCleanup {
 export class FailingForkCleanup implements ForkCleanup {
   cleanup(): Promise<ForkCleanupResult> {
     return Promise.reject(new Error('FailingForkCleanup: cleanup always fails'));
+  }
+
+  deleteFork(): ReturnType<ForkCleanup['deleteFork']> {
+    return Promise.reject(new Error('FailingForkCleanup: deleteFork always fails'));
   }
 }
 
