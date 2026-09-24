@@ -4,7 +4,7 @@ title: V2-T45 — Atualização por máquina desliga autostart e não religa
 status: Review
 assignee: []
 created_date: '2026-09-24 11:12'
-updated_date: '2026-09-24 14:17'
+updated_date: '2026-09-24 14:27'
 labels: []
 milestone: m-3
 dependencies: []
@@ -222,5 +222,11 @@ Depois dos dois: **`npm run dist:windows` (raiz, comando exato) rodou de verdade
 **Instalação por usuário (sem elevação) — o que mudou, não só o que foi confirmado.** Não achei documentação/fonte do plugin `UAC.dll` neste ambiente (só o `.dll` compilado e o `.nsh` wrapper, que documenta só o caso de dois processos) para confirmar se `UAC_AsUser_Call` cai para uma chamada local quando não há instância elevada — continua não verificado nesse sentido. Em vez de confiar nisso sem prova, mudei o código para não depender da resposta: `customInstall` agora ramifica em `${UAC_IsInnerInstance}` (o mesmo teste que o item 2 já usa) — só cruza `UAC_AsUser_Call` quando existe de fato um processo original separado; caso contrário (instalação por usuário, ou por máquina já rodada como admin desde o início) chama `SeeyaRestartDaemonAsUser` direto, no único processo em execução. Isso está coberto pelo teste novo #4 acima e foi exercitado de verdade pelo `npm run dist:windows` desta rodada (que também compila — não testa em runtime — o caminho instalador completo).
 
 `npm run verificar` rodou de verdade (não só os testes deste arquivo) — limpo, `exit 0`, cobertura igual à rodada anterior. `npm run dist:windows` (raiz) rodou de verdade duas vezes nesta rodada — limpo as duas.
+---
+
+author: PO
+created: 2026-09-24 14:27
+---
+Revisão do PO (2026-09-24), segunda rodada. Mesclado no po-gate e provado com os comandos reais: npm run dist:windows exit 0 a partir de dist-installer vazio, sem aviso do makensis, instalador de 117.616.967 bytes às 11:26; o executável sai NotSigned (as linhas 'signing with signtool.exe' do electron-builder são o passo vazio, sem certificado — o relatório dizia 'assinado', e não é). npm run verificar vermelho duas vezes, nos mesmos dois testes de tests/integration/app/composition.test.ts (timeout de 5s), independentes desta tarefa: medidos no main sem ela, 3.180 ms e 4.495 ms isolados. Virou a V2-T46 (task-36). Q-088 fechada: a contradição era do despacho do PO. Segue em Review até o aceite do mantenedor (duas instalações por máquina, a segunda prova o item 1; ler ~/.seeya/installer.log). Não coberto pelo aceite: instalação por usuário — o religamento ali chama a Function direto (sem UAC_AsUser_Call), provado por teste de texto e compilação, não em execução.
 ---
 <!-- COMMENTS:END -->

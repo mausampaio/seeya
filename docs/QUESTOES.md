@@ -8672,3 +8672,13 @@ pequeno e sem retrabalho de código — é só rodar o comando de verdade numa w
 `node_modules` (ou na raiz, fora desta tarefa) antes de mover para `Done`; nenhuma mudança de
 código depende do resultado desse comando para estar correta, e o `installer.nsh` em si não é
 tocado por `tsc`/`eslint`/`dependency-cruiser` (não é TypeScript).
+
+**Resolução (PO, 2026-09-24).** A incompatibilidade era do despacho, não da tarefa: a proibição de
+`npm ci` vale só para o checkout principal (de onde o app do mantenedor roda), e
+`docs/FLUXO-DE-AGENTES.md` já mandava rodar `npm ci` na worktree. Corrigido na rodada de revisão —
+o agente rodou `npm ci`, e as duas provas reais mostraram que a leitura "nenhuma mudança de código
+depende desse comando para estar correta" estava errada: o instalador não compilava
+(`${APP_EXECUTABLE_FILENAME}` fora de alcance a partir de uma macro aninhada, e depois `LogicLib.nsh`
+ausente no mesmo ponto) e dois testes existentes quebravam. O harness `makensis` à parte, sem as
+defines e a ordem de `!include` reais do `electron-builder`, deu falsa confiança. Lição registrada:
+prova de compilação é o comando real, nunca uma reprodução dele.
