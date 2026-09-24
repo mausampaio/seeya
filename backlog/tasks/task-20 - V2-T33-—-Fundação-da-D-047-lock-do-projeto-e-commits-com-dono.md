@@ -1,12 +1,10 @@
 ---
 id: TASK-20
-title: >-
-  V2-T33 — Fundação da D-047, parte 1: o lock do projeto, e commits de um
-  projeto só e com dono
+title: 'V2-T33 — Fundação da D-047: lock do projeto e commits com dono'
 status: Done
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-23 10:28'
+updated_date: '2026-09-24 18:10'
 labels:
   - fundacao
   - d-047

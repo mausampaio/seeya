@@ -34,13 +34,36 @@ interface BacklogFile {
   readonly title: string;
 }
 
+// A YAML block scalar indicator (`>`, `>-`, `|`, `|-` and their `+` variants): the value is not on
+// the `title:` line at all, but on the indented lines below it.
+const BLOCK_SCALAR_INDICATOR = /^[>|][+-]?$/;
+
+function readBlockScalar(lines: readonly string[]): string {
+  const continuation: string[] = [];
+  for (const line of lines) {
+    if (!/^\s+\S/.test(line)) {
+      break;
+    }
+    continuation.push(line.trim());
+  }
+  return continuation.join(' ');
+}
+
 function readTitle(filePath: string): string {
-  const content = fs.readFileSync(filePath, 'utf8');
-  const match = /^title:\s*(.+)$/m.exec(content);
+  const lines = fs.readFileSync(filePath, 'utf8').split(/\r?\n/);
+  const index = lines.findIndex((line) => /^title:/.test(line));
+  const raw = (lines[index]?.replace(/^title:/, '') ?? '').trim();
+  // Measured 2026-09-24: Backlog.md writes a long title as a folded block (`title: >-` followed by
+  // indented lines). Reading only the `title:` line saw `>-` as the whole title, so a 97-character
+  // title passed the length check and its file was named `task-20 - -.md` without this guard
+  // noticing.
+  if (BLOCK_SCALAR_INDICATOR.test(raw)) {
+    return readBlockScalar(lines.slice(index + 1));
+  }
   // Backlog.md quotes the title in YAML whenever it contains a character that would need it (a
   // colon, a `+`), with single or double quotes depending on the value — the quotes are the
   // format's, never part of the name.
-  return (match?.[1]?.trim() ?? '').replace(/^['"]|['"]$/g, '');
+  return raw.replace(/^['"]|['"]$/g, '');
 }
 
 function listBacklogFiles(): readonly BacklogFile[] {
