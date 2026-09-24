@@ -413,7 +413,9 @@ projectCommand
     const context = buildProjectContext();
     const deps = await buildProjectOpenDeps(context);
     const exitCode = await runProjectOpenCommand(deps, id, options.with, {
+      stdin: process.stdin,
       stdout: process.stdout,
+      isTTY: process.stdin.isTTY === true,
     });
     if (exitCode !== 0) {
       process.exitCode = exitCode;

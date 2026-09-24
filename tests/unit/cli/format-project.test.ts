@@ -4,9 +4,10 @@ import {
   formatCreateProjectReport,
   formatMissingRepositoryLines,
   formatOpenProjectReport,
-  formatProjectLockWarningLines,
   formatProjectsReport,
   formatShowProjectReport,
+  parseReadOnlyOpenConfirmation,
+  renderReadOnlyOpenConfirmation,
 } from '../../../packages/cli/src/format-project.js';
 import type { ProjectManifest } from '@seeya-ai/engine/core/types.js';
 import type { ProjectLockInfo } from '@seeya-ai/engine/core/project-lock.js';
@@ -158,34 +159,33 @@ describe('formatShowProjectReport', () => {
   });
 });
 
-describe('formatProjectLockWarningLines', () => {
-  it('a genuinely free acquisition prints nothing — no lock ever existed to comment on', () => {
-    const lines = formatProjectLockWarningLines('auth-hardening', {
-      kind: 'acquired',
-      reclaimedStale: null,
-    });
-    expect(lines).toEqual([]);
+// `formatProjectLockWarningLines`'s own tests moved to
+// `tests/unit/core/project-lock-message.test.ts` — it lives in `core/` since V2-T35 (shared, pure
+// text `application/project-open.ts` also needs for `--append-system-prompt`); `cli/format-project.ts`
+// only re-exports it now.
+
+describe('renderReadOnlyOpenConfirmation (V2-T35 item 1)', () => {
+  it('names the holder in the question', () => {
+    const text = renderReadOnlyOpenConfirmation(SOME_LOCK);
+    expect(text).toContain('session abc123');
+    expect(text).toContain('pid 9999');
+    expect(text).toContain('Continue and open this project for reading only');
+  });
+});
+
+describe('parseReadOnlyOpenConfirmation (V2-T35 item 1)', () => {
+  it('an explicit "y" (any case, with surrounding space) is a yes', () => {
+    expect(parseReadOnlyOpenConfirmation('y')).toBe(true);
+    expect(parseReadOnlyOpenConfirmation('Y')).toBe(true);
+    expect(parseReadOnlyOpenConfirmation('  yes  ')).toBe(true);
+    expect(parseReadOnlyOpenConfirmation('YES')).toBe(true);
   });
 
-  it('reclaiming a stale lock names who it took it from', () => {
-    const lines = formatProjectLockWarningLines('auth-hardening', {
-      kind: 'acquired',
-      reclaimedStale: SOME_LOCK,
-    });
-    expect(lines.join('\n')).toContain('was stale');
-    expect(lines.join('\n')).toContain('session abc123');
-    expect(lines.join('\n')).toContain('reclaimed');
-  });
-
-  it('readOnly names who holds the project and warns that writes will not be recorded', () => {
-    const lines = formatProjectLockWarningLines('auth-hardening', {
-      kind: 'readOnly',
-      heldBy: SOME_LOCK,
-    });
-    const text = lines.join('\n');
-    expect(text).toContain('"auth-hardening"');
-    expect(text).toContain('locked by session abc123');
-    expect(text).toContain('reading only');
+  it('a blank answer, or anything else, is a decline — never a guessed yes (D-025)', () => {
+    expect(parseReadOnlyOpenConfirmation('')).toBe(false);
+    expect(parseReadOnlyOpenConfirmation('\n')).toBe(false);
+    expect(parseReadOnlyOpenConfirmation('n')).toBe(false);
+    expect(parseReadOnlyOpenConfirmation('sure')).toBe(false);
   });
 });
 
@@ -297,7 +297,7 @@ describe('formatOpenProjectReport', () => {
     expect(text).toContain('"auth-hardening"');
   });
 
-  it('opened names the project, the harness and the exit code', () => {
+  it('opened names the project, the harness, the exit code, and the lock final state (item 3)', () => {
     const text = formatOpenProjectReport({
       kind: 'opened',
       projectId: 'auth-hardening',
@@ -306,9 +306,52 @@ describe('formatOpenProjectReport', () => {
       addedDirs: ['C:\\code\\app-api'],
       missing: [],
       lock: { kind: 'acquired', reclaimedStale: null },
+      finalLockStatus: { kind: 'unlocked' },
     });
     expect(text).toContain('"auth-hardening"');
     expect(text).toContain('claude');
     expect(text).toContain('code 0');
+    expect(text).toContain('lock: none');
+  });
+
+  it('opened with a readOnly lock repeats the SAME warning the person could not read before the harness took over (item 3)', () => {
+    const text = formatOpenProjectReport({
+      kind: 'opened',
+      projectId: 'auth-hardening',
+      harness: 'claude',
+      exitCode: 0,
+      addedDirs: [],
+      missing: [],
+      lock: { kind: 'readOnly', heldBy: SOME_LOCK },
+      finalLockStatus: { kind: 'heldByLiveSession', lock: SOME_LOCK },
+    });
+    expect(text).toContain('locked by session abc123');
+    expect(text).toContain('opening for reading only');
+    expect(text).toContain('lock: held by session abc123');
+  });
+
+  it('lockConfirmationDeclined names who holds the project and that the person chose not to continue (item 1)', () => {
+    const text = formatOpenProjectReport({
+      kind: 'lockConfirmationDeclined',
+      projectId: 'auth-hardening',
+      heldBy: SOME_LOCK,
+    });
+    expect(text).toContain('"auth-hardening"');
+    expect(text).toContain('not opened');
+    expect(text).toContain('chose not to continue');
+    expect(text).toContain('session abc123');
+  });
+
+  it('lockConfirmationUnavailable refuses and says why, no interactive terminal (item 1)', () => {
+    const text = formatOpenProjectReport({
+      kind: 'lockConfirmationUnavailable',
+      projectId: 'auth-hardening',
+      heldBy: SOME_LOCK,
+    });
+    expect(text).toContain('seeya:');
+    expect(text).toContain('"auth-hardening"');
+    expect(text).toContain('session abc123');
+    expect(text).toContain('refusing to open');
+    expect(text).toContain('no interactive terminal');
   });
 });

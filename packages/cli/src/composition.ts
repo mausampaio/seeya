@@ -7,6 +7,7 @@
  */
 import os from 'node:os';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import type {
   Autostart,
   Clock,
@@ -452,16 +453,22 @@ export function buildProjectContext(homeDir: string = os.homedir()): ProjectCont
 }
 
 /**
- * `seeya project open`'s own extra composition (V2-T33, D-047 items 1/4): `ProjectContext` plus
- * THIS INVOCATION's own `pid`/`procStart` — captured here, not in `buildProjectContext`, because
- * every other `seeya project` subcommand never needs a `procStart` capture at all (S4-T3b's own
- * `powershell.exe` cost on Windows, 500-880ms even warm, `adapters/process/proc-start.ts`'s own
- * measurement — paying it for `list`/`show`/`create`/`add-repo` would be pure waste). Same
- * composition-root-only self-capture `cli/index.ts`'s daemon `worker` branch already does for
- * `daemon.lock` (D-020) — reused, not reimplemented.
+ * `seeya project open`'s own extra composition (V2-T33, D-047 items 1/4; V2-T35 item 4):
+ * `ProjectContext` plus THIS INVOCATION's own `pid`/`procStart` — captured here, not in
+ * `buildProjectContext`, because every other `seeya project` subcommand never needs a `procStart`
+ * capture at all (S4-T3b's own `powershell.exe` cost on Windows, 500-880ms even warm,
+ * `adapters/process/proc-start.ts`'s own measurement — paying it for `list`/`show`/`create`/
+ * `add-repo` would be pure waste). Same composition-root-only self-capture `cli/index.ts`'s daemon
+ * `worker` branch already does for `daemon.lock` (D-020) — reused, not reimplemented.
+ *
+ * `launchedSessionId` (V2-T35 item 4): the id `open` generates for the session it's about to
+ * launch — `node:crypto#randomUUID`, a plain read of Node's CSPRNG, no new dependency. Generating
+ * an id is randomness, so it happens here, at the composition root, never inside `core/`/
+ * `application/` (`application/project-open.ts#ProjectOpenDeps.launchedSessionId`'s own
+ * docstring).
  */
 export async function buildProjectOpenDeps(context: ProjectContext): Promise<ProjectOpenDeps> {
   const procStartCapture = await captureObservedProcStart(process.pid, processExists);
   const procStart = procStartCapture.kind === 'value' ? procStartCapture.value : undefined;
-  return { ...context, pid: process.pid, procStart };
+  return { ...context, pid: process.pid, procStart, launchedSessionId: randomUUID() };
 }

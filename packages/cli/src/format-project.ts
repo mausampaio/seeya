@@ -7,6 +7,10 @@
 import type { RejectedDiscoveryRecord } from '@seeya-ai/engine/core/ports.js';
 import type { ProjectManifest } from '@seeya-ai/engine/core/types.js';
 import type { ProjectLockInfo } from '@seeya-ai/engine/core/project-lock.js';
+import {
+  formatLockHolderDescription,
+  formatProjectLockWarningLines,
+} from '@seeya-ai/engine/core/project-lock-message.js';
 import type {
   CreateProjectResult,
   ListProjectsResult,
@@ -17,8 +21,9 @@ import type { AddRepositoryResult } from '@seeya-ai/engine/application/repositor
 import type {
   MissingRepositoryRecord,
   OpenProjectResult,
-  ProjectOpenLockOutcome,
 } from '@seeya-ai/engine/application/project-open.js';
+
+export { formatProjectLockWarningLines };
 
 function formatInvalidIdLine(projectId: string): string {
   return (
@@ -93,15 +98,6 @@ export function formatProjectsReport(result: ListProjectsResult): string {
   return lines.join('\n');
 }
 
-/** "session &lt;id&gt;" when the lock's holder is known, "an unidentified session" otherwise (D-025:
- * `ProjectLockInfo.sessionId` is absent, not a guessed identity — see that field's own docstring).
- * Shared by `formatShowProjectReport`'s lock line and `formatProjectLockWarningLines` below. */
-function formatLockHolderDescription(lock: ProjectLockInfo): string {
-  const holder =
-    lock.sessionId === undefined ? 'an unidentified session' : `session ${lock.sessionId}`;
-  return `${holder} (pid ${lock.pid}) since ${lock.acquiredAt.toISOString()}`;
-}
-
 /** `seeya project show <id>`'s own lock line (V2-T33, D-047 item 5) — three states, matching
  * `ProjectLockStatus` (never flattened, D-024): `unlocked` says so plainly; `staleLock` still
  * names who last held it (useful diagnostic — the lock file is still ON DISK), but says clearly
@@ -171,32 +167,22 @@ function formatMissingRepositoryLine(projectId: string, missing: MissingReposito
   );
 }
 
-/** `seeya project open`'s own lock warning (V2-T33, D-047 item 4) — printed BEFORE the harness
- * takes over the terminal, same "the person needs to see this while they can still act on it"
- * timing `formatMissingRepositoryLines` already gets. `acquired` with no `reclaimedStale` prints
- * nothing (the ordinary case: a genuinely free lock needs no comment); `acquired` with
- * `reclaimedStale` set names the stale lock it just took over, so a silently-abandoned lock never
- * looks like nothing happened. `readOnly` is the one that matters most: this session did NOT get
- * the lock, so it can look but "não escreve" — the guard that enforces that is V2-T34's, this is
- * only the warning half (`ProjectOpenLockOutcome`'s own docstring). */
-export function formatProjectLockWarningLines(
-  projectId: string,
-  lock: ProjectOpenLockOutcome,
-): string[] {
-  if (lock.kind === 'readOnly') {
-    return [
-      `Project "${projectId}" is locked by ${formatLockHolderDescription(lock.heldBy)} — ` +
-        'opening for reading only. Work in your own code, but changes to this project itself ' +
-        'will not be recorded here until that session releases the lock.',
-    ];
-  }
-  if (lock.reclaimedStale === null) {
-    return [];
-  }
-  return [
-    `Project "${projectId}"'s lock was stale (last held by ` +
-      `${formatLockHolderDescription(lock.reclaimedStale)}) — reclaimed.`,
-  ];
+/** V2-T35 item 1: the question `open` asks, right after `formatProjectLockWarningLines`' own
+ * warning, before it hands the terminal to the harness — reusing `formatLockHolderDescription` so
+ * the answer names the same holder the warning just did. */
+export function renderReadOnlyOpenConfirmation(heldBy: ProjectLockInfo): string {
+  return (
+    `Continue and open this project for reading only, while ` +
+    `${formatLockHolderDescription(heldBy)}? [y/N] `
+  );
+}
+
+/** Anything other than an explicit "y"/"yes" is a decline (D-025: never guess "yes" from a blank
+ * or ambiguous answer) — unlike the richer pickers elsewhere in this package, there is no third
+ * "invalid" state to report: a person who typed something else just as clearly meant no. */
+export function parseReadOnlyOpenConfirmation(raw: string): boolean {
+  const normalized = raw.trim().toLowerCase();
+  return normalized === 'y' || normalized === 'yes';
 }
 
 export function formatMissingRepositoryLines(
@@ -206,9 +192,20 @@ export function formatMissingRepositoryLines(
   return missing.map((entry) => formatMissingRepositoryLine(projectId, entry));
 }
 
-/** `seeya project open <id> [--with <harness>]` (V2-T28). The `opened` case never repeats the
- * `missing` list — `runProjectOpenCommand` already streamed it via `formatMissingRepositoryLines`
- * before the harness launched. */
+/** `seeya project open <id> [--with <harness>]` (V2-T28). V2-T35 item 3: the `opened` case never repeats the `missing` list (that already streamed via
+ * `formatMissingRepositoryLines` before the harness launched, same as before this task) — it DOES
+ * repeat the lock warning, because that one is the whole bug this task fixes: "o claude abre por
+ * cima, não tem como ver." Followed by the lock's state read fresh, after the harness closed
+ * (`result.finalLockStatus`, never the pre-launch `result.lock` re-described as if still current),
+ * then the ordinary exit-code line. */
+function formatOpenedReport(
+  result: Extract<OpenProjectResult, { readonly kind: 'opened' }>,
+): string {
+  const repeatedWarning = formatProjectLockWarningLines(result.projectId, result.lock);
+  const closedLine = `Project "${result.projectId}" closed (${result.harness} exited with code ${result.exitCode}).`;
+  return [...repeatedWarning, formatLockStatusLine(result.finalLockStatus), closedLine].join('\n');
+}
+
 export function formatOpenProjectReport(result: OpenProjectResult): string {
   switch (result.kind) {
     case 'invalidId':
@@ -224,7 +221,22 @@ export function formatOpenProjectReport(result: OpenProjectResult): string {
       return `seeya: harness "${result.harness}" is not supported yet — only "claude" is, for now.`;
     case 'failedToStart':
       return `seeya: could not start ${result.harness} for project "${result.projectId}".`;
+    // V2-T35 item 1: the person was asked, and either said no or had no way to answer — the
+    // warning that preceded the question is still on screen (it was never covered by the
+    // harness, which never launched), so neither case repeats it.
+    case 'lockConfirmationDeclined':
+      return (
+        `Project "${result.projectId}" was not opened — you chose not to continue while it is ` +
+        `locked by ${formatLockHolderDescription(result.heldBy)}.`
+      );
+    case 'lockConfirmationUnavailable':
+      return (
+        `seeya: project "${result.projectId}" is locked by ` +
+        `${formatLockHolderDescription(result.heldBy)} — refusing to open without a way to ask ` +
+        'for confirmation (no interactive terminal attached). Run this from a real terminal, or ' +
+        'wait for the lock to be released.'
+      );
     case 'opened':
-      return `Project "${result.projectId}" closed (${result.harness} exited with code ${result.exitCode}).`;
+      return formatOpenedReport(result);
   }
 }

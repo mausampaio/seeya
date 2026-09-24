@@ -53,12 +53,14 @@ function buildContext(overrides: Partial<ProjectContext> = {}): ProjectContext {
   };
 }
 
+const LAUNCHED_SESSION_ID = '55555555-5555-4555-8555-555555555555';
+
 /** `runProjectOpenCommand` takes `ProjectOpenDeps`, not `ProjectContext` (its own docstring: the
  * real `pid`/`procStart` capture belongs to `index.ts`'s `.action()` alone, never this test) —
  * adds a fixed, fake pid onto an EXISTING context (same port instances, so whatever `create`/
  * `add-repo` already wrote through it is still visible) rather than building a fresh one. */
 function buildOpenDeps(context: ProjectContext): ProjectOpenDeps {
-  return { ...context, pid: 4242, procStart: undefined };
+  return { ...context, pid: 4242, procStart: undefined, launchedSessionId: LAUNCHED_SESSION_ID };
 }
 
 /** Same `PassThrough` + `'data'` accumulation `start-day-command.test.ts#makeIo` already uses —
@@ -70,6 +72,17 @@ function collectStdout(): { readonly stdout: PassThrough; readonly output: () =>
     collected += chunk.toString('utf8');
   });
   return { stdout, output: () => collected };
+}
+
+/** Every `runProjectOpenCommand` test in this file uses a non-interactive `io` by default (the
+ * simplest possible double) — `stdin` is never actually read unless a test's own project ends up
+ * `readOnly`, which none of these do (a fresh `FakeProjectLock` is always free). */
+function buildOpenIo(stdout: PassThrough): {
+  readonly stdin: PassThrough;
+  readonly stdout: PassThrough;
+  readonly isTTY: boolean;
+} {
+  return { stdin: new PassThrough(), stdout, isTTY: false };
 }
 
 describe('runProjectCreateCommand', () => {
@@ -162,20 +175,20 @@ describe('runProjectOpenCommand', () => {
       buildOpenDeps(context),
       'auth-hardening',
       undefined,
-      {
-        stdout,
-      },
+      buildOpenIo(stdout),
     );
     expect(exitCode).toBe(1);
     expect(output()).toContain('no default harness set');
   });
 
-  it('opens with --with claude, streaming a missing-repository warning before launch', async () => {
+  it('opens with --with claude, streaming a missing-repository warning before launch, and reports the id it generated (item 4) plus the final lock state (item 3)', async () => {
+    const harnessLauncher = new FakeHarnessLauncher();
     const context = buildContext({
       gitReader: new FakeGitReaderWithRemote(
         new Map([[REPO_PATH, 'git@host:acme-widgets/app-api.git']]),
       ),
       directoryExistence: new FakeDirectoryExistence(new Set([REPO_PATH])),
+      harnessLauncher,
     });
     await runProjectCreateCommand(context, 'auth-hardening');
     await runProjectAddRepoCommand(context, 'auth-hardening', REPO_PATH);
@@ -203,13 +216,106 @@ describe('runProjectOpenCommand', () => {
       buildOpenDeps(context),
       'auth-hardening',
       'claude',
-      {
-        stdout,
-      },
+      buildOpenIo(stdout),
     );
     expect(exitCode).toBe(0);
     const text = output();
     expect(text).toContain('Repository "frontend" is not registered on this device');
+    expect(text).toContain('lock: none');
     expect(text).toContain('closed (claude exited with code 0)');
+    expect(harnessLauncher.calls).toEqual([
+      {
+        cwd: path.join(SEEYA_HOME, 'workspace', 'auth-hardening'),
+        addDirs: [REPO_PATH],
+        sessionId: LAUNCHED_SESSION_ID,
+        systemPromptAppend: null,
+      },
+    ]);
+  });
+
+  describe('a project locked by another (live) session — V2-T35 item 1', () => {
+    // pid 777 is "alive" for `ControllableProcessControl` — the one thing that turns this lock
+    // into `readOnly` instead of a reclaimable stale one (`core/project-lock.ts
+    // #decideProjectLockAcquisition`).
+    function buildLockedContext(harnessLauncher: FakeHarnessLauncher): ProjectContext {
+      return buildContext({
+        processControl: new ControllableProcessControl(new Map([[777, true]])),
+        harnessLauncher,
+      });
+    }
+
+    async function lockAuthHardening(context: ProjectContext): Promise<void> {
+      await runProjectCreateCommand(context, 'auth-hardening');
+      // `ProjectLock.write`'s `root` is the WORKSPACE root, not the project's own directory
+      // (`core/ports.ts#ProjectLock`'s own docstring — same key shape `application/project-open
+      // .test.ts` already uses).
+      await context.projectLock.write(path.join(SEEYA_HOME, 'workspace'), 'auth-hardening', {
+        sessionId: 'other-session',
+        pid: 777,
+        procStart: undefined,
+        acquiredAt: new Date('2026-09-22T09:00:00.000Z'),
+      });
+    }
+
+    it('without a TTY, refuses without ever asking or launching the harness', async () => {
+      const harnessLauncher = new FakeHarnessLauncher();
+      const context = buildLockedContext(harnessLauncher);
+      await lockAuthHardening(context);
+      const { stdout, output } = collectStdout();
+      const exitCode = await runProjectOpenCommand(
+        buildOpenDeps(context),
+        'auth-hardening',
+        'claude',
+        buildOpenIo(stdout),
+      );
+      expect(exitCode).toBe(1);
+      const text = output();
+      expect(text).toContain('locked by session other-session');
+      expect(text).toContain('refusing to open without a way to ask for confirmation');
+      expect(harnessLauncher.calls).toHaveLength(0);
+    });
+
+    it('with a TTY and an explicit "y", opens read-only and the session gets the same warning', async () => {
+      const harnessLauncher = new FakeHarnessLauncher();
+      const context = buildLockedContext(harnessLauncher);
+      await lockAuthHardening(context);
+      const { stdout, output } = collectStdout();
+      // Written BEFORE the call, same as `start-day-command.test.ts#makeIo` — `node:stream`
+      // buffers it, so `readline`'s own `question()` sees it whenever it starts reading, no race.
+      const stdin = new PassThrough();
+      stdin.write('y\n');
+      const exitCode = await runProjectOpenCommand(
+        buildOpenDeps(context),
+        'auth-hardening',
+        'claude',
+        { stdin, stdout, isTTY: true },
+      );
+      expect(exitCode).toBe(0);
+      const text = output();
+      expect(text).toContain('locked by session other-session');
+      expect(text).toContain('Continue and open this project for reading only');
+      expect(harnessLauncher.calls).toHaveLength(1);
+      expect(harnessLauncher.calls[0]?.systemPromptAppend).toContain(
+        'locked by session other-session',
+      );
+    });
+
+    it('with a TTY and a blank answer, declines — never launches the harness', async () => {
+      const harnessLauncher = new FakeHarnessLauncher();
+      const context = buildLockedContext(harnessLauncher);
+      await lockAuthHardening(context);
+      const { stdout, output } = collectStdout();
+      const stdin = new PassThrough();
+      stdin.write('\n');
+      const exitCode = await runProjectOpenCommand(
+        buildOpenDeps(context),
+        'auth-hardening',
+        'claude',
+        { stdin, stdout, isTTY: true },
+      );
+      expect(exitCode).toBe(0);
+      expect(output()).toContain('you chose not to continue');
+      expect(harnessLauncher.calls).toHaveLength(0);
+    });
   });
 });

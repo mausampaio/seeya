@@ -349,4 +349,17 @@ describe('buildProjectOpenDeps', () => {
     // this platform's capture strategy genuinely failed — never anything else.
     expect(deps.procStart === undefined || typeof deps.procStart === 'string').toBe(true);
   });
+
+  it('V2-T35 item 4: generates a real, valid UUID for launchedSessionId — a different one per call', async () => {
+    fixture = await createDiscoveryFixture();
+    const context = buildProjectContext(fixture.root);
+
+    const first = await buildProjectOpenDeps(context);
+    const second = await buildProjectOpenDeps(context);
+
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    expect(first.launchedSessionId).toMatch(uuidPattern);
+    expect(second.launchedSessionId).toMatch(uuidPattern);
+    expect(first.launchedSessionId).not.toBe(second.launchedSessionId);
+  });
 });

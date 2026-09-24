@@ -5,6 +5,7 @@
  * the same split every other command module in this package already follows
  * (`autostart-command.ts`, `snooze-command.ts`).
  */
+import { createInterface } from 'node:readline/promises';
 import {
   createProject,
   listProjects,
@@ -12,7 +13,10 @@ import {
 } from '@seeya-ai/engine/application/workspace.js';
 import { addRepository } from '@seeya-ai/engine/application/repository-association.js';
 import { openProject } from '@seeya-ai/engine/application/project-open.js';
-import type { ProjectOpenDeps } from '@seeya-ai/engine/application/project-open.js';
+import type {
+  ConfirmReadOnlyOpen,
+  ProjectOpenDeps,
+} from '@seeya-ai/engine/application/project-open.js';
 import type { ProjectContext } from './composition.js';
 import {
   formatAddRepoReport,
@@ -22,6 +26,8 @@ import {
   formatProjectLockWarningLines,
   formatProjectsReport,
   formatShowProjectReport,
+  parseReadOnlyOpenConfirmation,
+  renderReadOnlyOpenConfirmation,
 } from './format-project.js';
 
 export async function runProjectCreateCommand(
@@ -54,13 +60,37 @@ export async function runProjectAddRepoCommand(
   return formatAddRepoReport(result);
 }
 
-/** Where `runProjectOpenCommand` writes the missing-repository warnings — always `process.stdout`
- * in production (`index.ts`), a `node:stream` `PassThrough` in tests, same injection
+/** Where `runProjectOpenCommand` writes the missing-repository/lock warnings and, when the
+ * project is locked, reads the confirmation answer — always the real `process.std{in,out}` in
+ * production (`index.ts`), a `node:stream` `PassThrough`/fake `isTTY` in tests, same injection
  * `start-day-command.ts#StartDayIo` already uses for the identical reason: the harness itself
  * takes over stdio right after, so these lines have to be written for real, not returned as part
  * of a string this function's caller only prints once everything else is done. */
 export interface ProjectOpenIo {
+  readonly stdin: NodeJS.ReadableStream;
   readonly stdout: NodeJS.WritableStream;
+  readonly isTTY: boolean;
+}
+
+/** V2-T35 item 1: `openProject`'s own `ConfirmReadOnlyOpen` — asks over `node:readline/promises`
+ * exactly like `start-day-command.ts#makeFallbackConfirmer` does, but never falls back to a
+ * default answer when `io.isTTY` is false: it resolves `'unavailable'` and lets `openProject`
+ * refuse ("sem entrada interativa, recusa dizendo o porquê"), the one confirmation in this project
+ * that does not guess. */
+function makeReadOnlyOpenConfirmer(io: ProjectOpenIo): ConfirmReadOnlyOpen {
+  return async (heldBy) => {
+    if (!io.isTTY) {
+      return 'unavailable';
+    }
+    const rl = createInterface({ input: io.stdin, output: io.stdout });
+    let answer: string;
+    try {
+      answer = await rl.question(`\n${renderReadOnlyOpenConfirmation(heldBy)}`);
+    } finally {
+      rl.close();
+    }
+    return parseReadOnlyOpenConfirmation(answer) ? 'proceed' : 'decline';
+  };
 }
 
 /**
@@ -86,15 +116,20 @@ export async function runProjectOpenCommand(
   harness: string | undefined,
   io: ProjectOpenIo,
 ): Promise<number> {
-  const result = await openProject(deps, projectId, harness, ({ missing, lock }) => {
-    const lines = [
-      ...formatMissingRepositoryLines(projectId, missing),
-      ...formatProjectLockWarningLines(projectId, lock),
-    ];
-    for (const line of lines) {
-      io.stdout.write(`${line}\n`);
-    }
+  const result = await openProject(deps, projectId, harness, {
+    onBeforeLaunch: ({ missing, lock }) => {
+      const lines = [
+        ...formatMissingRepositoryLines(projectId, missing),
+        ...formatProjectLockWarningLines(projectId, lock),
+      ];
+      for (const line of lines) {
+        io.stdout.write(`${line}\n`);
+      }
+    },
+    confirmReadOnlyOpen: makeReadOnlyOpenConfirmer(io),
   });
   io.stdout.write(`${formatOpenProjectReport(result)}\n`);
-  return result.kind === 'opened' ? 0 : 1;
+  // V2-T35 item 1: a deliberate decline is not a failure ("Nothing selected — nothing resumed"'s
+  // own precedent in `start-day-command.ts`) — everything else non-`opened` is.
+  return result.kind === 'opened' || result.kind === 'lockConfirmationDeclined' ? 0 : 1;
 }
