@@ -30,11 +30,19 @@
 #
 # What running `guards` would additionally catch, beyond what `lint`/`dependencias` above
 # already enforce on the real source tree: that the guard *tooling itself* still rejects bad
-# fixtures the way it's supposed to, backlog title-length/filename conventions
-# (`backlog-names.test.ts`), and that the per-directory coverage-floor declaration stays
+# fixtures the way it's supposed to, and that the per-directory coverage-floor declaration stays
 # consistent with the real `src/` tree (`coverage-directories.test.ts`). None of that is source
 # code correctness on the branch being pushed -- it stays covered by `npm run verificar` (the
 # PO's own gate, run before merge) and by CI.
+#
+# One guard file is the exception and runs below: `guards/backlog-names.test.ts`, measured at
+# 2.2s on its own (PO review, 2026-09-24) because it only reads `backlog/*.md` front matter --
+# no eslint, no dependency-cruiser, no AST walk. It earns its place for a reason the others
+# don't share: backlog files are routinely committed straight to the default branch without the
+# full gate ever running, so this hook is the only thing between a too-long task title and a
+# `git worktree add` that fails with `Filename too long` on someone's machine days later
+# (D-048). The criterion for adding another one here is the same two facts -- seconds, not
+# tens of seconds, AND it protects files that normally bypass `npm run verificar`.
 #
 # Where this guardrail ends: `git push --no-verify` skips this file entirely, and a clone that
 # never ran `npm install` (which runs the `prepare`/`husky` script that wires these hooks up)
@@ -72,5 +80,13 @@ npm run dependencias || {
   echo "" >&2
   echo "pre-push: dependency-cruiser found a layer boundary violation." >&2
   echo "pre-push: run 'npm run dependencias' to see it." >&2
+  exit 1
+}
+
+npx vitest run --project guards tests/integration/guards/backlog-names.test.ts || {
+  echo "" >&2
+  echo "pre-push: a backlog task or decision breaks the naming rule (D-048)." >&2
+  echo "pre-push: the failure above names the file; shorten the title to 72 characters" >&2
+  echo "pre-push: and rename the file with 'git mv' so the two stay in sync." >&2
   exit 1
 }
