@@ -144,4 +144,16 @@ export class DiscoveryForkCleanup implements ForkCleanup {
 
     return { outcomes, rejected: forkRejectionsAsRecords(seeyaHome, rejected) };
   }
+
+  /**
+   * V2-T29: deletes one fork's transcript file immediately, by `sessionId` alone — never reads
+   * `forks.json` first (unlike `cleanup` above): `locateTranscriptFile` finds a `.jsonl` by id
+   * across every project slug under `<claudeHome>/projects/`, the same lookup a registry entry
+   * would only have pointed back to anyway. `application/project-adopt.ts#adoptSession`'s own
+   * decline path is the one caller — see `core/ports.ts#ForkCleanup.deleteFork`'s own docstring for
+   * why this never touches the registry itself.
+   */
+  async deleteFork(sessionId: string): Promise<ForkCleanupOutcome> {
+    return deleteOneFork(this.options.claudeHome, sessionId);
+  }
 }

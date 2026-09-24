@@ -329,4 +329,71 @@ describe('FsWorkspaceRepository', () => {
     expect(rejected).toHaveLength(1);
     expect(rejected[0]?.reason).toMatch(/listing .* failed/);
   });
+
+  // V2-T29 item 4: `listChangedFiles` — `application/project-adopt.ts#adoptSession` reads this
+  // right after the fork's interactive session closes, to show the person what it wrote before
+  // asking whether to commit.
+  it('listChangedFiles is empty right after a project is created and committed — nothing pending', async () => {
+    root = await makeTmpDir();
+    const workspace = new FsWorkspaceRepository();
+    await workspace.initialize(root);
+    await workspace.writeProjectSkeleton(
+      root,
+      'auth-hardening',
+      buildProjectSkeleton('auth-hardening'),
+    );
+    await workspace.commitAll(root, 'auth-hardening', 'Create project auth-hardening');
+
+    expect(await workspace.listChangedFiles(root, 'auth-hardening')).toEqual([]);
+  });
+
+  it('listChangedFiles reports a file a session wrote inside the project, path relative to root', async () => {
+    root = await makeTmpDir();
+    const workspace = new FsWorkspaceRepository();
+    await workspace.initialize(root);
+    await workspace.writeProjectSkeleton(
+      root,
+      'auth-hardening',
+      buildProjectSkeleton('auth-hardening'),
+    );
+    await workspace.commitAll(root, 'auth-hardening', 'Create project auth-hardening');
+
+    await writeFile(
+      path.join(root, 'auth-hardening', 'context', 'know-how.md'),
+      'how this project is operated\n',
+      'utf8',
+    );
+
+    const changed = await workspace.listChangedFiles(root, 'auth-hardening');
+    expect(changed).toEqual([path.posix.join('auth-hardening', 'context', 'know-how.md')]);
+  });
+
+  it("listChangedFiles is scoped to ONE project — a second project's own pending change never leaks in (D-047 item 3)", async () => {
+    root = await makeTmpDir();
+    const workspace = new FsWorkspaceRepository();
+    await workspace.initialize(root);
+    await workspace.writeProjectSkeleton(
+      root,
+      'auth-hardening',
+      buildProjectSkeleton('auth-hardening'),
+    );
+    await workspace.commitAll(root, 'auth-hardening', 'Create project auth-hardening');
+    await workspace.writeProjectSkeleton(root, 'billing-v2', buildProjectSkeleton('billing-v2'));
+    await workspace.commitAll(root, 'billing-v2', 'Create project billing-v2');
+
+    await writeFile(path.join(root, 'auth-hardening', 'INDEX.md'), 'auth notes\n', 'utf8');
+    await writeFile(path.join(root, 'billing-v2', 'INDEX.md'), 'billing notes\n', 'utf8');
+
+    expect(await workspace.listChangedFiles(root, 'auth-hardening')).toEqual([
+      path.posix.join('auth-hardening', 'INDEX.md'),
+    ]);
+  });
+
+  it('listChangedFiles throws when root is not a git repository at all', async () => {
+    root = await makeTmpDir();
+    const workspace = new FsWorkspaceRepository();
+    await expect(workspace.listChangedFiles(root, 'auth-hardening')).rejects.toThrow(
+      /git status failed/,
+    );
+  });
 });

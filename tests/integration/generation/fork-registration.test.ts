@@ -7,7 +7,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { registerFork } from '@seeya-ai/engine/adapters/generation/fork-registration.js';
+import {
+  GenerationForkRegistration,
+  registerFork,
+  unregisterFork,
+} from '@seeya-ai/engine/adapters/generation/fork-registration.js';
 
 const SESSION_A = '11111111-1111-4111-8111-111111111111';
 const SESSION_B = '22222222-2222-4222-8222-222222222222';
@@ -76,5 +80,50 @@ describe('registerFork', () => {
 
     const files = await readdir(seeyaHome);
     expect(files).toStrictEqual(['forks.json']);
+  });
+});
+
+/** V2-T29: `unregisterFork` — the symmetric write `application/project-adopt.ts#adoptSession` uses
+ * both on decline (drop the entry entirely) and on an accepted commit (drop it here, the fork is
+ * tracked in `adoptions.json` from then on). */
+describe('unregisterFork', () => {
+  it('removes the one entry that matches, leaving the rest untouched', async () => {
+    await registerFork(seeyaHome, SESSION_A, new Date('2026-08-01T00:00:00.000Z'));
+    await registerFork(seeyaHome, SESSION_B, NOW);
+
+    await unregisterFork(seeyaHome, SESSION_A);
+
+    const registry = await readRegistry();
+    expect(registry.forks).toStrictEqual([{ sessionId: SESSION_B, createdAt: NOW.toISOString() }]);
+  });
+
+  it('a sessionId that was never registered is a no-op, not an error', async () => {
+    await registerFork(seeyaHome, SESSION_A, NOW);
+
+    await expect(unregisterFork(seeyaHome, SESSION_B)).resolves.toBeUndefined();
+
+    const registry = await readRegistry();
+    expect(registry.forks).toStrictEqual([{ sessionId: SESSION_A, createdAt: NOW.toISOString() }]);
+  });
+
+  it('an empty/missing forks.json is a no-op, not an error', async () => {
+    await expect(unregisterFork(seeyaHome, SESSION_A)).resolves.toBeUndefined();
+  });
+});
+
+/** V2-T29: `GenerationForkRegistration` — the `ForkRegistration` port's only implementation, a
+ * thin wrapper `application/project-adopt.ts` depends on instead of these free functions
+ * directly. */
+describe('GenerationForkRegistration', () => {
+  it('register() then unregister() round-trips through the same forks.json this module writes', async () => {
+    const registration = new GenerationForkRegistration(seeyaHome);
+
+    await registration.register(SESSION_A, NOW);
+    expect((await readRegistry()).forks).toStrictEqual([
+      { sessionId: SESSION_A, createdAt: NOW.toISOString() },
+    ]);
+
+    await registration.unregister(SESSION_A);
+    expect((await readRegistry()).forks).toStrictEqual([]);
   });
 });

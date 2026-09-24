@@ -9,6 +9,7 @@ import { readFile, readdir, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import type { Briefing, RejectedDiscoveryRecord, Storage } from '../../core/ports.js';
 import type {
+  AdoptionRecord,
   Config,
   Day,
   DaemonOwnershipTransitionAnswer,
@@ -71,6 +72,11 @@ import {
   parseRepositoryMapDocument,
   serializeRepositoryMapDocument,
 } from './repository-map-schema.js';
+import {
+  ADOPTION_REGISTRY_SCHEMA_VERSION,
+  parseAdoptionRegistryDocument,
+  serializeAdoptionRegistryDocument,
+} from './adoption-registry-schema.js';
 import { resolveSchemaVersion, type SchemaMigration } from './schema-version.js';
 import { writeFileAtomic } from './atomic-write.js';
 
@@ -478,6 +484,30 @@ export class StorageAdapter implements Storage {
     await writeFileAtomic(
       this.repositoryMapPath(),
       JSON.stringify(serializeRepositoryMapDocument(entries), null, 2) + '\n',
+    );
+  }
+
+  /** `~/.seeya/adoptions.json` (V2-T29). */
+  private adoptionsPath(): string {
+    return path.join(this.seeyaHome, 'adoptions.json');
+  }
+
+  async readAdoptions(): Promise<readonly AdoptionRecord[]> {
+    const resolved = await readVersionedDocument(
+      this.adoptionsPath(),
+      ADOPTION_REGISTRY_SCHEMA_VERSION,
+    );
+    if (resolved === null) {
+      // Nothing adopted on this device yet (D-025), not an error.
+      return [];
+    }
+    return parseAdoptionRegistryDocument(resolved);
+  }
+
+  async saveAdoptions(records: readonly AdoptionRecord[]): Promise<void> {
+    await writeFileAtomic(
+      this.adoptionsPath(),
+      JSON.stringify(serializeAdoptionRegistryDocument(records), null, 2) + '\n',
     );
   }
 }

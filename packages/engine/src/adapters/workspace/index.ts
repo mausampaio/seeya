@@ -284,4 +284,36 @@ export class FsWorkspaceRepository implements WorkspaceRepository {
     const resolved = await readManifestDocument(manifestPath(root, projectId));
     return resolved === null ? null : parseProjectManifestDocument(resolved);
   }
+
+  /**
+   * V2-T29: `git status --porcelain -- <projectId>`, scoped the same way `commitAll` scopes its own
+   * `git add` (D-047 item 3) — a second project's own pending change is never mixed in. Each
+   * `--porcelain` line is `XY <path>` (two status characters, one space, the path); renamed entries
+   * (`R  old -> new`) keep their `old -> new` form here too — this is a display list for
+   * `adoptSession`'s own confirmation prompt, never fed back into a `git add`, so a raw-but-honest
+   * line is preferable to a parser that has to get every porcelain edge case right for no benefit.
+   */
+  async listChangedFiles(root: string, projectId: string): Promise<readonly string[]> {
+    // `--untracked-files=all`: without it, git collapses a newly created directory (e.g. a
+    // session's first write into an empty `context/`) into one line naming the DIRECTORY, not the
+    // file inside it — useless for a confirmation prompt that exists to show what would be
+    // committed. `all` lists every individual file instead, at any depth.
+    const status = await runGit(root, [
+      'status',
+      '--porcelain',
+      '--untracked-files=all',
+      '--',
+      projectId,
+    ]);
+    if (!status.ran || status.exitCode !== 0) {
+      throw new Error(
+        `git status failed in workspace at "${root}": ` +
+          `${status.ran ? `exit ${status.exitCode}` : status.reason}`,
+      );
+    }
+    return status.stdout
+      .split('\n')
+      .filter((line) => line.trim().length > 0)
+      .map((line) => line.slice(3));
+  }
 }

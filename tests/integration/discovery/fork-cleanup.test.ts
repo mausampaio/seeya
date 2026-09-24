@@ -290,3 +290,42 @@ describe('DiscoveryForkCleanup.cleanup — containment (S2-T6 acceptance item 2)
     expect(await readFile(registryPath, 'utf8')).toBe(before);
   });
 });
+
+/** V2-T29: `deleteFork` — a single, immediate deletion by `sessionId` alone, never age-based and
+ * never touching `forks.json` itself (`core/ports.ts#ForkCleanup.deleteFork`'s own docstring on
+ * why the registry write is deliberately someone else's job, `ForkRegistration.unregister`). */
+describe('DiscoveryForkCleanup.deleteFork', () => {
+  it('deletes the one transcript file named, regardless of forks.json (never reads or writes it)', async () => {
+    await writeTranscript(fixture, 'slug-forks', STALE_FORK);
+    await writeTranscript(fixture, 'slug-forks', RECENT_FORK);
+    // Deliberately no forks.json at all — proves this method finds the file by sessionId alone.
+
+    const cleanup = new DiscoveryForkCleanup({
+      claudeHome: fixture.claudeHome,
+      seeyaHome: fixture.seeyaHome,
+      clock: new FakeClock(NOW),
+    });
+    const outcome = await cleanup.deleteFork(STALE_FORK);
+
+    expect(outcome).toStrictEqual({ sessionId: STALE_FORK, outcome: 'deleted' });
+    expect(
+      await fileExists(path.join(fixture.projectsDir, 'slug-forks', `${STALE_FORK}.jsonl`)),
+    ).toBe(false);
+    expect(
+      await fileExists(path.join(fixture.projectsDir, 'slug-forks', `${RECENT_FORK}.jsonl`)),
+    ).toBe(true);
+    expect(await fileExists(path.join(fixture.seeyaHome, 'forks.json'))).toBe(false);
+  });
+
+  it('a sessionId with no matching file anywhere is alreadyAbsent, not an error (D-025)', async () => {
+    const cleanup = new DiscoveryForkCleanup({
+      claudeHome: fixture.claudeHome,
+      seeyaHome: fixture.seeyaHome,
+      clock: new FakeClock(NOW),
+    });
+
+    const outcome = await cleanup.deleteFork(STALE_MISSING_FORK);
+
+    expect(outcome).toStrictEqual({ sessionId: STALE_MISSING_FORK, outcome: 'alreadyAbsent' });
+  });
+});
