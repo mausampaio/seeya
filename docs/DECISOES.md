@@ -66,3 +66,4 @@ dizendo o que mudou e por qual decisão — "emendada" não é status.
 | D-046 — Encerramento muito vencido vira pendência, não roda sozinho | `backlog/decisions/decision-46 - D-046-—-Encerramento-muito-vencido-vira-pendência-não-roda-sozinho.md` |
 | D-047 — Uma sessão escreve o projeto por vez, garantido por código | `backlog/decisions/decision-47 - D-047-—-Uma-sessão-escreve-o-projeto-por-vez-garantido-por-código.md` |
 | D-048 — As tarefas saem do plano único e vão para o Backlog.md | `backlog/decisions/decision-48 - D-048-—-As-tarefas-saem-do-plano-único-e-vão-para-o-Backlog.md.md` |
+| D-049 — Gancho antes do push agora, pull request quando fechar | `backlog/decisions/decision-49 - D-049-—-Gancho-antes-do-push-agora-pull-request-quando-fechar.md` |
