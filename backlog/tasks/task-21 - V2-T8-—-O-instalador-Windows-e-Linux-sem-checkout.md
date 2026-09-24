@@ -4,7 +4,7 @@ title: 'V2-T8 — O instalador: Windows e Linux sem checkout'
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-24 17:48'
+updated_date: '2026-09-24 17:53'
 labels: []
 milestone: m-3
 dependencies: []
@@ -199,5 +199,11 @@ author: PO
 created: 2026-09-24 17:48
 ---
 Ubuntu em 2026-09-24 (build de 1ba6dac): o aviso prévio APARECEU, mas o clique não trouxe a janela. Diagnóstico pedido ao mantenedor: marcador protocol-handler.json, xdg-mime do esquema seeya, versão do notify-send, xdg-open seeya://open manual, e se o clique foi no aviso na tela ou depois, na lista de notificações.
+---
+
+author: PO
+created: 2026-09-24 17:53
+---
+Diagnóstico do clique no Ubuntu (2026-09-24): marcador presente (activeScheme seeya), xdg-mime aponta para seeya.desktop, xdg-open seeya://open traz a janela — mas notify-send é 0.7.9, abaixo do piso 0.7.10 desta tarefa, então o aviso sai sem ação por projeto. Comportamento conforme a especificação; a lacuna (Ubuntu 22.04 nunca tem clique) virou a V2-T49.
 ---
 <!-- COMMENTS:END -->
