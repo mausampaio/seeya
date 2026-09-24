@@ -4,7 +4,7 @@ title: V2-T23 — Autostart congela o ambiente inteiro
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-23 10:46'
+updated_date: '2026-09-24 17:48'
 labels: []
 milestone: m-1
 dependencies: []
@@ -165,3 +165,13 @@ por acidente: na próxima tarefa que tocar o autostart, tornar a regra explícit
 não carregar o `Path`, com o porquê ao lado; nos outros sistemas, carregar `PATH`) e testar
 com o nome real de cada sistema.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-24 17:48
+---
+Aceite no Linux em 2026-09-24 (Ubuntu do mantenedor, build de 1ba6dac): depois de desligar e religar o autostart pela janela, a unidade systemd gerada tem só Environment=ELECTRON_RUN_AS_NODE=1 e Environment=PATH=<PATH da pessoa> — exatamente a lista permitida — e StandardOutput/StandardError apontando para ~/.seeya/autostart.log. Falta a conferência equivalente no Windows.
+---
+<!-- COMMENTS:END -->

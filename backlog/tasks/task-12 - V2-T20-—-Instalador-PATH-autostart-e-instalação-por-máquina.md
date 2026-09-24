@@ -4,7 +4,7 @@ title: 'V2-T20 — Instalador: PATH, autostart e instalação por máquina'
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-23 10:46'
+updated_date: '2026-09-24 17:48'
 labels: []
 milestone: m-3
 dependencies: []
@@ -189,3 +189,13 @@ fazer: **a subida do app INSTALADO**, que não passa pelo lançamento a partir d
 `node_modules`. Só depois dessa comparação é que uma tarefa de otimização tem alvo — hoje ela
 teria palpite.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-24 17:48
+---
+Aceite parcial em 2026-09-24, Ubuntu do mantenedor (build de 1ba6dac, .deb em /opt): num terminal novo, 'seeya status' responde. Falta desinstalar e conferir que não sobra autostart (Linux e Windows), e o terminal novo no Windows.
+---
+<!-- COMMENTS:END -->

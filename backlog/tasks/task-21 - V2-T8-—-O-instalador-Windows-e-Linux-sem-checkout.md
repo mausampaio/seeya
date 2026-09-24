@@ -4,7 +4,7 @@ title: 'V2-T8 — O instalador: Windows e Linux sem checkout'
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-24 17:39'
+updated_date: '2026-09-24 17:48'
 labels: []
 milestone: m-3
 dependencies: []
@@ -193,5 +193,11 @@ author: PO
 created: 2026-09-24 17:39
 ---
 Evidência parcial do mantenedor em 2026-09-24, Ubuntu (instalado a partir de um clone local): a janela sobe e o painel Hoje explica o estado vazio de uma máquina que nunca capturou nada ('No pending briefing found in the last 31 days scanned...'). Ainda faltam os passos do aceite: abrir pelo menu, aba de claude, Start daemon pela janela, clique no aviso prévio.
+---
+
+author: PO
+created: 2026-09-24 17:48
+---
+Ubuntu em 2026-09-24 (build de 1ba6dac): o aviso prévio APARECEU, mas o clique não trouxe a janela. Diagnóstico pedido ao mantenedor: marcador protocol-handler.json, xdg-mime do esquema seeya, versão do notify-send, xdg-open seeya://open manual, e se o clique foi no aviso na tela ou depois, na lista de notificações.
 ---
 <!-- COMMENTS:END -->
