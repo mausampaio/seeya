@@ -40,7 +40,6 @@ existe independentemente de Claude Code, Codex, Gemini ou de qualquer outro harn
 ```text
 auth-hardening/
 ├── AGENTS.md          # instruções canônicas para qualquer harness
-├── CLAUDE.md          # só aponta para o AGENTS.md
 ├── INDEX.md           # porta de entrada: o essencial e onde buscar o resto
 ├── seeya.json
 ├── context/           # sistema, restrições, glossário

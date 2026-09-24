@@ -12,6 +12,15 @@
  * `understanding`/`pendingItems`/`tomorrowPlan`, never to a static template `seeya` writes itself.
  * A later session filling `status/`/`decisions/` is free to write in whatever language the work
  * happens in — this skeleton doesn't constrain that.
+ *
+ * **Only `AGENTS.md` — no `CLAUDE.md` (D-030, V2-T44).** An earlier version of this skeleton also
+ * wrote a one-line `CLAUDE.md` pointing at `AGENTS.md`, on the theory that harness-specific files
+ * are a convention worth mirroring. That was a `core/` module writing a file path that names a
+ * specific harness — exactly what D-030's third consequence rules out ("o núcleo pode citar um
+ * harness em texto para humano; nunca em... caminho de arquivo"). The maintainer also measured
+ * that it doesn't buy anything today: the current Claude Code already reads `AGENTS.md` directly,
+ * so the pointer file has no reader left to serve. Projects created before this fix keep whatever
+ * `CLAUDE.md` they already have — `seeya` never deletes a file a person might have edited.
  */
 import type { ProjectManifest, ProjectSkeleton, WorkspaceProjectFile } from './types.js';
 
@@ -25,16 +34,6 @@ const PROJECT_DIRECTORIES: readonly string[] = [
   'journal',
   'references',
 ];
-
-function buildClaudeMd(): string {
-  // Mirrors this very repository's own CLAUDE.md (`docs/V2-RUMO.md`: "os arquivos específicos de
-  // cada harness apenas apontam para" AGENTS.md) — same one-line pointer, same convention
-  // (https://agents.md), just describing a project instead of the seeya repo itself.
-  return (
-    'See AGENTS.md — the instructions for this project live there, in the agents.md convention ' +
-    '(https://agents.md), the same file any harness reads.\n'
-  );
-}
 
 function buildAgentsMd(projectId: string): string {
   return (
@@ -68,7 +67,7 @@ function buildIndexMd(projectId: string): string {
  * @example
  * const skeleton = buildProjectSkeleton('auth-hardening');
  * skeleton.manifest.id; // 'auth-hardening'
- * skeleton.files.map((f) => f.relativePath); // ['AGENTS.md', 'CLAUDE.md', 'INDEX.md']
+ * skeleton.files.map((f) => f.relativePath); // ['AGENTS.md', 'INDEX.md']
  *
  * Callers are expected to have already validated `projectId` with
  * `core/project-id.ts#isValidProjectId` — this function doesn't re-check it (it only builds
@@ -88,7 +87,6 @@ export function buildProjectSkeleton(projectId: string): ProjectSkeleton {
   };
   const files: WorkspaceProjectFile[] = [
     { relativePath: 'AGENTS.md', content: buildAgentsMd(projectId) },
-    { relativePath: 'CLAUDE.md', content: buildClaudeMd() },
     { relativePath: 'INDEX.md', content: buildIndexMd(projectId) },
   ];
   return { manifest, files, directories: PROJECT_DIRECTORIES };
