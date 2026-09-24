@@ -4,7 +4,7 @@ title: V2-T29 — Adotar uma sessão existente num projeto
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-24 21:05'
+updated_date: '2026-09-24 21:13'
 labels:
   - adocao
   - d-047
@@ -215,5 +215,11 @@ author: PO
 created: 2026-09-24 21:05
 ---
 Mais do mesmo aceite (Ubuntu do mantenedor, 2026-09-24), que confirma a parte que a Q-090 deixou para o terminal real: a retomada INTERATIVA da cópia abriu com --resume + --fork-session + --session-id + --add-dir juntos, com o histórico carregado. Enquanto a sessão estava aberta, forks.json trazia a cópia (o id gerado pelo seeya); no exit, sem nada escrito no projeto, a CLI imprimiu 'didn't write anything inside the project — nothing to commit, nothing kept', apagou a cópia e limpou forks.json; adoptions.json não foi criado. Ou seja: fluxo de registro/descarte certo em uso real; o único defeito é a instrução sem o caminho do projeto, já devolvido ao agente.
+---
+
+author: PO
+created: 2026-09-24 21:13
+---
+Decisão do mantenedor em 2026-09-24, a partir da pergunta dele sobre o diretório: a adoção continua abrindo a cópia no diretório ORIGINAL da sessão — porque é ali que o Claude Code carrega as instruções (CLAUDE.md), a memória automática, configurações e skills daquele diretório, e aberta no projeto a sessão ficaria só com o histórico, enfraquecendo a adoção. O trabalho do dia a dia depois segue no diretório do projeto (project open). Acrescentado à correção em andamento: a instrução pede explicitamente que a sessão leve para o projeto o que, das instruções e da memória daquele diretório, pertence a este trabalho (e deixe o resto de fora); a linha da CLI antes de lançar diz por que abre ali. Correção do PO: a afirmação de que o --resume só acha o histórico no diretório original nunca foi medida e não sustenta a escolha — o que sustenta é a memória do diretório.
 ---
 <!-- COMMENTS:END -->
