@@ -76,6 +76,108 @@ Var SeeyaCliScriptPath
 ; see `seeyaResolvePaths` below for why it is recomputed alongside the other two paths, and the
 ; "seeya on PATH" section further down for the macros that use it.
 Var SeeyaBinDirPath
+
+; -----------------------------------------------------------------------------------------------
+; V2-T45 item 5: `~/.seeya/installer.log` -- a real log, in place of the comments below (V2-T15/
+; V2-T22) that used to cite `%TEMP%\seeya-installer.log`, a path this file never actually wrote
+; to (measured: the maintainer's own machine had no such file after an install, V2-T45's own
+; report). One line per step, timestamped, naming which of the three instances a per-machine
+; update runs wrote it (`original` / `elevated` / `old-uninstaller`, V2-T45's own vocabulary) --
+; this is what lets the acceptance test read where four minutes went, instead of a stopwatch.
+;
+; **Declared unconditionally (no `!ifndef`/`!ifdef BUILD_UNINSTALLER` guard), unlike
+; `$SeeyaDaemonWasRunning`.** `seeyaLogWrite`/`seeyaRunLoggedCli` below are inserted from BOTH
+; `customInit`/`customInstall` (installer-only) AND `customUnInstall` (uninstaller-only) call
+; sites, so every one of these Vars ends up referenced in both compiler passes -- same reasoning
+; `seeyaResolvePaths`'s own Vars already rely on, just for a new set of Vars.
+;
+; **`${GetTime}` comes from `FileFunc.nsh`, already `!include`d by `multiUser.nsh` (this
+; template's own `include/UAC.nsh` chain) before this file's macros are ever inserted** -- checked
+; directly in the cached template tree before writing this, not assumed: re-`!include`ing it here
+; would risk the exact "already defined" failure `StrContains.nsh` already caused elsewhere in
+; this file (see `SeeyaPathFind`'s own comment above).
+;
+; **`nsExec::ExecToStack`, not `ExecToLog`, for every CLI call this file makes from here on.**
+; `ExecToLog` only ever reaches the on-screen details view, which V2-T22's own restart call
+; already needed but which item 3 (below) shows is NOT available for the daemon restart once it
+; runs across the UAC elevation boundary -- `ExecToStack` is the one mechanism that gets the CLI's
+; own text back into OUR hands (on the stack) so it can go into a file instead, from any process.
+; Traded off: NSIS's own `${NSIS_MAX_STRLEN}` still caps how much of that text a single
+; `ExecToStack` call can capture -- long CLI output is truncated by NSIS itself, not by this file.
+;
+; **Teto: 256 KiB (${SEEYA_INSTALLER_LOG_MAX_BYTES}).** A handful of timestamped one-line steps
+; per install run (well under 1 KiB total) means this covers dozens of updates before ever
+; truncating -- enough to compare "how long did this update take" against the last one or two, the
+; acceptance test's own use case, without the file growing without bound on a machine that updates
+; seeya often. Checked on every write (`seeyaLogWrite`, not a separate "start of install" check):
+; simpler than tracking "is this the first write of this run" across three unrelated processes,
+; and it still means the cap is only ever crossed at the start of some future run's own first
+; line, in practice.
+;
+; **Never fails the install.** Every `FileOpen`/`FileSeek` is guarded with `${if}${Errors}` and
+; `ClearErrors` before returning control -- a log line that could not be written is one line
+; short, never an aborted step.
+; -----------------------------------------------------------------------------------------------
+
+!define SEEYA_INSTALLER_LOG_MAX_BYTES 262144
+
+Var SeeyaLogPath
+Var SeeyaLogSize
+Var SeeyaLogFileHandle
+Var SeeyaLogExitCode
+Var SeeyaLogOutput
+Var SeeyaLogTimeDay
+Var SeeyaLogTimeMonth
+Var SeeyaLogTimeYear
+Var SeeyaLogTimeDow
+Var SeeyaLogTimeHour
+Var SeeyaLogTimeMinute
+Var SeeyaLogTimeSecond
+
+; Appends one timestamped, instance-labelled line to `~/.seeya/installer.log`, truncating first if
+; the file has already grown past the cap above. No `un.` twin needed: unlike `SeeyaPathFind`, this
+; is a `!macro` (text-substituted at every call site), never a `Function` reached through a plain
+; `Call` -- the "must start with un." compiler rule this file's other comments warn about is about
+; `Call`/`GetFunctionAddress`, not about macros.
+!macro seeyaLogWrite instanceLabel message
+  StrCpy $SeeyaLogPath "$PROFILE\.seeya\installer.log"
+  CreateDirectory "$PROFILE\.seeya"
+  StrCpy $SeeyaLogSize 0
+  ClearErrors
+  FileOpen $SeeyaLogFileHandle "$SeeyaLogPath" r
+  ${ifNot} ${Errors}
+    FileSeek $SeeyaLogFileHandle 0 END $SeeyaLogSize
+    FileClose $SeeyaLogFileHandle
+  ${endIf}
+  ClearErrors
+  ${if} $SeeyaLogSize > ${SEEYA_INSTALLER_LOG_MAX_BYTES}
+    FileOpen $SeeyaLogFileHandle "$SeeyaLogPath" w
+  ${else}
+    FileOpen $SeeyaLogFileHandle "$SeeyaLogPath" a
+  ${endIf}
+  ${ifNot} ${Errors}
+    ${GetTime} "" "L" $SeeyaLogTimeDay $SeeyaLogTimeMonth $SeeyaLogTimeYear $SeeyaLogTimeDow $SeeyaLogTimeHour $SeeyaLogTimeMinute $SeeyaLogTimeSecond
+    FileSeek $SeeyaLogFileHandle 0 END
+    FileWrite $SeeyaLogFileHandle "[$SeeyaLogTimeYear-$SeeyaLogTimeMonth-$SeeyaLogTimeDay $SeeyaLogTimeHour:$SeeyaLogTimeMinute:$SeeyaLogTimeSecond] [${instanceLabel}] ${message}$\r$\n"
+    FileClose $SeeyaLogFileHandle
+  ${endIf}
+  ClearErrors
+!macroend
+
+; Runs a packaged-CLI command with `ELECTRON_RUN_AS_NODE=1` (like every other CLI call in this
+; file), captures its exit code AND its printed text (`nsExec::ExecToStack`, see this section's own
+; top comment on why not `ExecToLog`), prints a short line to the on-screen details view, and
+; writes the full result -- command, exit code, output -- to `installer.log`.
+!macro seeyaRunLoggedCli instanceLabel stepLabel command
+  DetailPrint "${stepLabel}"
+  !insertmacro seeyaSetRunAsNode
+  nsExec::ExecToStack '${command}'
+  Pop $SeeyaLogExitCode
+  Pop $SeeyaLogOutput
+  !insertmacro seeyaClearRunAsNode
+  !insertmacro seeyaLogWrite "${instanceLabel}" "${stepLabel} -- exit $SeeyaLogExitCode -- $SeeyaLogOutput"
+!macroend
+
 ; Measured (a real `npm run dist:windows` run, V2-T15): NSIS's own compiler treats "unreferenced
 ; variable" as a fatal warning (`warning 6001 ... wasting memory!`, `electron-builder`'s own
 ; `makensis` wrapper turns any compiler warning into a hard build failure). `$SeeyaDaemonWasRunning`
@@ -323,21 +425,38 @@ FunctionEnd
   ${endIf}
 !macroend
 
+; V2-T45 cause 2, confirmed by reading the cached template tree before writing this fix:
+; `multiUserUi.nsh`'s own elevation Leave-function (`UAC_RunElevated` then `Quit`, ~lines 152-165)
+; and `installer.nsi`'s own silent per-machine elevation inside `Section "install"` (same pattern,
+; ~lines 99-119) BOTH run only after `.onInit` -- and therefore `customInit` -- already completed
+; once, in the non-elevated ("original") process. `UAC_RunElevated` then launches a SECOND, fully
+; independent process of this same installer, which runs `.onInit`/`customInit` again from
+; scratch: `${UAC_IsInnerInstance}` (`include/UAC.nsh`) is what tells the two runs apart.
+; Recomputing `$SeeyaDaemonWasRunning` from `daemon.lock` a second time there reads "0" --  the
+; original process's own daemon-stop call, below, has already deleted the lock file by then --
+; which is the actual defect the maintainer measured (autostart aside, the daemon simply never
+; came back). `UAC_AsUser_GetGlobalVar` (`include/UAC.nsh`) pulls the ORIGINAL process's own copy
+; of the variable across the elevation boundary instead of guessing from a lock file that may
+; already be gone; it is also one fewer packaged-CLI launch (item 4): the elevated instance no
+; longer needs its own redundant `daemon --stop` at all, since the original instance already ran
+; it moments earlier in the same install.
 !macro customInit
   !insertmacro seeyaResolvePaths
-  StrCpy $SeeyaDaemonWasRunning "0"
-  IfFileExists "$SeeyaDaemonLockPath" 0 seeyaInitNoLock
-    StrCpy $SeeyaDaemonWasRunning "1"
-  seeyaInitNoLock:
-  ; A first-time install has no OLD `${APP_EXECUTABLE_FILENAME}` on disk yet to call — nothing to
-  ; stop (and `$SeeyaDaemonWasRunning` would only be "1" here from a daemon this same NSIS-driven
-  ; app itself started, which needs an install to have already happened once).
-  IfFileExists "$INSTDIR\${APP_EXECUTABLE_FILENAME}" 0 seeyaInitDone
-    DetailPrint "Stopping the seeya daemon before installing..."
-    !insertmacro seeyaSetRunAsNode
-    ExecWait '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" "$SeeyaCliScriptPath" daemon --stop'
-    !insertmacro seeyaClearRunAsNode
-  seeyaInitDone:
+  ${if} ${UAC_IsInnerInstance}
+    !insertmacro UAC_AsUser_GetGlobalVar $SeeyaDaemonWasRunning
+    !insertmacro seeyaLogWrite "elevated" "Reused the original instance's own daemon state ($SeeyaDaemonWasRunning) instead of stopping it again"
+  ${else}
+    StrCpy $SeeyaDaemonWasRunning "0"
+    IfFileExists "$SeeyaDaemonLockPath" 0 seeyaInitNoLock
+      StrCpy $SeeyaDaemonWasRunning "1"
+    seeyaInitNoLock:
+    ; A first-time install has no OLD `${APP_EXECUTABLE_FILENAME}` on disk yet to call — nothing to
+    ; stop (and `$SeeyaDaemonWasRunning` would only be "1" here from a daemon this same NSIS-driven
+    ; app itself started, which needs an install to have already happened once).
+    IfFileExists "$INSTDIR\${APP_EXECUTABLE_FILENAME}" 0 seeyaInitDone
+      !insertmacro seeyaRunLoggedCli "original" "Stopping the seeya daemon before installing..." '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" "$SeeyaCliScriptPath" daemon --stop'
+    seeyaInitDone:
+  ${endIf}
 !macroend
 
 ; V2-T22: the defect this task fixes, measured on the maintainer's machine — this restart used to
@@ -346,19 +465,63 @@ FunctionEnd
 ; text away: it only ever returns an exit code, never the child's stdout, and nothing here looked
 ; at the code either. Two independent fixes to that silence, not one:
 ;
-; 1. **`nsExec::ExecToLog` instead of plain `ExecWait`.** Same bundled plugin
+; 1. **`nsExec`, not plain `ExecWait`, so the CLI's own text is captured instead of thrown away.**
+;    Originally (V2-T22) `nsExec::ExecToLog` — same bundled plugin
 ;    `allowOnlyOneInstallerInstance.nsh` already calls elsewhere in this template tree (no new
-;    dependency) — it runs the command exactly like `ExecWait` but also pipes every line the child
-;    prints to stdout/stderr straight into the installer's own DetailPrint log, so the CLI's own
-;    message ("seeya daemon started (pid ...)", or the refusal text this task's own `daemon-
-;    command.ts` fix addresses) is what a person reading `%TEMP%\seeya-installer.log` (or the
-;    on-screen details view) actually sees, not silence.
+;    dependency) — piping every line the child prints to the installer's own on-screen details log,
+;    so the CLI's own message ("seeya daemon started (pid ...)", or the refusal text this task's
+;    own `daemon-command.ts` fix addresses) was what a person reading that view actually saw, not
+;    silence. V2-T45 moved this specific call behind `seeyaRunLoggedCli`, which uses
+;    `nsExec::ExecToStack` instead (see this file's own top comment on why) so the same text also
+;    reaches `~/.seeya/installer.log` — the on-screen details view is not always available for this
+;    one call any more (item 3, below), so the log file is now the one place guaranteed to have it.
 ; 2. **The exit code, captured and checked too**, as a defensive belt: `runDaemonLauncher`'s own
 ;    "launcher" branch (`cli/index.ts`) does not currently set a non-zero `process.exitCode` on
 ;    refusal (only the worker path does) — measured while writing this fix, not assumed — so this
 ;    check alone would NOT have caught the original defect. It stays because a future failure mode
 ;    that DOES exit non-zero (a spawn failure inside `spawnDetachedDaemon`, for one) will now also
 ;    get its own explicit line, instead of counting on someone reading the log line above closely.
+;
+; V2-T45 item 3: this restart MUST run as the person, never as admin. A daemon launched directly
+; from `customInstall` would inherit whatever process is running it -- for a per-machine install
+; that is the ELEVATED instance (cause 2, above), so the daemon would come up elevated: the window
+; could never stop it again (D-002, only graceful termination, and only the app's own daemon), and
+; everything it then wrote to `~/.seeya/` would carry a different integrity level than every other
+; file this app writes there.
+;
+; **`UAC_AsUser_Call`, not `UAC_AsUser_ExecShell` (both from `include/UAC.nsh`, both cited in this
+; task's own evidence) -- measured against what each one can report back:**
+; `UAC_AsUser_ExecShell` is a thin wrapper over Win32 `ShellExecute`, fire-and-forget by design --
+; it returns no exit code and there is nothing to `Pop`, so `$SeeyaDaemonRestartExitCode`'s own
+; failure message (V2-T22) could not be fed by it at all, and neither could `installer.log`.
+; `UAC_AsUser_Call` instead runs a real `Function` IN the original, unprivileged process and syncs
+; `$0`-`$9`/`$R0`-`$R9` back (`UAC_SYNCREGISTERS`) once it returns -- enough to carry the exit code
+; across, and the function body can call `seeyaRunLoggedCli` itself, so the CLI's own text and exit
+; code still reach `installer.log` (item 5) even though this step crosses the elevation boundary.
+;
+; **What neither macro preserves: the ON-SCREEN details view.** The original process's own window
+; was hidden before elevation (`ShowWindow $HWNDPARENT ${SW_HIDE}`, the same elevation code this
+; section's own top comment on cause 2 already cites) -- `DetailPrint` calls made while running
+; inside that process write to a details list nobody is looking at. `installer.log` is what
+; survives the boundary; that is why item 5 exists, and why this one step is the reason it does.
+!ifndef BUILD_UNINSTALLER
+Function SeeyaRestartDaemonAsUser
+  ; Runs in the ORIGINAL (unprivileged) process even when `customInstall` itself is running
+  ; elevated -- `UAC_AsUser_Call`, below, is what jumps here. `$INSTDIR` arrives synced
+  ; (`UAC_SYNCINSTDIR`); `$SeeyaCliScriptPath` does NOT (only `$0`-`$9`/`$R0`-`$R9` do, per
+  ; `UAC_AsUser_Call`'s own doc comment in `include/UAC.nsh`), so this recomputes it fresh from the
+  ; now-synced `$INSTDIR` -- the same "recompute, never cache across hooks" rule
+  ; `seeyaResolvePaths`'s own top comment already states, just applied across a process boundary
+  ; instead of across hooks.
+  !insertmacro seeyaResolvePaths
+  !insertmacro seeyaRunLoggedCli "elevated" "Restarting the seeya daemon (it was running before this install)..." '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" "$SeeyaCliScriptPath" daemon'
+  ; `$0` is the one register `UAC_AsUser_Call`'s caller reads back below (see the `Push $0` /
+  ; `Pop $0` around it) -- this is the same "stash the result in a synced register, restore it
+  ; after" idiom `include/UAC.nsh`'s own `UAC_AsUser_GetGlobalVar` already uses internally.
+  StrCpy $0 $SeeyaLogExitCode
+FunctionEnd
+!endif
+
 !macro customInstall
   ; V2-T20 item 1: independent of whether the daemon needs restarting below -- this runs on every
   ; install AND every upgrade, `$INSTDIR` already final at this point (see `seeyaResolvePaths`'s
@@ -367,11 +530,10 @@ FunctionEnd
   !insertmacro seeyaWriteCliShim
   !insertmacro seeyaAddBinDirToUserPath
   ${if} $SeeyaDaemonWasRunning == "1"
-    DetailPrint "Restarting the seeya daemon (it was running before this install)..."
-    !insertmacro seeyaSetRunAsNode
-    nsExec::ExecToLog '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" "$SeeyaCliScriptPath" daemon'
-    Pop $SeeyaDaemonRestartExitCode
-    !insertmacro seeyaClearRunAsNode
+    Push $0
+    !insertmacro UAC_AsUser_Call Function SeeyaRestartDaemonAsUser ${UAC_SYNCREGISTERS}|${UAC_SYNCINSTDIR}
+    StrCpy $SeeyaDaemonRestartExitCode $0
+    Pop $0
     ${if} $SeeyaDaemonRestartExitCode != 0
       DetailPrint "Restarting the seeya daemon failed (exit code $SeeyaDaemonRestartExitCode) -- open seeya and use Start daemon, or run 'seeya daemon' yourself."
     ${endIf}
@@ -382,17 +544,29 @@ FunctionEnd
 ; (`seeya autostart disable`, same reasoning `customInit`'s own top comment already gives for
 ; `daemon --stop`: it already knows how to read/remove the OS-specific registration, own tests
 ; cover it, and D-045 item 3 left `disable` working for every `DaemonOwner`, not just the app's own).
-; Best-effort like the restart in `customInstall`: `nsExec::ExecToLog` so the CLI's own output
-; ("autostart removed"/"autostart was not registered", or a failure) reaches
-; `%TEMP%\seeya-installer.log`, but a non-zero exit never aborts the uninstall -- the app itself is
-; already gone by the time this runs; a person can still open a terminal and run the command by
+; Best-effort like the restart in `customInstall`: `seeyaRunLoggedCli` (V2-T45 item 5) so the CLI's
+; own output ("autostart removed"/"autostart was not registered", or a failure) and its exit code
+; reach `~/.seeya/installer.log`, but a non-zero exit never aborts the uninstall -- the app itself
+; is already gone by the time this runs; a person can still open a terminal and run the command by
 ; hand if this one line failed for some OS-specific reason.
+;
+; V2-T45 cause 1, confirmed by reading the cached template tree before writing this fix:
+; `include/installUtil.nsh#uninstallOldVersion` (called from `installSection.nsh`, on every
+; install where a previous version is registered) runs the OLD uninstaller with `/S ... --updated`
+; (line ~206: "always pass --updated flag"). `uninstaller.nsh`'s own `Section "un.${...}"` calls
+; `customUnInstall` (line ~157) BEFORE it ever branches on `${isUpdated}` itself (lines ~164 and
+; ~224, the two places the template's OWN code already treats an update differently from a real
+; uninstall) -- our macro is what had not been taught the same distinction. `${isUpdated}` is
+; already in scope at the point `customUnInstall` runs (the template's own later `${if}`s in that
+; same function prove it), so there is no new plumbing needed to read it here, only to act on it.
+!define SEEYA_UNINSTALL_LOG_LABEL "old-uninstaller"
+
+; V2-T45 item 1: only ever called from `customUnInstall` when this is NOT an update (see there) --
+; a genuine uninstall, never the OLD uninstaller electron-builder's own `uninstallOldVersion`
+; (`include/installUtil.nsh`) runs on top of a fresh install.
 !macro seeyaDisableAutostart
-  DetailPrint "Removing the seeya autostart registration..."
-  !insertmacro seeyaSetRunAsNode
-  nsExec::ExecToLog '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" "$SeeyaCliScriptPath" autostart disable'
-  Pop $SeeyaAutostartDisableExitCode
-  !insertmacro seeyaClearRunAsNode
+  !insertmacro seeyaRunLoggedCli "${SEEYA_UNINSTALL_LOG_LABEL}" "Removing the seeya autostart registration..." '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" "$SeeyaCliScriptPath" autostart disable'
+  StrCpy $SeeyaAutostartDisableExitCode $SeeyaLogExitCode
   ${if} $SeeyaAutostartDisableExitCode != 0
     DetailPrint "Removing the seeya autostart registration failed (exit code $SeeyaAutostartDisableExitCode) -- run 'seeya autostart disable' yourself if it is still registered."
   ${endIf}
@@ -401,16 +575,30 @@ FunctionEnd
 !macro customUnInstall
   !insertmacro seeyaResolvePaths
   IfFileExists "$INSTDIR\${APP_EXECUTABLE_FILENAME}" 0 seeyaUnInstallNoExe
-    DetailPrint "Stopping the seeya daemon..."
-    !insertmacro seeyaSetRunAsNode
-    ExecWait '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" "$SeeyaCliScriptPath" daemon --stop'
-    !insertmacro seeyaClearRunAsNode
-    !insertmacro seeyaDisableAutostart
+    !insertmacro seeyaRunLoggedCli "${SEEYA_UNINSTALL_LOG_LABEL}" "Stopping the seeya daemon..." '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" "$SeeyaCliScriptPath" daemon --stop'
+    ; V2-T45 item 1: an update is not an uninstall -- the NEW version's own `customInstall` is what
+    ; leaves the final autostart/protocol state (it runs moments later, after this old uninstaller
+    ; returns). Stopping the daemon above still always runs: the files need to be replaceable
+    ; either way, and a stop against an already-stopped daemon is the same safe no-op `customInit`'s
+    ; own top comment already relies on -- keeping it here is a deliberate belt-and-suspenders
+    ; against the new installer's own stop having failed or not run, not an oversight left in by
+    ; not reading this far.
+    ${ifNot} ${isUpdated}
+      !insertmacro seeyaDisableAutostart
+    ${else}
+      !insertmacro seeyaLogWrite "${SEEYA_UNINSTALL_LOG_LABEL}" "Skipping autostart/protocol cleanup: this uninstall is part of an update"
+    ${endIf}
   seeyaUnInstallNoExe:
   ; V2-T20 item 1: undoes `customInstall`'s own `seeyaWriteCliShim`/`seeyaAddBinDirToUserPath` --
   ; unconditional (unlike the two calls above, which need the packaged exe to still be there to run
-  ; `seeya` itself): removing a file and a registry value needs no exe at all.
+  ; `seeya` itself): removing a file and a registry value needs no exe at all, and re-adding the
+  ; shim/PATH entry right after is exactly what the NEW version's own `customInstall` already does
+  ; unconditionally too -- this still covers an install directory changing under
+  ; `allowToChangeInstallationDirectory`, so it is left exactly as it already ran (V2-T20), update
+  ; or not.
   !insertmacro seeyaRemoveCliShim
   !insertmacro seeyaRemoveBinDirFromUserPath
-  DeleteRegKey HKCU "Software\Classes\seeya"
+  ${ifNot} ${isUpdated}
+    DeleteRegKey HKCU "Software\Classes\seeya"
+  ${endIf}
 !macroend

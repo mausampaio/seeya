@@ -8634,3 +8634,41 @@ mapeamento tem de ser revisto.
 **Nenhuma das três muda o formato do `.seeya-lock`/dos trailers em si** (já fixados no glossário do
 `AGENTS.md` antes do código, como a spec pediu) — são decisões sobre a FONTE de um valor que os dois
 já esperavam receber.
+
+## Q-088 — V2-T45: `node_modules` ausente na worktree impediu `npm run dist:windows`/`npm run
+verificar` de verdade
+
+**Contexto.** A tarefa pede duas provas por execução real: `npm run dist:windows` (compilar o
+instalador, item de restrição própria — "compilar é permitido, instalar não") e `npm run
+verificar` ao final (o portão padrão). As restrições do ambiente desta tarefa proíbem `npm
+install`/`npm ci` na worktree e proíbem criar uma junction apontando para o `node_modules` da
+raiz. A worktree (`C:\code\seeya\.claude\worktrees\agent-a124c4488ff59866e`) nunca teve
+`node_modules` instalado — nem na raiz, nem em nenhum pacote — então nenhum dos dois comandos roda
+ali: `npm run dist:windows` falha ao tentar `npm run build` (typescript/tsup ausentes), e `npm run
+verificar` falha da mesma forma no primeiro passo (`prettier` ausente). A premissa da tarefa (que
+dá para rodar os dois na worktree) não se sustenta com as outras duas restrições do mesmo
+despacho — não é uma ambiguidade de spec, é uma incompatibilidade entre duas instruções do mesmo
+ambiente.
+
+**Efeito, e o que foi feito em vez disso (D-025: relatar o estado real, não inventar uma prova que
+não existe).** Não rodei nenhum `npm run *` na worktree. Para não devolver "não sei se
+compila" sem mais nada, montei um harness `makensis` isolado (fora do repositório, em
+`%TEMP%`), usando o `makensis.exe`/os plugins NSIS já baixados no cache do `electron-builder`
+nesta máquina (`%LOCALAPPDATA%\electron-builder\Cache`, de uma build anterior do mantenedor —
+nada instalado por mim) e os arquivos REAIS de `node_modules/app-builder-lib/templates/nsis/`
+(lidos, nunca copiados para dentro do repositório) para reproduzir, o mais fielmente possível, a
+mesma geração de `${isUpdated}` que `app-builder-lib/out/targets/nsis/nsisScriptGenerator.js`
+produz em tempo real — compilando o `packages/app/build/installer.nsh` desta tarefa (o arquivo de
+verdade, lido da worktree) com `-WX` (avisos são erro fatal, igual ao `makensis` do
+`electron-builder`) nas duas passadas (`BUILD_UNINSTALLER` definido e não definido). As duas
+passadas compilaram sem aviso nem erro. Isto prova a sintaxe NSIS e os mecanismos novos (`UAC_
+AsUser_Call`, `UAC_AsUser_GetGlobalVar`, `${GetTime}`, `nsExec::ExecToStack`) contra os headers e
+plugins reais — **não** prova o pipeline inteiro do `electron-builder` (ícones, `app.asar`,
+assinatura, o `installer.nsi` real com todas as páginas MUI). O relatório da tarefa detalha o
+harness; ele não faz parte do repositório (só tocou `%TEMP%`).
+
+**Efeito, se a decisão de não rodar `npm run verificar` de verdade for julgada insuficiente:**
+pequeno e sem retrabalho de código — é só rodar o comando de verdade numa worktree com
+`node_modules` (ou na raiz, fora desta tarefa) antes de mover para `Done`; nenhuma mudança de
+código depende do resultado desse comando para estar correta, e o `installer.nsh` em si não é
+tocado por `tsc`/`eslint`/`dependency-cruiser` (não é TypeScript).
