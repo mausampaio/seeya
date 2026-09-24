@@ -71,8 +71,22 @@ nsis/`), a confirmar pelo agente:**
    na instância original, de novo na elevada, de novo no desinstalador antigo, mais o
    `autostart disable`) — cada uma sobe o executável do Electron. É o primeiro suspeito dos 4
    minutos, mas **não foi medido**: o relatório diz quantas chamadas sobram e por quê.
-5. **Corrigir os comentários que citam `%TEMP%\seeya-installer.log`**, que não existe. Onde a saída
-   do instalador vai de fato (a janela de detalhes, enquanto ela está aberta) é o que se escreve.
+5. **O instalador passa a ter log de verdade: `~/.seeya/installer.log`** (pedido do mantenedor,
+   2026-09-24, no lugar de só corrigir os comentários que citavam um `%TEMP%\seeya-installer.log`
+   que nunca existiu). Ao lado do `autostart.log` (V2-T23 item 5), pelo mesmo motivo: é saída de
+   um processo que ninguém está olhando.
+   - **Uma linha por passo, com horário** (`${GetTime}`, de `FileFunc.nsh`, que vem com o próprio
+     NSIS) e **qual instância escreveu** — original, elevada, desinstalador da versão anterior.
+     É isto que mede os 4 minutos: o aceite lê o log, não um cronômetro.
+   - **A saída da CLI entra no arquivo**, não só na janela de detalhes: `daemon --stop`, `daemon` e
+     `autostart disable` com o texto que imprimiram e o código de saída.
+   - **Acrescenta, não sobrescreve** — uma atualização envolve três instâncias, e cada uma precisa
+     deixar o seu pedaço. Com teto de tamanho: passou do teto no começo de uma instalação, o arquivo
+     recomeça. Diga o teto escolhido e por quê.
+   - **Nunca falha a instalação.** Não conseguir escrever o log é uma linha a menos, nunca um
+     instalador parado.
+   - Nome novo em disco: entra na tabela de identificadores do `AGENTS.md` antes de entrar no código.
+   - Os comentários de `installer.nsh` que citam o arquivo inexistente passam a citar este.
 
 **Limite que precisa estar no relatório e no aceite:** a correção do item 1 mora no desinstalador
 **da versão corrigida**. A primeira atualização para ela ainda roda o desinstalador de hoje, que
@@ -83,7 +97,7 @@ compila (`npm run dist:windows`) e lê; quem executa é o mantenedor. Nenhuma de
 que está acima já vem no template do `electron-builder`.
 
 **Aceite do mantenedor (Windows, por máquina):** instalar o build corrigido uma vez (o autostart
-ainda pode cair — é o limite acima); ligar daemon e autostart; instalar o mesmo build por cima e
-cronometrar. Ao abrir a janela: **daemon de pé, autostart ligado**, e o tempo de instalação dito
-no comentário da tarefa.
+ainda pode cair — é o limite acima); ligar daemon e autostart; instalar o mesmo build por cima. Ao
+abrir a janela: **daemon de pé, autostart ligado**. E `~/.seeya/installer.log` conta a história
+das três instâncias com horário — de onde sai quanto tempo cada passo levou.
 <!-- SECTION:DESCRIPTION:END -->
