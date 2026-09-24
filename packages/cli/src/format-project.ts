@@ -5,7 +5,7 @@
  * own orchestration).
  */
 import type { RejectedDiscoveryRecord } from '@seeya-ai/engine/core/ports.js';
-import type { ProjectManifest } from '@seeya-ai/engine/core/types.js';
+import type { DiscoveredSession, ProjectManifest } from '@seeya-ai/engine/core/types.js';
 import type { ProjectLockInfo } from '@seeya-ai/engine/core/project-lock.js';
 import {
   formatLockHolderDescription,
@@ -22,6 +22,7 @@ import type {
   MissingRepositoryRecord,
   OpenProjectResult,
 } from '@seeya-ai/engine/application/project-open.js';
+import type { AdoptSessionResult } from '@seeya-ai/engine/application/project-adopt.js';
 
 export { formatProjectLockWarningLines };
 
@@ -240,5 +241,109 @@ export function formatOpenProjectReport(result: OpenProjectResult): string {
       );
     case 'opened':
       return formatOpenedReport(result);
+  }
+}
+
+/** `seeya project adopt <session> <projectId>` (V2-T29) — `--session`-style resolution, same
+ * message shape `end-day-command.ts#formatNoMatchMessage` already established for the identical
+ * "your positional value didn't match anything discovered" case, minus the `--session` flag name
+ * (this command's session argument is positional, never a flag). */
+export function formatAdoptNoMatchMessage(session: string, discoveredCount: number): string {
+  const discovered = `${discoveredCount} ${discoveredCount === 1 ? 'session was' : 'sessions were'}`;
+  return (
+    `No discovered session matches "${session}" (checked against sessionId, a sessionId prefix, ` +
+    `the display name, and cwd). ${discovered} discovered in total — see "seeya sessions" to ` +
+    'list them.'
+  );
+}
+
+/** Same "never guess which one" rule `end-day-command.ts#formatAmbiguousMatchMessage` already
+ * enforces for `--session` — adoption can create a project and take its lock, real consequences
+ * exactly like `end-day --session`'s own D-002 termination, so an ambiguous match refuses here too. */
+export function formatAdoptAmbiguousMatchMessage(
+  session: string,
+  matches: readonly DiscoveredSession[],
+): string {
+  const lines = [
+    `"${session}" matches ${matches.length} discovered sessions — refusing to guess which one:`,
+    ...matches.map((match) => `  - ${match.name} (${match.cwd}) — sessionId ${match.sessionId}`),
+    'Retype the session argument with the full sessionId shown above to pick one.',
+  ];
+  return lines.join('\n');
+}
+
+/** V2-T29 item 4: the question `adopt` asks once the fork's interactive session has closed and
+ * something inside the project actually changed — one line per changed file, same "show, then
+ * ask" order the task's own spec requires ("a CLI mostra os arquivos que mudaram... e pergunta"). */
+export function renderAdoptionCommitConfirmation(changedFiles: readonly string[]): string {
+  const lines = [
+    'The session wrote the following inside the project:',
+    ...changedFiles.map((file) => `  ${file}`),
+    'Commit these changes? [y/N] ',
+  ];
+  return lines.join('\n');
+}
+
+function formatAdoptSessionRunning(
+  result: Extract<AdoptSessionResult, { readonly kind: 'sessionRunning' }>,
+): string {
+  return (
+    `seeya: session "${result.name}" is running right now (${result.state}) — resuming it here ` +
+    'would open a second copy. Wait for it to end, or capture and adopt it afterward.'
+  );
+}
+
+function formatAdoptAlreadyAdopted(
+  result: Extract<AdoptSessionResult, { readonly kind: 'alreadyAdopted' }>,
+): string {
+  return (
+    `seeya: session ${result.sessionId} was already adopted into project "${result.projectId}" ` +
+    `on ${result.adoptedAt.toISOString()} — refusing to adopt it a second time.`
+  );
+}
+
+function formatAdoptedChangedFiles(changedFiles: readonly string[]): string {
+  return changedFiles.map((file) => `  ${file}`).join('\n');
+}
+
+export function formatAdoptSessionReport(result: AdoptSessionResult): string {
+  switch (result.kind) {
+    case 'invalidId':
+      return formatInvalidIdLine(result.projectId);
+    case 'sessionRunning':
+      return formatAdoptSessionRunning(result);
+    case 'alreadyAdopted':
+      return formatAdoptAlreadyAdopted(result);
+    case 'projectLocked':
+      return (
+        `seeya: project "${result.projectId}" is locked by ` +
+        `${formatLockHolderDescription(result.heldBy)} — refusing to adopt into it while it's ` +
+        'held by another live session.'
+      );
+    case 'failedToStart':
+      return `seeya: could not start claude to adopt session into project "${result.projectId}".`;
+    case 'noChanges':
+      return (
+        `Project "${result.projectId}": the session (fork ${result.forkSessionId}) didn't write ` +
+        'anything inside the project — nothing to commit, nothing kept.'
+      );
+    case 'declined':
+      return (
+        `Project "${result.projectId}": adoption declined — the fork (${result.forkSessionId}) ` +
+        `was discarded and nothing was committed. It had written:\n` +
+        formatAdoptedChangedFiles(result.changedFiles)
+      );
+    case 'confirmationUnavailable':
+      return (
+        `seeya: project "${result.projectId}" — the fork (${result.forkSessionId}) wrote changes, ` +
+        'but there was no interactive terminal to confirm the commit. Nothing was committed or ' +
+        'discarded; run "seeya project adopt" again from a real terminal to decide. It had ' +
+        `written:\n${formatAdoptedChangedFiles(result.changedFiles)}`
+      );
+    case 'adopted':
+      return (
+        `Project "${result.projectId}": adopted. The fork (${result.forkSessionId}) is now this ` +
+        `project's own session. Committed:\n${formatAdoptedChangedFiles(result.changedFiles)}`
+      );
   }
 }

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   resolveSessionReference,
+  toDiscoveredSessionReference,
   type SessionReference,
 } from '../../../packages/cli/src/session-reference.js';
+import type { DiscoveredSession } from '@seeya-ai/engine/core/types.js';
 
 type Candidate = SessionReference;
 
@@ -119,5 +121,24 @@ describe('resolveSessionReference', () => {
     const result = resolveSessionReference([alpha, beta], toRef, '');
 
     expect(result).toEqual({ kind: 'notFound' });
+  });
+});
+
+describe('toDiscoveredSessionReference', () => {
+  it('projects the three fields resolveSessionReference matches against, nothing else', () => {
+    const session: DiscoveredSession = {
+      sessionId: '11111111-1111-4111-8111-111111111111',
+      cwd: 'c:\\code\\alpha',
+      name: 'alpha',
+      hasTranscript: true,
+      lastTranscriptWrite: null,
+      lastActivity: null,
+      hasPid: false,
+    };
+    expect(toDiscoveredSessionReference(session)).toEqual({
+      sessionId: session.sessionId,
+      cwd: session.cwd,
+      name: session.name,
+    });
   });
 });

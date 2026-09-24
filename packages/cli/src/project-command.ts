@@ -6,6 +6,7 @@
  * (`autostart-command.ts`, `snooze-command.ts`).
  */
 import { createInterface } from 'node:readline/promises';
+import type { SessionProvider } from '@seeya-ai/engine/core/ports.js';
 import {
   createProject,
   listProjects,
@@ -17,9 +18,18 @@ import type {
   ConfirmReadOnlyOpen,
   ProjectOpenDeps,
 } from '@seeya-ai/engine/application/project-open.js';
+import { adoptSession } from '@seeya-ai/engine/application/project-adopt.js';
+import type {
+  AdoptSessionDeps,
+  ConfirmAdoptionCommit,
+} from '@seeya-ai/engine/application/project-adopt.js';
+import { resolveSessionReference, toDiscoveredSessionReference } from './session-reference.js';
 import type { ProjectContext } from './composition.js';
 import {
   formatAddRepoReport,
+  formatAdoptAmbiguousMatchMessage,
+  formatAdoptNoMatchMessage,
+  formatAdoptSessionReport,
   formatCreateProjectReport,
   formatMissingRepositoryLines,
   formatOpenProjectReport,
@@ -27,6 +37,7 @@ import {
   formatProjectsReport,
   formatShowProjectReport,
   parseReadOnlyOpenConfirmation,
+  renderAdoptionCommitConfirmation,
   renderReadOnlyOpenConfirmation,
 } from './format-project.js';
 
@@ -132,4 +143,71 @@ export async function runProjectOpenCommand(
   // V2-T35 item 1: a deliberate decline is not a failure ("Nothing selected — nothing resumed"'s
   // own precedent in `start-day-command.ts`) — everything else non-`opened` is.
   return result.kind === 'opened' || result.kind === 'lockConfirmationDeclined' ? 0 : 1;
+}
+
+/** V2-T29 item 4: `adoptSession`'s own `ConfirmAdoptionCommit` — same shape and same "no TTY, no
+ * silent guess" contract `makeReadOnlyOpenConfirmer` above already established, reusing its y/N
+ * parsing (`parseReadOnlyOpenConfirmation`): the convention ("anything other than y/yes is a
+ * decline") is generic, not specific to the read-only-open question it was first written for. */
+function makeAdoptionCommitConfirmer(io: ProjectOpenIo): ConfirmAdoptionCommit {
+  return async (changedFiles) => {
+    if (!io.isTTY) {
+      return 'unavailable';
+    }
+    const rl = createInterface({ input: io.stdin, output: io.stdout });
+    let answer: string;
+    try {
+      answer = await rl.question(`\n${renderAdoptionCommitConfirmation(changedFiles)}`);
+    } finally {
+      rl.close();
+    }
+    return parseReadOnlyOpenConfirmation(answer) ? 'commit' : 'decline';
+  };
+}
+
+/**
+ * `seeya project adopt <session> <projectId>` (V2-T29) — resolves `session` against real
+ * discovery first (`resolveSessionReference`, the same ambiguity-refusing match `--session` uses
+ * on `end-day`/`start-day`), then hands the resolved `DiscoveredSession` to `adoptSession`. Takes
+ * `SessionProvider`/`AdoptSessionDeps` directly rather than a single `ProjectContext`-shaped bag,
+ * same reasoning `runProjectOpenCommand` above already gives for its own `ProjectOpenDeps`: the
+ * per-invocation pieces (`forkSessionId`, `pid`, `procStart`) are composition-root concerns
+ * (`composition.ts#buildProjectAdoptDeps`), not this function's.
+ */
+export async function runProjectAdoptCommand(
+  sessionProvider: SessionProvider,
+  deps: AdoptSessionDeps,
+  sessionRef: string,
+  projectId: string,
+  io: ProjectOpenIo,
+): Promise<number> {
+  const discovery = await sessionProvider.list();
+  const match = resolveSessionReference(
+    discovery.sessions,
+    toDiscoveredSessionReference,
+    sessionRef,
+  );
+  if (match.kind === 'notFound') {
+    io.stdout.write(`${formatAdoptNoMatchMessage(sessionRef, discovery.sessions.length)}\n`);
+    return 1;
+  }
+  if (match.kind === 'ambiguous') {
+    io.stdout.write(`${formatAdoptAmbiguousMatchMessage(sessionRef, match.matches)}\n`);
+    return 1;
+  }
+
+  const result = await adoptSession(deps, match.item, projectId, {
+    onBeforeLaunch: ({ forkSessionId }) => {
+      io.stdout.write(
+        `Adopting "${match.item.name}" into project "${projectId}" (fork ${forkSessionId})...\n`,
+      );
+    },
+    confirmCommit: makeAdoptionCommitConfirmer(io),
+  });
+  io.stdout.write(`${formatAdoptSessionReport(result)}\n`);
+  // Same "deliberate outcome vs. refusal" split `runProjectOpenCommand` already draws: `adopted`,
+  // `declined` and `noChanges` are all decisions that completed cleanly; everything else refused.
+  return result.kind === 'adopted' || result.kind === 'declined' || result.kind === 'noChanges'
+    ? 0
+    : 1;
 }

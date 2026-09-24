@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatAddRepoReport,
+  formatAdoptAmbiguousMatchMessage,
+  formatAdoptNoMatchMessage,
+  formatAdoptSessionReport,
   formatCreateProjectReport,
   formatMissingRepositoryLines,
   formatOpenProjectReport,
   formatProjectsReport,
   formatShowProjectReport,
   parseReadOnlyOpenConfirmation,
+  renderAdoptionCommitConfirmation,
   renderReadOnlyOpenConfirmation,
 } from '../../../packages/cli/src/format-project.js';
-import type { ProjectManifest } from '@seeya-ai/engine/core/types.js';
+import type { DiscoveredSession, ProjectManifest } from '@seeya-ai/engine/core/types.js';
 import type { ProjectLockInfo } from '@seeya-ai/engine/core/project-lock.js';
 
 const SOME_LOCK: ProjectLockInfo = {
@@ -362,5 +366,142 @@ describe('formatOpenProjectReport', () => {
     expect(text).toContain('session abc123');
     expect(text).toContain('refusing to open');
     expect(text).toContain('no interactive terminal');
+  });
+});
+
+const DISCOVERED_A: DiscoveredSession = {
+  sessionId: '11111111-1111-4111-8111-111111111111',
+  cwd: 'c:\\code\\projeto',
+  name: 'projeto-01',
+  hasTranscript: true,
+  lastTranscriptWrite: new Date('2026-09-24T10:00:00.000Z'),
+  lastActivity: new Date('2026-09-24T10:00:00.000Z'),
+  hasPid: false,
+};
+
+describe('formatAdoptNoMatchMessage', () => {
+  it('names the raw value and the discovered count', () => {
+    const text = formatAdoptNoMatchMessage('nothing-like-this', 3);
+    expect(text).toContain('"nothing-like-this"');
+    expect(text).toContain('3 sessions were discovered');
+  });
+
+  it('singular phrasing for exactly one discovered session', () => {
+    expect(formatAdoptNoMatchMessage('x', 1)).toContain('1 session was discovered');
+  });
+});
+
+describe('formatAdoptAmbiguousMatchMessage', () => {
+  it('names every match by sessionId, refusing to guess', () => {
+    const text = formatAdoptAmbiguousMatchMessage('projeto', [DISCOVERED_A]);
+    expect(text).toContain('matches 1 discovered sessions');
+    expect(text).toContain(DISCOVERED_A.sessionId);
+    expect(text).toContain('refusing to guess');
+  });
+});
+
+describe('renderAdoptionCommitConfirmation', () => {
+  it('shows every changed file, then asks to commit', () => {
+    const text = renderAdoptionCommitConfirmation(['auth-hardening/AGENTS.md']);
+    expect(text).toContain('auth-hardening/AGENTS.md');
+    expect(text).toContain('Commit these changes?');
+  });
+});
+
+describe('formatAdoptSessionReport', () => {
+  it('invalidId names the id and the allowed shape', () => {
+    const text = formatAdoptSessionReport({ kind: 'invalidId', projectId: 'Not Valid' });
+    expect(text).toContain('"Not Valid"');
+    expect(text).toContain('lowercase');
+  });
+
+  it('sessionRunning explains a second copy would open', () => {
+    const text = formatAdoptSessionReport({
+      kind: 'sessionRunning',
+      sessionId: DISCOVERED_A.sessionId,
+      name: 'projeto-01',
+      state: 'alive',
+    });
+    expect(text).toContain('"projeto-01"');
+    expect(text).toContain('running right now (alive)');
+    expect(text).toContain('second copy');
+  });
+
+  it('alreadyAdopted names the existing project and the date', () => {
+    const text = formatAdoptSessionReport({
+      kind: 'alreadyAdopted',
+      sessionId: DISCOVERED_A.sessionId,
+      projectId: 'billing',
+      adoptedAt: new Date('2026-09-01T00:00:00.000Z'),
+    });
+    expect(text).toContain(DISCOVERED_A.sessionId);
+    expect(text).toContain('"billing"');
+    expect(text).toContain('2026-09-01T00:00:00.000Z');
+    expect(text).toContain('refusing to adopt it a second time');
+  });
+
+  it('projectLocked names who holds it', () => {
+    const text = formatAdoptSessionReport({
+      kind: 'projectLocked',
+      projectId: 'auth-hardening',
+      heldBy: SOME_LOCK,
+    });
+    expect(text).toContain('seeya:');
+    expect(text).toContain('"auth-hardening"');
+    expect(text).toContain('session abc123');
+  });
+
+  it('failedToStart names the project', () => {
+    const text = formatAdoptSessionReport({ kind: 'failedToStart', projectId: 'auth-hardening' });
+    expect(text).toContain('seeya:');
+    expect(text).toContain('"auth-hardening"');
+  });
+
+  it('noChanges names the project and the fork, and says nothing was kept', () => {
+    const text = formatAdoptSessionReport({
+      kind: 'noChanges',
+      projectId: 'auth-hardening',
+      forkSessionId: '22222222-2222-4222-8222-222222222222',
+    });
+    expect(text).toContain('"auth-hardening"');
+    expect(text).toContain('22222222-2222-4222-8222-222222222222');
+    expect(text).toContain('nothing to commit');
+  });
+
+  it('declined lists the changed files and says the fork was discarded', () => {
+    const text = formatAdoptSessionReport({
+      kind: 'declined',
+      projectId: 'auth-hardening',
+      forkSessionId: '22222222-2222-4222-8222-222222222222',
+      changedFiles: ['auth-hardening/AGENTS.md'],
+    });
+    expect(text).toContain('declined');
+    expect(text).toContain('discarded');
+    expect(text).toContain('auth-hardening/AGENTS.md');
+  });
+
+  it('confirmationUnavailable says nothing was committed or discarded, and lists what was written', () => {
+    const text = formatAdoptSessionReport({
+      kind: 'confirmationUnavailable',
+      projectId: 'auth-hardening',
+      forkSessionId: '22222222-2222-4222-8222-222222222222',
+      changedFiles: ['auth-hardening/status/README.md'],
+    });
+    expect(text).toContain('no interactive terminal');
+    expect(text).toContain('Nothing was committed or discarded');
+    expect(text).toContain('auth-hardening/status/README.md');
+  });
+
+  it('adopted says the fork is now the project session, and lists what was committed', () => {
+    const text = formatAdoptSessionReport({
+      kind: 'adopted',
+      projectId: 'auth-hardening',
+      forkSessionId: '22222222-2222-4222-8222-222222222222',
+      changedFiles: ['auth-hardening/AGENTS.md', 'auth-hardening/context/know-how.md'],
+    });
+    expect(text).toContain('adopted');
+    expect(text).toContain("project's own session");
+    expect(text).toContain('auth-hardening/AGENTS.md');
+    expect(text).toContain('auth-hardening/context/know-how.md');
   });
 });

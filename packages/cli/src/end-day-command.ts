@@ -24,7 +24,7 @@ import {
   normalizeCwdForComparison,
   type PathPlatformHint,
 } from '@seeya-ai/engine/core/cwd-normalization.js';
-import { resolveSessionReference, type SessionReference } from './session-reference.js';
+import { resolveSessionReference, toDiscoveredSessionReference } from './session-reference.js';
 import { formatEndDayReport } from '@seeya-ai/engine/application/format-end-day.js';
 import { buildEndDayNotice } from '@seeya-ai/engine/application/end-day-notice.js';
 
@@ -43,10 +43,6 @@ export interface EndDayCommandOptions {
 /** Real environment read once, here — `cli/` is the composition root (D-020), the one place
  * allowed to resolve `process.platform` into a normalization hint for `core/`. */
 const PLATFORM_HINT: PathPlatformHint = process.platform === 'win32' ? 'win32' : 'posix';
-
-function toSessionReference(session: DiscoveredSession): SessionReference {
-  return { sessionId: session.sessionId, cwd: session.cwd, name: session.name };
-}
 
 /**
  * `--session`'s "no match" report. A very likely typo, not "zero eligible sessions" — the
@@ -149,7 +145,11 @@ export async function runEndDayCommand(
     return formatEndDayReport(result, config);
   }
   const discovery = await deps.sessionProvider.list();
-  const match = resolveSessionReference(discovery.sessions, toSessionReference, options.session);
+  const match = resolveSessionReference(
+    discovery.sessions,
+    toDiscoveredSessionReference,
+    options.session,
+  );
   if (match.kind === 'notFound') {
     return formatNoMatchMessage(options.session, discovery.sessions.length);
   }

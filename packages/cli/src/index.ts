@@ -22,6 +22,8 @@ import {
   buildConfigContext,
   buildDaemonContext,
   buildEndDayContext,
+  buildProjectAdoptContext,
+  buildProjectAdoptDeps,
   buildProjectContext,
   buildProjectOpenDeps,
   buildSnoozeContext,
@@ -52,6 +54,7 @@ import {
 } from './config-command.js';
 import {
   runProjectAddRepoCommand,
+  runProjectAdoptCommand,
   runProjectCreateCommand,
   runProjectListCommand,
   runProjectOpenCommand,
@@ -413,6 +416,32 @@ projectCommand
     const context = buildProjectContext();
     const deps = await buildProjectOpenDeps(context);
     const exitCode = await runProjectOpenCommand(deps, id, options.with, {
+      stdin: process.stdin,
+      stdout: process.stdout,
+      isTTY: process.stdin.isTTY === true,
+    });
+    if (exitCode !== 0) {
+      process.exitCode = exitCode;
+    }
+  });
+
+projectCommand
+  .command('adopt')
+  .description(
+    'Adopt an existing session into a project: resumes a FORK of it interactively (the ' +
+      'original is never touched), in its own directory, with the project released via ' +
+      '--add-dir. Creates the project first if it does not exist yet. Nothing is committed ' +
+      'until you confirm what the session wrote (V2-T29, D-047 item 6).',
+  )
+  .argument(
+    '<session>',
+    'The session, by the name "seeya sessions" shows, a sessionId (or prefix), or its cwd.',
+  )
+  .argument('<id>', 'The project id, e.g. "auth-hardening".')
+  .action(async (session: string, id: string) => {
+    const context = await buildProjectAdoptContext();
+    const deps = await buildProjectAdoptDeps(context);
+    const exitCode = await runProjectAdoptCommand(context.sessionProvider, deps, session, id, {
       stdin: process.stdin,
       stdout: process.stdout,
       isTTY: process.stdin.isTTY === true,

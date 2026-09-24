@@ -19,6 +19,7 @@ import {
   normalizeCwdForComparison,
   type PathPlatformHint,
 } from '@seeya-ai/engine/core/cwd-normalization.js';
+import type { DiscoveredSession } from '@seeya-ai/engine/core/types.js';
 
 /** The three fields any `--session` candidate needs, regardless of whether the underlying value is
  * a `DiscoveredSession` (`end-day`) or a `Handoff` (`start-day`) — both already carry all three. */
@@ -32,6 +33,14 @@ export type SessionReferenceMatch<T> =
   | { readonly kind: 'found'; readonly item: T }
   | { readonly kind: 'notFound' }
   | { readonly kind: 'ambiguous'; readonly matches: readonly T[] };
+
+/** The `DiscoveredSession` → `SessionReference` mapping every `--session`/positional-session-name
+ * caller needs — shared here instead of each command file (`end-day-command.ts`,
+ * `project-command.ts`) redeclaring the same three-field projection (AGENTS.md: "nada de
+ * duplicação"). */
+export function toDiscoveredSessionReference(session: DiscoveredSession): SessionReference {
+  return { sessionId: session.sessionId, cwd: session.cwd, name: session.name };
+}
 
 /** Real environment read once, here, at module scope (not inside `core/`, which cannot read
  * `process.platform` at all — see `core/cwd-normalization.ts`'s own docstring for why the hint is

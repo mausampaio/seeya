@@ -12,11 +12,14 @@ import type {
   Autostart,
   Clock,
   DirectoryExistence,
+  ForkCleanup,
+  ForkRegistration,
   GitReader,
   HarnessLauncher,
   Notifier,
   ProcessControl,
   ProjectLock,
+  SessionAdoptionLauncher,
   SessionProvider,
   SessionResumer,
   Storage,
@@ -45,14 +48,17 @@ import {
   LeanHandoffGenerator,
   DeepHandoffGenerator,
 } from '@seeya-ai/engine/adapters/generation/index.js';
+import { GenerationForkRegistration } from '@seeya-ai/engine/adapters/generation/fork-registration.js';
 import { ClaudeSessionResumer } from '@seeya-ai/engine/adapters/resumption/index.js';
 import { ClaudeHarnessLauncher } from '@seeya-ai/engine/adapters/harness/index.js';
+import { ClaudeSessionAdoptionLauncher } from '@seeya-ai/engine/adapters/harness/session-adoption.js';
 import {
   notifier as realNotifier,
   buildNotifier,
 } from '@seeya-ai/engine/adapters/notification/index.js';
 import type { EndDayDeps } from '@seeya-ai/engine/application/types.js';
 import type { ProjectOpenDeps } from '@seeya-ai/engine/application/project-open.js';
+import type { AdoptSessionDeps } from '@seeya-ai/engine/application/project-adopt.js';
 import type { DaemonDeps } from '@seeya-ai/engine/scheduler/index.js';
 
 /** D-047: the same `CLAUDE_CODE_SESSION_ID` D-017's own table already strips from a SPAWNED
@@ -471,4 +477,57 @@ export async function buildProjectOpenDeps(context: ProjectContext): Promise<Pro
   const procStartCapture = await captureObservedProcStart(process.pid, processExists);
   const procStart = procStartCapture.kind === 'value' ? procStartCapture.value : undefined;
   return { ...context, pid: process.pid, procStart, launchedSessionId: randomUUID() };
+}
+
+/**
+ * `seeya project adopt`'s own composition (V2-T29): `ProjectContext` plus the ports its own
+ * orchestration needs that no other `seeya project` subcommand does — a `SessionProvider` (to
+ * resolve the session argument against real discovery, `config.relevanceHours`-dependent, same
+ * `buildSessionProvider` every other command's own `CliContext` already uses), `idleMinutes`
+ * (`classifyState`'s own second input), and the fork registry/cleanup/launcher ports
+ * `application/project-adopt.ts#AdoptSessionDeps` declares. Reads `config.json` once, unlike
+ * `buildProjectContext` above (V2-T27's own docstring: "none of these five commands needs
+ * config.json for anything") — `adopt` is the first `project` subcommand that does.
+ */
+export interface ProjectAdoptContext extends ProjectContext {
+  readonly sessionProvider: SessionProvider;
+  readonly forkRegistration: ForkRegistration;
+  readonly forkCleanup: ForkCleanup;
+  readonly adoptionLauncher: SessionAdoptionLauncher;
+  readonly idleMinutes: number;
+}
+
+export async function buildProjectAdoptContext(
+  homeDir: string = os.homedir(),
+): Promise<ProjectAdoptContext> {
+  const home = resolveCliHome(homeDir);
+  const clock = systemClock;
+  const context = buildProjectContext(homeDir);
+  const config = await context.storage.readConfig();
+  return {
+    ...context,
+    sessionProvider: buildSessionProvider(home, clock, realProcessControl, config.relevanceHours),
+    forkRegistration: new GenerationForkRegistration(home.seeyaHome),
+    forkCleanup: new DiscoveryForkCleanup({
+      claudeHome: home.claudeHome,
+      seeyaHome: home.seeyaHome,
+      clock,
+    }),
+    adoptionLauncher: new ClaudeSessionAdoptionLauncher(),
+    idleMinutes: config.idleMinutes,
+  };
+}
+
+/**
+ * `ProjectAdoptContext` plus THIS INVOCATION's own `pid`/`procStart`/`forkSessionId` — same
+ * per-invocation capture `buildProjectOpenDeps` already does for `open`'s `launchedSessionId`, for
+ * the identical reason: `application/project-adopt.ts#AdoptSessionDeps.forkSessionId` is randomness
+ * (`node:crypto#randomUUID`), which stays out of `core/`/`application/` (D-020).
+ */
+export async function buildProjectAdoptDeps(
+  context: ProjectAdoptContext,
+): Promise<AdoptSessionDeps> {
+  const procStartCapture = await captureObservedProcStart(process.pid, processExists);
+  const procStart = procStartCapture.kind === 'value' ? procStartCapture.value : undefined;
+  return { ...context, pid: process.pid, procStart, forkSessionId: randomUUID() };
 }
