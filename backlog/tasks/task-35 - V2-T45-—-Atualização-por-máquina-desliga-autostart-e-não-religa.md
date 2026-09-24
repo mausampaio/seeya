@@ -4,7 +4,7 @@ title: V2-T45 — Atualização por máquina desliga autostart e não religa
 status: Review
 assignee: []
 created_date: '2026-09-24 11:12'
-updated_date: '2026-09-24 13:38'
+updated_date: '2026-09-24 14:17'
 labels: []
 milestone: m-3
 dependencies: []
@@ -198,3 +198,29 @@ de verdade ainda precisa rodar antes do `Done`.
 máquina; nenhum toque em `~/.seeya`/`~/.claude`/registro reais; nenhuma dependência nova; branch
 `tarefa/V2-T45-atualizacao-por-maquina`, commit único e pequeno já feito.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: agent
+created: 2026-09-24 14:17
+---
+**Resposta à revisão — todos os cinco pontos endereçados, commit `5efeb28` na mesma branch.**
+
+**`npm ci` rodou na worktree** (a proibição era só do checkout principal, como o revisor corrigiu) — e isso expôs **dois bugs de verdade** que o harness `makensis` isolado (sem os `-D` reais do `electron-builder`, sem a ordem de `!include` real) não tinha como pegar:
+
+1. **`${APP_EXECUTABLE_FILENAME}` dentro de `seeyaRunLoggedCli`** — confirmado: a mensagem era exatamente a que o revisor citou. Causa raiz medida (rodando o build de verdade repetidas vezes até isolar): `build/installer.nsh` é `!include`ado pelo `electron-builder` **antes** de `installer.nsi` incluir `common.nsh` (onde `${APP_EXECUTABLE_FILENAME}` é `!define`ido). Um macro definido neste arquivo só resolve essa define quando é chamado **diretamente** de `.onInit`/`Section` — um segundo nível de macro (mesmo sem passar por argumento, só uma linha `StrCpy` comum) já falha. Corrigido: `$SeeyaAppExePath` agora é calculado, redundantemente, em cada um dos três macros de topo (`customInit`/`customInstall`/`customUnInstall`), nunca dentro do `seeyaResolvePaths` compartilhado; a `Function SeeyaRestartDaemonAsUser` recebe o valor por um registrador sincronizado (`$1`), em vez de recalcular.
+2. **Um segundo bug, da mesma família, achado só depois de corrigir o primeiro**: `LogicLib.nsh`/`FileFunc.nsh` também não estavam disponíveis ainda no ponto em que `seeyaLogWrite` (chamado por `seeyaRunLoggedCli`) tentava usar `${ifNot}` — erro `Invalid command: ${ifNot}`. Corrigido com `!include LogicLib.nsh`/`!include FileFunc.nsh` explícitos no topo do arquivo (os dois são headers padrão do NSIS, com guarda `!ifndef`, seguros para incluir de novo).
+
+Depois dos dois: **`npm run dist:windows` (raiz, comando exato) rodou de verdade e terminou limpo** — instalador assinado, uninstaller embutido, blockmap gerado, `exit 0`. Rodei de novo, do zero, antes deste comentário, para confirmar.
+
+3. **Testes atualizados** (`tests/unit/app/build/installer-nsh.test.ts`): os dois que ainda procuravam `nsExec::ExecToLog` (restart e `seeyaDisableAutostart`) agora conferem `seeyaRunLoggedCli`/`ExecToStack`, sem afrouxar o que protegiam (saída registrada, código de saída conferido, sem `Abort`).
+4. **Cinco testes novos**: `${isUpdated}` gate em `seeyaDisableAutostart` e em `DeleteRegKey`; o stop do daemon continua incondicional; `customInit` ramifica em `${UAC_IsInnerInstance}` sem `daemon --stop` na instância elevada; o religamento só cruza `UAC_AsUser_Call` quando `${UAC_IsInnerInstance}`; o teto do log; e o teste de regressão pedido — nenhum argumento de `seeyaRunLoggedCli` contém `${APP_EXECUTABLE_FILENAME}` — **confirmei que ele falha contra o commit anterior** (`919a919`, 4 ocorrências) antes de aceitar o commit atual como correto. Mais dois testes de guarda para os bugs novos (item 1/2 acima): `seeyaResolvePaths` nunca menciona `APP_EXECUTABLE_FILENAME`, e as duas primeiras linhas do arquivo são os dois `!include`.
+
+**Rótulo `elevated` corrigido para `as-user`** na única linha de log que roda na instância sem privilégio (`SeeyaRestartDaemonAsUser`, via `UAC_AsUser_Call`) — o comentário do item 5 no topo do arquivo e a linha do `AGENTS.md` agora citam os quatro rótulos (`original`/`elevated`/`as-user`/`old-uninstaller`) com a explicação de por que `as-user` não é um quarto processo do SO.
+
+**Instalação por usuário (sem elevação) — o que mudou, não só o que foi confirmado.** Não achei documentação/fonte do plugin `UAC.dll` neste ambiente (só o `.dll` compilado e o `.nsh` wrapper, que documenta só o caso de dois processos) para confirmar se `UAC_AsUser_Call` cai para uma chamada local quando não há instância elevada — continua não verificado nesse sentido. Em vez de confiar nisso sem prova, mudei o código para não depender da resposta: `customInstall` agora ramifica em `${UAC_IsInnerInstance}` (o mesmo teste que o item 2 já usa) — só cruza `UAC_AsUser_Call` quando existe de fato um processo original separado; caso contrário (instalação por usuário, ou por máquina já rodada como admin desde o início) chama `SeeyaRestartDaemonAsUser` direto, no único processo em execução. Isso está coberto pelo teste novo #4 acima e foi exercitado de verdade pelo `npm run dist:windows` desta rodada (que também compila — não testa em runtime — o caminho instalador completo).
+
+`npm run verificar` rodou de verdade (não só os testes deste arquivo) — limpo, `exit 0`, cobertura igual à rodada anterior. `npm run dist:windows` (raiz) rodou de verdade duas vezes nesta rodada — limpo as duas.
+---
+<!-- COMMENTS:END -->
