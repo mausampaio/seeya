@@ -354,7 +354,7 @@ const projectCommand = program
   .command('project')
   .description(
     'Manage the workspace (V2-T27): a single local git repository holding every project — a ' +
-      'persistent context directory (AGENTS.md, CLAUDE.md, INDEX.md, seeya.json, ' +
+      'persistent context directory (AGENTS.md, INDEX.md, seeya.json, ' +
       'decisions/plans/status/journal/references) that outlives any one harness session.',
   );
 

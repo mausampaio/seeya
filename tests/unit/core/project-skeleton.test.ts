@@ -19,10 +19,10 @@ describe('buildProjectSkeleton', () => {
     expect(skeleton.manifest.trackers).toEqual([]);
   });
 
-  it('writes exactly AGENTS.md, CLAUDE.md and INDEX.md — never seeya.json (the adapter serializes that itself)', () => {
+  it('writes exactly AGENTS.md and INDEX.md — never CLAUDE.md (D-030), never seeya.json (the adapter serializes that itself)', () => {
     const skeleton = buildProjectSkeleton('auth-hardening');
     const paths = skeleton.files.map((file) => file.relativePath).sort();
-    expect(paths).toEqual(['AGENTS.md', 'CLAUDE.md', 'INDEX.md']);
+    expect(paths).toEqual(['AGENTS.md', 'INDEX.md']);
   });
 
   it('creates the six directories docs/V2-RUMO.md lays out', () => {
@@ -40,12 +40,6 @@ describe('buildProjectSkeleton', () => {
     for (const dir of skeleton.directories) {
       expect(agentsMd?.content).toContain(`${dir}/`);
     }
-  });
-
-  it("CLAUDE.md only points to AGENTS.md, mirroring this repository's own CLAUDE.md", () => {
-    const skeleton = buildProjectSkeleton('auth-hardening');
-    const claudeMd = skeleton.files.find((file) => file.relativePath === 'CLAUDE.md');
-    expect(claudeMd?.content).toContain('AGENTS.md');
   });
 
   it('INDEX.md says the project is empty and points to AGENTS.md', () => {
