@@ -54,13 +54,33 @@ repositório do projeto: é operacional, é deste dispositivo, e não é conteú
 - **A janela mostra caixa com mensagem nova** na lateral (encaixa na V2-T30), e a leitura continua
   sendo pedida pela pessoa ou lembrada por gancho (V2-T40) — nunca injetada à força na sessão.
 
+**Precisão do mantenedor (2026-09-23): é caixa de comunicação, não de documentação.** Ela serve
+para sessões se falarem; **toda decisão continua sendo registrada no projeto**. A caixa é transporte
+e prova de que a conversa aconteceu — não é onde a memória mora. Isso responde a pergunta 2 abaixo:
+o que vira decisão vai para `decisions/` do projeto de quem decidiu, sempre.
+
+**Os dois usos que ele descreveu, e que definem a forma da mensagem:**
+
+1. **Aviso que atravessa frentes.** Uma sessão encontra algo que interessa a outro projeto — "achei
+   um furo que pode afetar o desenvolvimento de vocês". Quem recebe decide o que fazer com aquilo.
+   A mensagem informa; não pauta o trabalho alheio.
+2. **Pedido dentro de um escopo que não é seu.** Um agente toca a infraestrutura e **só ele tem essa
+   permissão**; os outros podem pedir uma medição ou uma confirmação no ambiente. Quem recebe
+   escolhe, **junto com a pessoa que está tocando aquela frente**, se vai fazer.
+
+**A regra que nasce dos dois, e que não se negocia:** *"como tudo é assistido, não existe autonomia
+aqui"*. Uma mensagem **nunca** é uma ordem, nunca dispara trabalho sozinha e nunca é executada por
+ter chegado. Ela é dado com origem à vista; quem age é a dupla agente + pessoa do lado que recebeu.
+Isso também é a defesa natural contra uma sessão induzir outra a fazer algo: sem execução
+automática, o pior que uma mensagem faz é ocupar uma linha da caixa.
+
 **Perguntas em aberto, que decidem o recorte:**
 
 1. **Quem lê, e quando?** A pessoa pede ("leia sua caixa"), o `open` lê ao abrir, ou o gancho lembra?
    Cada resposta muda o quanto isso depende de harness.
-2. **A mensagem vira parte do projeto?** Se duas sessões trocam uma decisão, ela deveria acabar em
-   `decisions/` do projeto, não só na caixa. Talvez a caixa seja o transporte e o projeto continue
-   sendo a memória.
+2. ~~A mensagem vira parte do projeto?~~ **Respondida em 2026-09-23:** a caixa é transporte; a
+   memória é o projeto. Decisão tomada a partir de uma mensagem vira decisão no projeto de quem
+   decidiu.
 3. **Mensagem para sessão morta**: fica na caixa esperando ela voltar, ou expira? E para sessão que
    nunca mais é retomada?
 4. **Vale para máquinas diferentes?** Hoje não — é do dispositivo. Com a sincronização (passo 7 do
