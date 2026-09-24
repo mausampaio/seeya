@@ -1,9 +1,10 @@
 ---
 id: TASK-35
 title: V2-T45 — Atualização por máquina desliga autostart e não religa
-status: To Do
+status: Review
 assignee: []
 created_date: '2026-09-24 11:12'
+updated_date: '2026-09-24 13:38'
 labels: []
 milestone: m-3
 dependencies: []
@@ -101,3 +102,99 @@ ainda pode cair — é o limite acima); ligar daemon e autostart; instalar o mes
 abrir a janela: **daemon de pé, autostart ligado**. E `~/.seeya/installer.log` conta a história
 das três instâncias com horário — de onde sai quanto tempo cada passo levou.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+**Causas confirmadas no template (`node_modules/app-builder-lib/templates/nsis/`), antes de corrigir:**
+
+1. `uninstaller.nsh` — `customUnInstall` roda (linha ~157, `!insertmacro customUnInstall`) ANTES de
+   qualquer `${if} ${isUpdated}` no mesmo `Section un.${...}` (linhas ~164 e ~224 são os dois
+   lugares em que o próprio template já trata atualização diferente de desinstalação de verdade).
+   `${isUpdated}` já está em escopo nesse ponto — confirmado pelo próprio template usá-lo mais
+   adiante na mesma função. O nosso macro não olhava para ele.
+2. `multiUserUi.nsh` (linhas ~51-52 e ~79-80, `FUNCTION_INSTALL_MODE_PAGE_FUNCTION`) e
+   `installer.nsi` (linhas ~99-119, `Section install`, caminho silencioso) — os dois pontos onde
+   uma instalação por máquina eleva (`UAC_RunElevated` seguido de `Quit`) rodam DEPOIS que
+   `.onInit`/`customInit` já rodou uma vez na instância original. `UAC_RunElevated` sobe uma
+   segunda instância do mesmo instalador, que roda `.onInit`/`customInit` de novo — `${UAC_
+   IsInnerInstance}` (`include/UAC.nsh`) é o que distingue as duas.
+
+**Os cinco itens:**
+
+1. `customUnInstall` (`packages/app/build/installer.nsh`) só desliga o autostart e apaga
+   `HKCU\Software\Classes\seeya` quando `${ifNot} ${isUpdated}`; parar o daemon continua
+   incondicional (os arquivos precisam ficar substituíveis de qualquer forma, e um stop contra um
+   daemon já parado é o mesmo no-op seguro que o comentário da V2-T15 já descreve — mantido de
+   propósito, como cinto e suspensório). Atalho/PATH continuam sendo removidos e recolocados
+   incondicionalmente, como já era (cobre troca de pasta de instalação).
+2. `customInit` agora ramifica em `${UAC_IsInnerInstance}`: a instância elevada usa
+   `UAC_AsUser_GetGlobalVar $SeeyaDaemonWasRunning` para puxar o valor já calculado pela instância
+   original, em vez de reler `daemon.lock` (que a essa altura o stop da instância original já
+   apagou) — e não chama `daemon --stop` de novo.
+3. O restart do daemon, em `customInstall`, agora roda dentro de `SeeyaRestartDaemonAsUser`
+   (Function nova, só existe na passada do instalador), chamada via `UAC_AsUser_Call` — executa na
+   instância ORIGINAL (sem privilégio), nunca na elevada. Medido: `UAC_AsUser_ExecShell` (a outra
+   opção citada) é `ShellExecute` — sem código de saída, sem nada para popar, não alimentaria nem o
+   aviso de falha (V2-T22) nem o log. `UAC_AsUser_Call` roda uma Function de verdade que ainda
+   consegue chamar `nsExec::ExecToStack` e devolver o código de saída via `$0` sincronizado
+   (`UAC_SYNCREGISTERS`). O que nenhum dos dois preserva: a janela de detalhes ON-SCREEN da
+   instância elevada — a janela original foi escondida antes da elevação
+   (`ShowWindow $HWNDPARENT ${SW_HIDE}`), então `DetailPrint` desse passo escreve numa lista que
+   ninguém está olhando. É por isso que o item 5 existe.
+4. Contagem de chamadas à CLI empacotada antes do arquivo novo ser copiado, numa atualização por
+   máquina silenciosa: **antes, 4** (`daemon --stop` na original, de novo na elevada, de novo no
+   desinstalador antigo, mais `autostart disable`); **depois, 2** (`daemon --stop` na original e no
+   desinstalador antigo — este último mantido de propósito, cinto e suspensório). O `daemon`
+   restart de `customInstall` continua sendo 1 chamada adicional depois da cópia, agora correta
+   (como a pessoa, não como admin).
+5. `~/.seeya/installer.log` — uma linha por passo, com `${GetTime}` (`FileFunc.nsh`, já incluído
+   pela cadeia de `multiUser.nsh`, não incluído de novo) e qual instância escreveu (`original` /
+   `elevated` / `old-uninstaller`). Toda chamada à CLI passou de `nsExec::ExecToLog`/`ExecWait` para
+   `nsExec::ExecToStack` (`seeyaRunLoggedCli`), que devolve o texto e o código de saída para o
+   arquivo — a janela de detalhes deixa de ser a única fonte. Teto: 256 KiB
+   (`SEEYA_INSTALLER_LOG_MAX_BYTES`) — dezenas de atualizações cabem antes de truncar, verificado a
+   cada escrita (`seeyaLogWrite`), nunca falha a instalação (`${if}${Errors}`/`ClearErrors` em toda
+   operação de arquivo). Nome novo em disco já entrou na tabela do `AGENTS.md` antes deste commit.
+
+**Limite registrado no próprio arquivo e aqui:** a correção do item 1 mora no desinstalador da
+VERSÃO CORRIGIDA. A primeira atualização para esta versão ainda roda o desinstalador de hoje
+(sem a checagem de `${isUpdated}`), que desliga o autostart mais uma vez — só a segunda atualização
+prova o item 1 (e o `installer.log` do desinstalador antigo, nessa primeira vez, não existe: ele
+não sabe escrever nele).
+
+**Exemplo do que o log deve conter numa atualização por máquina, na ordem:**
+```
+[2026-09-24 08:02:11] [original] Stopping the seeya daemon before installing... -- exit 0 -- seeya daemon stopped (pid 1234)
+[2026-09-24 08:02:12] [elevated] Reused the original instance's own daemon state (1) instead of stopping it again
+[2026-09-24 08:02:41] [old-uninstaller] Stopping the seeya daemon... -- exit 0 -- seeya daemon is not running
+[2026-09-24 08:02:41] [old-uninstaller] Skipping autostart/protocol cleanup: this uninstall is part of an update
+[2026-09-24 08:04:02] [elevated] Restarting the seeya daemon (it was running before this install)... -- exit 0 -- seeya daemon started (pid 5678)
+```
+(a segunda linha do `old-uninstaller` só aparece a partir da SEGUNDA atualização para esta versão,
+pelo limite acima)
+
+**Prova de compilação.** `npm run dist:windows` não pôde rodar nesta worktree: ela não tem
+`node_modules` (nem na raiz, nem em nenhum pacote), e a tarefa proíbe `npm install`/`npm ci` e
+proíbe criar uma junction para o `node_modules` da raiz — registrado em Q-088. Em vez disso, montei
+um harness `makensis` isolado (fora do repositório, só em `%TEMP%`), usando o `makensis.exe`/UAC.dll
+já baixados no cache do `electron-builder` nesta máquina (de uma build anterior do mantenedor —
+nada instalado por mim) e os arquivos reais de `node_modules/app-builder-lib/templates/nsis/`
+(lidos, não copiados para o repositório), reproduzindo a mesma geração de `${isUpdated}` que
+`nsisScriptGenerator.js` produz de verdade. Compilei `packages/app/build/installer.nsh` desta
+tarefa com `-WX` (avisos são erro fatal, igual ao `makensis` do `electron-builder`) nas duas
+passadas — `BUILD_UNINSTALLER` definido e não definido. **As duas compilaram limpas, sem aviso nem
+erro** (a primeira tentativa pegou um erro de verdade — `$SeeyaDaemonWasRunning` referenciado fora
+do `!ifndef BUILD_UNINSTALLER` certo no meu próprio harness, não no `installer.nsh` — corrigido no
+harness, não no arquivo). Isto prova a sintaxe NSIS e os mecanismos novos (`UAC_AsUser_Call`,
+`UAC_AsUser_GetGlobalVar`, `${GetTime}`, `nsExec::ExecToStack`) contra os headers/plugins reais;
+NÃO prova o pipeline inteiro do `electron-builder` (ícones, `app.asar`, assinatura, o
+`installer.nsi` real com as páginas MUI). `npm run verificar` também não pôde rodar, pelo mesmo
+motivo (Q-088) — nenhuma mudança de código depende do resultado dele para estar correta
+(`installer.nsh` não é TypeScript, não passa por `tsc`/`eslint`/`dependency-cruiser`), mas o comando
+de verdade ainda precisa rodar antes do `Done`.
+
+**Restrições respeitadas:** nada foi instalado, desinstalado ou executado como instalador nesta
+máquina; nenhum toque em `~/.seeya`/`~/.claude`/registro reais; nenhuma dependência nova; branch
+`tarefa/V2-T45-atualizacao-por-maquina`, commit único e pequeno já feito.
+<!-- SECTION:NOTES:END -->
