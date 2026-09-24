@@ -238,9 +238,12 @@ Duas responsabilidades que vieram do Spike A e são fáceis de esquecer:
 - **Transcript ausente não desqualifica a sessão** (D-013). A sessão entra com
   `hasTranscript: false` e dispara a notificação de detecção precoce, uma vez por `sessionId`.
 
-Na v2 este adapter passa a ter duas origens — registro e wrapper PTY — e precisa deduplicar por
-`sessionId` (D-014). A interface já é desenhada para isso: `list()` devolve a união, não a
-concatenação.
+A v2 previa aqui uma segunda origem — o wrapper PTY — e a deduplicação por `sessionId` dentro deste
+adapter (D-014). **Não foi o que aconteceu**, e a emenda de 2026-09-24 à D-014 registra o porquê: o
+PTY chegou como as abas da janela, o adapter continua com uma origem só (o registro), e quem evita
+a sessão duplicada é a interface, casando aba e sessão descoberta pelo pid
+(`packages/app/src/sidebar/session-match.ts`). A assinatura de `list()` continua devolvendo uma
+lista única — só que por não ter segunda origem, não por unir duas.
 
 ### `transcript/`
 Streaming linha a linha (arquivos passam de 1 MB). Ignora tipos desconhecidos em vez de falhar

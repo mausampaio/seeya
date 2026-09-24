@@ -16,9 +16,11 @@ Pare e registre em `docs/QUESTOES.md`.
 - **Multiusuário.** Um usuário, um `~/.seeya/`.
 - **Injetar comandos na sessão viva.** Fechado por D-001. Não tente TTY, named pipe, injeção
   de teclado, automação de janela ou qualquer variação disso.
-- **O wrapper PTY (`seeya claude`).** É v2 e já está desenhado em D-014. Não antecipe, não
-  adicione `node-pty`, não crie o comando "só para reservar o nome". A v1 tem que funcionar
-  inteira sem ele.
+- **O wrapper PTY (`seeya claude`).** Continua fora: o comando nunca existiu e não está na fila.
+  O PTY da v2 chegou como as abas embutidas da janela (D-042/D-043), que lançam e retomam sessão —
+  passthrough de teclado, nada mais. A parte da D-014 que previa pedir o handoff à sessão viva foi
+  **abandonada** na emenda de 2026-09-24, pelo mesmo motivo da D-001/D-031; a necessidade por trás
+  dela é da família de ganchos por harness (V2-T40).
 - **Ler a issue / o tracker** de onde um agente de execução escreve o resultado. O `seeya` lê o
   worktree, não o tracker.
 - **Kill forçado de sessão.** Só terminação graciosa (D-002).

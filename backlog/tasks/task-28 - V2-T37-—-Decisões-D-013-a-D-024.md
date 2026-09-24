@@ -4,7 +4,7 @@ title: V2-T37 — Decisões D-013 a D-024
 status: Review
 assignee: []
 created_date: '2026-09-23 10:37'
-updated_date: '2026-09-24 00:16'
+updated_date: '2026-09-24 10:56'
 labels:
   - decisoes
   - d-048
@@ -132,5 +132,11 @@ Achados da migração D-013 a D-024 (V2-T37) -- nada foi alterado nas decisões 
 3. D-020 -- emendada pela D-043 (V2-T1, monorepo): "cli/ é a única raiz de composição" virou "cli/ e app/ são as duas raízes de composição" (AGENTS.md, seção Arquitetura, e docs/DECISOES.md D-043). Registrei a emenda como uma seção extra ("## Emendada") no corpo de decision-20, sem tocar no texto original da decisão -- igual ao padrão que a V2-T36 já usou para casos assim.
 
 Decisões conferidas contra o código e sem achado (D-013, D-015 a D-019, D-021, D-022, D-024): os mecanismos, nomes de campo e schemas descritos continuam batendo com o código atual -- D-013 (fontes git/transcript/registro em application/evidence-gathering.ts e core/evidence.ts), D-015 (a correção de 2026-08-30 já embutida no próprio texto original, sem novidade), D-016 (duas estratégias em adapters/discovery/index.ts), D-017 (lista de variáveis removidas idêntica em packages/engine/src/adapters/generation/env.ts:19-24), D-018 (aviso de sessão suprimida em core/early-warnings.ts), D-019 (guard de Date em vigor, com o mesmo teste de caso permitido/proibido), D-021 (grupos obrigatório/opcional idênticos em adapters/discovery/schemas.ts:72-79), D-022 (validação item a item ainda em vigor, comentário cita D-022 explicitamente em schemas.ts:141), D-024 (união discriminada SessionWithPid/SessionWithoutPid ainda em core/types.ts).
+---
+
+author: PO
+created: 2026-09-24 10:56
+---
+Achado 1 da revisão (D-014, wrapper PTY) resolvido pelo mantenedor em 2026-09-24: emendar a decisão no lugar, sem número novo. A D-014 ganhou Contexto e uma seção de emenda dizendo o que se realizou (PTY = abas da janela; descoberta segue como única fonte; dedupe por pid na interface), o que foi abandonado (pedir handoff à sessão viva, pelo mesmo motivo da D-001/D-031) e o que ocupou o lugar da necessidade (V2-T40/T41). Corrigidos os dois textos que ainda apontavam para a promessa antiga: docs/FORA-DE-ESCOPO.md e docs/ARQUITETURA.md.
 ---
 <!-- COMMENTS:END -->
