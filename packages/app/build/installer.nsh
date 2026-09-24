@@ -1,3 +1,21 @@
+; V2-T45 review round: explicit, defensive includes for the two STANDARD NSIS headers (ship with
+; every NSIS install, always on its default search path -- not an `app-builder-lib` template file,
+; nothing project-specific to hardcode a path for) this file's own macros need: `LogicLib.nsh`
+; (`${if}`/`${ifNot}`/...) and `FileFunc.nsh` (`${GetTime}`, item 5's own log timestamps). Measured
+; on a real `npm run dist:windows` run: `build/installer.nsh` is `!include`d by electron-builder's
+; own generated wrapper script BEFORE `installer.nsi`'s own `!include "common.nsh"`/`"multiUser.nsh"`
+; chain ever runs (its `sharedHeader` -- `NsisTarget.js#computeCommonInstallerScriptHeader` --
+; pulls in our file ahead of `installer.nsi`'s own content) -- so a macro defined here that is
+; itself called from ANOTHER macro defined here (not directly from `.onInit`/a `Section`, i.e.
+; `seeyaLogWrite`, called from `seeyaRunLoggedCli`) hit `Invalid command: "${ifNot}"` the one time
+; this file needed LogicLib two macro-layers deep, because neither header had been `!include`d by
+; ANYONE yet at that point. Both headers below are already `!ifndef`-guarded against being
+; `!include`d twice (unlike `StrContains.nsh`, this file's own top comment further down explains
+; why THAT one is never reused directly) -- `installer.nsi`'s own later `!include`s of the same
+; headers, through `multiUser.nsh`, are themselves no-ops once this runs first.
+!include "LogicLib.nsh"
+!include "FileFunc.nsh"
+
 ; V2-T10 item 4: cleans up the `seeya://` registry entry `electron/main.ts#registerProtocolHandler`
 ; writes at RUNTIME (`app.setAsDefaultProtocolClient`), which the installer itself never wrote in
 ; the first place — measured, not assumed: `node_modules/app-builder-lib/out/targets/nsis/
@@ -76,14 +94,23 @@ Var SeeyaCliScriptPath
 ; see `seeyaResolvePaths` below for why it is recomputed alongside the other two paths, and the
 ; "seeya on PATH" section further down for the macros that use it.
 Var SeeyaBinDirPath
+; V2-T45 review round: `$INSTDIR\${APP_EXECUTABLE_FILENAME}` -- NOT resolved inside
+; `seeyaResolvePaths` itself (see that macro's own top comment for the measured reason);
+; `customInit`/`customInstall`/`customUnInstall` each set it directly, right where they call that
+; macro.
+Var SeeyaAppExePath
 
 ; -----------------------------------------------------------------------------------------------
 ; V2-T45 item 5: `~/.seeya/installer.log` -- a real log, in place of the comments below (V2-T15/
 ; V2-T22) that used to cite `%TEMP%\seeya-installer.log`, a path this file never actually wrote
 ; to (measured: the maintainer's own machine had no such file after an install, V2-T45's own
-; report). One line per step, timestamped, naming which of the three instances a per-machine
-; update runs wrote it (`original` / `elevated` / `old-uninstaller`, V2-T45's own vocabulary) --
-; this is what lets the acceptance test read where four minutes went, instead of a stopwatch.
+; report). One line per step, timestamped, naming which of the FOUR contexts a per-machine update
+; runs wrote it (`original` / `elevated` / `as-user` / `old-uninstaller`, V2-T45's own vocabulary
+; -- `as-user` is not a fourth OS process, it is `elevated`'s own `customInstall` reaching back
+; into the `original` process via `UAC_AsUser_Call`, item 3 below; labelled separately because the
+; code that actually executes at that point is not running with the elevated instance's own
+; privilege) -- this is what lets the acceptance test read where four minutes went, instead of a
+; stopwatch.
 ;
 ; **Declared unconditionally (no `!ifndef`/`!ifdef BUILD_UNINSTALLER` guard), unlike
 ; `$SeeyaDaemonWasRunning`.** `seeyaLogWrite`/`seeyaRunLoggedCli` below are inserted from BOTH
@@ -91,11 +118,14 @@ Var SeeyaBinDirPath
 ; sites, so every one of these Vars ends up referenced in both compiler passes -- same reasoning
 ; `seeyaResolvePaths`'s own Vars already rely on, just for a new set of Vars.
 ;
-; **`${GetTime}` comes from `FileFunc.nsh`, already `!include`d by `multiUser.nsh` (this
-; template's own `include/UAC.nsh` chain) before this file's macros are ever inserted** -- checked
-; directly in the cached template tree before writing this, not assumed: re-`!include`ing it here
-; would risk the exact "already defined" failure `StrContains.nsh` already caused elsewhere in
-; this file (see `SeeyaPathFind`'s own comment above).
+; **`${GetTime}` comes from `FileFunc.nsh`.** V2-T45's first pass assumed `multiUser.nsh` (this
+; template's own `include/UAC.nsh` chain) already `!include`s it before this file's macros are
+; ever inserted, and skipped including it directly here to avoid the "already defined" failure
+; `StrContains.nsh` causes elsewhere in this file (see `SeeyaPathFind`'s own comment above) --
+; WRONG, measured on a real `npm run dist:windows` run in the review round: this file is
+; `!include`d before `multiUser.nsh` ever runs, not after (this file's own top comment now explains
+; why). `FileFunc.nsh` IS `!include`d directly now, at this file's own top -- safely, since unlike
+; `StrContains.nsh` it is a standard, `!ifndef`-guarded NSIS header (verified in the same run).
 ;
 ; **`nsExec::ExecToStack`, not `ExecToLog`, for every CLI call this file makes from here on.**
 ; `ExecToLog` only ever reaches the on-screen details view, which V2-T22's own restart call
@@ -225,6 +255,32 @@ Var SeeyaLogTimeSecond
 ; the person change on the "choose install location" page in between). `$SeeyaDaemonLockPath`
 ; never depends on `$INSTDIR` at all (`~/.seeya/daemon.lock` is home-based, not install-based) —
 ; recomputed anyway so this macro has no hidden ordering requirement on its callers.
+; V2-T45 review round: `${APP_EXECUTABLE_FILENAME}` (a compile-time `!define`, ultimately
+; `"${PRODUCT_FILENAME}.exe"` -- `app-builder-lib/templates/nsis/common.nsh`) resolves correctly
+; ONLY when referenced directly inside a macro that is itself inserted from a genuine top-level
+; position (`.onInit`, a `Section` body) -- i.e. `customInit`/`customInstall`/`customUnInstall`
+; themselves. It does NOT resolve inside a SECOND macro nested one level deeper, EVEN as a plain,
+; un-nested instruction operand with no macro-argument involved at all. Measured directly, twice,
+; on real `npm run dist:windows` runs:
+;   warning 6000: unknown variable/constant "{APP_EXECUTABLE_FILENAME}" detected, ignoring
+;   (macro:seeyaRunLoggedCli:3)      -- passed as an ARGUMENT to a nested macro call
+;   warning 6000: unknown variable/constant "{APP_EXECUTABLE_FILENAME}" detected, ignoring
+;   (macro:seeyaResolvePaths:4)      -- referenced directly INSIDE a nested macro's own body
+; Both are `seeyaResolvePaths`-or-deeper: this project's own customization file is `!include`d
+; BEFORE `common.nsh` in electron-builder's own assembled script (its `sharedHeader` -- built from
+; `NsisTarget.js#computeCommonInstallerScriptHeader`, which `!include`s our `build/installer.nsh`
+; -- is prepended ahead of `installer.nsi`'s own content, and `installer.nsi` is what `!include`s
+; `common.nsh`, near its own top). A macro's OWN un-nested body still resolves correctly regardless
+; of where it was DEFINED, because NSIS only expands it at `!insertmacro` (use) time -- but a
+; NESTED `!insertmacro` (a macro calling another macro, both defined in our file, ahead of
+; `common.nsh`) is apparently flattened using the state as of when the OUTER macro was originally
+; parsed, not the state at its eventual use site. `seeyaResolvePaths`, `seeyaRunLoggedCli`, and the
+; `Function SeeyaRestartDaemonAsUser` below are all more than one level removed from a genuine
+; top-level call site -- none of them may reference `${APP_EXECUTABLE_FILENAME}` directly.
+; `$SeeyaAppExePath` is the workaround: `customInit`/`customInstall`/`customUnInstall` each set it
+; with their OWN direct (never nested) `StrCpy`, right where they call this macro; everything else
+; in this file references the VARIABLE, never the define, from here on -- a plain runtime `$Var` is
+; not a preprocessor construct, so it passes through any number of macro layers as inert text.
 !macro seeyaResolvePaths
   StrCpy $SeeyaDaemonLockPath "$PROFILE\.seeya\daemon.lock"
   StrCpy $SeeyaCliScriptPath "$INSTDIR\resources\app.asar\node_modules\@seeya-ai\cli\dist\index.js"
@@ -442,6 +498,9 @@ FunctionEnd
 ; it moments earlier in the same install.
 !macro customInit
   !insertmacro seeyaResolvePaths
+  ; Direct, un-nested reference -- see seeyaResolvePaths's own top comment on why this cannot move
+  ; into that (nested) macro itself.
+  StrCpy $SeeyaAppExePath "$INSTDIR\${APP_EXECUTABLE_FILENAME}"
   ${if} ${UAC_IsInnerInstance}
     !insertmacro UAC_AsUser_GetGlobalVar $SeeyaDaemonWasRunning
     !insertmacro seeyaLogWrite "elevated" "Reused the original instance's own daemon state ($SeeyaDaemonWasRunning) instead of stopping it again"
@@ -453,8 +512,8 @@ FunctionEnd
     ; A first-time install has no OLD `${APP_EXECUTABLE_FILENAME}` on disk yet to call — nothing to
     ; stop (and `$SeeyaDaemonWasRunning` would only be "1" here from a daemon this same NSIS-driven
     ; app itself started, which needs an install to have already happened once).
-    IfFileExists "$INSTDIR\${APP_EXECUTABLE_FILENAME}" 0 seeyaInitDone
-      !insertmacro seeyaRunLoggedCli "original" "Stopping the seeya daemon before installing..." '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" "$SeeyaCliScriptPath" daemon --stop'
+    IfFileExists "$SeeyaAppExePath" 0 seeyaInitDone
+      !insertmacro seeyaRunLoggedCli "original" "Stopping the seeya daemon before installing..." '"$SeeyaAppExePath" "$SeeyaCliScriptPath" daemon --stop'
     seeyaInitDone:
   ${endIf}
 !macroend
@@ -508,13 +567,18 @@ FunctionEnd
 Function SeeyaRestartDaemonAsUser
   ; Runs in the ORIGINAL (unprivileged) process even when `customInstall` itself is running
   ; elevated -- `UAC_AsUser_Call`, below, is what jumps here. `$INSTDIR` arrives synced
-  ; (`UAC_SYNCINSTDIR`); `$SeeyaCliScriptPath` does NOT (only `$0`-`$9`/`$R0`-`$R9` do, per
-  ; `UAC_AsUser_Call`'s own doc comment in `include/UAC.nsh`), so this recomputes it fresh from the
-  ; now-synced `$INSTDIR` -- the same "recompute, never cache across hooks" rule
-  ; `seeyaResolvePaths`'s own top comment already states, just applied across a process boundary
-  ; instead of across hooks.
+  ; (`UAC_SYNCINSTDIR`), so `$SeeyaCliScriptPath` (no define involved, safe to recompute in a
+  ; nested macro -- see `seeyaResolvePaths`'s own top comment) is refreshed the normal way.
+  ; `$SeeyaAppExePath` is NOT recomputed here: it needs `${APP_EXECUTABLE_FILENAME}`, and THIS
+  ; Function, like `seeyaResolvePaths` itself, is one level too deep from a genuine top-level call
+  ; site for that define to resolve (same top comment). `customInstall` already computed it
+  ; correctly, directly, moments before calling this Function -- it arrives here over `$1` instead,
+  ; the one extra register `${UAC_SYNCREGISTERS}` carries alongside `$0` (both branches below set
+  ; it, so this works identically whether this Function is reached via `UAC_AsUser_Call` or a plain
+  ; `Call`).
   !insertmacro seeyaResolvePaths
-  !insertmacro seeyaRunLoggedCli "elevated" "Restarting the seeya daemon (it was running before this install)..." '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" "$SeeyaCliScriptPath" daemon'
+  StrCpy $SeeyaAppExePath $1
+  !insertmacro seeyaRunLoggedCli "as-user" "Restarting the seeya daemon (it was running before this install)..." '"$SeeyaAppExePath" "$SeeyaCliScriptPath" daemon'
   ; `$0` is the one register `UAC_AsUser_Call`'s caller reads back below (see the `Push $0` /
   ; `Pop $0` around it) -- this is the same "stash the result in a synced register, restore it
   ; after" idiom `include/UAC.nsh`'s own `UAC_AsUser_GetGlobalVar` already uses internally.
@@ -527,13 +591,38 @@ FunctionEnd
   ; install AND every upgrade, `$INSTDIR` already final at this point (see `seeyaResolvePaths`'s
   ; own top comment on why every hook recomputes it rather than trusting `customInit`'s copy).
   !insertmacro seeyaResolvePaths
+  ; Direct, un-nested reference -- see seeyaResolvePaths's own top comment on why this cannot move
+  ; into that (nested) macro itself.
+  StrCpy $SeeyaAppExePath "$INSTDIR\${APP_EXECUTABLE_FILENAME}"
   !insertmacro seeyaWriteCliShim
   !insertmacro seeyaAddBinDirToUserPath
   ${if} $SeeyaDaemonWasRunning == "1"
-    Push $0
-    !insertmacro UAC_AsUser_Call Function SeeyaRestartDaemonAsUser ${UAC_SYNCREGISTERS}|${UAC_SYNCINSTDIR}
-    StrCpy $SeeyaDaemonRestartExitCode $0
-    Pop $0
+    ; V2-T45 review round, item 5: `UAC_AsUser_Call` only has an ORIGINAL, unprivileged process to
+    ; reach back into when one actually exists -- i.e., when this `customInstall` is running in an
+    ; elevated INNER instance (`${UAC_IsInnerInstance}`, the same check `customInit` already uses
+    ; for item 2). Whether the plugin itself falls back to a plain in-process call when there is no
+    ; such outer process was NOT verified against its own source or documentation -- neither ships
+    ; with this project's `node_modules`/NSIS cache, only the compiled `UAC.dll` and this `.nsh`
+    ; wrapper, which documents the two-process case only. Branching on `${UAC_IsInnerInstance}`
+    ; ourselves removes the need to trust that undocumented behavior at all: a per-user install (no
+    ; elevation ever happens) or a per-machine install already run AS admin from the very start
+    ; (no separate elevation step either, so no de-elevated process to route back to -- this one
+    ; case genuinely has no "as the person, not admin" option available; it IS the person's own
+    ; admin session throughout) both call the Function directly, in whichever single process is
+    ; running; only a REAL elevated/original pair crosses the boundary via `UAC_AsUser_Call`.
+    ${if} ${UAC_IsInnerInstance}
+      Push $0
+      Push $1
+      StrCpy $1 $SeeyaAppExePath
+      !insertmacro UAC_AsUser_Call Function SeeyaRestartDaemonAsUser ${UAC_SYNCREGISTERS}|${UAC_SYNCINSTDIR}
+      StrCpy $SeeyaDaemonRestartExitCode $0
+      Pop $1
+      Pop $0
+    ${else}
+      StrCpy $1 $SeeyaAppExePath
+      Call SeeyaRestartDaemonAsUser
+      StrCpy $SeeyaDaemonRestartExitCode $0
+    ${endIf}
     ${if} $SeeyaDaemonRestartExitCode != 0
       DetailPrint "Restarting the seeya daemon failed (exit code $SeeyaDaemonRestartExitCode) -- open seeya and use Start daemon, or run 'seeya daemon' yourself."
     ${endIf}
@@ -565,7 +654,7 @@ FunctionEnd
 ; a genuine uninstall, never the OLD uninstaller electron-builder's own `uninstallOldVersion`
 ; (`include/installUtil.nsh`) runs on top of a fresh install.
 !macro seeyaDisableAutostart
-  !insertmacro seeyaRunLoggedCli "${SEEYA_UNINSTALL_LOG_LABEL}" "Removing the seeya autostart registration..." '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" "$SeeyaCliScriptPath" autostart disable'
+  !insertmacro seeyaRunLoggedCli "${SEEYA_UNINSTALL_LOG_LABEL}" "Removing the seeya autostart registration..." '"$SeeyaAppExePath" "$SeeyaCliScriptPath" autostart disable'
   StrCpy $SeeyaAutostartDisableExitCode $SeeyaLogExitCode
   ${if} $SeeyaAutostartDisableExitCode != 0
     DetailPrint "Removing the seeya autostart registration failed (exit code $SeeyaAutostartDisableExitCode) -- run 'seeya autostart disable' yourself if it is still registered."
@@ -574,8 +663,11 @@ FunctionEnd
 
 !macro customUnInstall
   !insertmacro seeyaResolvePaths
-  IfFileExists "$INSTDIR\${APP_EXECUTABLE_FILENAME}" 0 seeyaUnInstallNoExe
-    !insertmacro seeyaRunLoggedCli "${SEEYA_UNINSTALL_LOG_LABEL}" "Stopping the seeya daemon..." '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" "$SeeyaCliScriptPath" daemon --stop'
+  ; Direct, un-nested reference -- see seeyaResolvePaths's own top comment on why this cannot move
+  ; into that (nested) macro itself.
+  StrCpy $SeeyaAppExePath "$INSTDIR\${APP_EXECUTABLE_FILENAME}"
+  IfFileExists "$SeeyaAppExePath" 0 seeyaUnInstallNoExe
+    !insertmacro seeyaRunLoggedCli "${SEEYA_UNINSTALL_LOG_LABEL}" "Stopping the seeya daemon..." '"$SeeyaAppExePath" "$SeeyaCliScriptPath" daemon --stop'
     ; V2-T45 item 1: an update is not an uninstall -- the NEW version's own `customInstall` is what
     ; leaves the final autostart/protocol state (it runs moments later, after this old uninstaller
     ; returns). Stopping the daemon above still always runs: the files need to be replaceable
