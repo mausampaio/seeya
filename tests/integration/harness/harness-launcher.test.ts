@@ -28,6 +28,7 @@ const ENV_VARS_UNDER_TEST = [
 ] as const;
 
 const PROJECT_CWD = process.cwd();
+const SESSION_ID = '11111111-1111-4111-8111-111111111111';
 
 describe('ClaudeHarnessLauncher — V2-T28', () => {
   let fixture: FakeInteractiveClaudeFixture;
@@ -50,35 +51,57 @@ describe('ClaudeHarnessLauncher — V2-T28', () => {
     await removeFakeInteractiveClaudeFixture(fixture);
   });
 
-  it('opens with no --add-dir at all when there are no associated repositories', async () => {
+  it('opens with --session-id and no --add-dir when there are no associated repositories', async () => {
     process.env['FAKE_CLAUDE_EXIT_CODE'] = '0';
     const launcher = new ClaudeHarnessLauncher({ claudeBinary: fixture.binaryPath });
 
-    const result = await launcher.open(PROJECT_CWD, []);
+    const result = await launcher.open(PROJECT_CWD, [], SESSION_ID, null);
 
     expect(result).toStrictEqual({ kind: 'opened', exitCode: 0 });
     const calls = await readCapturedInteractiveClaudeCalls(fixture);
     expect(calls).toHaveLength(1);
-    expect(calls[0]?.argv).toStrictEqual([]);
+    expect(calls[0]?.argv).toStrictEqual(['--session-id', SESSION_ID]);
   });
 
-  it('opens with --add-dir <dirs...> -- when repositories are associated — the exact argv, terminator included', async () => {
+  it('opens with --add-dir <dirs...> -- when repositories are associated — the exact argv, terminator included, after --session-id', async () => {
     process.env['FAKE_CLAUDE_EXIT_CODE'] = '0';
     const launcher = new ClaudeHarnessLauncher({ claudeBinary: fixture.binaryPath });
     const addDirs = [path.join(PROJECT_CWD, 'app-api'), path.join(PROJECT_CWD, 'app-web')];
 
-    const result = await launcher.open(PROJECT_CWD, addDirs);
+    const result = await launcher.open(PROJECT_CWD, addDirs, SESSION_ID, null);
 
     expect(result).toStrictEqual({ kind: 'opened', exitCode: 0 });
     const calls = await readCapturedInteractiveClaudeCalls(fixture);
-    expect(calls[0]?.argv).toStrictEqual(['--add-dir', addDirs[0], addDirs[1], '--']);
+    expect(calls[0]?.argv).toStrictEqual([
+      '--session-id',
+      SESSION_ID,
+      '--add-dir',
+      addDirs[0],
+      addDirs[1],
+      '--',
+    ]);
+  });
+
+  it('V2-T35 item 2: a non-null systemPromptAppend becomes --append-system-prompt <text>', async () => {
+    process.env['FAKE_CLAUDE_EXIT_CODE'] = '0';
+    const launcher = new ClaudeHarnessLauncher({ claudeBinary: fixture.binaryPath });
+
+    await launcher.open(PROJECT_CWD, [], SESSION_ID, 'Project note: locked.');
+
+    const calls = await readCapturedInteractiveClaudeCalls(fixture);
+    expect(calls[0]?.argv).toStrictEqual([
+      '--session-id',
+      SESSION_ID,
+      '--append-system-prompt',
+      'Project note: locked.',
+    ]);
   });
 
   it('reports the real exit code the harness closed with, even non-zero — never a "failure"', async () => {
     process.env['FAKE_CLAUDE_EXIT_CODE'] = '7';
     const launcher = new ClaudeHarnessLauncher({ claudeBinary: fixture.binaryPath });
 
-    const result = await launcher.open(PROJECT_CWD, []);
+    const result = await launcher.open(PROJECT_CWD, [], SESSION_ID, null);
 
     expect(result).toStrictEqual({ kind: 'opened', exitCode: 7 });
   });
@@ -88,7 +111,7 @@ describe('ClaudeHarnessLauncher — V2-T28', () => {
     process.env['CLAUDE_CODE_CHILD_SESSION'] = 'contaminated-value';
     const launcher = new ClaudeHarnessLauncher({ claudeBinary: fixture.binaryPath });
 
-    await launcher.open(PROJECT_CWD, []);
+    await launcher.open(PROJECT_CWD, [], SESSION_ID, null);
 
     const calls = await readCapturedInteractiveClaudeCalls(fixture);
     expect(calls[0]?.env['CLAUDE_CODE_CHILD_SESSION']).toBeUndefined();
@@ -101,7 +124,7 @@ describe('ClaudeHarnessLauncher — V2-T28', () => {
         claudeBinary: path.join(missingDir, 'no-such-claude-binary'),
       });
 
-      const result = await launcher.open(PROJECT_CWD, []);
+      const result = await launcher.open(PROJECT_CWD, [], SESSION_ID, null);
 
       expect(result).toStrictEqual({ kind: 'failedToStart' });
     } finally {

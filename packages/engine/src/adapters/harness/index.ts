@@ -24,11 +24,16 @@ export interface ClaudeHarnessLauncherOptions {
 export class ClaudeHarnessLauncher implements HarnessLauncher {
   constructor(private readonly options: ClaudeHarnessLauncherOptions = {}) {}
 
-  async open(cwd: string, addDirs: readonly string[]): Promise<HarnessOpenResult> {
+  async open(
+    cwd: string,
+    addDirs: readonly string[],
+    sessionId: string,
+    systemPromptAppend: string | null,
+  ): Promise<HarnessOpenResult> {
     const claudeBinary = this.options.claudeBinary ?? DEFAULT_CLAUDE_BINARY;
     const result = await runInteractive({
       claudeBinary,
-      args: buildOpenArgs(addDirs),
+      args: buildOpenArgs(addDirs, sessionId, systemPromptAppend),
       cwd,
       env: buildResumptionEnv(process.env),
     });

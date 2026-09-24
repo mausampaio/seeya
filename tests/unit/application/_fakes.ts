@@ -806,12 +806,22 @@ export class FakeDirectoryExistence implements DirectoryExistence {
 /** `HarnessLauncher` double (V2-T28) — records every call and answers with whatever `result`
  * (or `resultFor`, keyed by `cwd`) the test configured, defaulting to a clean `opened` exit 0. */
 export class FakeHarnessLauncher implements HarnessLauncher {
-  readonly calls: { readonly cwd: string; readonly addDirs: readonly string[] }[] = [];
+  readonly calls: {
+    readonly cwd: string;
+    readonly addDirs: readonly string[];
+    readonly sessionId: string;
+    readonly systemPromptAppend: string | null;
+  }[] = [];
 
   constructor(private readonly result: HarnessOpenResult = { kind: 'opened', exitCode: 0 }) {}
 
-  open(cwd: string, addDirs: readonly string[]): Promise<HarnessOpenResult> {
-    this.calls.push({ cwd, addDirs });
+  open(
+    cwd: string,
+    addDirs: readonly string[],
+    sessionId: string,
+    systemPromptAppend: string | null,
+  ): Promise<HarnessOpenResult> {
+    this.calls.push({ cwd, addDirs, sessionId, systemPromptAppend });
     return Promise.resolve(this.result);
   }
 }

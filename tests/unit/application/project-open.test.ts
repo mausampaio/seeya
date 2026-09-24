@@ -13,6 +13,7 @@ import type {
   MissingRepositoryRecord,
   ProjectOpenLockOutcome,
 } from '@seeya-ai/engine/application/project-open.js';
+import type { ProjectLockInfo } from '@seeya-ai/engine/core/project-lock.js';
 import {
   ControllableProcessControl,
   DEFAULT_TEST_CONFIG,
@@ -40,6 +41,8 @@ const THIS_PID = 4242;
  * `application/workspace.test.ts#buildDeps` already established. `processLiveness` defaults to
  * "nothing is alive" (no prior lock holder to collide with); a test proving the `readOnly`/stale
  * paths passes its own. */
+const LAUNCHED_SESSION_ID = '55555555-5555-4555-8555-555555555555';
+
 function buildOpenDeps(
   storage: InMemoryDeviceStorage,
   workspace: FakeWorkspaceRepository,
@@ -57,6 +60,7 @@ function buildOpenDeps(
     sessionId: undefined,
     pid: THIS_PID,
     procStart: undefined,
+    launchedSessionId: LAUNCHED_SESSION_ID,
     ...overrides,
   };
 }
@@ -123,8 +127,18 @@ describe('openProject', () => {
       addedDirs: [],
       missing: [],
       lock: ACQUIRED_FREE,
+      finalLockStatus: { kind: 'unlocked' },
     });
-    expect(harnessLauncher.calls).toEqual([{ cwd: PROJECT_DIR, addDirs: [] }]);
+    // item 4: `open`'s own generated id, never the caller's `deps.sessionId` (`undefined` here) —
+    // and item 2: no system prompt append for a genuinely free lock (nothing to warn about).
+    expect(harnessLauncher.calls).toEqual([
+      {
+        cwd: PROJECT_DIR,
+        addDirs: [],
+        sessionId: LAUNCHED_SESSION_ID,
+        systemPromptAppend: null,
+      },
+    ]);
   });
 
   it('adds --add-dir for a repository whose local path is registered and still exists', async () => {
@@ -156,7 +170,14 @@ describe('openProject', () => {
       expect(result.addedDirs).toEqual([REPO_PATH]);
       expect(result.missing).toEqual([]);
     }
-    expect(harnessLauncher.calls).toEqual([{ cwd: PROJECT_DIR, addDirs: [REPO_PATH] }]);
+    expect(harnessLauncher.calls).toEqual([
+      {
+        cwd: PROJECT_DIR,
+        addDirs: [REPO_PATH],
+        sessionId: LAUNCHED_SESSION_ID,
+        systemPromptAppend: null,
+      },
+    ]);
   });
 
   it('item 4: a repository never registered on this device is reported missing, notInDeviceMap — open continues anyway', async () => {
@@ -172,8 +193,10 @@ describe('openProject', () => {
       buildOpenDeps(storage, workspace, { harnessLauncher }),
       'auth-hardening',
       'claude',
-      ({ missing }) => {
-        observedBeforeLaunch = missing;
+      {
+        onBeforeLaunch: ({ missing }) => {
+          observedBeforeLaunch = missing;
+        },
       },
     );
     expect(result.kind).toBe('opened');
@@ -185,7 +208,14 @@ describe('openProject', () => {
     // promise) — proven here by asserting it happened at all, not just that the final result
     // carries it too.
     expect(observedBeforeLaunch).toEqual([{ name: 'frontend', reason: 'notInDeviceMap' }]);
-    expect(harnessLauncher.calls).toEqual([{ cwd: PROJECT_DIR, addDirs: [] }]);
+    expect(harnessLauncher.calls).toEqual([
+      {
+        cwd: PROJECT_DIR,
+        addDirs: [],
+        sessionId: LAUNCHED_SESSION_ID,
+        systemPromptAppend: null,
+      },
+    ]);
   });
 
   it('item 4: a registered repository whose local path no longer exists is reported missing, pathMissing', async () => {
@@ -255,6 +285,9 @@ describe('openProject', () => {
       expect(result.kind).toBe('opened');
       if (result.kind === 'opened') {
         expect(result.lock).toEqual(ACQUIRED_FREE);
+        // V2-T35 item 3: read fresh, after the release just below — "how it ended up," never the
+        // pre-launch snapshot.
+        expect(result.finalLockStatus).toEqual({ kind: 'unlocked' });
       }
       // Released by the time `open` returns — nothing left over for the next `show`/`open` to
       // trip on (D-047 item 4: "libera... ao sair").
@@ -276,8 +309,10 @@ describe('openProject', () => {
         buildOpenDeps(storage, workspace, { projectLock, processControl }),
         'auth-hardening',
         'claude',
-        ({ lock }) => {
-          observedLock = lock;
+        {
+          onBeforeLaunch: ({ lock }) => {
+            observedLock = lock;
+          },
         },
       );
       const expectedLock: ProjectOpenLockOutcome = {
@@ -308,12 +343,23 @@ describe('openProject', () => {
       const processControl = new ControllableProcessControl(new Map([[555, true]]));
       const harnessLauncher = new FakeHarnessLauncher();
       let observedLock: ProjectOpenLockOutcome | undefined;
+      let confirmedHeldBy: ProjectLockInfo | undefined;
       const result = await openProject(
         buildOpenDeps(storage, workspace, { projectLock, processControl, harnessLauncher }),
         'auth-hardening',
         'claude',
-        ({ lock }) => {
-          observedLock = lock;
+        {
+          onBeforeLaunch: ({ lock }) => {
+            observedLock = lock;
+          },
+          // V2-T35 item 1: a live lock now PAUSES for this confirmation — without one, `open`
+          // would refuse (`'unavailable'`, the next test proves that path). Answering `'proceed'`
+          // here is what still lets this test observe the pre-V2-T35 "opens read-only anyway"
+          // behavior.
+          confirmReadOnlyOpen: (heldBy) => {
+            confirmedHeldBy = heldBy;
+            return Promise.resolve('proceed');
+          },
         },
       );
       const expectedLock: ProjectOpenLockOutcome = {
@@ -326,12 +372,23 @@ describe('openProject', () => {
         },
       };
       expect(observedLock).toEqual(expectedLock);
+      expect(confirmedHeldBy).toEqual(expectedLock.heldBy);
       expect(result.kind).toBe('opened');
       if (result.kind === 'opened') {
         expect(result.lock).toEqual(expectedLock);
       }
       // `open` still ran the harness — item 4: "abre para leitura", never refuses to open at all.
-      expect(harnessLauncher.calls).toEqual([{ cwd: PROJECT_DIR, addDirs: [] }]);
+      // item 2: the lock's own warning text travels to the launched session too, as
+      // `--append-system-prompt` (`systemPromptAppend`), never `null` for a `readOnly` lock.
+      expect(harnessLauncher.calls).toHaveLength(1);
+      expect(harnessLauncher.calls[0]).toMatchObject({
+        cwd: PROJECT_DIR,
+        addDirs: [],
+        sessionId: LAUNCHED_SESSION_ID,
+      });
+      expect(harnessLauncher.calls[0]?.systemPromptAppend).toContain(
+        'locked by session other-session',
+      );
       // The OTHER session's lock is exactly as this process found it — never touched, never
       // released by a session that never held it.
       expect(await projectLock.read(WORKSPACE_ROOT, 'auth-hardening')).toEqual({
@@ -340,6 +397,61 @@ describe('openProject', () => {
         procStart: undefined,
         acquiredAt: new Date('2026-09-20T09:00:00.000Z'),
       });
+    });
+
+    it('item 1: a live lock with an explicit decline never launches the harness at all', async () => {
+      const projectLock = new FakeProjectLock();
+      await projectLock.write(WORKSPACE_ROOT, 'auth-hardening', {
+        sessionId: 'other-session',
+        pid: 555,
+        procStart: undefined,
+        acquiredAt: new Date('2026-09-20T09:00:00.000Z'),
+      });
+      const processControl = new ControllableProcessControl(new Map([[555, true]]));
+      const harnessLauncher = new FakeHarnessLauncher();
+      const result = await openProject(
+        buildOpenDeps(storage, workspace, { projectLock, processControl, harnessLauncher }),
+        'auth-hardening',
+        'claude',
+        { confirmReadOnlyOpen: () => Promise.resolve('decline') },
+      );
+      expect(result).toEqual({
+        kind: 'lockConfirmationDeclined',
+        projectId: 'auth-hardening',
+        heldBy: {
+          sessionId: 'other-session',
+          pid: 555,
+          procStart: undefined,
+          acquiredAt: new Date('2026-09-20T09:00:00.000Z'),
+        },
+      });
+      expect(harnessLauncher.calls).toHaveLength(0);
+      // Never held anything to release — the other session's lock is still exactly as it was.
+      expect(await projectLock.read(WORKSPACE_ROOT, 'auth-hardening')).toEqual({
+        sessionId: 'other-session',
+        pid: 555,
+        procStart: undefined,
+        acquiredAt: new Date('2026-09-20T09:00:00.000Z'),
+      });
+    });
+
+    it('item 1: a live lock with no confirmer at all refuses, unavailable — never a silent default', async () => {
+      const projectLock = new FakeProjectLock();
+      await projectLock.write(WORKSPACE_ROOT, 'auth-hardening', {
+        sessionId: 'other-session',
+        pid: 555,
+        procStart: undefined,
+        acquiredAt: new Date('2026-09-20T09:00:00.000Z'),
+      });
+      const processControl = new ControllableProcessControl(new Map([[555, true]]));
+      const harnessLauncher = new FakeHarnessLauncher();
+      const result = await openProject(
+        buildOpenDeps(storage, workspace, { projectLock, processControl, harnessLauncher }),
+        'auth-hardening',
+        'claude',
+      );
+      expect(result.kind).toBe('lockConfirmationUnavailable');
+      expect(harnessLauncher.calls).toHaveLength(0);
     });
 
     it('a failed-to-start harness still releases the lock this session acquired', async () => {

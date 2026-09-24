@@ -22,10 +22,14 @@
  */
 export interface ProjectLockInfo {
   /**
-   * The Claude Code session holding this lock — `process.env.CLAUDE_CODE_SESSION_ID`, read only at
-   * the composition root (`packages/cli/src/composition.ts`). `undefined` when `seeya project
-   * open` ran outside a Claude Code session (a plain terminal): D-025 forbids inventing an identity
-   * that isn't there, so this stays absent rather than guessing. Same optionality discipline
+   * The Claude Code session holding this lock. **V2-T35 item 4: for a lock `seeya project open`
+   * writes, this is always the id `open` itself generated for the session it launched**
+   * (`application/project-open.ts#ProjectOpenDeps.launchedSessionId`, `packages/cli/src/
+   * composition.ts#buildProjectOpenDeps`'s own `randomUUID()`) — never `process.env
+   * .CLAUDE_CODE_SESSION_ID`, which names the CALLER, not the session the lock actually belongs
+   * to. Stays `string | undefined` regardless: a `.seeya-lock` left on disk by an OLDER `seeya`
+   * (before this task) could still have `undefined` here, and a read has to stay tolerant of that
+   * without guessing an identity that isn't there (D-025) — same optionality discipline
    * `core/daemon-lock.ts#DaemonLockInfo.launchedBy` already established for "don't know", never
    * "someone else".
    */
@@ -99,3 +103,17 @@ export function decideProjectLockRelease(
   }
   return { kind: 'released' };
 }
+
+/**
+ * `seeya project open`'s own outcome for its lock attempt (V2-T33/V2-T35, D-047 items 1/4) — never
+ * flattened into a boolean (D-024): `acquired` is the normal case (this session now owns the
+ * project, `reclaimedStale` set only when a DEAD lock was reclaimed, D-047 item 1's own "aviso");
+ * `readOnly` is item 4's own carve-out — another session's lock is still live, so `open` pauses for
+ * a confirmation (V2-T35 item 1) before still running, for reading. Moved here from
+ * `application/project-open.ts` (re-exported there unchanged) so `project-lock-message.ts` — pure,
+ * shared by `cli/` and `application/` alike — can describe it without either layer reaching into
+ * the other (`docs/ARQUITETURA.md`'s matrix: `application` never imports from `cli`).
+ */
+export type ProjectOpenLockOutcome =
+  | { readonly kind: 'acquired'; readonly reclaimedStale: ProjectLockInfo | null }
+  | { readonly kind: 'readOnly'; readonly heldBy: ProjectLockInfo };
