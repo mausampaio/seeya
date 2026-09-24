@@ -8840,3 +8840,103 @@ revisar. Como `adopt` só faz sentido rodado por alguém num terminal, o caso é
 **Resolução da Q-092 (PO, 2026-09-24).** Corrigido o `AGENTS.md`: "Como trabalhar" dizia commits
 "em português", contra a tabela da D-028 e contra o histórico real, que é todo em inglês. Agora
 diz inglês e aponta para a tabela.
+
+## Q-093 — V2-T29: o caso exato que o aceite do mantenedor reprovou, medido em `-p` — a instrução
+precisava do caminho absoluto
+
+**Contexto.** O aceite do mantenedor em 2026-09-24 (task-23 comment #2) reprovou a V2-T29:
+`ADOPTION_INSTRUCTION` mandava escrever "the project directory" e citava `AGENTS.md`/
+`context/know-how.md` sem nunca dizer ONDE o projeto fica. A cópia abre no diretório ORIGINAL da
+sessão — de propósito (decisão do mantenedor: é o diretório onde o Claude Code carrega o
+`CLAUDE.md`, a memória automática, configuração e skills locais; aberta no projeto, ficaria só com
+o histórico) — nunca no do projeto; sem o caminho, a sessão leu "o diretório do projeto" como o
+próprio `cwd` e não achou nada lá. O `docs/spikes/N-adocao-de-sessao.md` mediu a instrução com a
+sessão de teste já rodando DE DENTRO do projeto — a ambiguidade nunca teve chance de aparecer
+naquela medição, nem na revisão do PO. (Não afirmado aqui nem em código: qualquer coisa sobre o
+que `--resume` consegue ou não achar fora do diretório original de uma sessão — nunca medido.)
+
+**Correção.** `ADOPTION_INSTRUCTION` (constante) virou `buildAdoptionInstruction(projectDir)`
+(função) — o texto continua fixo e curto, mas agora nomeia o diretório do projeto logo na
+primeira frase e cada arquivo pelo caminho absoluto a partir dele
+(`adapters/harness/adopt-instruction.ts`). `buildAdoptArgs`/`SessionAdoptionLauncher.adopt`
+deixaram de aceitar uma lista `addDirs` e passaram a aceitar um único `projectDir: string` — este
+fluxo nunca libera mais de um diretório, e uma lista que sempre tem um elemento é um tipo mais
+fraco que o próprio elemento (D-024).
+
+**Método da prova, em `-p` (sem terminal, mesma lacuna de Q-069/Q-089/Q-090).** Duas sessões
+descartáveis: uma original, em `original-cwd` (fora de qualquer repositório), com um contexto
+sintético concreto (mesmo estilo do Spike N: "estamos construindo a CLI catcli; decisão D-1:
+`catcli.json`; o comando `list` está pronto, o próximo é `add`"); depois, no MESMO `original-cwd`
+(o `--resume` só acha o histórico ali, como em produção), um único comando montado com o
+`buildAdoptArgs` real (compilado, `packages/engine/dist/...`) — `--resume` + `--fork-session` +
+`--session-id` + `--add-dir <project-dir>`, com `project-dir` num diretório TOTALMENTE DIFERENTE
+de `original-cwd`, e a instrução nova como primeiro turno. **`--permission-mode acceptEdits`
+usado só nesta medição, nunca em produção** — sem alguém para aprovar, `-p` nega toda escrita
+(Spike N, Achado 2); é o único jeito de ver arquivos de verdade em disco sem um terminal
+interativo.
+
+**Resultado.** `exit=0`, sem `permission_denials`. `AGENTS.md`, `INDEX.md` e `context/know-how.md`
+apareceram exatamente dentro de `project-dir` — com o conteúdo certo (decisão D-1, os comandos
+`list`/`add`) e `context/know-how.md` chegou a citar o caminho absoluto de `project-dir` como o
+"Working Directory" ao descrever o ambiente, prova de que a sessão sabia exatamente onde estava
+escrevendo. `original-cwd` ficou **vazio** — nenhum arquivo novo apareceu lá. Hash SHA-256 do
+transcript original idêntico antes e depois (`5d78554d...`, 201.753 bytes nos dois momentos) — a
+original continua intocada.
+
+**Achado colateral, primeira tentativa (descartada, sem custo de escrita real).** Uma primeira
+sessão original com um fato só decorativo ("lembre em silêncio o codeword MANGO-19") não deu à
+sessão adotada contexto suficiente para escrever — ela navegou corretamente até `project-dir`
+(prova de que já entendia o caminho), mas preferiu perguntar "sobre o que é este projeto?" em vez
+de inventar conteúdo, coerente com a instrução ("mark anything you are not sure about as
+uncertain") e com D-025. A segunda tentativa, com contexto substantivo real, é a que produziu a
+escrita — registrada aqui porque também é evidência de que a instrução não força invenção quando
+não há o que documentar.
+
+**Sessões descartáveis criadas por esta medição (já apagadas):**
+`77777777-7777-4777-8777-777777777777`/`88888888-8888-4888-8888-888888888888` (primeira
+tentativa, sem escrita) e `99999999-9999-4999-8999-999999999999`/
+`10101010-1010-4101-8101-101010101010` (segunda, com escrita — a prova válida), todas em
+`%TEMP%\claude\C--code-seeya\<sessão-do-agente>\scratchpad\v2t29-q093-probe\` (fora de qualquer
+repositório real). Custo total: ~US$ 0,13.
+
+**Interpretação, D-025 aplicado.** Prova o caso exato que reprovou o aceite — sessão original e
+projeto em diretórios diferentes — em modo `-p` com `acceptEdits`. Não prova o modo interativo
+genuíno (a pessoa aprovando cada escrita na hora, sem `--permission-mode`); essa parte segue sem
+medição por este agente (mesma lacuna de Q-069/Q-089/Q-090), e é o que o novo aceite do
+mantenedor precisa confirmar.
+
+## Q-094 — V2-T29 item 5: a sessão carrega o `CLAUDE.md` local do diretório original para o
+projeto, medido em `-p`
+
+**Contexto.** Acréscimo do mantenedor à correção da V2-T29 (mesmo dia, 2026-09-24): já que a
+cópia abre no diretório ORIGINAL da sessão de propósito (para ter acesso às instruções e à
+memória locais dali), a instrução passou a pedir explicitamente que a sessão leve para o projeto
+o que, dessas instruções e memória locais, pertence ao trabalho — e deixe de fora o resto. Faltava
+provar que isso acontece de verdade, não só que o texto pede.
+
+**Método.** Mesmo par de sessões descartáveis do Q-093 (`-p`, `--permission-mode acceptEdits` só
+nesta medição), com um acréscimo: um `CLAUDE.md` descartável no diretório original, com um fato
+inventado e inofensivo ("este trabalho usa a ferramenta fictícia de build 'Frobinator' — sempre
+rode `frobinate --release` antes de testar mudanças, nunca um comando de build simples"). Sessão
+original criada normalmente nesse diretório (o `CLAUDE.md` é carregado como instrução local pelo
+próprio Claude Code ao iniciar ali); depois, a adoção com a instrução nova, no mesmo diretório
+original, `--add-dir` para um `project-dir` diferente.
+
+**Resultado.** `exit=0`, sem `permission_denials`. O fato inventado ("Frobinator"/
+`frobinate --release`) apareceu em `context/know-how.md` (atribuído explicitamente: "per CLAUDE.md
+in the project"), em `AGENTS.md`, em `INDEX.md` e em `status`, todos dentro de `project-dir` — a
+sessão leu a instrução local do seu próprio diretório e carregou o que era relevante para o
+projeto, sem inventar nada além do que estava lá. Hash SHA-256 do transcript original idêntico
+antes e depois (`579bd2ed...`, 203.674 bytes nos dois momentos); `original-cwd` não ganhou nenhum
+arquivo novo (só o `CLAUDE.md` que este agente colocou lá).
+
+**Sessões descartáveis criadas por esta medição (já apagadas):**
+`20202020-2020-4202-8202-202020202020` (original) e `30303030-3030-4303-8303-303030303030`
+(fork), em `%TEMP%\claude\C--code-seeya\<sessão-do-agente>\scratchpad\v2t29-q094-probe\` (fora de
+qualquer repositório real). Custo total: ~US$ 0,09.
+
+**Interpretação, D-025 aplicado.** Prova que a instrução de fato faz a sessão carregar memória
+local relevante para o projeto, em `-p`/`acceptEdits`. Não prova (e não é afirmado em código nem
+aqui) nada sobre o que `--resume` consegue achar fora do diretório original — a razão de abrir ali
+é a disponibilidade de `CLAUDE.md`/memória/configuração/skills locais, não uma limitação medida do
+`--resume`. Modo interativo genuíno segue sem medição por este agente (mesma lacuna de sempre).
