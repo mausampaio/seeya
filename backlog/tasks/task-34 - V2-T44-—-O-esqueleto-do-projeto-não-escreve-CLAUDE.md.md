@@ -4,7 +4,7 @@ title: V2-T44 — O esqueleto do projeto não escreve CLAUDE.md
 status: Review
 assignee: []
 created_date: '2026-09-24 10:45'
-updated_date: '2026-09-24 17:28'
+updated_date: '2026-09-24 17:33'
 labels: []
 dependencies: []
 references:
@@ -155,3 +155,13 @@ violações), build, e `cobertura` (226 arquivos de teste, 2334 passaram, 4 skip
 
 Branch `tarefa/V2-T44-esqueleto-sem-claude-md`, commit `5b36df5`.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-24 17:33
+---
+Revisão do PO em 2026-09-24. Código correto: esqueleto = AGENTS.md + INDEX.md + seis pastas, teste afirma a lista inteira e falhava antes. O PO completou a linha do glossário no AGENTS.md que o despacho pedia e o agente não tocou. INCIDENTE: ao provar pela CLI, o agente usou um SEEYA_HOME que não existe; o comando caiu no home real e criou o projeto v2-t44-proof, com commit, no espaço de trabalho do mantenedor. O mantenedor negou a tentativa seguinte; o PO desfez com o aval dele (reset para aaee62e + remoção das pastas vazias), conferido limpo. Causa registrada como armadilha em docs/FLUXO-DE-AGENTES.md: prova pela CLI só com buildProjectContext(homeDir) ou com USERPROFILE/HOME apontando para temporário. Portão verde no po-gate. Falta o aceite do mantenedor (projeto novo sem CLAUDE.md), que depende de um build novo instalado.
+---
+<!-- COMMENTS:END -->

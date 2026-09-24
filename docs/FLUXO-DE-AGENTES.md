@@ -72,6 +72,16 @@ aprovada. É o único que altera os documentos de autoridade.
 > `git push` na mesma linha.** Rode o portão, **leia o código de saída**, e só então publique.
 > Encadear foi o que deixou o vermelho passar despercebido, duas vezes na mesma sessão.
 
+> **Armadilha da prova pela CLI: o `seeya` não tem variável de ambiente para trocar o home.** Ele
+> resolve `~/.seeya` e `~/.claude` só por `os.homedir()`. Na V2-T44 (2026-09-24), um agente rodou
+> `seeya project create` com um `SEEYA_HOME` inventado, achando que isolava a prova — a variável
+> não existe, o comando caiu no home **real** e criou um projeto, com commit, no espaço de trabalho
+> do mantenedor. **Para provar um comando de verdade**, faça uma de duas: chame a raiz de composição
+> em código com o home descartável (`buildProjectContext(homeDir)` e irmãs aceitam o diretório), ou
+> rode o binário com `USERPROFILE` (Windows) **e** `HOME` apontando para um diretório temporário —
+> é o que `os.homedir()` lê. Nunca suponha uma variável que você não achou num `grep`. E depois da
+> prova, confira que nada apareceu no home real.
+
 ## Dev — Sonnet 5
 
 Implementa **uma tarefa por vez** do plano de entrega. Lê `AGENTS.md` no início de cada tarefa.
