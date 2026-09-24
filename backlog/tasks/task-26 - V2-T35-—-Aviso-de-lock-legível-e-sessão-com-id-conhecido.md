@@ -4,7 +4,7 @@ title: V2-T35 — Aviso de lock legível e sessão com id conhecido
 status: Review
 assignee: []
 created_date: '2026-09-23 10:12'
-updated_date: '2026-09-24 18:53'
+updated_date: '2026-09-24 19:01'
 labels:
   - correcao
   - d-047
@@ -158,3 +158,13 @@ para quem já usava) — necessário para `core/project-lock-message.ts` descrev
 terminal de verdade) — ver Q-089. O aceite do mantenedor (dois terminais + perguntar ao agente se o
 projeto está travado + conferir que `.seeya-lock` traz o id da sessão) cobre exatamente isso.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-24 19:01
+---
+Revisão do PO em 2026-09-24: mesclado no po-gate, portão verde (2351 testes). Conferido: o claude é lançado com shell:false (as aspas do texto do lock chegam intactas pelo --append-system-prompt); o id é gerado na raiz de composição (randomUUID), passado por --session-id antes dos --add-dir e é o mesmo gravado no lock; o texto do aviso subiu para core/project-lock-message.ts (puro) porque CLI e aplicação precisam da mesma frase. Não verificado em TTY real (o agente não tinha console — Q-089); provado com o binário real sem TTY e com as medições anteriores (spike J, Q-069). Fica para o aceite do mantenedor, que precisa de um build novo: dois terminais, ler o aviso e confirmar, perguntar à sessão se o projeto está travado, e o .seeya-lock trazer o id dela.
+---
+<!-- COMMENTS:END -->
