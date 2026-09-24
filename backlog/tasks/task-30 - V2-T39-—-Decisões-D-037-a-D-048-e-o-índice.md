@@ -4,7 +4,7 @@ title: V2-T39 — Decisões D-037 a D-048 e o índice
 status: Review
 assignee: []
 created_date: '2026-09-23 10:37'
-updated_date: '2026-09-23 22:36'
+updated_date: '2026-09-24 10:45'
 labels:
   - decisoes
   - d-048
@@ -153,5 +153,11 @@ Achados da migração D-037 a D-048 (V2-T39) -- nada foi alterado nas decisões 
 3. D-048 -- a própria migração desta tarefa torna uma frase sua desatualizada: a última linha do corpo de D-048 diz "`docs/DECISOES.md` continua sendo o registro das decisões (o Backlog.md tem pasta própria para isso, mas o código inteiro cita `D-0XX` a partir daqui)". Com o índice que esta tarefa publica (instrução explícita da V2-T39), `docs/DECISOES.md` deixa de ser o registro e passa a ser só um índice que aponta para `backlog/decisions/`. O texto de D-048 foi mantido verbatim (reorganizar não é reescrever, e a correção não se resolve aqui) -- fica como achado para o mantenedor decidir se emenda D-048 com uma nota.
 
 Decisões conferidas contra o código e sem achado: D-038 (guard de `spawn` de `node:child_process` em `eslint.config.js`, com `daemon-launch.ts` como exceção declarada, exatamente como a decisão previu), D-039 (nenhum agrupamento por projeto no briefing ainda -- consistente com "aprovado como direção e ainda não agendado", sem drift), D-040 (escopo `@seeya-ai` em todo `package.json` dos três pacotes), D-042 (`@xterm/xterm` e `@xterm/addon-fit` em `packages/app/package.json`, sem Tauri), D-043 (três pacotes `@seeya-ai/engine`/`@seeya-ai/cli`/`@seeya-ai/app`, ponteiro para D-020 já bidirecional), D-045 (glossário de AGENTS.md documenta os quatro itens como implementados: `resolveDaemonOwner`, `AppInstallation`, a recusa da CLI, o autostart com `env`), D-046 (regra ainda não implementada em código, mas a própria decisão registra isso como trabalho absorvido pela tarefa de `checkpoint`/`pause`, sem tarefa própria -- não é achado novo), D-047 (o lock existe em `packages/engine/src/adapters/workspace/project-lock.ts`/`core/project-lock.ts`; os ganchos de git/harness e a auditoria do item 5 ainda não existem em código, mas já têm tarefas próprias no backlog -- `task-22`/V2-T34, `task-31`/V2-T40, `task-31.1`/V2-T41 -- então não é lacuna sem dono).
+---
+
+author: PO
+created: 2026-09-24 10:45
+---
+Achado 1 da revisão (D-030 x core/project-skeleton.ts) resolvido pelo mantenedor em 2026-09-24: o esqueleto está errado, gera só AGENTS.md — sem CLAUDE.md e sem condicionar ao defaultHarness. Motivo medido: a versão atual do Claude Code já lê AGENTS.md direto. Virou a task-34 (V2-T44). A D-030 continua como está.
 ---
 <!-- COMMENTS:END -->
