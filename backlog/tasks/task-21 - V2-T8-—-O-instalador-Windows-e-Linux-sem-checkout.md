@@ -4,7 +4,7 @@ title: 'V2-T8 — O instalador: Windows e Linux sem checkout'
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-23 10:46'
+updated_date: '2026-09-24 17:39'
 labels: []
 milestone: m-3
 dependencies: []
@@ -185,3 +185,13 @@ workflow manual uma vez; **o aceite real
 da tarefa** — instalar de verdade no Linux e no Windows do mantenedor e repetir os passos que
 só ele pode confirmar (menu, aba, daemon pela janela, clique no aviso prévio).
 <!-- SECTION:DESCRIPTION:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-24 17:39
+---
+Evidência parcial do mantenedor em 2026-09-24, Ubuntu (instalado a partir de um clone local): a janela sobe e o painel Hoje explica o estado vazio de uma máquina que nunca capturou nada ('No pending briefing found in the last 31 days scanned...'). Ainda faltam os passos do aceite: abrir pelo menu, aba de claude, Start daemon pela janela, clique no aviso prévio.
+---
+<!-- COMMENTS:END -->
