@@ -4,7 +4,7 @@ title: V2-T38 — Decisões D-025 a D-036
 status: Review
 assignee: []
 created_date: '2026-09-23 10:37'
-updated_date: '2026-09-24 00:33'
+updated_date: '2026-09-24 17:17'
 labels:
   - decisoes
   - d-048
@@ -142,5 +142,11 @@ Achados da migração D-025 a D-036 (V2-T38) -- nada foi alterado nas decisões 
 3. D-031 -- código já não segue integralmente a "revisão mais interessante" que a própria decisão previu: ela dizia que reavaliar a D-011 "pode resolver [a perda do texto do assistente] por escopo -- o modelo passando a ler o que o Claude escreveu -- em vez de por remendo no prompt", e a reavaliação de fato aconteceu (registrada dentro do arquivo migrado de D-011, V2-T36) mas por um caminho diferente do que D-031 sugeriu: não foi o encolhimento do conjunto candidato (menos sessões, mais barato pagar o profundo) que motivou a mudança, foi o modo enxuto parar de descartar o texto do assistente estruturalmente. Não é contradição, mas o texto de D-031 lido isoladamente prevê um caminho que não foi o tomado -- vale uma nota cruzada se algum dia D-011 e D-031 forem revisadas juntas.
 
 Decisões conferidas contra o código e sem achado: D-025 (`classifyState`/`isIdleByTranscript` em `core/classification.ts` ainda implementam exatamente a regra `null` → `alive`, com o comentário citando D-025 linha a linha), D-026 (`sameEvidence`/`buildEvidenceSignature` em `core/evidence.ts` ainda comparam assinatura de evidência, não transcript), D-027 (`~/.seeya/` continua o nome, sem adoção de XDG), D-028 (glossário de idioma em AGENTS.md ainda é a fonte única, sem deriva encontrada), D-029 (a estratégia de aviso por `.key` sem `.json` continua em `core/early-warnings.ts`, citando D-029 explicitamente), D-032 (`HandoffFacts.git` é `readonly RepositoryGitFacts[]`, plural, em `core/types.ts`), D-033 (`system-prompt.ts` ainda instrui "Mirror the session's predominant language in the field values"), D-034 (`Notice`/`Notifier` em `core/ports.ts` continuam só `title`/`body`, sem ação), D-036 (a regra dos três casos -- dia local diferente/atrasado dentro do mesmo dia/dentro do limiar -- não tem código contraditório encontrado; a emenda da D-046 ainda não foi implementada, mas a própria D-046 já registra isso como trabalho deferido para a tarefa que introduz `checkpoint`/`pause`/end-day global, então não é achado novo).
+---
+
+author: PO
+created: 2026-09-24 17:17
+---
+Achado 2 da revisão (D-035, tabela de chaves desatualizada) resolvido pelo mantenedor em 2026-09-24: sem tabela nenhuma. A decisão guarda o critério, diz que vale para todo número do projeto, e aponta onde a lista viva mora (config-schema.ts#EDITABLE_CONFIG_KEYS e a tabela de identificadores em disco do AGENTS.md). Princípio dele: decisão vale do momento em que é tomada até ser revogada; listar o estado do código no dia só cria um segundo lugar para envelhecer. A lista de constantes que ficaram saiu pelo mesmo motivo.
 ---
 <!-- COMMENTS:END -->
