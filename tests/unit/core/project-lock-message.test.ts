@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import {
   formatLockHolderDescription,
   formatProjectLockWarningLines,
+  renderLeftoverChangesLines,
   renderReadOnlyOpenQuestion,
 } from '@seeya-ai/engine/core/project-lock-message.js';
 import type { ProjectLockInfo } from '@seeya-ai/engine/core/project-lock.js';
@@ -72,5 +73,21 @@ describe('renderReadOnlyOpenQuestion', () => {
     expect(text).toContain('locked by session abc123');
     expect(text).not.toContain('[y/N]');
     expect(text).not.toContain('\n');
+  });
+});
+
+describe('renderLeftoverChangesLines (V2-T34 production defect, PO review 2026-09-25)', () => {
+  it('lists every changed file as its own line, without any interface-specific prompt suffix', () => {
+    const lines = renderLeftoverChangesLines([
+      'auth-hardening/status/current.md',
+      'auth-hardening/journal/notes.md',
+    ]);
+    expect(lines).toEqual([
+      'Project has 2 change(s) left uncommitted by a previous session:',
+      '  auth-hardening/status/current.md',
+      '  auth-hardening/journal/notes.md',
+      'Commit them now (attributed to an unidentified session), or continue without ' +
+        'committing (the new session will be told what is pending)?',
+    ]);
   });
 });

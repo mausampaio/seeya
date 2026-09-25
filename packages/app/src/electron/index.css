@@ -552,7 +552,8 @@ body {
 }
 
 #adopt-launch-confirm-lines p,
-#adopt-commit-confirm-lines p {
+#adopt-commit-confirm-lines p,
+#leftover-changes-confirm-lines p {
   font-size: 13px;
   line-height: 1.4;
   overflow-wrap: anywhere;

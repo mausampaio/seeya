@@ -31,7 +31,10 @@ import {
 } from '@seeya-ai/engine/application/project-lock.js';
 import { openProject, SUPPORTED_HARNESS } from '@seeya-ai/engine/application/project-open.js';
 import { adoptSession } from '@seeya-ai/engine/application/project-adopt.js';
-import { renderReadOnlyOpenQuestion } from '@seeya-ai/engine/core/project-lock-message.js';
+import {
+  renderLeftoverChangesLines,
+  renderReadOnlyOpenQuestion,
+} from '@seeya-ai/engine/core/project-lock-message.js';
 import {
   renderAdoptionCommitChangedFilesLines,
   renderAdoptionLaunchExplanationLines,
@@ -42,9 +45,11 @@ import type {
   AdoptSessionResponse,
   AnswerAdoptionCommitConfirmRequest,
   AnswerAdoptionLaunchConfirmRequest,
+  AnswerLeftoverChangesOpenConfirmRequest,
   AnswerProjectLockOpenConfirmRequest,
   ConfirmAdoptionCommitRequestEvent,
   ConfirmAdoptionLaunchRequestEvent,
+  ConfirmLeftoverChangesOpenRequestEvent,
   ConfirmProjectLockOpenRequestEvent,
   CreateProjectRequest,
   CreateProjectResponse,
@@ -125,6 +130,13 @@ export function wireProjectIpc(
   // up), but keyed independently by requestId anyway — same defensive shape
   // `PendingFallbackRequests` already takes for `resumeSessions`' own sequential loop.
   const pendingLockConfirmations = new PendingConfirmations<'proceed' | 'decline'>('open-lock');
+  // V2-T34 production defect (PO review, 2026-09-25): the window never asked this question at all
+  // before — every leftover-changes `open` hit the flat `leftoverChangesConfirmationUnavailable`
+  // refusal. Same shape as `pendingLockConfirmations` above, for the OTHER question `openProject`
+  // can ask.
+  const pendingLeftoverChangesConfirmations = new PendingConfirmations<
+    'commitNow' | 'proceedWithoutCommitting'
+  >('open-leftover-changes');
   const pendingLaunchConfirmations = new PendingConfirmations<'proceed' | 'decline'>(
     'adopt-launch',
   );
@@ -189,6 +201,16 @@ export function wireProjectIpc(
           window.webContents.send(CHANNELS.confirmProjectLockOpenRequest, event);
           return answer;
         },
+        confirmLeftoverChanges: async (changedFiles) => {
+          const { requestId, answer } = pendingLeftoverChangesConfirmations.create();
+          const event: ConfirmLeftoverChangesOpenRequestEvent = {
+            requestId,
+            projectId: request.projectId,
+            questionLines: renderLeftoverChangesLines(changedFiles),
+          };
+          window.webContents.send(CHANNELS.confirmLeftoverChangesOpenRequest, event);
+          return answer;
+        },
       });
       await pushProjectsUpdate();
       return { outcomeText: formatProjectOpenOutcomeText(result) };
@@ -199,6 +221,13 @@ export function wireProjectIpc(
     CHANNELS.answerProjectLockOpenConfirm,
     (_event, answer: AnswerProjectLockOpenConfirmRequest) => {
       pendingLockConfirmations.resolve(answer.requestId, answer.decision);
+    },
+  );
+
+  ipcMain.on(
+    CHANNELS.answerLeftoverChangesOpenConfirm,
+    (_event, answer: AnswerLeftoverChangesOpenConfirmRequest) => {
+      pendingLeftoverChangesConfirmations.resolve(answer.requestId, answer.decision);
     },
   );
 
