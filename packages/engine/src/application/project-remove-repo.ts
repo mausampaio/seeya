@@ -175,8 +175,17 @@ export async function removeRepository(
     return { kind: 'projectLocked', projectId, heldBy: lock.decision.heldBy };
   }
 
-  await writeManifestWithoutRepository(deps, root, projectId, manifest, name);
-  await pruneRepositoryMapEntry(deps, root, projectId, target);
-  await releaseProjectLock(deps, root, projectId, deps.pid);
-  return { kind: 'removed', projectId, name };
+  // V2-T34 production defect (PO review, 2026-09-25): same guaranteed-release fix as
+  // `application/project-open.ts#openProject`/`project-remove.ts#removeProject` — `commitAll`
+  // (inside `writeManifestWithoutRepository`) can throw for the same reason `project-adopt.ts
+  // #commitAdoption`'s did. Idempotent alongside the explicit release below
+  // (`core/project-lock.ts#decideProjectLockRelease`).
+  try {
+    await writeManifestWithoutRepository(deps, root, projectId, manifest, name);
+    await pruneRepositoryMapEntry(deps, root, projectId, target);
+    await releaseProjectLock(deps, root, projectId, deps.pid);
+    return { kind: 'removed', projectId, name };
+  } finally {
+    await releaseProjectLock(deps, root, projectId, deps.pid);
+  }
 }

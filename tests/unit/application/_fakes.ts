@@ -539,9 +539,25 @@ export class FakeWorkspaceRepository implements WorkspaceRepository {
     return Promise.resolve();
   }
 
+  // V2-T34 production defect (PO review, 2026-09-25): a test sets this to simulate the workspace's
+  // own git hook refusing a commit (`adapters/workspace/index.ts#commitAll`'s own real throw,
+  // stderr and all) — lets `application/project-adopt.ts#commitAdoption`'s own `commitFailed`
+  // handling, and every other lock-taking flow's guaranteed-release `finally`, be exercised without
+  // a real git process. Consumed once, so a test doesn't have to remember to reset it.
+  private commitFailureMessage: string | null = null;
+
+  failNextCommitWith(message: string): void {
+    this.commitFailureMessage = message;
+  }
+
   commitAll(root: string, projectId: string, message: string): Promise<void> {
     void root;
     void projectId;
+    if (this.commitFailureMessage !== null) {
+      const reason = this.commitFailureMessage;
+      this.commitFailureMessage = null;
+      return Promise.reject(new Error(reason));
+    }
     this.commitMessages.push(message);
     return Promise.resolve();
   }
@@ -615,6 +631,16 @@ export class FakeWorkspaceRepository implements WorkspaceRepository {
     this.revertOutcome = outcome;
   }
 
+  // V2-T34 production defect (PO review, 2026-09-25): a test sets this to simulate `revertCommits`
+  // itself throwing (an unexpected git failure, as opposed to the already-handled `{ kind:
+  // 'failed' }` outcome) — proves `application/project-revert-adoption.ts#revertAdoption`'s own
+  // guaranteed-release `finally` runs even then.
+  private revertCommitsFailureMessage: string | null = null;
+
+  failNextRevertCommitsWith(message: string): void {
+    this.revertCommitsFailureMessage = message;
+  }
+
   wasProjectDirRemoved(projectId: string): boolean {
     return this.removedProjectDirs.includes(projectId);
   }
@@ -660,6 +686,11 @@ export class FakeWorkspaceRepository implements WorkspaceRepository {
     message: string,
   ): Promise<RevertExecutionOutcome> {
     void root;
+    if (this.revertCommitsFailureMessage !== null) {
+      const reason = this.revertCommitsFailureMessage;
+      this.revertCommitsFailureMessage = null;
+      return Promise.reject(new Error(reason));
+    }
     this.revertCalls.push({ projectId, commitsNewestFirst, message });
     return Promise.resolve(this.revertOutcome);
   }

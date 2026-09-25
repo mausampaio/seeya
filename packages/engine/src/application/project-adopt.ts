@@ -161,6 +161,22 @@ export type AdoptSessionResult =
       readonly projectId: string;
       readonly forkSessionId: string;
       readonly changedFiles: readonly string[];
+    }
+  /** V2-T34 production defect (PO review, 2026-09-25): `commitAll` rejected — most often the
+   * workspace's own commit-msg hook refusing the commit (`core/workspace-commit-guard.ts`), but
+   * any git failure lands here. Same non-destructive handling as `confirmationUnavailable`: the
+   * fork's files stay on disk uncommitted, `forks.json` keeps it registered as pending (a later
+   * `seeya project adopt` on the SAME original session would still see `alreadyAdopted` is false
+   * — nothing here marks the original as adopted), and `adoptions.json` never gets an entry.
+   * `reason` is `commitAll`'s own thrown message, which now includes git's stderr
+   * (`adapters/workspace/index.ts#commitAll`'s own fix, same PO review) — the caller (CLI/window)
+   * shows it instead of the operation silently vanishing. */
+  | {
+      readonly kind: 'commitFailed';
+      readonly projectId: string;
+      readonly forkSessionId: string;
+      readonly changedFiles: readonly string[];
+      readonly reason: string;
     };
 
 /** Item 1's own "sessão aberta agora recusada": `alive`/`idle` both mean the process is running
@@ -228,7 +244,23 @@ async function commitAdoption(
     projectId,
     deps.forkSessionId,
   );
-  await deps.workspace.commitAll(root, projectId, message);
+  // V2-T34 production defect (PO review, 2026-09-25): caught here, not left to propagate — a
+  // refused commit (most often the workspace's own git hook) is an EXPECTED outcome this function
+  // reports through its own return type (`AdoptSessionResult`'s own `commitFailed`), the same way
+  // `decideAdoptionOutcome`'s `declined` branch already does for "the person said no." Nothing
+  // below this catch runs: the fork stays registered pending, the files stay on disk, no
+  // `adoptions.json` entry — exactly the state a later `seeya project adopt` retry needs to find.
+  try {
+    await deps.workspace.commitAll(root, projectId, message);
+  } catch (error) {
+    return {
+      kind: 'commitFailed',
+      projectId,
+      forkSessionId: deps.forkSessionId,
+      changedFiles,
+      reason: error instanceof Error ? error.message : String(error),
+    };
+  }
   await deps.forkRegistration.unregister(deps.forkSessionId);
   const adoptions = await deps.storage.readAdoptions();
   await deps.storage.saveAdoptions([
@@ -266,8 +298,8 @@ async function confirmCommit(
 }
 
 /** What to do once the fork session has closed AND the person (or the absence of one) has
- * answered — the three-way branch item 4's spec describes, kept separate from `finishAdoption` so
- * that function's own lock release stays a single, unmissable line at the end. */
+ * answered — the three-way branch item 4's spec describes (now four, with `commitFailed`), kept
+ * separate from `finishAdoption` so each concern reads on its own. */
 async function decideAdoptionOutcome(
   deps: AdoptSessionDeps,
   root: string,
@@ -297,8 +329,10 @@ async function decideAdoptionOutcome(
 }
 
 /** The tail of `adoptSession`, after the fork's interactive harness has already closed: reads what
- * changed inside the project, decides the outcome (item 4), and always releases the lock before
- * returning — mirrors `application/project-open.ts#finishOpen`'s own shape. */
+ * changed inside the project and decides the outcome (item 4). Lock release is no longer done
+ * here — `adoptSession`'s own `finally` (V2-T34 production defect fix below) is the single place
+ * that happens now, so it also covers a throw from THIS function's own calls, not just their
+ * normal return. */
 async function finishAdoption(
   deps: AdoptSessionDeps,
   root: string,
@@ -307,16 +341,7 @@ async function finishAdoption(
   callbacks: AdoptSessionCallbacks | undefined,
 ): Promise<AdoptSessionResult> {
   const changedFiles = await deps.workspace.listChangedFiles(root, projectId);
-  const result = await decideAdoptionOutcome(
-    deps,
-    root,
-    projectId,
-    originalSessionId,
-    changedFiles,
-    callbacks,
-  );
-  await releaseProjectLock(deps, root, projectId, deps.pid);
-  return result;
+  return decideAdoptionOutcome(deps, root, projectId, originalSessionId, changedFiles, callbacks);
 }
 
 /** Registers the fork (before spawning — D-012, survives a crash the same way
@@ -393,11 +418,20 @@ export async function adoptSession(
     return { kind: 'projectLocked', projectId, heldBy: lock.decision.heldBy };
   }
 
-  const launch = await launchAdoptionFork(deps, projectDir, original, now);
-  if (launch.kind === 'failedToStart') {
+  // V2-T34 production defect (PO review, 2026-09-25): a single `finally`, not a `releaseProjectLock`
+  // call hand-copied onto every branch below — the pre-fix version had exactly that (one on
+  // `failedToStart`, one at the end of the old `finishAdoption`) and STILL leaked the lock, because
+  // `commitAll` throwing from deeper inside `finishAdoption` skipped both of them. Anything commitAll
+  // itself expects to fail (the workspace's own git hook refusing a commit) is now caught inside
+  // `commitAdoption` and returned as `AdoptSessionResult`'s own `commitFailed` — this `finally` is
+  // the safety net for everything else (a truly unexpected throw anywhere in this span).
+  try {
+    const launch = await launchAdoptionFork(deps, projectDir, original, now);
+    if (launch.kind === 'failedToStart') {
+      return { kind: 'failedToStart', projectId };
+    }
+    return await finishAdoption(deps, root, projectId, original.sessionId, callbacks);
+  } finally {
     await releaseProjectLock(deps, root, projectId, deps.pid);
-    return { kind: 'failedToStart', projectId };
   }
-
-  return finishAdoption(deps, root, projectId, original.sessionId, callbacks);
 }

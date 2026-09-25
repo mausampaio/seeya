@@ -173,6 +173,22 @@ describe('removeProject', () => {
     expect(workspace.commitMessages.at(-1)).toContain('Remove project auth-hardening');
   });
 
+  it('releases the lock even when the removal commit throws (V2-T34 production defect, PO review 2026-09-25)', async () => {
+    workspace.failNextCommitWith(
+      'git commit failed in workspace at "/x": exit 1: seeya: the workspace\'s own git hooks ' +
+        '(D-047) refused this commit.',
+    );
+    const projectLock = new FakeProjectLock();
+
+    await expect(
+      removeProject(buildDeps(storage, workspace, { projectLock }), 'auth-hardening', {
+        confirmRemove: () => Promise.resolve('proceed'),
+      }),
+    ).rejects.toThrow(/git commit failed/);
+
+    expect(await projectLock.read(WORKSPACE_ROOT, 'auth-hardening')).toBeNull();
+  });
+
   it("drops this project's own adoptions from adoptions.json, leaving other projects' untouched (item 7)", async () => {
     await storage.saveAdoptions([ADOPTION_FOR_PROJECT, ADOPTION_FOR_OTHER_PROJECT]);
 

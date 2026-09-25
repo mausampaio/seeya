@@ -344,5 +344,13 @@ export async function revertAdoption(
     return { kind: 'projectLocked', projectId, heldBy: lock.decision.heldBy };
   }
 
-  return performRevert(deps, root, projectId, selection.record, callbacks);
+  // V2-T34 production defect (PO review, 2026-09-25): same guaranteed-release fix as the other
+  // lock-taking flows in this package — `performRevert` calls `WorkspaceRepository.revertCommits`,
+  // which, like `commitAll`, can throw. Idempotent alongside `performRevert`'s own explicit
+  // releases (`core/project-lock.ts#decideProjectLockRelease`).
+  try {
+    return await performRevert(deps, root, projectId, selection.record, callbacks);
+  } finally {
+    await releaseProjectLock(deps, root, projectId, deps.pid);
+  }
 }
