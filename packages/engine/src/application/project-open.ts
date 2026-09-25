@@ -357,7 +357,16 @@ async function handleLeftoverChanges(
       projectId,
       undefined,
     );
-    await deps.workspace.commitAll(root, projectId, message);
+    // V2-T34 hotfix (PO review, 2026-09-25): this attempt holds the lock under `deps
+    // .launchedSessionId` (a freshly generated id for a session that hasn't even started yet) —
+    // `lockHolder` is how the workspace's own commit-msg hook recognizes THIS commit as
+    // authorized anyway, without contradicting the deliberate `Seeya-Session-Id: unknown` above
+    // (`core/workspace-commit-guard.ts`'s own docstring on why that trailer must never be
+    // recomputed from the lock's sessionId once this authorization applies).
+    await deps.workspace.commitAll(root, projectId, message, {
+      pid: deps.pid,
+      procStart: deps.procStart,
+    });
     return { pendingFiles: [] };
   }
   if (answer === 'proceedWithoutCommitting') {

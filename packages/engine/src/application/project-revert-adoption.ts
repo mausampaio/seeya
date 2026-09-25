@@ -265,11 +265,14 @@ async function performRevert(
     projectId,
     deps.sessionId,
   );
+  // V2-T34 hotfix (PO review, 2026-09-25): same lock-holder authorization every other commit made
+  // while holding the project lock needs — `core/workspace-commit-guard.ts`'s own docstring.
   const outcome = await deps.workspace.revertCommits(
     root,
     projectId,
     plan.commitsNewestFirst,
     message,
+    { pid: deps.pid, procStart: deps.procStart },
   );
   if (outcome.kind === 'failed') {
     await releaseProjectLock(deps, root, projectId, deps.pid);

@@ -30,6 +30,7 @@ import type {
   WorkspaceRepository,
 } from '@seeya-ai/engine/core/ports.js';
 import type { ProjectLockInfo } from '@seeya-ai/engine/core/project-lock.js';
+import type { LockHolderProcess } from '@seeya-ai/engine/core/lock-holder-process.js';
 import type { AuditableCommit } from '@seeya-ai/engine/core/project-audit.js';
 import type {
   AdoptionRecord,
@@ -550,9 +551,21 @@ export class FakeWorkspaceRepository implements WorkspaceRepository {
     this.commitFailureMessage = message;
   }
 
-  commitAll(root: string, projectId: string, message: string): Promise<void> {
+  // V2-T34 hotfix (PO review, 2026-09-25): records each call's `lockHolder` so a test can assert
+  // `application/project-open.ts`/`project-adopt.ts`/`project-remove.ts`/`project-remove-repo.ts`
+  // actually thread their own `deps.pid`/`deps.procStart` through, not just that SOME commit
+  // happened.
+  readonly commitAllLockHolders: (LockHolderProcess | undefined)[] = [];
+
+  commitAll(
+    root: string,
+    projectId: string,
+    message: string,
+    lockHolder?: LockHolderProcess,
+  ): Promise<void> {
     void root;
     void projectId;
+    this.commitAllLockHolders.push(lockHolder);
     if (this.commitFailureMessage !== null) {
       const reason = this.commitFailureMessage;
       this.commitFailureMessage = null;
@@ -679,13 +692,19 @@ export class FakeWorkspaceRepository implements WorkspaceRepository {
     return Promise.resolve(this.commitsAfterByKey.get(`${projectId}:${afterCommit}`) ?? []);
   }
 
+  // V2-T34 hotfix: same tracking as `commitAllLockHolders` above, for `revertAdoption`'s own final
+  // commit.
+  readonly revertCommitsLockHolders: (LockHolderProcess | undefined)[] = [];
+
   revertCommits(
     root: string,
     projectId: string,
     commitsNewestFirst: readonly string[],
     message: string,
+    lockHolder?: LockHolderProcess,
   ): Promise<RevertExecutionOutcome> {
     void root;
+    this.revertCommitsLockHolders.push(lockHolder);
     if (this.revertCommitsFailureMessage !== null) {
       const reason = this.revertCommitsFailureMessage;
       this.revertCommitsFailureMessage = null;

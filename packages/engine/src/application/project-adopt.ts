@@ -251,7 +251,14 @@ async function commitAdoption(
   // below this catch runs: the fork stays registered pending, the files stay on disk, no
   // `adoptions.json` entry — exactly the state a later `seeya project adopt` retry needs to find.
   try {
-    await deps.workspace.commitAll(root, projectId, message);
+    // V2-T34 hotfix (PO review, 2026-09-25): this commit is made WHILE this adoption holds the
+    // project's lock (under `deps.forkSessionId`, never a session the environment's own
+    // CLAUDE_CODE_SESSION_ID could ever equal) — `lockHolder` is how the workspace's own
+    // commit-msg hook recognizes it anyway.
+    await deps.workspace.commitAll(root, projectId, message, {
+      pid: deps.pid,
+      procStart: deps.procStart,
+    });
   } catch (error) {
     return {
       kind: 'commitFailed',
