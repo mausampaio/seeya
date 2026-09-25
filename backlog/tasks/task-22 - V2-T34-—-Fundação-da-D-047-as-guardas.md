@@ -4,7 +4,7 @@ title: 'V2-T34 — Fundação da D-047: as guardas'
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-25 15:03'
+updated_date: '2026-09-25 19:20'
 labels:
   - fundacao
   - d-047
@@ -290,5 +290,27 @@ author: PO
 created: 2026-09-25 15:03
 ---
 Revisão do PO em 2026-09-25, segunda rodada: aceita para o aceite do mantenedor. As três correções pedidas estão feitas e provadas: (1) a CLI passa ELECTRON_RUN_AS_NODE=1 ao gancho quando roda sob Electron (função pura testada nos dois lados) — sem isso o gancho gravado pela CLI instalada abriria o app a cada commit; (2) verificador ausente recusa com mensagem que diz o caminho e como reinstalar, executado de verdade; (3) o gancho do harness não depende mais de node no PATH: chama o seeya por caminho absoluto (seeya project verify-bash-command), bloqueia com código 2 se o verificador sumir, e é regravado a cada open, fora do git do espaço de trabalho (**/.claude/ no .gitignore). --no-verify medido bloqueado com sessão descartável isolada e a CLI compilada. Limite registrado: a camada do harness não protege a adoção (o Claude Code não lê settings de diretório só --add-dir); os ganchos de git cobrem. Portão verde no po-gate (2735 testes). A armadilha 'a CLI instalada roda sob o Electron' entrou no docs/FLUXO-DE-AGENTES.md.
+---
+
+author: Claude (agente)
+created: 2026-09-25 19:20
+---
+Defeito de producao (2026-09-25), achado pelo mantenedor no uso real em Ubuntu com o .deb: os dois ganchos testavam a existencia de `cliEntryPath` com `[ -f ... ]` sobre o caminho INTEIRO, mesmo quando esse caminho mora dentro de um `app.asar` empacotado pelo Electron. Para o shell, `app.asar` e um arquivo so — o caminho interno nunca existe de verdade — entao o gancho de git recusava TODO commit no espaco de trabalho como "verificador ausente" e o gancho do harness saia com 2, bloqueando TODO comando Bash de toda sessao aberta num projeto. Isso disparou uma cadeia real: adocao aprovada no dialogo mas commit recusado -> motivo descartado (stderr do git nunca capturado) -> lock nunca solto (sem `finally`) -> reabertura recusada sem dialogo nenhum (item 4 da V2-T34 nunca ligado na janela).
+
+Seis correcoes, cada uma com teste que falha antes da correcao:
+
+1. **Checagem ciente de `.asar`**: `core/hook-verifier-path.ts#resolveHookVerifierCheckPath` (pura) trunca o caminho no proprio `.asar` so para a checagem `-f`; o `exec`/invocacao real continua com o `cliEntryPath` completo. Vale para os dois ganchos. Testado com execucao real: um `git commit` de verdade contra um arquivo `.asar` real em disco (gancho de git) e um payload `PreToolUse` real, por um shell de verdade — o mesmo `sh.exe` que o Git para Windows empacota, ja que ganchos do Claude Code nunca herdam o stdin de um `git commit` (medido) — contra outro `.asar` real (gancho do harness).
+
+2. **stderr do git chega a quem commitou**: `adapters/git/run-git.ts#GitCommandResult` ganhou o campo `stderr` (antes descartado, `stdio: ['ignore','pipe','ignore']`); `commitAll` agora inclui `commit.stderr.trim()` no erro, nao so o codigo de saida.
+
+3. **Lock sempre solto**: `adoptSession` tinha `releaseProjectLock` copiado a mao em cada ramo, e o throw do `commitAll` pulava todos. Agora e um `try`/`finally` unico — e o mesmo criterio foi aplicado aos outros quatro fluxos que tomam o lock do projeto (`openProject`, `removeProject`, `removeRepository`, `revertAdoption`), com `releaseProjectLock` ja idempotente garantindo que isso e seguro mesmo ao lado das liberacoes explicitas que ja existiam. Commit que falha agora e capturado dentro de `commitAdoption` e vira `AdoptSessionResult`'s own `commitFailed` (projectId, forkSessionId, changedFiles, reason) — arquivos ficam no disco, a copia continua pendente em `forks.json`, a adocao nunca e registrada.
+
+4. **A janela nunca fecha em silencio**: `formatAdoptSessionReport` (CLI) e `formatAdoptSessionOutcomeText` (janela) ganharam o caso `commitFailed` (as duas switches sao exaustivas, o compilador forcou); `electron/adopt-flow-view.ts`/`projects-list-view.ts` ganharam `.catch()` no `.then()` que faltava — antes, uma rejeicao da IPC deixava o dialogo parado em `idle` para sempre ou o texto de resultado em branco, lendo como "deu certo".
+
+5. **Dialogo de sobra na janela**: a janela nunca perguntava — `electron/project-ipc.ts` nunca passava `confirmLeftoverChanges` para `openProject`, entao toda sobra de sessao anterior caia direto no refuso "18 uncommitted change(s)... refusing to open without confirmation", sem dialogo. `core/project-lock-message.ts#renderLeftoverChangesLines` (movida de `cli/format-project.ts`, mesmo texto) e o novo `project-leftover-changes-confirm-dialog-view.ts` (Commit now / Continue without committing) fecham o item 4 da V2-T34 que tinha ficado pela metade.
+
+6. Provado sob simulacao de instalacao real, nao so unitario: os dois testes de integracao geram os scripts com `cliEntryPath` dentro de um `.asar` de verdade e executam — os dois deixam passar o que e permitido.
+
+`npm run verificar` verde (exit 0), rodado duas vezes (apos as correcoes e apos os commits finais). `~/.seeya` real, o espaco de trabalho real e o registro do Windows conferidos ao final: nada alem do que ja existia antes desta rodada — o espaco de trabalho do mantenedor com os ganchos quebrados nao foi tocado. Toda medicao usou diretorios `mkdtemp` descartaveis ou o shell puro, nunca uma sessao Claude real desta vez (a fixture necessaria — um `.asar` de verdade e um script "verificador" controlavel — nao precisou de uma sessao para ser provada; a reconstrucao do fluxo de adocao completo com sessao real ja tinha sido feita pelo mantenedor no incidente original).
 ---
 <!-- COMMENTS:END -->
