@@ -16,6 +16,47 @@ describe('formatProjectOpenOutcomeText (V2-T30 item 3)', () => {
     expect(formatProjectOpenOutcomeText(result)).toBe('Project "auth-hardening" not found.');
   });
 
+  it('invalidId names the offending value', () => {
+    const result: OpenProjectResult = { kind: 'invalidId', projectId: 'Not Valid!' };
+    expect(formatProjectOpenOutcomeText(result)).toBe('"Not Valid!" is not a valid project id.');
+  });
+
+  it('noHarnessChosen names the project', () => {
+    const result: OpenProjectResult = { kind: 'noHarnessChosen', projectId: 'auth-hardening' };
+    expect(formatProjectOpenOutcomeText(result)).toBe(
+      'Project "auth-hardening" has no default harness set.',
+    );
+  });
+
+  it('unsupportedHarness names the harness', () => {
+    const result: OpenProjectResult = { kind: 'unsupportedHarness', harness: 'codex' };
+    expect(formatProjectOpenOutcomeText(result)).toBe(
+      'seeya: harness "codex" is not supported yet.',
+    );
+  });
+
+  it('failedToStart names the harness and the project', () => {
+    const result: OpenProjectResult = {
+      kind: 'failedToStart',
+      projectId: 'auth-hardening',
+      harness: 'claude',
+    };
+    expect(formatProjectOpenOutcomeText(result)).toBe(
+      'seeya: could not start claude for project "auth-hardening".',
+    );
+  });
+
+  it('lockConfirmationUnavailable names who holds it', () => {
+    const result: OpenProjectResult = {
+      kind: 'lockConfirmationUnavailable',
+      projectId: 'auth-hardening',
+      heldBy: HELD_BY,
+    };
+    const text = formatProjectOpenOutcomeText(result);
+    expect(text).toContain('refusing to open without confirmation');
+    expect(text).toContain('session 11111111');
+  });
+
   it('lockConfirmationDeclined names who holds it', () => {
     const result: OpenProjectResult = {
       kind: 'lockConfirmationDeclined',

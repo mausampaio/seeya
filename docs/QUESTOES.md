@@ -8990,3 +8990,47 @@ seria mudar formato em disco sem necessidade. O lado do erro é o conservador �
 vira "não sei" e pergunta, com a resposta padrão de manter. (2) `<sessão>` do `revert-adoption`
 casa só por id ou prefixo, da original ou da cópia: a original pode já nem aparecer na descoberta
 (fora de `relevanceHours`), e o `adoptions.json` é a fonte certa para este comando.
+
+## Q-096 — V2-T30: memória em repouso subiu acima da faixa registrada em docs/DESEMPENHO.md
+
+**Tarefa:** V2-T30
+**Bloqueia:** não — remedido pelo próprio agente, registrado aqui para o mantenedor decidir se a
+diferença é aceitável (docs/DESEMPENHO.md § "O que fazer quando um número piorar": "nunca decida
+sozinho").
+
+**Método.** `packages/app/scripts/measure-startup.mjs` e `measure-idle.mjs`, exatamente como
+`docs/DESEMPENHO.md` descreve, na mesma máquina da linha de base (2026-09-20), com a árvore já
+buildada (`node scripts/build.mjs`) e três janelas de 60 s. Como na linha de base, a máquina tinha
+outros processos abertos, incluindo uma cópia instalada do próprio `seeya` (o mesmo achado
+incidental que a linha de base já registra).
+
+**Antes (2026-09-20) → depois (2026-09-24, com V2-T30 aplicada):**
+
+| Medida | Linha de base | V2-T30 |
+|---|---|---|
+| (a) Tempo até a lista de sessões | 5782–5801 ms | 5716–5734 ms (dentro da faixa, sem piora) |
+| (b) Memória em repouso (árvore inteira) | 335,6–338,0 MiB | 345,5–365,3 MiB (acima do teto anterior) |
+| (c) CPU ocioso (janela de 60 s) | 0,39%–0,57% de um núcleo | 0,26%–0,34% de um núcleo (melhor, dentro do ruído) |
+
+**O que mudou que poderia explicar (b).** Esta tarefa: (1) acrescentou três adaptadores novos,
+sempre construídos em `buildAppContext` independentemente de a pessoa ter algum projeto
+(`FsWorkspaceRepository`, `FsProjectLock`, `GenerationForkRegistration`) — objetos leves, sem
+estado grande, mas mais módulos JS carregados; (2) acrescentou dois arquivos novos e relativamente
+grandes ao processo principal e ao renderer (`electron/project-ipc.ts`, `electron/
+project-panel-view.ts`) mais os módulos `state/`/`sidebar/` que eles importam
+(`application/project-open.js`, `application/project-adopt.js`, `application/workspace.js`,
+`core/project-adoption-message.js` etc.) — todos residentes na memória do processo mesmo com zero
+projetos criados; (3) o ciclo de 10 s agora também lê `listProjects`/`readAdoptions` e um
+`.seeya-lock` por projeto (custo já declarado na especificação da tarefa, mas não medido em
+isolamento aqui). A medição de (b)/(c) acima rodou contra um `~/.seeya` descartável com ZERO
+projetos — o mesmo estado da linha de base —, então o item 3 não deveria pesar nesta amostra
+específica; a suspeita mais provável é (1)+(2), "mais código carregado", mas o agente não isolou
+qual das duas pesa mais.
+
+**O que o agente NÃO fez:** não tentou reduzir esse custo (fora do escopo desta tarefa, mesma
+régua do próprio documento: "esta tarefa não otimiza nada") nem decidiu que a diferença é
+aceitável — a variação entre a mínima nova (345,5) e o teto antigo (338,0) é de ~7,5 MiB (~2,2%),
+e entre o máximo novo (365,3) e o teto antigo é de ~27,3 MiB (~8,1%); a própria linha de base já
+registra que esta máquina, com pouca memória livre e outros processos abertos, é sensível a ruído
+de sistema — o agente não tem como garantir que 100% da diferença seja código novo e não variação
+de máquina entre as duas datas.

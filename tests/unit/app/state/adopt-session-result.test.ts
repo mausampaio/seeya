@@ -4,8 +4,99 @@ import {
   isAdoptedResult,
 } from '../../../../packages/app/src/state/adopt-session-result.js';
 import type { AdoptSessionResult } from '@seeya-ai/engine/application/project-adopt.js';
+import type { ProjectLockInfo } from '@seeya-ai/engine/core/project-lock.js';
+
+const HELD_BY: ProjectLockInfo = {
+  sessionId: '11111111-1111-4111-8111-111111111111',
+  pid: 4242,
+  procStart: undefined,
+  acquiredAt: new Date('2026-09-24T12:00:00.000Z'),
+};
 
 describe('formatAdoptSessionOutcomeText (V2-T30 item 5)', () => {
+  it('invalidId names the offending value', () => {
+    const result: AdoptSessionResult = { kind: 'invalidId', projectId: 'Not Valid!' };
+    expect(formatAdoptSessionOutcomeText(result)).toBe('"Not Valid!" is not a valid project id.');
+  });
+
+  it('sessionRunning names the session and its state', () => {
+    const result: AdoptSessionResult = {
+      kind: 'sessionRunning',
+      sessionId: '11111111-1111-4111-8111-111111111111',
+      name: 'my-session',
+      state: 'alive',
+    };
+    const text = formatAdoptSessionOutcomeText(result);
+    expect(text).toContain('"my-session"');
+    expect(text).toContain('(alive)');
+  });
+
+  it('alreadyAdopted names the project', () => {
+    const result: AdoptSessionResult = {
+      kind: 'alreadyAdopted',
+      sessionId: '11111111-1111-4111-8111-111111111111',
+      projectId: 'auth-hardening',
+      adoptedAt: new Date('2026-09-20T00:00:00.000Z'),
+    };
+    expect(formatAdoptSessionOutcomeText(result)).toContain('"auth-hardening"');
+  });
+
+  it('launchConfirmationDeclined says cancelled', () => {
+    const result: AdoptSessionResult = {
+      kind: 'launchConfirmationDeclined',
+      projectId: 'auth-hardening',
+    };
+    expect(formatAdoptSessionOutcomeText(result)).toBe(
+      'Project "auth-hardening": adoption cancelled — you chose not to continue.',
+    );
+  });
+
+  it('launchConfirmationUnavailable refuses without confirmation', () => {
+    const result: AdoptSessionResult = {
+      kind: 'launchConfirmationUnavailable',
+      projectId: 'auth-hardening',
+    };
+    expect(formatAdoptSessionOutcomeText(result)).toContain('without confirmation');
+  });
+
+  it('projectLocked names who holds it', () => {
+    const result: AdoptSessionResult = {
+      kind: 'projectLocked',
+      projectId: 'auth-hardening',
+      heldBy: HELD_BY,
+    };
+    expect(formatAdoptSessionOutcomeText(result)).toContain('session 11111111');
+  });
+
+  it('failedToStart names the project', () => {
+    const result: AdoptSessionResult = { kind: 'failedToStart', projectId: 'auth-hardening' };
+    expect(formatAdoptSessionOutcomeText(result)).toContain('"auth-hardening"');
+  });
+
+  it('declined says the copy was discarded', () => {
+    const result: AdoptSessionResult = {
+      kind: 'declined',
+      projectId: 'auth-hardening',
+      forkSessionId: '22222222-2222-4222-8222-222222222222',
+      changedFiles: ['AGENTS.md'],
+    };
+    expect(formatAdoptSessionOutcomeText(result)).toBe(
+      'Project "auth-hardening": adoption declined — the copy was discarded.',
+    );
+  });
+
+  it('confirmationUnavailable says nothing was committed or discarded', () => {
+    const result: AdoptSessionResult = {
+      kind: 'confirmationUnavailable',
+      projectId: 'auth-hardening',
+      forkSessionId: '22222222-2222-4222-8222-222222222222',
+      changedFiles: ['AGENTS.md'],
+    };
+    const text = formatAdoptSessionOutcomeText(result);
+    expect(text).toContain('no way to');
+    expect(text).toContain('Nothing was committed or discarded');
+  });
+
   it('noChanges says nothing to commit', () => {
     const result: AdoptSessionResult = {
       kind: 'noChanges',
