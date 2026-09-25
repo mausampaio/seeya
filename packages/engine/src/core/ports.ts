@@ -1290,6 +1290,17 @@ export interface WorkspaceRepository {
     projectId: string,
     sinceCommit: string | null,
   ): Promise<readonly AuditableCommit[]>;
+
+  /**
+   * V2-T34 item 2 (PO review): writes `<root>/<projectId>/.claude/settings.json` — the Claude Code
+   * project hook (`core/harness-hook-config.ts`). Called at the start of every
+   * `application/project-open.ts#openProject`, the SAME "reinstalled by every open" discipline
+   * `installCommitMsgHook` above already has, for the identical reason: the content embeds this
+   * machine's current, absolute `seeya` path, which only `open` can know is fresh. Never
+   * committed — the workspace's own `.gitignore` excludes every project's own `.claude/` directory
+   * (`adapters/workspace/index.ts`'s own gitignore reassertion, extended to cover this).
+   */
+  installHarnessHook(root: string, projectId: string, settingsJsonContent: string): Promise<void>;
 }
 
 /**

@@ -493,6 +493,18 @@ describe('openProject', () => {
       );
     });
 
+    it('installs the harness hook (V2-T34 item 2, PO review) alongside the git hook', async () => {
+      const result = await openProject(
+        buildOpenDeps(storage, workspace),
+        'auth-hardening',
+        'claude',
+      );
+      expect(result.kind).toBe('opened');
+      const call = workspace.installedHarnessHookCalls.at(-1);
+      expect(call?.projectId).toBe('auth-hardening');
+      expect(call?.settingsJsonContent).toContain('project verify-bash-command');
+    });
+
     it('reports what the audit found via onBeforeLaunch, before the lock is even checked', async () => {
       workspace.setCommitsForAudit([
         { hash: 'abc', message: 'no trailers', files: ['auth-hardening/x'] },

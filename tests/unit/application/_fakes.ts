@@ -686,6 +686,18 @@ export class FakeWorkspaceRepository implements WorkspaceRepository {
     void sinceCommit;
     return Promise.resolve(this.commitsForAudit);
   }
+
+  // V2-T34 (PO review): `project-open.test.ts`'s own hook for the harness's own project settings.
+  readonly installedHarnessHookCalls: {
+    readonly root: string;
+    readonly projectId: string;
+    readonly settingsJsonContent: string;
+  }[] = [];
+
+  installHarnessHook(root: string, projectId: string, settingsJsonContent: string): Promise<void> {
+    this.installedHarnessHookCalls.push({ root, projectId, settingsJsonContent });
+    return Promise.resolve();
+  }
 }
 
 /** Named double for `SessionResumer` (S3-T3, docs/TESTES.md: "duplo de I/O é classe/objeto

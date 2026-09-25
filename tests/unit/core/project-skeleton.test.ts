@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { buildProjectSkeleton } from '@seeya-ai/engine/core/project-skeleton.js';
-import {
-  HARNESS_HOOK_SCRIPT_RELATIVE_PATH,
-  HARNESS_SETTINGS_RELATIVE_PATH,
-} from '@seeya-ai/engine/core/harness-hook-config.js';
 
 describe('buildProjectSkeleton', () => {
   it('uses the given id as both id and name — no invented display name (D-025)', () => {
@@ -23,25 +19,10 @@ describe('buildProjectSkeleton', () => {
     expect(skeleton.manifest.trackers).toEqual([]);
   });
 
-  it('writes AGENTS.md, INDEX.md and the V2-T34 item 2 harness hook files — never CLAUDE.md (D-030), never seeya.json (the adapter serializes that itself)', () => {
+  it('writes exactly AGENTS.md and INDEX.md — never CLAUDE.md (D-030), never seeya.json (the adapter serializes that itself), and never the harness hook config (V2-T34, PO review: regenerated fresh by every "open" instead, never tracked)', () => {
     const skeleton = buildProjectSkeleton('auth-hardening');
     const paths = skeleton.files.map((file) => file.relativePath).sort();
-    expect(paths).toEqual(
-      [
-        'AGENTS.md',
-        'INDEX.md',
-        HARNESS_HOOK_SCRIPT_RELATIVE_PATH,
-        HARNESS_SETTINGS_RELATIVE_PATH,
-      ].sort(),
-    );
-  });
-
-  it('the harness settings JSON references the harness hook script', () => {
-    const skeleton = buildProjectSkeleton('auth-hardening');
-    const settings = skeleton.files.find(
-      (file) => file.relativePath === HARNESS_SETTINGS_RELATIVE_PATH,
-    );
-    expect(settings?.content).toContain(HARNESS_HOOK_SCRIPT_RELATIVE_PATH);
+    expect(paths).toEqual(['AGENTS.md', 'INDEX.md']);
   });
 
   it('AGENTS.md names the project by id and has a "Working in this project" section (V2-T34 item 6)', () => {

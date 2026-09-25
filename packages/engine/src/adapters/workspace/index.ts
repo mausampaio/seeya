@@ -68,10 +68,22 @@ const GITIGNORE_FILE_NAME = '.gitignore';
  */
 /** V2-T34 item 3: `.seeya-audit` (the audit marker, `adapters/workspace/project-audit-marker.ts`)
  * is device bookkeeping, not project content — same "never committed" discipline as the lock file
- * right above it, and reasserted the exact same way, at the exact same call site. */
+ * right above it, and reasserted the exact same way, at the exact same call site.
+ *
+ * `**\/.claude/` (V2-T34 item 2, PO review): the Claude Code project hook config
+ * (`core/harness-hook-config.ts`), regenerated fresh by every `openProject` — same reasoning, but a
+ * DIRECTORY pattern, not a bare name: a plain `.claude/settings.json` line here would only match at
+ * the workspace ROOT (git anchors any pattern containing a `/` to the `.gitignore`'s own
+ * directory), never inside `<projectId>/.claude/settings.json` one level down. Confirmed for real:
+ * `git status --porcelain --ignored=matching` against a disposable fixture with this exact line
+ * reported `<project>/.claude/` as `!!` (ignored). */
 const IGNORED_OPERATIONAL_FILE_NAMES: readonly string[] = [
   PROJECT_LOCK_FILE_NAME,
   PROJECT_AUDIT_FILE_NAME,
+];
+const IGNORED_WORKSPACE_PATTERNS: readonly string[] = [
+  ...IGNORED_OPERATIONAL_FILE_NAMES,
+  '**/.claude/',
 ];
 
 async function ensureWorkspaceGitignoreIgnoresProjectLock(root: string): Promise<void> {
@@ -86,7 +98,7 @@ async function ensureWorkspaceGitignoreIgnoresProjectLock(root: string): Promise
     current = '';
   }
   const lines = current.split('\n').map((line) => line.trim());
-  const missing = IGNORED_OPERATIONAL_FILE_NAMES.filter((name) => !lines.includes(name));
+  const missing = IGNORED_WORKSPACE_PATTERNS.filter((name) => !lines.includes(name));
   if (missing.length === 0) {
     return;
   }
@@ -430,5 +442,20 @@ export class FsWorkspaceRepository implements WorkspaceRepository {
     sinceCommit: string | null,
   ): Promise<readonly AuditableCommit[]> {
     return listCommitsForAuditImpl(root, projectId, sinceCommit);
+  }
+
+  /** V2-T34 item 2 (PO review): writes `<root>/<projectId>/.claude/settings.json` — always
+   * overwrites, same "seeya's own generated text" discipline `installCommitMsgHook` already has. No
+   * executable bit needed (unlike the git hook): this is plain JSON Claude Code itself reads, never
+   * executed directly. */
+  async installHarnessHook(
+    root: string,
+    projectId: string,
+    settingsJsonContent: string,
+  ): Promise<void> {
+    await writeFileAtomic(
+      path.join(root, projectId, '.claude', 'settings.json'),
+      settingsJsonContent,
+    );
   }
 }

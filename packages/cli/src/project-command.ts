@@ -29,6 +29,8 @@ import { auditProject } from '@seeya-ai/engine/application/project-audit.js';
 import type { ProjectAuditDeps } from '@seeya-ai/engine/application/project-audit.js';
 import { verifyCommit } from '@seeya-ai/engine/application/verify-commit.js';
 import type { VerifyCommitDeps } from '@seeya-ai/engine/application/verify-commit.js';
+import { decideBashCommandGuard } from '@seeya-ai/engine/core/harness-hook-config.js';
+import { parseBashCommandFromHookPayload } from '@seeya-ai/engine/adapters/harness/bash-command-hook-payload-schema.js';
 import { resolveSessionReference, toDiscoveredSessionReference } from './session-reference.js';
 import type { ProjectContext } from './composition.js';
 import {
@@ -318,4 +320,54 @@ export async function runProjectVerifyCommitCommand(
     return 1;
   }
   return 0;
+}
+
+/** Reads `stream` to completion as UTF-8 text — `runProjectVerifyBashCommandCommand`'s own way of
+ * collecting the `PreToolUse` payload Claude Code pipes to it on stdin (never a file path or an
+ * argument, D-015: a hook payload is exactly the "variable-size context" that rule is about). */
+function readWholeStream(stream: NodeJS.ReadableStream): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let raw = '';
+    stream.setEncoding('utf8');
+    stream.on('data', (chunk: string) => {
+      raw += chunk;
+    });
+    stream.on('end', () => resolve(raw));
+    stream.on('error', (error: Error) => reject(error));
+  });
+}
+
+/**
+ * `seeya project verify-bash-command` (V2-T34 item 2, PO review) — the Claude Code project hook's
+ * one caller (`core/harness-hook-config.ts#buildHarnessSettingsJson`), never meant to be run by
+ * hand. Reads the `PreToolUse` payload from stdin (the same channel Claude Code itself uses to
+ * hand it over), decides with `core/harness-hook-config.ts#decideBashCommandGuard`, and — only on a
+ * block — writes the `permissionDecision: "deny"` JSON the docs describe to stdout and exits `2`
+ * (the one exit code that blocks the tool call, `https://code.claude.com/docs/en/hooks.md`).
+ * Anything else (unparseable payload, a call with no `tool_input.command`, an allowed command)
+ * exits `0` silently — this hook never has an opinion beyond the two things it's here to refuse.
+ */
+export async function runProjectVerifyBashCommandCommand(
+  stdin: NodeJS.ReadableStream,
+  stdout: NodeJS.WritableStream,
+): Promise<number> {
+  const raw = await readWholeStream(stdin);
+  const command = parseBashCommandFromHookPayload(raw);
+  if (command === null) {
+    return 0;
+  }
+  const decision = decideBashCommandGuard(command);
+  if (decision.kind === 'allow') {
+    return 0;
+  }
+  stdout.write(
+    JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'deny',
+        permissionDecisionReason: decision.reason,
+      },
+    }),
+  );
+  return 2;
 }

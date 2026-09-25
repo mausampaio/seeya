@@ -31,21 +31,17 @@
  * reading the file, or a session that hasn't been told yet (before the first `open`) — the one
  * source that "valer sempre" actually depends on is the live delivery.
  *
- * **The Claude Code project hook (V2-T34 item 2, `core/harness-hook-config.ts`) is written here
- * too — at creation time only, like every other skeleton file.** Unlike the workspace's own git
- * hook (`core/workspace-hooks.ts`), which lives outside git's tracked content and is reinstalled on
- * every `open`, this one is ordinary project content: reasserting it on every `open` the same way
- * would make it look like an uncommitted change to the leftover-changes check (V2-T34 item 4) every
- * single time, even when nothing was actually touched. A session is free to edit or remove it —
- * `seeya project audit` (`core/project-audit.ts`) is what catches what a missing hook let through.
+ * **The Claude Code project hook (V2-T34 item 2, `core/harness-hook-config.ts`) is NOT written
+ * here.** An earlier version of this skeleton wrote a static `.claude/settings.json` here, once, at
+ * creation time — the maintainer's own review found that wrong on two counts (embedding a `node`
+ * dependency the harness might not have, and baking a machine-specific absolute `seeya` path into
+ * TRACKED content that would go stale). `application/harness-hook.ts#ensureHarnessHookInstalled`
+ * writes it fresh at the start of every `openProject` instead — never committed, same "reinstalled
+ * by every open" discipline `core/workspace-hooks.ts`'s own git hook already has — so it's simply
+ * not part of this skeleton at all (`core/harness-hook-config.ts`'s own docstring has the full
+ * story).
  */
 import type { ProjectManifest, ProjectSkeleton, WorkspaceProjectFile } from './types.js';
-import {
-  HARNESS_HOOK_SCRIPT_RELATIVE_PATH,
-  HARNESS_SETTINGS_RELATIVE_PATH,
-  buildHarnessHookScript,
-  buildHarnessSettingsJson,
-} from './harness-hook-config.js';
 import { buildProjectWorkingRulesText } from './project-working-rules.js';
 
 /** `docs/V2-RUMO.md` § "Projeto persistente" — the six subdirectories every project starts with,
@@ -114,10 +110,6 @@ export function buildProjectSkeleton(projectId: string): ProjectSkeleton {
   const files: WorkspaceProjectFile[] = [
     { relativePath: 'AGENTS.md', content: buildAgentsMd(projectId) },
     { relativePath: 'INDEX.md', content: buildIndexMd(projectId) },
-    // V2-T34 item 2 — this module's own docstring on why these two are written once, here, and
-    // never reasserted by `open` the way the workspace's own git hook is.
-    { relativePath: HARNESS_SETTINGS_RELATIVE_PATH, content: buildHarnessSettingsJson() },
-    { relativePath: HARNESS_HOOK_SCRIPT_RELATIVE_PATH, content: buildHarnessHookScript() },
   ];
   return { manifest, files, directories: PROJECT_DIRECTORIES };
 }

@@ -66,6 +66,7 @@ import {
   runProjectOpenCommand,
   runProjectShowCommand,
   runProjectVerifyCommitCommand,
+  runProjectVerifyBashCommandCommand,
 } from './project-command.js';
 import {
   runProjectRemoveCommand,
@@ -467,6 +468,19 @@ projectCommand
       messageFile,
       process.stderr,
     );
+    if (exitCode !== 0) {
+      process.exitCode = exitCode;
+    }
+  });
+
+projectCommand
+  .command('verify-bash-command')
+  .description(
+    "Internal: called by a project's own Claude Code hook (D-047, V2-T34) — reads the " +
+      'PreToolUse payload from stdin, not meant to be run by hand.',
+  )
+  .action(async () => {
+    const exitCode = await runProjectVerifyBashCommandCommand(process.stdin, process.stdout);
     if (exitCode !== 0) {
       process.exitCode = exitCode;
     }

@@ -19,6 +19,7 @@ import {
   runProjectOpenCommand,
   runProjectShowCommand,
   runProjectVerifyCommitCommand,
+  runProjectVerifyBashCommandCommand,
 } from '../../../packages/cli/src/project-command.js';
 import type { ProjectContext } from '../../../packages/cli/src/composition.js';
 import type { ProjectOpenDeps } from '@seeya-ai/engine/application/project-open.js';
@@ -66,6 +67,7 @@ function buildContext(overrides: Partial<ProjectContext> = {}): ProjectContext {
     cliEntryPath: '/fake/cli-entry.js',
     auditMarker: new FakeProjectAuditMarker(),
     lockFileName: '.seeya-lock',
+    hookEnv: {},
     ...overrides,
   };
 }
@@ -701,5 +703,55 @@ describe('runProjectVerifyCommitCommand (V2-T34 item 1)', () => {
 
     expect(exitCode).toBe(1);
     expect(output()).toContain('one project per commit');
+  });
+});
+
+describe('runProjectVerifyBashCommandCommand (V2-T34 item 2, PO review)', () => {
+  function stdinWith(content: string): PassThrough {
+    const stream = new PassThrough();
+    stream.end(content);
+    return stream;
+  }
+
+  function collectStdout(): { readonly stdout: PassThrough; readonly output: () => string } {
+    const stdout = new PassThrough();
+    let collected = '';
+    stdout.on('data', (chunk: Buffer) => (collected += chunk.toString('utf8')));
+    return { stdout, output: () => collected };
+  }
+
+  it('exits 0 silently for an allowed command', async () => {
+    const { stdout, output } = collectStdout();
+    const payload = JSON.stringify({ tool_input: { command: 'git commit -m "normal"' } });
+
+    const exitCode = await runProjectVerifyBashCommandCommand(stdinWith(payload), stdout);
+
+    expect(exitCode).toBe(0);
+    expect(output()).toBe('');
+  });
+
+  it('exits 2 with a deny JSON on stdout for a --no-verify command', async () => {
+    const { stdout, output } = collectStdout();
+    const payload = JSON.stringify({ tool_input: { command: 'git commit --no-verify -m "x"' } });
+
+    const exitCode = await runProjectVerifyBashCommandCommand(stdinWith(payload), stdout);
+
+    expect(exitCode).toBe(2);
+    const parsed: unknown = JSON.parse(output());
+    expect(parsed).toMatchObject({
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'deny',
+      },
+    });
+  });
+
+  it('exits 0 silently for a payload it cannot parse (D-025)', async () => {
+    const { stdout, output } = collectStdout();
+
+    const exitCode = await runProjectVerifyBashCommandCommand(stdinWith('not json'), stdout);
+
+    expect(exitCode).toBe(0);
+    expect(output()).toBe('');
   });
 });
