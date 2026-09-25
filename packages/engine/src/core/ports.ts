@@ -722,6 +722,17 @@ export type ForkCleanupOutcome =
   | { readonly sessionId: string; readonly outcome: 'failed'; readonly reason: string };
 
 /**
+ * `ForkCleanup.checkForkActivity()`'s return shape (V2-T32) — a cheap `stat` of a fork's own
+ * transcript file, never its content. `notFound` (D-025: no `.jsonl` at all, never read as "it
+ * never grew") is its own case, not a `null` field on `found`, so a caller can never mistake "we
+ * don't know" for "we checked and it's unchanged" — `core/adopted-copy-growth.ts
+ * #decideAdoptedCopyGrowth` is what turns this into that decision.
+ */
+export type ForkActivityCheck =
+  | { readonly kind: 'notFound' }
+  | { readonly kind: 'found'; readonly lastWrite: Date; readonly sizeBytes: number };
+
+/**
  * `ForkCleanup.cleanup()`'s return shape — D-022's "both sides" applied to a deletion pass instead
  * of a validation pass: `outcomes` is what happened to every stale fork attempted (one failure
  * never stops the others, AGENTS.md D-022), and `rejected` is `forks.json`'s own D-022 contract
@@ -762,6 +773,16 @@ export interface ForkCleanup {
    * adoption can drop the registry entry WITHOUT deleting the transcript it's about to promote.
    */
   deleteFork(sessionId: string): Promise<ForkCleanupOutcome>;
+
+  /**
+   * V2-T32: `stat`s a fork's transcript file by `sessionId` alone — the SAME `locateTranscriptFile`
+   * lookup `deleteFork` already uses, read instead of removed. `application/
+   * project-revert-adoption.ts`'s own "did the adopted copy keep writing after being adopted" check
+   * (D-047 item 6): a promoted fork is no longer listed in `forks.json`, so this never reads that
+   * registry either — same reasoning `deleteFork`'s own docstring already gives for going straight
+   * to the filesystem by id.
+   */
+  checkForkActivity(sessionId: string): Promise<ForkActivityCheck>;
 }
 
 /**
@@ -1164,7 +1185,99 @@ export interface WorkspaceRepository {
    * to confirm".
    */
   listChangedFiles(root: string, projectId: string): Promise<readonly string[]>;
+
+  /**
+   * V2-T32: deletes `root/projectId` recursively — `seeya project remove`'s own physical removal.
+   * Never commits (`commitAll`, right after, is the separate, explicit step every other mutating
+   * method here already keeps distinct) and never touches anything outside `root/projectId` itself
+   * — an associated repository, a discovered session, a transcript, all live elsewhere and this
+   * method has no path to reach any of them (`docs/PLANO-DE-ENTREGA.md` V2-T32 item 4).
+   */
+  removeProjectDirectory(root: string, projectId: string): Promise<void>;
+
+  /**
+   * V2-T32: the workspace's current `HEAD` commit hash, or `null` when it has no commits yet
+   * (D-025) — `application/project-remove.ts`'s own "how to recover" line: the commit right BEFORE
+   * a removal is simply whatever `HEAD` already was the moment before that removal's own commit.
+   */
+  currentCommit(root: string): Promise<string | null>;
+
+  /**
+   * V2-T32: how many files `root/projectId` currently holds under version control (`git ls-files`,
+   * scoped the same way `listChangedFiles`/`commitAll` already scope their own git calls) —
+   * `seeya project remove`'s own confirmation prompt ("this removes N files").
+   */
+  countProjectFiles(root: string, projectId: string): Promise<number>;
+
+  /**
+   * V2-T32: every commit inside `root/projectId`'s own history carrying `Seeya-Session-Id:
+   * <sessionId>` (`core/project-commit.ts#SESSION_ID_TRAILER_KEY`, the trailer `commitAll` writes
+   * on every project commit, D-047 item 4) — oldest first (`git log --reverse`), each with the
+   * files IT changed (scoped to `projectId`, same as `commitAll`'s own `git add`, so a workspace
+   * -wide file like `.gitignore` never counts as "touched" by a project's own session). Empty when
+   * the session never committed inside this project at all (D-025) —
+   * `application/project-revert-adoption.ts`'s own "nothing to revert" case, never an error.
+   */
+  findSessionCommits(
+    root: string,
+    projectId: string,
+    sessionId: string,
+  ): Promise<readonly RevertCommitInfo[]>;
+
+  /**
+   * V2-T32: every commit inside `root/projectId`'s own history strictly AFTER `afterCommit`, oldest
+   * first, each with the files it changed (same `projectId`-scoping as `findSessionCommits`) —
+   * `application/project-revert-adoption.ts`'s own "did anything else touch these files since"
+   * check (`core/project-revert.ts#planAdoptionRevert`), the pre-check D-047 item 4 requires before
+   * ever running `git revert`.
+   */
+  findCommitsAfter(
+    root: string,
+    projectId: string,
+    afterCommit: string,
+  ): Promise<readonly RevertCommitInfo[]>;
+
+  /**
+   * V2-T32: reverts `commitsNewestFirst` (already ordered newest → oldest by the caller,
+   * `core/project-revert.ts#planAdoptionRevert`'s own `commitsNewestFirst`) with `git revert
+   * --no-commit --no-edit`, one at a time, then a SINGLE commit with `message` (already carrying
+   * both D-047 item 4 trailers, `core/project-commit.ts#buildProjectCommitMessage` — this method
+   * never assembles trailer text itself, same split `commitAll` already draws). Stops at the first
+   * commit that fails to apply cleanly and runs `git revert --abort` before returning `failed` —
+   * "nunca reverte pela metade" applied to git's own mechanics, not just this port's own pre-check:
+   * every commit here belongs to ONE session that held the project lock alone (D-047), so a clean
+   * sequential revert is the expected case; `failed` is the safety net for the unexpected one.
+   * `noChanges` is the rarer edge case where the reverts cancel out to a net-zero diff against
+   * `HEAD` (same "no-op, not an empty commit" contract `commitAll` already has).
+   */
+  revertCommits(
+    root: string,
+    projectId: string,
+    commitsNewestFirst: readonly string[],
+    message: string,
+  ): Promise<RevertExecutionOutcome>;
 }
+
+/**
+ * `WorkspaceRepository.findSessionCommits`/`findCommitsAfter`'s own return shape (V2-T32) — one
+ * commit's hash plus the files IT changed, scoped to one project. `core/project-revert.ts
+ * #planAdoptionRevert` is the one (pure) consumer, comparing `files` across two of these lists to
+ * decide whether reverting is safe.
+ */
+export interface RevertCommitInfo {
+  readonly hash: string;
+  readonly files: readonly string[];
+}
+
+/**
+ * `WorkspaceRepository.revertCommits()`'s own outcome (V2-T32) — a discriminated union, not a bare
+ * boolean (D-024): `failed` names the one commit that didn't apply cleanly, so a refusal message
+ * can say exactly where the sequence stopped, not just that it did.
+ */
+export type RevertExecutionOutcome =
+  | { readonly kind: 'committed' }
+  | { readonly kind: 'noChanges' }
+  | { readonly kind: 'failed'; readonly hash: string; readonly reason: string };
 
 /**
  * `HarnessLauncher.open()`'s own outcome (V2-T28) — a discriminated union, not a bare exit code
