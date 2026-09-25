@@ -15,7 +15,7 @@
  */
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { spawn } from 'node:child_process';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -276,5 +276,56 @@ describe('the workspace commit-msg hook — real execution', () => {
     expect(attempt.stderr).toContain('seeya project open');
     expect(attempt.stderr).not.toContain('No such file or directory');
     expect(await headHash(dir)).toBe(beforeHash);
+  }, 30_000);
+
+  it('lets a real commit through when cliEntryPath is inside a real .asar FILE (V2-T34 production defect, PO review 2026-09-25)', async () => {
+    const dir = await makeTmpDir();
+    root = dir;
+    const workspace = new FsWorkspaceRepository();
+    await workspace.initialize(dir);
+    await workspace.writeProjectSkeleton(
+      dir,
+      'auth-hardening',
+      buildProjectSkeleton('auth-hardening'),
+    );
+    await workspace.commitAll(
+      dir,
+      'auth-hardening',
+      buildProjectCommitMessage('Create project auth-hardening', 'auth-hardening', undefined),
+    );
+    // A REAL file named exactly like Electron's own asar archive — the production defect: the
+    // shell's naive `[ -f "$cliEntryPath" ]` on the FULL inner path always failed against this,
+    // even though the .asar file itself is right there. Content is irrelevant (a real `app.asar`
+    // is an opaque archive blob to a shell too) — only its existence as a FILE matters here.
+    const asarPath = path.join(dir, 'app.asar');
+    await writeFile(asarPath, 'not a real asar archive, just needs to exist as a file\n');
+    const cliEntryPath = path.join(
+      asarPath,
+      'node_modules',
+      '@seeya-ai',
+      'cli',
+      'dist',
+      'index.js',
+    );
+    // A stand-in for the packaged `seeya` binary (`nodePath`) — plain node can never actually read
+    // INSIDE a real `.asar` (only Electron's own patched `fs` can); this script stands in for that
+    // real capability so the test can prove what's actually under test here — the shell's own
+    // pre-flight existence check — without needing a full Electron install. It ignores its
+    // arguments and always approves, exactly what "verify-commit says yes" looks like from the
+    // hook script's own point of view.
+    const fakeNodePath = path.join(dir, 'fake-seeya-node');
+    await writeFile(fakeNodePath, '#!/bin/sh\nexit 0\n');
+    await chmod(fakeNodePath, 0o755);
+    await workspace.installCommitMsgHook(dir, buildCommitMsgHookScript(fakeNodePath, cliEntryPath));
+
+    await writeFile(path.join(dir, 'auth-hardening', 'status', 'current.md'), 'x\n');
+    await runGit(dir, ['add', 'auth-hardening']);
+    const attempt = await realCommit(dir, 'Edit under a packaged (asar) install', process.env);
+
+    // The FIX under test: before it, this always refused with "can't find its seeya binary" — the
+    // existence check ran against the full, never-real inner path. Now it passes the check and
+    // actually calls the (stand-in) verifier, which approves.
+    expect(attempt.stderr).not.toContain("can't find its seeya binary");
+    expect(attempt.exitCode).toBe(0);
   }, 30_000);
 });

@@ -44,4 +44,14 @@ describe('buildCommitMsgHookScript', () => {
     expect(messageBody).toBeDefined();
     expect(messageBody).not.toContain('"');
   });
+
+  it('checks the .asar file itself, not the unpacked inner path, when cliEntryPath is packaged (production defect, PO review 2026-09-25)', () => {
+    const cliEntryPath = '/opt/seeya/resources/app.asar/node_modules/@seeya-ai/cli/dist/index.js';
+    const script = buildCommitMsgHookScript('/usr/bin/node', cliEntryPath);
+    expect(script).toContain('if [ -f "/usr/bin/node" ] && [ -f "/opt/seeya/resources/app.asar" ]');
+    // The actual invocation and the missing-verifier message still name the REAL inner path —
+    // only the existence check is truncated at the .asar boundary.
+    expect(script).toContain(`exec "/usr/bin/node" "${cliEntryPath}" project verify-commit "$1"`);
+    expect(script).toContain(cliEntryPath);
+  });
 });

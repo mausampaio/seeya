@@ -58,6 +58,21 @@ describe('buildHarnessSettingsJson', () => {
     expect(command).toContain('ELECTRON_RUN_AS_NODE=1 "/path/to/electron"');
   });
 
+  it('checks the .asar file itself, not the unpacked inner path, when cliEntryPath is packaged (production defect, PO review 2026-09-25)', () => {
+    const cliEntryPath = '/opt/seeya/resources/app.asar/node_modules/@seeya-ai/cli/dist/index.js';
+    const settings = JSON.parse(buildHarnessSettingsJson('/usr/bin/node', cliEntryPath)) as {
+      hooks: { PreToolUse: { hooks: { command: string }[] }[] };
+    };
+    const command = settings.hooks.PreToolUse[0]?.hooks[0]?.command ?? '';
+    expect(command).toContain(
+      'if [ -f "/usr/bin/node" ] && [ -f "/opt/seeya/resources/app.asar" ]',
+    );
+    // The actual invocation and the missing-verifier message still name the REAL inner path —
+    // only the existence check is truncated at the .asar boundary.
+    expect(command).toContain(`"/usr/bin/node" "${cliEntryPath}" project verify-bash-command`);
+    expect(command).toContain(cliEntryPath);
+  });
+
   it('is valid, parseable JSON with a trailing newline', () => {
     const text = buildHarnessSettingsJson('/usr/bin/node', '/opt/seeya/dist/index.js');
     expect(text.endsWith('\n')).toBe(true);

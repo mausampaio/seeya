@@ -63,6 +63,8 @@
  * from — this is exactly item 7's own "onde o guarda-corpo termina," for this one layer.
  */
 
+import { resolveHookVerifierCheckPath } from './hook-verifier-path.js';
+
 export const HARNESS_SETTINGS_RELATIVE_PATH = '.claude/settings.json';
 
 /** D-024: named, not a boolean — a Bash command is either fine, or blocked with a reason a person
@@ -125,8 +127,13 @@ function buildHarnessHookCommand(
   const envPrefix = Object.entries(env)
     .map(([key, value]) => `${key}=${value} `)
     .join('');
+  // PO review production defect (2026-09-25): same fix as `core/workspace-hooks.ts`'s own commit
+  // hook — a packaged `cliEntryPath` lives inside `app.asar`, so the pre-flight checks the `.asar`
+  // file itself (`core/hook-verifier-path.ts`), while the actual invocation below still gets the
+  // real `cliEntryPath`.
+  const cliEntryCheckPath = resolveHookVerifierCheckPath(cliEntryPath);
   return (
-    `if [ -f "${nodePath}" ] && [ -f "${cliEntryPath}" ]; then ` +
+    `if [ -f "${nodePath}" ] && [ -f "${cliEntryCheckPath}" ]; then ` +
     `${envPrefix}"${nodePath}" "${cliEntryPath}" project verify-bash-command; ` +
     `else echo "${missingVerifierMessage(nodePath, cliEntryPath)}" >&2; exit 2; fi`
   );
