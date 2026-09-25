@@ -11,6 +11,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { writeFile } from 'node:fs/promises';
 import {
   buildAppContext,
+  buildProjectAdoptDeps,
+  buildProjectOpenDeps,
+  buildProjectWorkspaceDeps,
   resolveAppHome,
   toEndDayDeps,
 } from '../../../packages/app/src/composition/index.js';
@@ -300,5 +303,95 @@ describe('toEndDayDeps', () => {
     expect(deps.processControl).toBe(context.processControl);
     expect(deps.clock).toBe(context.clock);
     expect(deps.forkCleanup).toBe(context.forkCleanup);
+  });
+});
+
+// V2-T30: `resolveProcessIdentity`/`buildProjectWorkspaceDeps`/`buildProjectOpenDeps`/
+// `buildProjectAdoptDeps` — the project item this task adds. `workspace`/`projectLock`/
+// `forkRegistration` are real adapters (same "wired for real, exercised against a fixture
+// ~/.seeya" discipline every other AppContext field above already gets); the fake pieces below
+// are only the per-call ones a real `HarnessLauncher`/`SessionAdoptionLauncher` would need a real
+// tab for, which this suite never spawns (AGENTS.md: never a real claude/harness process from a
+// test).
+describe('resolveProcessIdentity (V2-T30, Q-087 item 3)', () => {
+  it("is this process's own pid, resolved lazily and cached across repeat calls", async () => {
+    fixture = await createDiscoveryFixture();
+    const context = await buildAppContext(fixture.root, {
+      appInstallation: new FakeAppInstallation(),
+    });
+
+    const first = await context.resolveProcessIdentity();
+    const second = await context.resolveProcessIdentity();
+
+    expect(first.pid).toBe(process.pid);
+    expect(second).toBe(first);
+  });
+});
+
+describe('buildProjectWorkspaceDeps (V2-T30)', () => {
+  it('maps AppContext fields straight through to WorkspaceCommandDeps', async () => {
+    fixture = await createDiscoveryFixture();
+    const context = await buildAppContext(fixture.root, {
+      appInstallation: new FakeAppInstallation(),
+    });
+
+    const deps = buildProjectWorkspaceDeps(context);
+
+    expect(deps.storage).toBe(context.storage);
+    expect(deps.workspace).toBe(context.workspace);
+    expect(deps.projectLock).toBe(context.projectLock);
+    expect(deps.processControl).toBe(context.processControl);
+    expect(deps.seeyaHome).toBe(context.home.seeyaHome);
+    expect(deps.sessionId).toBe(context.sessionId);
+  });
+});
+
+describe('buildProjectOpenDeps (V2-T30 item 3)', () => {
+  it('maps AppContext + processIdentity + a launcher + launchedSessionId into ProjectOpenDeps', async () => {
+    fixture = await createDiscoveryFixture();
+    const context = await buildAppContext(fixture.root, {
+      appInstallation: new FakeAppInstallation(),
+    });
+    const fakeLauncher = { open: vi.fn() };
+    const processIdentity = { pid: 4242, procStart: undefined };
+
+    const deps = buildProjectOpenDeps(
+      context,
+      processIdentity,
+      fakeLauncher,
+      '11111111-1111-4111-8111-111111111111',
+    );
+
+    expect(deps.workspace).toBe(context.workspace);
+    expect(deps.projectLock).toBe(context.projectLock);
+    expect(deps.harnessLauncher).toBe(fakeLauncher);
+    expect(deps.pid).toBe(4242);
+    expect(deps.launchedSessionId).toBe('11111111-1111-4111-8111-111111111111');
+  });
+});
+
+describe('buildProjectAdoptDeps (V2-T30 item 5)', () => {
+  it('maps AppContext + processIdentity + a launcher + forkSessionId + idleMinutes into AdoptSessionDeps', async () => {
+    fixture = await createDiscoveryFixture();
+    const context = await buildAppContext(fixture.root, {
+      appInstallation: new FakeAppInstallation(),
+    });
+    const fakeLauncher = { adopt: vi.fn() };
+    const processIdentity = { pid: 4242, procStart: '123' };
+
+    const deps = buildProjectAdoptDeps(
+      context,
+      processIdentity,
+      fakeLauncher,
+      '22222222-2222-4222-8222-222222222222',
+      45,
+    );
+
+    expect(deps.forkRegistration).toBe(context.forkRegistration);
+    expect(deps.forkCleanup).toBe(context.forkCleanup);
+    expect(deps.adoptionLauncher).toBe(fakeLauncher);
+    expect(deps.procStart).toBe('123');
+    expect(deps.forkSessionId).toBe('22222222-2222-4222-8222-222222222222');
+    expect(deps.idleMinutes).toBe(45);
   });
 });

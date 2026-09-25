@@ -54,6 +54,11 @@ import {
   resolveDaemonOwner,
   shouldOfferDaemonOwnershipTransition,
 } from '@seeya-ai/engine/application/daemon-ownership.js';
+import { FsWorkspaceRepository } from '@seeya-ai/engine/adapters/workspace/index.js';
+import { FsProjectLock } from '@seeya-ai/engine/adapters/workspace/project-lock.js';
+import { GenerationForkRegistration } from '@seeya-ai/engine/adapters/generation/fork-registration.js';
+import { captureObservedProcStart } from '@seeya-ai/engine/adapters/process/proc-start.js';
+import { processExists } from '@seeya-ai/engine/adapters/process/existence.js';
 import type {
   AppInstallation,
   Autostart,
@@ -61,14 +66,22 @@ import type {
   Clock,
   DirectoryExistence,
   ForkCleanup,
+  ForkRegistration,
   GitReader,
   HandoffGenerator,
+  HarnessLauncher,
   Notifier,
   ProcessControl,
+  ProjectLock,
+  SessionAdoptionLauncher,
   SessionProvider,
   Storage,
   TranscriptReader,
+  WorkspaceRepository,
 } from '@seeya-ai/engine/core/ports.js';
+import type { ProjectOpenDeps } from '@seeya-ai/engine/application/project-open.js';
+import type { AdoptSessionDeps } from '@seeya-ai/engine/application/project-adopt.js';
+import type { WorkspaceCommandDeps } from '@seeya-ai/engine/application/workspace.js';
 import type { DaemonOwner, DaemonOwnershipTransitionAnswer } from '@seeya-ai/engine/core/types.js';
 import type { PathPlatformHint } from '@seeya-ai/engine/core/cwd-normalization.js';
 import type { EndDayDeps } from '@seeya-ai/engine/application/types.js';
@@ -223,6 +236,39 @@ export interface AppContext {
    * silence.
    */
   readonly loginShellPathSource: 'login-shell' | 'inherited' | 'not-applicable';
+  /**
+   * V2-T30: the same `WorkspaceRepository`/`ProjectLock`/`ForkRegistration` ports
+   * `packages/cli/src/composition.ts#buildProjectContext`/`buildProjectAdoptContext` wire, so
+   * `seeya project create`/`list`/`open`/`adopt`'s own `application/` orchestration runs
+   * identically from the window (`electron/project-ipc.ts`, `app/`'s own composition, D-043: never
+   * reused from `cli/`'s functions directly).
+   */
+  readonly workspace: WorkspaceRepository;
+  readonly projectLock: ProjectLock;
+  readonly forkRegistration: ForkRegistration;
+  /**
+   * `process.env.CLAUDE_CODE_SESSION_ID`, read once here (D-020) — same source
+   * `cli/composition.ts#readCurrentSessionId` reads, for the identical reason: a project's commit
+   * trailer (`core/project-commit.ts`) names whichever session ran `create`/`add-repo`/`adopt`.
+   * Almost always `undefined` for the app (a desktop window is not usually launched from inside a
+   * Claude Code session) — D-025 never guesses otherwise.
+   */
+  readonly sessionId: string | undefined;
+  /**
+   * This process's own `pid`/`procStart` (Q-087 item 3: "o pid gravado no lock é o do processo
+   * principal do app" — the app's own equivalent of the CLI process that blocks for the whole of
+   * `seeya project open`/`adopt`, since a project's lock here is held for as long as the APP
+   * lives, not for as long as one tab does). **Resolved lazily, once, and cached** — never eagerly
+   * at startup: `captureObservedProcStart`'s own `powershell.exe` cost on Windows (500-880ms even
+   * warm, `packages/cli/src/composition.ts`'s own measurement) would otherwise land on every
+   * window launch's "time until the session list appears" budget
+   * (`docs/DESEMPENHO.md`'s measure (a)) even for a person who never opens or adopts a project this
+   * run.
+   */
+  resolveProcessIdentity(): Promise<{
+    readonly pid: number;
+    readonly procStart: string | undefined;
+  }>;
 }
 
 /**
@@ -242,6 +288,95 @@ export function toEndDayDeps(context: AppContext): EndDayDeps {
     processControl: context.processControl,
     clock: context.clock,
     forkCleanup: context.forkCleanup,
+  };
+}
+
+/**
+ * V2-T30: `seeya project create`/`list`/`show`'s own `WorkspaceCommandDeps`, assembled from an
+ * `AppContext` — mirrors `packages/cli/src/composition.ts#buildProjectContext`'s own shape, pure
+ * fiação (no I/O of its own), so `electron/project-ipc.ts` (excluded from this package's coverage
+ * floor) never carries a mapping worth testing on its own; this one does, via
+ * `tests/integration/app/composition.test.ts`.
+ */
+export function buildProjectWorkspaceDeps(context: AppContext): WorkspaceCommandDeps {
+  return {
+    storage: context.storage,
+    workspace: context.workspace,
+    projectLock: context.projectLock,
+    processControl: context.processControl,
+    seeyaHome: context.home.seeyaHome,
+    sessionId: context.sessionId,
+  };
+}
+
+/** This invocation's own `pid`/`procStart` — see `AppContext#resolveProcessIdentity`'s own
+ * docstring for why it's a separate, lazily-resolved value rather than a plain field here. */
+export interface AppProcessIdentity {
+  readonly pid: number;
+  readonly procStart: string | undefined;
+}
+
+/**
+ * `seeya project open`'s own `ProjectOpenDeps` (V2-T30 item 3), assembled from an `AppContext` plus
+ * this invocation's own `processIdentity` (`AppContext#resolveProcessIdentity`, Q-087 item 3: the
+ * app's own main process, not a per-open capture) and a fresh `HarnessLauncher`
+ * (`resume/project-tab-launcher.ts#ProjectOpenTabLauncher`, constructed by the caller with this
+ * open's own tab label — never reused from `cli/`'s `ClaudeHarnessLauncher`, D-043).
+ * `launchedSessionId` is generated by the caller (`electron/project-ipc.ts`, `node:crypto
+ * #randomUUID` — randomness stays out of `core/`/`application/`, same V2-T35 item 4 reasoning the
+ * CLI's own `buildProjectOpenDeps` already follows).
+ */
+export function buildProjectOpenDeps(
+  context: AppContext,
+  processIdentity: AppProcessIdentity,
+  harnessLauncher: HarnessLauncher,
+  launchedSessionId: string,
+): ProjectOpenDeps {
+  return {
+    storage: context.storage,
+    workspace: context.workspace,
+    directoryExistence: context.directoryExistence,
+    harnessLauncher,
+    projectLock: context.projectLock,
+    processControl: context.processControl,
+    clock: context.clock,
+    seeyaHome: context.home.seeyaHome,
+    sessionId: context.sessionId,
+    pid: processIdentity.pid,
+    procStart: processIdentity.procStart,
+    launchedSessionId,
+  };
+}
+
+/**
+ * `seeya project adopt`'s own `AdoptSessionDeps` (V2-T30 item 5) — same shape as
+ * `buildProjectOpenDeps` above, for `application/project-adopt.ts#adoptSession` instead.
+ * `idleMinutes` is read fresh by the caller (`context.storage.readConfig()`, same "never a startup
+ * snapshot" discipline `electron/main.ts`'s own settings-aware handlers already follow) rather than
+ * cached on `AppContext` itself.
+ */
+export function buildProjectAdoptDeps(
+  context: AppContext,
+  processIdentity: AppProcessIdentity,
+  adoptionLauncher: SessionAdoptionLauncher,
+  forkSessionId: string,
+  idleMinutes: number,
+): AdoptSessionDeps {
+  return {
+    storage: context.storage,
+    workspace: context.workspace,
+    projectLock: context.projectLock,
+    processControl: context.processControl,
+    clock: context.clock,
+    forkRegistration: context.forkRegistration,
+    forkCleanup: context.forkCleanup,
+    adoptionLauncher,
+    seeyaHome: context.home.seeyaHome,
+    idleMinutes,
+    sessionId: context.sessionId,
+    pid: processIdentity.pid,
+    procStart: processIdentity.procStart,
+    forkSessionId,
   };
 }
 
@@ -457,6 +592,23 @@ export async function buildAppContext(
       startDaemon,
     });
   }
+  // V2-T30: `AppContext#resolveProcessIdentity`'s own docstring has the "why lazy" reasoning —
+  // computed at most once per window, only the first time Open/Adopt actually needs it.
+  let cachedProcessIdentity: { pid: number; procStart: string | undefined } | null = null;
+  async function resolveProcessIdentity(): Promise<{
+    readonly pid: number;
+    readonly procStart: string | undefined;
+  }> {
+    if (cachedProcessIdentity !== null) {
+      return cachedProcessIdentity;
+    }
+    const procStartCapture = await captureObservedProcStart(process.pid, processExists);
+    cachedProcessIdentity = {
+      pid: process.pid,
+      procStart: procStartCapture.kind === 'value' ? procStartCapture.value : undefined,
+    };
+    return cachedProcessIdentity;
+  }
   return {
     clock,
     home,
@@ -504,5 +656,10 @@ export async function buildAppContext(
     startDaemon,
     stopDaemon,
     loginShellPathSource,
+    workspace: new FsWorkspaceRepository(),
+    projectLock: new FsProjectLock(),
+    forkRegistration: new GenerationForkRegistration(home.seeyaHome),
+    sessionId: process.env.CLAUDE_CODE_SESSION_ID,
+    resolveProcessIdentity,
   };
 }
