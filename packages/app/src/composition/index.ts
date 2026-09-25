@@ -55,7 +55,11 @@ import {
   shouldOfferDaemonOwnershipTransition,
 } from '@seeya-ai/engine/application/daemon-ownership.js';
 import { FsWorkspaceRepository } from '@seeya-ai/engine/adapters/workspace/index.js';
-import { FsProjectLock } from '@seeya-ai/engine/adapters/workspace/project-lock.js';
+import {
+  FsProjectLock,
+  PROJECT_LOCK_FILE_NAME,
+} from '@seeya-ai/engine/adapters/workspace/project-lock.js';
+import { FsProjectAuditMarker } from '@seeya-ai/engine/adapters/workspace/project-audit-marker.js';
 import { GenerationForkRegistration } from '@seeya-ai/engine/adapters/generation/fork-registration.js';
 import { captureObservedProcStart } from '@seeya-ai/engine/adapters/process/proc-start.js';
 import { processExists } from '@seeya-ai/engine/adapters/process/existence.js';
@@ -306,6 +310,29 @@ export function buildProjectWorkspaceDeps(context: AppContext): WorkspaceCommand
     processControl: context.processControl,
     seeyaHome: context.home.seeyaHome,
     sessionId: context.sessionId,
+    ...projectHookIdentity(),
+  };
+}
+
+/**
+ * V2-T34 item 1: the interface's own `nodePath`/`cliEntryPath`/`hookEnv` for the workspace's
+ * `commit-msg` hook — `resolveCliDaemonScriptPath()` already resolves `@seeya-ai/cli`'s own compiled
+ * entry point for the daemon launch target above (`daemonLaunchTarget.scriptPath`); the SAME file
+ * also dispatches `project verify-commit` (it's the whole `seeya` CLI, not a daemon-only script), so
+ * reusing it here is calling back into a working `seeya`, not a second resolution mechanism. Runs
+ * under `process.execPath` — Electron's own binary — so `ELECTRON_RUN_AS_NODE=1` has to travel with
+ * it (`core/workspace-hooks.ts#buildCommitMsgHookScript`'s own docstring on why), the identical
+ * pairing `daemonLaunchTarget.env` already carries for the same reason.
+ */
+function projectHookIdentity(): {
+  readonly nodePath: string;
+  readonly cliEntryPath: string;
+  readonly hookEnv: Readonly<Record<string, string>>;
+} {
+  return {
+    nodePath: process.execPath,
+    cliEntryPath: resolveCliDaemonScriptPath(),
+    hookEnv: { ELECTRON_RUN_AS_NODE: '1' },
   };
 }
 
@@ -345,6 +372,9 @@ export function buildProjectOpenDeps(
     pid: processIdentity.pid,
     procStart: processIdentity.procStart,
     launchedSessionId,
+    ...projectHookIdentity(),
+    auditMarker: new FsProjectAuditMarker(),
+    lockFileName: PROJECT_LOCK_FILE_NAME,
   };
 }
 
@@ -377,6 +407,7 @@ export function buildProjectAdoptDeps(
     pid: processIdentity.pid,
     procStart: processIdentity.procStart,
     forkSessionId,
+    ...projectHookIdentity(),
   };
 }
 

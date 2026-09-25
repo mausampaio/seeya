@@ -50,6 +50,8 @@ function buildAdoptDeps(
     pid: THIS_PID,
     procStart: undefined,
     forkSessionId: FORK_SESSION_ID,
+    nodePath: 'node',
+    cliEntryPath: '/fake/cli-entry.js',
     ...overrides,
   };
 }

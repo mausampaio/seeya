@@ -15,6 +15,7 @@ import {
 import { addRepository } from '@seeya-ai/engine/application/repository-association.js';
 import { openProject } from '@seeya-ai/engine/application/project-open.js';
 import type {
+  ConfirmLeftoverChanges,
   ConfirmReadOnlyOpen,
   ProjectOpenDeps,
 } from '@seeya-ai/engine/application/project-open.js';
@@ -24,6 +25,10 @@ import type {
   ConfirmAdoptionCommit,
   ConfirmAdoptionLaunch,
 } from '@seeya-ai/engine/application/project-adopt.js';
+import { auditProject } from '@seeya-ai/engine/application/project-audit.js';
+import type { ProjectAuditDeps } from '@seeya-ai/engine/application/project-audit.js';
+import { verifyCommit } from '@seeya-ai/engine/application/verify-commit.js';
+import type { VerifyCommitDeps } from '@seeya-ai/engine/application/verify-commit.js';
 import { resolveSessionReference, toDiscoveredSessionReference } from './session-reference.js';
 import type { ProjectContext } from './composition.js';
 import {
@@ -31,6 +36,8 @@ import {
   formatAdoptAmbiguousMatchMessage,
   formatAdoptNoMatchMessage,
   formatAdoptSessionReport,
+  formatAuditCommandReport,
+  formatAuditLines,
   formatCreateProjectReport,
   formatMissingRepositoryLines,
   formatOpenProjectReport,
@@ -38,9 +45,11 @@ import {
   formatProjectsReport,
   formatShowProjectReport,
   parseAdoptionLaunchConfirmation,
+  parseLeftoverChangesAnswer,
   parseReadOnlyOpenConfirmation,
   renderAdoptionCommitConfirmation,
   renderAdoptionLaunchConfirmation,
+  renderLeftoverChangesConfirmation,
   renderReadOnlyOpenConfirmation,
 } from './format-project.js';
 
@@ -131,6 +140,20 @@ function makeReadOnlyOpenConfirmer(reader: ConfirmationReader): ConfirmReadOnlyO
   };
 }
 
+/** V2-T34 item 4: `openProject`'s own `ConfirmLeftoverChanges` — a bad/blank answer folds into
+ * `'unavailable'` exactly like no terminal at all, the same "never guess" discipline
+ * `parseLeftoverChangesAnswer`'s own docstring gives for why `null` isn't a fourth case of its own
+ * here. */
+function makeLeftoverChangesConfirmer(reader: ConfirmationReader): ConfirmLeftoverChanges {
+  return async (changedFiles) => {
+    const answer = await askQuestion(reader, renderLeftoverChangesConfirmation(changedFiles));
+    if (answer === null) {
+      return 'unavailable';
+    }
+    return parseLeftoverChangesAnswer(answer) ?? 'unavailable';
+  };
+}
+
 /**
  * `seeya project open <id> [--with <harness>]` — unlike the other four commands, `open` spawns a
  * real interactive session (`stdio: 'inherit'`, `core/ports.ts#HarnessLauncher`'s own docstring).
@@ -158,8 +181,9 @@ export async function runProjectOpenCommand(
   let result;
   try {
     result = await openProject(deps, projectId, harness, {
-      onBeforeLaunch: ({ missing, lock }) => {
+      onBeforeLaunch: ({ missing, lock, audit }) => {
         const lines = [
+          ...formatAuditLines(audit),
           ...formatMissingRepositoryLines(projectId, missing),
           ...formatProjectLockWarningLines(projectId, lock),
         ];
@@ -168,6 +192,7 @@ export async function runProjectOpenCommand(
         }
       },
       confirmReadOnlyOpen: makeReadOnlyOpenConfirmer(reader),
+      confirmLeftoverChanges: makeLeftoverChangesConfirmer(reader),
     });
   } finally {
     reader?.close();
@@ -261,4 +286,36 @@ export async function runProjectAdoptCommand(
     result.kind === 'launchConfirmationDeclined'
     ? 0
     : 1;
+}
+
+/** `seeya project audit <id>` (V2-T34 item 3) — the standalone command; `openProject` already runs
+ * the same check on every `open`, before ever taking the lock (that call site prints through
+ * `formatAuditLines` instead, `runProjectOpenCommand`'s own `onBeforeLaunch`). */
+export async function runProjectAuditCommand(
+  deps: ProjectAuditDeps,
+  projectId: string,
+): Promise<string> {
+  const outcome = await auditProject(deps, projectId);
+  return formatAuditCommandReport(outcome);
+}
+
+/**
+ * `seeya project verify-commit <messageFile>` (V2-T34 item 1) — the workspace's own `commit-msg`
+ * git hook's one caller (`core/workspace-hooks.ts#buildCommitMsgHookScript`), never meant to be run
+ * by hand. Silent on success (the standard git hook convention — nothing on stdout, exit 0);
+ * writes the refusal reason to `stderr` and exits non-zero otherwise, which git shows verbatim and
+ * aborts the commit for.
+ */
+export async function runProjectVerifyCommitCommand(
+  deps: VerifyCommitDeps,
+  root: string,
+  messageFilePath: string,
+  stderr: NodeJS.WritableStream,
+): Promise<number> {
+  const result = await verifyCommit(deps, root, messageFilePath);
+  if (result.kind === 'refused') {
+    stderr.write(`${result.reason}\n`);
+    return 1;
+  }
+  return 0;
 }

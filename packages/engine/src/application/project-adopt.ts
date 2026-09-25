@@ -68,6 +68,11 @@ export interface AdoptSessionDeps {
    * once the person confirms the commit — into the `Seeya-Session-Id` trailer and
    * `adoptions.json`'s own `forkSessionId`. */
   readonly forkSessionId: string;
+  /** V2-T34 item 1: threaded through only so `ensureProjectExists` below can hand a full
+   * `WorkspaceCommandDeps`-shaped object to `createProject` when adopting into a project that
+   * doesn't exist yet — same pair `application/workspace.ts#WorkspaceCommandDeps` itself carries. */
+  readonly nodePath: string;
+  readonly cliEntryPath: string;
 }
 
 /** D-025: three answers, never flattened into a boolean — `unavailable` (no interactive terminal

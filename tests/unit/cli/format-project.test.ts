@@ -4,15 +4,19 @@ import {
   formatAdoptAmbiguousMatchMessage,
   formatAdoptNoMatchMessage,
   formatAdoptSessionReport,
+  formatAuditCommandReport,
+  formatAuditLines,
   formatCreateProjectReport,
   formatMissingRepositoryLines,
   formatOpenProjectReport,
   formatProjectsReport,
   formatShowProjectReport,
   parseAdoptionLaunchConfirmation,
+  parseLeftoverChangesAnswer,
   parseReadOnlyOpenConfirmation,
   renderAdoptionCommitConfirmation,
   renderAdoptionLaunchConfirmation,
+  renderLeftoverChangesConfirmation,
   renderReadOnlyOpenConfirmation,
 } from '../../../packages/cli/src/format-project.js';
 import type { DiscoveredSession, ProjectManifest } from '@seeya-ai/engine/core/types.js';
@@ -562,5 +566,95 @@ describe('formatAdoptSessionReport', () => {
     expect(text).toContain('auth-hardening/context/know-how.md');
     // Item 9: the follow-up repeated after the fact.
     expect(text).toContain('seeya project open auth-hardening');
+  });
+});
+
+describe('formatAuditLines (V2-T34 item 3)', () => {
+  it('is empty when nothing escaped', () => {
+    expect(
+      formatAuditLines({ projectId: 'auth-hardening', commitsChecked: 3, escaped: [] }),
+    ).toEqual([]);
+  });
+
+  it('is empty when the audit itself could not run', () => {
+    expect(formatAuditLines(null)).toEqual([]);
+  });
+
+  it('names the commit and every reason it escaped', () => {
+    const lines = formatAuditLines({
+      projectId: 'auth-hardening',
+      commitsChecked: 1,
+      escaped: [
+        {
+          hash: 'abcdef1234567890',
+          reasons: [
+            { kind: 'missingOrWrongProjectTrailer', found: null },
+            { kind: 'includesLockFile' },
+          ],
+        },
+      ],
+    });
+    expect(lines[0]).toContain('auth-hardening');
+    expect(lines.join('\n')).toContain('abcdef123456');
+    expect(lines.join('\n')).toContain('missing Seeya-Project-Id trailer');
+    expect(lines.join('\n')).toContain('includes the project lock file');
+  });
+});
+
+describe('formatAuditCommandReport (V2-T34 item 3)', () => {
+  it('invalidId/notFound read like the other project commands', () => {
+    expect(formatAuditCommandReport({ kind: 'invalidId', projectId: 'Not Valid' })).toContain(
+      'not a valid project id',
+    );
+    expect(formatAuditCommandReport({ kind: 'notFound', projectId: 'ghost' })).toBe(
+      'Project "ghost" not found.',
+    );
+  });
+
+  it('reports a clean audit', () => {
+    const text = formatAuditCommandReport({
+      kind: 'audited',
+      report: { projectId: 'auth-hardening', commitsChecked: 5, escaped: [] },
+    });
+    expect(text).toContain('5 commit(s) checked');
+    expect(text).toContain('none escaped');
+  });
+
+  it('reports escaped commits with their reasons', () => {
+    const text = formatAuditCommandReport({
+      kind: 'audited',
+      report: {
+        projectId: 'auth-hardening',
+        commitsChecked: 2,
+        escaped: [{ hash: 'deadbeef', reasons: [{ kind: 'missingSessionTrailer' }] }],
+      },
+    });
+    expect(text).toContain('1 escaped');
+    expect(text).toContain('missing Seeya-Session-Id trailer');
+  });
+});
+
+describe('renderLeftoverChangesConfirmation / parseLeftoverChangesAnswer (V2-T34 item 4)', () => {
+  it('lists every changed file in the question', () => {
+    const text = renderLeftoverChangesConfirmation([
+      'auth-hardening/status/current.md',
+      'auth-hardening/journal/notes.md',
+    ]);
+    expect(text).toContain('auth-hardening/status/current.md');
+    expect(text).toContain('auth-hardening/journal/notes.md');
+    expect(text).toContain('2 change(s)');
+  });
+
+  it('parses c/commit as commitNow, p/proceed as proceedWithoutCommitting', () => {
+    expect(parseLeftoverChangesAnswer('c')).toBe('commitNow');
+    expect(parseLeftoverChangesAnswer('Commit')).toBe('commitNow');
+    expect(parseLeftoverChangesAnswer('p')).toBe('proceedWithoutCommitting');
+    expect(parseLeftoverChangesAnswer('PROCEED')).toBe('proceedWithoutCommitting');
+  });
+
+  it('anything else parses to null — never a guessed answer (D-025)', () => {
+    expect(parseLeftoverChangesAnswer('')).toBeNull();
+    expect(parseLeftoverChangesAnswer('y')).toBeNull();
+    expect(parseLeftoverChangesAnswer('discard')).toBeNull();
   });
 });

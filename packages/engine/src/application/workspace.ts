@@ -19,6 +19,7 @@ import { isValidProjectId } from '../core/project-id.js';
 import { buildProjectSkeleton } from '../core/project-skeleton.js';
 import { buildProjectCommitMessage } from '../core/project-commit.js';
 import { describeProjectLockStatus, type ProjectLockStatus } from './project-lock.js';
+import { ensureWorkspaceHooksInstalled } from './workspace-hooks.js';
 
 export type { ProjectLockStatus };
 
@@ -35,6 +36,18 @@ export interface WorkspaceCommandDeps {
    * `undefined` when `seeya` runs outside a Claude Code session (D-025). Every commit this module
    * makes carries it as the `Seeya-Session-Id` trailer (`core/project-commit.ts`). */
   readonly sessionId: string | undefined;
+  /** V2-T34 item 1: `process.execPath` — the absolute path the workspace's own `commit-msg` hook
+   * (installed right after `initialize()`) uses to run `node`, never relying on `PATH`. */
+  readonly nodePath: string;
+  /** V2-T34 item 1: this invocation's own CLI entry point (`process.argv[1]` at the composition
+   * root, `packages/cli/src/composition.ts#resolveCliEntryPath`) — the absolute path the hook
+   * passes to `nodePath` above, so it calls back into `seeya project verify-commit` without `PATH`
+   * either. */
+  readonly cliEntryPath: string;
+  /** Optional — `packages/app/src/composition/index.ts` is the one caller that supplies it
+   * (`core/workspace-hooks.ts#buildCommitMsgHookScript`'s own docstring on why). Every CLI caller
+   * omits it, same as passing `{}`. */
+  readonly hookEnv?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -86,6 +99,15 @@ export async function createProject(
   if (!(await deps.workspace.isInitialized(root))) {
     await deps.workspace.initialize(root);
   }
+  // V2-T34 item 1: reasserted every time `createProject` runs, not just the first — cheap
+  // (a single file write), and covers a workspace that already existed before this task shipped.
+  await ensureWorkspaceHooksInstalled(
+    deps.workspace,
+    root,
+    deps.nodePath,
+    deps.cliEntryPath,
+    deps.hookEnv ?? {},
+  );
   if (await deps.workspace.projectExists(root, projectId)) {
     return { kind: 'alreadyExists', projectId };
   }

@@ -10,16 +10,21 @@ import type {
   DirectoryExistence,
   HarnessLauncher,
   ProcessControl,
+  ProjectAuditMarker,
   ProjectLock,
   Storage,
   WorkspaceRepository,
 } from '../core/ports.js';
 import type { ProjectLockInfo, ProjectOpenLockOutcome } from '../core/project-lock.js';
 import { formatProjectLockWarningLines } from '../core/project-lock-message.js';
+import { buildProjectWorkingRulesText } from '../core/project-working-rules.js';
+import { buildProjectCommitMessage } from '../core/project-commit.js';
 import type { AssociatedRepository, ProjectManifest } from '../core/types.js';
 import { isValidProjectId } from '../core/project-id.js';
 import { findRepositoryMapEntry } from '../core/repository-map.js';
 import { resolveWorkspaceRoot } from './workspace.js';
+import { ensureWorkspaceHooksInstalled } from './workspace-hooks.js';
+import { auditProject, type ProjectAuditReport } from './project-audit.js';
 import {
   acquireProjectLock,
   describeProjectLockStatus,
@@ -70,6 +75,22 @@ export interface ProjectOpenDeps {
    * run from inside a session.
    */
   readonly launchedSessionId: string;
+  /** V2-T34 item 1: same pair `application/workspace.ts#WorkspaceCommandDeps` already carries for
+   * `createProject` — `openProject` reasserts the workspace's own `commit-msg` hook right at the
+   * start of every run ("reafirmados a cada open"). */
+  readonly nodePath: string;
+  readonly cliEntryPath: string;
+  /** Same optional escape hatch as `application/workspace.ts#WorkspaceCommandDeps.hookEnv` — only
+   * `packages/app/src/composition/index.ts` supplies it. */
+  readonly hookEnv?: Readonly<Record<string, string>>;
+  /** V2-T34 item 3: `application/project-audit.ts#auditProject`'s own extra dependency —
+   * `openProject` audits BEFORE ever taking the lock (item 3's own "chamada também pelo open,
+   * antes de tomar o lock"). */
+  readonly auditMarker: ProjectAuditMarker;
+  /** `adapters/workspace/project-lock.ts#PROJECT_LOCK_FILE_NAME`, injected by the composition root
+   * (`application/` cannot import `adapters/`) — `auditProject`'s own dependency, threaded through
+   * here rather than duplicated as a bare literal. */
+  readonly lockFileName: string;
 }
 
 /** D-024: one repository `open` couldn't attach, and exactly why — never conflated with a
@@ -100,15 +121,34 @@ export type ReadOnlyOpenAnswer = 'proceed' | 'decline' | 'unavailable';
  * NOT fall back to guessing). */
 export type ConfirmReadOnlyOpen = (heldBy: ProjectLockInfo) => Promise<ReadOnlyOpenAnswer>;
 
+/** V2-T34 item 4: what `confirmLeftoverChanges` answers, asked ONLY when this attempt actually
+ * ACQUIRED the lock (a read-only open never writes, so a previous session's leftovers are none of
+ * its business) and `WorkspaceRepository.listChangedFiles` reports something uncommitted. Never
+ * flattened into a boolean (D-024): "commit it now" and "proceed, but tell the new session" are two
+ * different actions, not a yes/no — and `unavailable` is its own case, same "no way to ask" reading
+ * `ReadOnlyOpenAnswer` already established, never a silent default either way. */
+export type LeftoverChangesAnswer = 'commitNow' | 'proceedWithoutCommitting' | 'unavailable';
+
+export type ConfirmLeftoverChanges = (
+  changedFiles: readonly string[],
+) => Promise<LeftoverChangesAnswer>;
+
 export interface OpenProjectCallbacks {
   readonly onBeforeLaunch?: (info: {
     readonly missing: readonly MissingRepositoryRecord[];
     readonly lock: ProjectOpenLockOutcome;
+    /** V2-T34 item 3: what `auditProject` found since the last audit — `null` only if the audit
+     * itself couldn't run (never in production: `openProject` already validated `projectId` and
+     * confirmed the project exists before this point). */
+    readonly audit: ProjectAuditReport | null;
   }) => void;
   /** `undefined` behaves exactly like `'unavailable'` (D-025: never silently proceed without an
    * explicit yes) — every production caller (`cli/project-command.ts`) always supplies one; a test
    * that never reaches a `readOnly` lock never needs to either. */
   readonly confirmReadOnlyOpen?: ConfirmReadOnlyOpen;
+  /** Same `undefined` → `'unavailable'` discipline as `confirmReadOnlyOpen` above — a test that
+   * never leaves changed files behind never needs to supply this either. */
+  readonly confirmLeftoverChanges?: ConfirmLeftoverChanges;
 }
 
 export type OpenProjectResult =
@@ -130,6 +170,16 @@ export type OpenProjectResult =
       readonly kind: 'lockConfirmationUnavailable';
       readonly projectId: string;
       readonly heldBy: ProjectLockInfo;
+    }
+  /** V2-T34 item 4: this attempt acquired the lock, found changes a previous session left
+   * uncommitted, and there was no interactive terminal to ask what to do with them — `open` refuses
+   * (releasing the lock it just took) rather than guessing "commit" or "proceed" on the person's
+   * behalf (item 4's own "nunca descarta," extended: it never silently commits OR silently proceeds
+   * either). */
+  | {
+      readonly kind: 'leftoverChangesConfirmationUnavailable';
+      readonly projectId: string;
+      readonly changedFiles: readonly string[];
     }
   | {
       readonly kind: 'opened';
@@ -244,13 +294,77 @@ async function blockedByLock(
   };
 }
 
-/** V2-T35 item 2: the SAME text `cli/format-project.ts` prints to the terminal
- * (`core/project-lock-message.ts#formatProjectLockWarningLines`), joined into one string for
- * `--append-system-prompt` — `null` when that list is empty (a genuinely free lock has nothing
- * noteworthy to tell the session, same "nada muda" as item 1's own confirmation gate). */
-function systemPromptAppendFor(projectId: string, lock: ProjectOpenLockOutcome): string | null {
-  const lines = formatProjectLockWarningLines(projectId, lock);
-  return lines.length === 0 ? null : lines.join('\n');
+/**
+ * V2-T34 item 5: `core/project-working-rules.ts#buildProjectWorkingRulesText`, always present —
+ * unlike the V2-T35 item 2 lock warning below (which is empty for a genuinely free lock), the
+ * working rules are delivered on EVERY `open`, since D-047 item 5's own "valer sempre" doesn't stop
+ * mattering just because nobody else is holding the lock right now. V2-T35 item 2's own lock
+ * warning (`core/project-lock-message.ts#formatProjectLockWarningLines`, the SAME text
+ * `cli/format-project.ts` prints to the terminal) is appended when there's something to say, and
+ * V2-T34 item 4's own leftover-files note is appended when `pendingFiles` isn't empty (only reached
+ * when the person chose "proceed without committing" — item 4's own "a sessão nova recebe... a
+ * lista do que está pendente").
+ */
+function systemPromptAppendFor(
+  projectId: string,
+  lock: ProjectOpenLockOutcome,
+  pendingFiles: readonly string[],
+): string {
+  const sections = [buildProjectWorkingRulesText(projectId)];
+  const lockLines = formatProjectLockWarningLines(projectId, lock);
+  if (lockLines.length > 0) {
+    sections.push(lockLines.join('\n'));
+  }
+  if (pendingFiles.length > 0) {
+    sections.push(
+      'Changes a previous session left uncommitted are still here (nobody committed them before ' +
+        `closing):\n${pendingFiles.map((file) => `- ${file}`).join('\n')}`,
+    );
+  }
+  return sections.join('\n\n');
+}
+
+/** V2-T34 item 4's own gate, extracted the same way `blockedByLock` already is (AGENTS.md §
+ * "Retorno cedo") — only relevant once THIS attempt actually holds the lock (`lock.kind ===
+ * 'readOnly'` never writes, so a previous session's leftovers are irrelevant to it). `pendingFiles`
+ * is what `systemPromptAppendFor` folds into the new session's own context when the person chose to
+ * proceed without committing; `null` means "stop here," with the final `OpenProjectResult` already
+ * decided. */
+async function handleLeftoverChanges(
+  deps: ProjectOpenDeps,
+  callbacks: OpenProjectCallbacks | undefined,
+  root: string,
+  projectId: string,
+  lock: ProjectOpenLockOutcome,
+): Promise<{ readonly pendingFiles: readonly string[] } | { readonly result: OpenProjectResult }> {
+  if (lock.kind !== 'acquired') {
+    return { pendingFiles: [] };
+  }
+  const changedFiles = await deps.workspace.listChangedFiles(root, projectId);
+  if (changedFiles.length === 0) {
+    return { pendingFiles: [] };
+  }
+  const answer =
+    callbacks?.confirmLeftoverChanges === undefined
+      ? 'unavailable'
+      : await callbacks.confirmLeftoverChanges(changedFiles);
+  if (answer === 'commitNow') {
+    // D-025: nobody present can say whose these were — `undefined` reads as `Seeya-Session-Id:
+    // unknown` (`core/project-commit.ts#UNKNOWN_SESSION_TRAILER_VALUE`), never a guessed identity.
+    const message = buildProjectCommitMessage(
+      `Commit changes left uncommitted before opening ${projectId}`,
+      projectId,
+      undefined,
+    );
+    await deps.workspace.commitAll(root, projectId, message);
+    return { pendingFiles: [] };
+  }
+  if (answer === 'proceedWithoutCommitting') {
+    return { pendingFiles: changedFiles };
+  }
+  // `'unavailable'` (item 4's own "sem terminal interativo, recusa dizendo o porquê") — the caller
+  // is responsible for releasing the lock this attempt already took (`openProject`'s own tail).
+  return { result: { kind: 'leftoverChangesConfirmationUnavailable', projectId, changedFiles } };
 }
 
 /**
@@ -270,6 +384,14 @@ function systemPromptAppendFor(projectId: string, lock: ProjectOpenLockOutcome):
  * `callbacks.onBeforeLaunch` has already shown the warning, and `callbacks.confirmReadOnlyOpen` is
  * asked next. Anything other than `'proceed'` returns without ever calling `harnessLauncher.open`
  * at all: no session launched, nothing to release (this attempt never held the lock).
+ *
+ * V2-T34 item 1: the workspace's own `commit-msg` hook is reasserted right at the top, before
+ * anything else — "um gancho apagado volta sozinho." Item 3: the project is audited next, still
+ * BEFORE the lock is ever touched (`auditProject`'s own report reaches `callbacks.onBeforeLaunch`
+ * alongside the missing-repository/lock info, same "print it before the harness takes the screen"
+ * timing V2-T28 item 4 already established for the other two). Item 4: once this attempt actually
+ * holds the lock (never for a `readOnly` open), `handleLeftoverChanges` asks what to do with
+ * whatever a previous session left uncommitted, before the harness ever launches.
  */
 export async function openProject(
   deps: ProjectOpenDeps,
@@ -294,13 +416,32 @@ export async function openProject(
     return { kind: 'unsupportedHarness', harness };
   }
 
+  await ensureWorkspaceHooksInstalled(
+    deps.workspace,
+    root,
+    deps.nodePath,
+    deps.cliEntryPath,
+    deps.hookEnv ?? {},
+  );
+  const auditOutcome = await auditProject(deps, projectId);
+  const audit = auditOutcome.kind === 'audited' ? auditOutcome.report : null;
+
   const { addDirs, missing } = await resolveRepositoryDirs(deps, projectId, manifest.repositories);
   const lock = await acquireOpenLock(deps, root, projectId);
-  callbacks?.onBeforeLaunch?.({ missing, lock });
+  callbacks?.onBeforeLaunch?.({ missing, lock, audit });
 
   const blocked = await blockedByLock(callbacks, projectId, lock);
   if (blocked !== null) {
     return blocked;
+  }
+
+  const leftover = await handleLeftoverChanges(deps, callbacks, root, projectId, lock);
+  if ('result' in leftover) {
+    // This attempt already acquired the lock (`handleLeftoverChanges` only asks in that case) —
+    // release it before refusing, same best-effort discipline `finishOpen` uses for every other
+    // early return after acquisition.
+    await releaseProjectLock(deps, root, projectId, deps.pid);
+    return leftover.result;
   }
 
   const projectDir = path.join(root, projectId);
@@ -308,7 +449,7 @@ export async function openProject(
     projectDir,
     addDirs,
     deps.launchedSessionId,
-    systemPromptAppendFor(projectId, lock),
+    systemPromptAppendFor(projectId, lock, leftover.pendingFiles),
   );
   return finishOpen(deps, root, projectId, { harness, addDirs, missing, lock }, result);
 }
