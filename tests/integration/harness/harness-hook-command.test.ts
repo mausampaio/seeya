@@ -69,6 +69,17 @@ async function runShellCommand(
       stderr += chunk.toString('utf8');
     });
     child.on('close', (code) => resolve({ exitCode: code ?? -1, stdout, stderr }));
+    // The hook legitimately exits WITHOUT reading stdin when it refuses up front (the
+    // missing-verifier case) — the same way Claude Code's own runner has to cope with a hook that
+    // stops early. Writing the payload after that is a closed pipe: on Linux it surfaced as an
+    // uncaught `EPIPE` that failed the whole CI run (run 36194596292), timing-dependent, never on
+    // Windows. The exit code and stderr are what the tests assert, so a closed stdin is expected
+    // here, not an error; anything else still throws.
+    child.stdin.on('error', (error: NodeJS.ErrnoException) => {
+      if (error.code !== 'EPIPE') {
+        throw error;
+      }
+    });
     child.stdin.write(stdin);
     child.stdin.end();
   });
