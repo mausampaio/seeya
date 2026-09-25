@@ -269,9 +269,14 @@ export class FsWorkspaceRepository implements WorkspaceRepository {
       ...COMMIT_IDENTITY_ENV,
     });
     if (!commit.ran || commit.exitCode !== 0) {
+      // V2-T34 production defect (PO review, 2026-09-25): the commit-msg hook's own refusal
+      // reason (`core/workspace-commit-guard.ts#decideCommitGuard`) lands on git's stderr — the
+      // ONE piece of information a caller (`seeya project open`/`adopt`/... ) needs to show the
+      // person instead of a bare exit code nobody could act on. `run-git.ts#runGit` now captures
+      // it; this is the one call site that actually writes a commit, so it's the one that matters.
       throw new Error(
         `git commit failed in workspace at "${root}": ` +
-          `${commit.ran ? `exit ${commit.exitCode}` : commit.reason}`,
+          `${commit.ran ? `exit ${commit.exitCode}: ${commit.stderr.trim()}` : commit.reason}`,
       );
     }
   }

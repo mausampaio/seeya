@@ -322,6 +322,30 @@ describe('FsWorkspaceRepository', () => {
     );
   });
 
+  it("commitAll throws WITH git's own stderr, not just a bare exit code (V2-T34 production defect, PO review 2026-09-25)", async () => {
+    root = await makeTmpDir();
+    const workspace = new FsWorkspaceRepository();
+    await workspace.initialize(root);
+    await workspace.writeProjectSkeleton(
+      root,
+      'auth-hardening',
+      buildProjectSkeleton('auth-hardening'),
+    );
+    let caught: unknown;
+    try {
+      await workspace.commitAll(root, 'auth-hardening', '');
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    const message = (caught as Error).message;
+    // Before this fix, `run-git.ts#runGit` discarded stderr entirely (`stdio: ['ignore', 'pipe',
+    // 'ignore']`) — the thrown error was just `git commit failed ... exit 1`, with no way to tell
+    // WHY. This is the regression proof: something git itself said about the empty message must
+    // now be present, not just the exit code.
+    expect(message).toMatch(/git commit failed.*exit 1:\s*\S/s);
+  });
+
   it('listProjects reports a rejection (not a silent empty list) when root is a file, not a directory', async () => {
     const parent = await makeTmpDir();
     root = parent;
