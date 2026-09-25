@@ -1,10 +1,10 @@
 ---
 id: TASK-25
 title: 'V2-T30 — A janela: lateral por projeto e open em aba'
-status: To Do
+status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-24 17:28'
+updated_date: '2026-09-25 02:51'
 labels: []
 milestone: m-0
 dependencies:
@@ -95,6 +95,124 @@ também pela CLI, o **Open** da janela mostra o aviso e pergunta; criar um proje
 janela e adotar nele uma sessão sem importância pela lista, aceitando o commit, e **Open project**
 abrir o projeto; e a primeira maximização sem barra de rolagem nenhuma.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implementado (absorve a V2-T48, itens 1-2, junto):
+
+**Item 1 — Projects no topo.** `sidebar/project-sessions.ts#groupSessionsByProject` (pura) casa
+sessão↔projeto só por evidência (cwd normalizado, `AdoptionRecord.forkSessionId`, `sessionId` do
+lock — nunca por repositório associado, nunca a original de uma adoção); `state/projects-panel.ts
+#buildProjectsPanelData` junta isso ao `ProjectLockStatus` de cada projeto (texto pronto:
+"unlocked" / "held by session X (pid N) since ..." / "stale — ... (reclaimable)"). Sessões sem
+projeto caem em "Other sessions". `electron/project-ipc.ts#wireProjectIpc` lê `listProjects`/
+`readAdoptions`/um `.seeya-lock` por projeto a cada ciclo de 10s (reusa o `SidebarRow[]` que o
+ciclo já calcula, sem segunda descoberta) e depois de cada ação de projeto; `CHANNELS.
+getProjectsPanel` (invoke) cobre a PRIMEIRA pintura — achado medindo com uma janela real
+descartável: o primeiro tick do laço ambiente dispara antes do renderer terminar de carregar e
+registrar `onProjectsUpdate`, perdendo esse primeiro push (mesmo mecanismo de `getTodayPanel`/
+`onTodayUpdate`).
+
+**Item 2 — lateral recolhível.** `state/sidebar-collapse.ts` (parse protegido: sem valor ou
+malformado abre aberta, D-025) + `electron/project-panel-view.ts#wireSidebarCollapse` (localStorage
+do renderer, nunca `config.json`). O botão fica sempre visível, mesmo recolhida.
+
+**Item 3 — `open` em aba, sem bloquear a janela.** `resume/project-tab-launcher.ts
+#ProjectOpenTabLauncher` implementa `HarnessLauncher` reusando o `TabResumeOpener` que a V2-T4 já
+tem (mesmo mecanismo de montar aba para um pty já lançado, nunca resume-específico). `electron/
+project-ipc.ts` chama o MESMO `openProject` da engine, com `SUPPORTED_HARNESS` ('claude') sempre
+passado explicitamente (o app não escolhe harness) e o pid/procStart do PRÓPRIO processo principal
+do app (Q-087 item 3), resolvidos uma vez e cacheados (`AppContext#resolveProcessIdentity`,
+lazy — nunca no startup, para não pesar a medida (a) com o custo do `powershell.exe` que a CLI já
+mediu). O handler nunca é esperado pelo clique: a aba aparece via o mesmo push `resumeTabOpened`
+já existente; só o texto curto de "como ficou" espera a promise (`state/project-open-result.ts`).
+Lock read-only pede confirmação por diálogo (mesmo texto de `core/project-lock-message.ts
+#renderReadOnlyOpenQuestion`, extraído do `cli/format-project.ts` sem mudar a saída da CLI).
+
+**Item 4 — Novo projeto.** Diálogo simples (`projectId` só, como a CLI) → `createProject` real,
+refresh imediato do painel.
+
+**Item 5 — Adotar pela lista.** `resume/project-tab-launcher.ts#ProjectAdoptTabLauncher`
+(`SessionAdoptionLauncher`); `state/adopt-panel.ts` é a máquina de estados do fluxo (picker →
+launch confirm → [aba do fork abre e fecha] → commit confirm → resultado com "Open project") —
+**o diálogo fecha entre a resposta do launch confirm e o próximo push**, de propósito: um
+`<dialog>` modal bloquearia a própria aba que a pessoa precisa usar. Texto da explicação e da
+pergunta do commit vêm de `core/project-adoption-message.ts` (novo módulo, movido de
+`cli/format-project.ts`, mesma saída da CLI preservada — `renderAdoptionLaunchConfirmation`/
+`renderAdoptionCommitConfirmation` da CLI agora chamam essas funções).
+
+**Item 6 (V2-T48).** `#status-panel` ganhou `overflow-wrap: anywhere` (quebra dentro do caminho
+longo do autostart, texto da CLI inalterado) e `html,body { overflow: hidden }` (nunca barra de
+rolagem do documento). `renderer.ts#wireWindowResize` trocou `window.resize` por um
+`ResizeObserver` em `#terminal-host` — **medido**: o recolher da lateral nunca dispara `resize` da
+janela (é só flexbox), então esse era o único mecanismo capaz de cobrir os dois casos ao mesmo
+tempo. Rodei uma instrumentação temporária (removida antes do commit) comparando `resize` ×
+`ResizeObserver` em torno de um `maximize()` programático nesta máquina, em modo offscreen: os
+dois dispararam quase juntos, já com o tamanho pós-maximização — não reproduziu o defeito do
+mantenedor (a mesma ressalva que `docs/DESEMPENHO.md` já registra para o modo offscreen), então o
+evento exato que falta na maximização real não foi confirmado por medição direta; o
+`ResizeObserver` é a correção de qualquer forma, por ser estritamente pós-layout e por já ser
+necessário, sem alternativa, para o item do recolhimento.
+
+**Compartilhamento de texto (regra do enunciado).** `core/project-lock-message.ts` ganhou
+`renderReadOnlyOpenQuestion`; novo `core/project-adoption-message.ts` tem
+`renderAdoptionLaunchExplanationLines`/`renderAdoptionCommitChangedFilesLines`. `cli/
+format-project.ts` só chama essas funções e concatena o sufixo de prompt (`[y/N]` etc.) — saída da
+CLI byte-idêntica, testes da CLI passam sem editar texto esperado.
+
+**Linhas de `renderer.ts`/`main.ts`.** `main.ts`: 1116 → 1128 (+12: import, construção de
+`projectIpc`, uma chamada no tick). `renderer.ts`: 1381 → 1390 (+9 líquido: import +
+`wireProjectPanel()`; removida a função `renderSidebar`/lista plana de sessões, ~24 linhas, e a
+função de resize antiga trocada pela versão com `ResizeObserver`). Todo o resto (painel de
+projetos, diálogos, IPC dos itens 3/4/5) foi para `electron/project-panel-view.ts` (novo,
+~540 linhas) e `electron/project-ipc.ts` (novo, ~280 linhas) — os dois na mesma categoria de
+`electron/` já isenta de piso de cobertura (dependem de DOM/Electron reais); a lógica pura ficou em
+`sidebar/project-sessions.ts`, `state/projects-panel.ts`, `state/adopt-panel.ts`, `state/
+project-open-result.ts`, `state/adopt-session-result.ts`, `state/sidebar-collapse.ts`,
+`resume/project-tab-launcher.ts`, `resume/pending-confirmations.ts` — todos testados.
+
+**Desempenho (docs/DESEMPENHO.md), antes (2026-09-20) → depois:**
+- (a) tempo até a lista: 5782–5801ms → 5716–5734ms (sem piora).
+- (b) memória em repouso: 335,6–338,0 MiB → 345,5–365,3 MiB (acima do teto anterior — Q-096 aberta
+  para o mantenedor julgar; suspeita mais provável é código novo carregado sempre, não o custo de
+  runtime por projeto, já que a medição rodou com zero projetos).
+- (c) CPU ocioso: 0,39%–0,57% → 0,26%–0,34% (melhor, dentro do ruído).
+
+**Prova real (janela descartável, `SEEYA_APP_HOME_OVERRIDE`, offscreen).** Duas sessões sintéticas
+(pid morto, nunca um processo real) seedadas à mão num `~/.claude` descartável — uma com `cwd`
+igual ao diretório previsto do projeto de teste (prova o agrupamento), outra em diretório não
+relacionado (prova "Other sessions"/Adopt). Criei "demo-project" pela janela de verdade, adotei a
+sessão não relacionada até o diálogo de confirmação do lançamento e RECUSEI ali (nunca cheguei a
+chamar `claude` de verdade — este ambiente tem `claude` no PATH, e resumir um `sessionId` sintético
+seria um processo real e desnecessário para provar a UI). Capturas em
+`%TEMP%\claude\...\scratchpad\v2t30-screenshots\` (fora do repositório): lateral aberta com os dois
+projetos vazios, lateral recolhida, projeto com a sessão agrupada e a outra em "Other sessions",
+diálogo de confirmação de adoção (mesmo texto do `core/project-adoption-message.ts`), resultado da
+recusa. `~/.seeya` e o espaço de trabalho REAIS conferidos depois: `HEAD`/mtimes do workspace real
+inalterados, nenhum `adoptions.json`/`forks.json` novo.
+
+**O que fica para o aceite do mantenedor / fora desta entrega:**
+- O fluxo real de `claude` sendo aberto por `Open`/`Adopt` (Proceed) não foi exercido de ponta a
+  ponta por este agente — só via os testes unitários dos lançadores (`ProjectOpenTabLauncher`/
+  `ProjectAdoptTabLauncher`, args e ciclo de vida da aba) e a reutilização direta do `openProject`/
+  `adoptSession` da engine, já testados nas tarefas V2-T28/V2-T29/V2-T33/V2-T35. Evitei deliberado
+  spawnar `claude` de verdade nesta verificação (custo real, sem necessidade para provar a UI).
+- O aviso de lock lido por OUTRA sessão viva (CLI segurando o lock enquanto a janela tenta abrir)
+  não foi provado em coreografia multi-processo — a lógica é a mesma `openProject`/
+  `confirmReadOnlyOpen` já testada pela V2-T35; só a costura do diálogo na janela é nova aqui.
+- `npm run verificar:linux` não rodou (só o `npm run verificar` do Windows, que passou). CI
+  cobre os três sistemas de qualquer forma.
+- Glossário do AGENTS.md não ganhou entradas novas para os termos desta tarefa (grupo de sessão
+  por projeto, `ProjectOpenTabLauncher`/`ProjectAdoptTabLauncher`, `getProjectsPanel`) — decisão
+  de escopo do agente, dado o tamanho já grande da entrega; o mantenedor/PO pode preencher ou pedir
+  isso como item separado.
+- Q-096 aberta (memória em repouso acima da faixa anterior) — decisão do mantenedor se é aceitável
+  ou se vira tarefa de otimização.
+
+`npm run verificar`: verde (build, tipos, lint, `dependency-cruiser`, cobertura — 96,39%
+statements geral, `core/` 99,33%, `app/src/state` 98,78%).
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
