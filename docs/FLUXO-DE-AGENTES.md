@@ -92,6 +92,15 @@ aprovada. É o único que altera os documentos de autoridade.
 > achou. Quem grava um comando para ser executado depois testa o caso Electron também (a decisão
 > "estou sob Electron?" vira função pura testada nos dois lados), e nunca depende de `node` no PATH —
 > o Claude Code e o app podem existir numa máquina sem Node.
+>
+> **E o script da CLI mora dentro do `app.asar`.** O Electron lê arquivos lá dentro; o shell não —
+> para o sistema de arquivos, `app.asar` é um arquivo só. Na V2-T34 (2026-09-25), os ganchos testavam
+> `[ -f "<caminho dentro do .asar>" ]`, isso sempre dava falso na instalação real, e o gancho de git
+> passou a recusar **todo** commit do espaço de trabalho e o do harness a bloquear **todo** Bash das
+> sessões de projeto — no uso real do mantenedor, uma adoção inteira ficou sem commit e o lock preso.
+> Os testes passavam porque rodavam a CLI fora do pacote. Qualquer comando gravado para rodar depois
+> é **executado de verdade** contra um caminho que atravessa um arquivo `.asar`, antes de ir para a
+> pessoa.
 
 > **Armadilha da janela de desenvolvimento: ela escreve no sistema real, não só no home.** Na
 > V2-T30 (2026-09-25), um agente rodou `node scripts/build.mjs --dev` para verificar a janela — esse

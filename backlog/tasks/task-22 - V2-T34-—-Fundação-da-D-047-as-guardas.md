@@ -4,7 +4,7 @@ title: 'V2-T34 — Fundação da D-047: as guardas'
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-25 19:20'
+updated_date: '2026-09-25 19:29'
 labels:
   - fundacao
   - d-047
@@ -312,5 +312,11 @@ Seis correcoes, cada uma com teste que falha antes da correcao:
 6. Provado sob simulacao de instalacao real, nao so unitario: os dois testes de integracao geram os scripts com `cliEntryPath` dentro de um `.asar` de verdade e executam — os dois deixam passar o que e permitido.
 
 `npm run verificar` verde (exit 0), rodado duas vezes (apos as correcoes e apos os commits finais). `~/.seeya` real, o espaco de trabalho real e o registro do Windows conferidos ao final: nada alem do que ja existia antes desta rodada — o espaco de trabalho do mantenedor com os ganchos quebrados nao foi tocado. Toda medicao usou diretorios `mkdtemp` descartaveis ou o shell puro, nunca uma sessao Claude real desta vez (a fixture necessaria — um `.asar` de verdade e um script "verificador" controlavel — nao precisou de uma sessao para ser provada; a reconstrucao do fluxo de adocao completo com sessao real ja tinha sido feita pelo mantenedor no incidente original).
+---
+
+author: PO
+created: 2026-09-25 19:29
+---
+Revisão do PO em 2026-09-25, rodada urgente (defeito de produção achado pelo mantenedor no uso real): aceita. Causa confirmada — os ganchos testavam a existência do verificador pelo caminho DENTRO do app.asar, que o shell não enxerga; na instalação real, todo commit do espaço de trabalho era recusado e todo Bash das sessões de projeto bloqueado; no aceite, uma adoção real ficou sem commit (motivo engolido: stderr descartado), com o lock preso (sem finally) e a janela recusando o open por falta do diálogo da sobra. Corrigido com teste de regressão em cada item: checagem que para no .asar (execução real nos dois ganchos), stderr no erro do commit, try/finally no lock de todos os fluxos, commitFailed explícito na CLI e na janela, e o diálogo da sobra na janela. Conflito de código com a correção da V2-T55 em adopt-flow-view.ts resolvido pelo PO (dois imports, ambos necessários). Portão verde no po-gate (2812 testes), também sem identidade global do git. A lição do .asar entrou na armadilha da CLI instalada em docs/FLUXO-DE-AGENTES.md.
 ---
 <!-- COMMENTS:END -->
