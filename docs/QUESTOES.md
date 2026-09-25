@@ -9164,3 +9164,9 @@ escolhido é conservador (o pior caso é custo, nunca erro) e documentado no pr�
 justificar tê-lo pulado — se houver um critério melhor (por exemplo, validar a posição dos hífens
 contra os cinco limites de grupo que `application/session-id-display.ts#UUID_GROUP_BOUNDARIES` já
 fixa), é troca pequena e isolada num módulo só.
+
+**Resolução da Q-098 (PO, 2026-09-25).** Aceito o critério: uma referência é tratada como possível
+id quando tem só hexadecimal e hífen, com pelo menos dois caracteres — e a procura direta só roda
+quando a resolução por nome não achou nada. O erro possível é gastar uma busca a mais num nome que
+por acaso parece hexadecimal (`cafe`), nunca escolher a sessão errada: prefixo ambíguo continua
+listando as candidatas.

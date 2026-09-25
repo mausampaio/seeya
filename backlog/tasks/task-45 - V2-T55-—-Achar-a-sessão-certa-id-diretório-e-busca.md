@@ -4,7 +4,7 @@ title: 'V2-T55 — Achar a sessão certa: id, diretório e busca'
 status: Review
 assignee: []
 created_date: '2026-09-25 13:35'
-updated_date: '2026-09-25 16:50'
+updated_date: '2026-09-25 17:05'
 labels: []
 milestone: m-2
 dependencies: []
@@ -200,5 +200,11 @@ author: PO
 created: 2026-09-25 13:40
 ---
 Acréscimo do PO em 2026-09-25, a partir de outro uso do mantenedor no Ubuntu: a mesma sessão aparecia como '<diretório>-<código>' enquanto aberta e só como '<diretório>' depois do exit. Causa: o nome com código é o que o próprio Claude Code grava no registro de sessões vivas (nameSource derived, adapters/discovery); fechada, o registro some e o seeya deriva o nome do diretório (deriveNameFromCwd). Item 5 desta tarefa: em todo lugar que lista sessão — lateral, modal, painel Hoje — o id curto (application/session-id-display.ts, o mesmo do seeya sessions) aparece SEMPRE ao lado do nome, aberta ou fechada; é o que identifica a sessão de verdade. Guardar o nome do Claude Code visto em vida fica de fora (arquivo novo em disco para um nome que não é da pessoa); o nome dado pela pessoa é a V2-T56.
+---
+
+author: PO
+created: 2026-09-25 17:05
+---
+Revisão do PO em 2026-09-25: mesclado no po-gate junto com a V2-T52/V2-T55 (entrega única), portão verde (2775 testes) também sem identidade global do git. Conferido: id explícito ignora relevanceHours por uma porta separada (SessionIdLookup) que nunca entra no ciclo de 10 s, custo medido ~20 ms/1.500 e ~100 ms/9.000 transcripts; prefixo ambíguo lista, nunca escolhe; rótulo 'no running process' num lugar só (core/session-state-label.ts), enum continua unknown; lateral agrupada por diretório, modal com id copiável, estado e data; busca por id achou sessão de 30 h. Q-098 aceita. A janela de verificação tocou de novo a chave seeya-dev do registro real (limite documentado) — virou a V2-T57. Falta o aceite do mantenedor.
 ---
 <!-- COMMENTS:END -->

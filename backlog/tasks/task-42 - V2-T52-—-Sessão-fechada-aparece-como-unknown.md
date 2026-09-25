@@ -4,7 +4,7 @@ title: V2-T52 — Sessão fechada aparece como unknown
 status: Review
 assignee: []
 created_date: '2026-09-25 11:12'
-updated_date: '2026-09-25 16:50'
+updated_date: '2026-09-25 17:05'
 labels: []
 milestone: m-2
 dependencies: []
@@ -77,3 +77,13 @@ fechada há 30h.
 
 Portão: verde nas duas rodadas (com e sem identidade git global) — ver task-45.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-25 17:05
+---
+Revisão do PO em 2026-09-25: mesclado no po-gate junto com a V2-T52/V2-T55 (entrega única), portão verde (2775 testes) também sem identidade global do git. Conferido: id explícito ignora relevanceHours por uma porta separada (SessionIdLookup) que nunca entra no ciclo de 10 s, custo medido ~20 ms/1.500 e ~100 ms/9.000 transcripts; prefixo ambíguo lista, nunca escolhe; rótulo 'no running process' num lugar só (core/session-state-label.ts), enum continua unknown; lateral agrupada por diretório, modal com id copiável, estado e data; busca por id achou sessão de 30 h. Q-098 aceita. A janela de verificação tocou de novo a chave seeya-dev do registro real (limite documentado) — virou a V2-T57. Falta o aceite do mantenedor.
+---
+<!-- COMMENTS:END -->
