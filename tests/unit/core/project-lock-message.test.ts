@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import {
   formatLockHolderDescription,
   formatProjectLockWarningLines,
+  renderReadOnlyOpenQuestion,
 } from '@seeya-ai/engine/core/project-lock-message.js';
 import type { ProjectLockInfo } from '@seeya-ai/engine/core/project-lock.js';
 
@@ -61,5 +62,15 @@ describe('formatProjectLockWarningLines', () => {
     expect(text).toContain('"auth-hardening"');
     expect(text).toContain('locked by session abc123');
     expect(text).toContain('reading only');
+  });
+});
+
+describe('renderReadOnlyOpenQuestion', () => {
+  it('names the holder without any interface-specific prompt suffix (V2-T30)', () => {
+    const text = renderReadOnlyOpenQuestion(SOME_LOCK);
+    expect(text).toContain('reading only');
+    expect(text).toContain('locked by session abc123');
+    expect(text).not.toContain('[y/N]');
+    expect(text).not.toContain('\n');
   });
 });

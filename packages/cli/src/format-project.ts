@@ -10,7 +10,12 @@ import type { ProjectLockInfo } from '@seeya-ai/engine/core/project-lock.js';
 import {
   formatLockHolderDescription,
   formatProjectLockWarningLines,
+  renderReadOnlyOpenQuestion,
 } from '@seeya-ai/engine/core/project-lock-message.js';
+import {
+  renderAdoptionCommitChangedFilesLines,
+  renderAdoptionLaunchExplanationLines,
+} from '@seeya-ai/engine/core/project-adoption-message.js';
 import type {
   CreateProjectResult,
   ListProjectsResult,
@@ -174,10 +179,7 @@ function formatMissingRepositoryLine(projectId: string, missing: MissingReposito
  * own ("session <id> (pid <n>) since <time>"), so it goes after "locked by", never glued onto the
  * question — the first wording ("..., while session ...?") read as a sentence that stopped short. */
 export function renderReadOnlyOpenConfirmation(heldBy: ProjectLockInfo): string {
-  return (
-    `Continue and open this project for reading only? ` +
-    `(It stays locked by ${formatLockHolderDescription(heldBy)}.) [y/N] `
-  );
+  return `${renderReadOnlyOpenQuestion(heldBy)} [y/N] `;
 }
 
 /** Anything other than an explicit "y"/"yes" is a decline (D-025: never guess "yes" from a blank
@@ -289,11 +291,7 @@ export function renderAdoptionLaunchConfirmation(
   projectId: string,
 ): string {
   const lines = [
-    `The copy will open in ${originalCwd} — that is where its own instructions and memory ` +
-      'live, and it needs them to pass this work on.',
-    `The project lives at ${projectDir}; that is where it will write.`,
-    `Afterward, to work on the project itself, reopen it from there: seeya project open ` +
-      `${projectId} (that is where the project's own memory applies).`,
+    ...renderAdoptionLaunchExplanationLines(originalCwd, projectDir, projectId),
     'Continue? [Y/n] ',
   ];
   return lines.join('\n');
@@ -313,8 +311,7 @@ export function parseAdoptionLaunchConfirmation(raw: string): boolean {
  * ask" order the task's own spec requires ("a CLI mostra os arquivos que mudaram... e pergunta"). */
 export function renderAdoptionCommitConfirmation(changedFiles: readonly string[]): string {
   const lines = [
-    'The session wrote the following inside the project:',
-    ...changedFiles.map((file) => `  ${file}`),
+    ...renderAdoptionCommitChangedFilesLines(changedFiles),
     'Commit these changes? [y/N] ',
   ];
   return lines.join('\n');

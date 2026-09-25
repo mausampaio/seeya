@@ -32,6 +32,22 @@ export function formatLockHolderDescription(lock: ProjectLockInfo): string {
  * formatProjectLockWarningLines('auth-hardening', { kind: 'acquired', reclaimedStale: null })
  * // [] — nothing to warn about
  */
+/**
+ * V2-T30 item 3: the question asked when `open` finds the project read-only-locked (V2-T35 item
+ * 1), without any interface-specific prompt suffix attached — `cli/format-project.ts
+ * #renderReadOnlyOpenConfirmation` appends its own `" [y/N] "` for `readline`, and the app's own
+ * lock-confirmation dialog (`packages/app/src/resume/project-tab-launcher.ts` and its dialog in
+ * `packages/app/src/electron/project-panel-view.ts`) shows this exact sentence above its own
+ * Proceed/Decline buttons — one wording, two renderings, same "sai de `cli/` para um módulo que os
+ * dois alcancem" movement V2-T35 already made for `formatProjectLockWarningLines` above.
+ */
+export function renderReadOnlyOpenQuestion(heldBy: ProjectLockInfo): string {
+  return (
+    `Continue and open this project for reading only? ` +
+    `(It stays locked by ${formatLockHolderDescription(heldBy)}.)`
+  );
+}
+
 export function formatProjectLockWarningLines(
   projectId: string,
   lock: ProjectOpenLockOutcome,
