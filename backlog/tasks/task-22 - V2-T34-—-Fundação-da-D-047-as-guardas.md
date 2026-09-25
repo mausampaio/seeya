@@ -4,7 +4,7 @@ title: 'V2-T34 — Fundação da D-047: as guardas'
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-25 14:58'
+updated_date: '2026-09-25 15:03'
 labels:
   - fundacao
   - d-047
@@ -284,5 +284,11 @@ Revisao do PO (2026-09-25): tres defeitos corrigidos, todos porque os testes ori
 Medido de verdade, nao simulado: uma sessao descartavel confirmou que o `command` do hook do Claude Code roda por um shell real (sintaxe `KEY=value cmd` funciona no Windows, nao e argv literal). Outra medicao, isolada num diretorio de rascunho fora do worktree real, com um `seeya` compilado de verdade e duas sessoes descartaveis: uma tentativa de `git commit --no-verify` foi bloqueada pelo gancho reconstruido, um `echo` comum passou. As duas sessoes e seus transcripts foram apagados depois. Limite medido e documentado no docstring do modulo: essa camada nao protege `seeya project adopt` (o Claude Code nao le `.claude/settings.json` de um diretorio liberado so por `--add-dir`) — os ganchos de git continuam cobrindo esse caminho.
 
 `npm run verificar` verde (exit 0) apos as correcoes. `~/.seeya` real, o espaco de trabalho real (teste-projeto/teste-projeto2) e o registro do Windows (`seeya`/`seeya-dev`) conferidos ao final: nada alem do que ja existia antes desta rodada de correcoes.
+---
+
+author: PO
+created: 2026-09-25 15:03
+---
+Revisão do PO em 2026-09-25, segunda rodada: aceita para o aceite do mantenedor. As três correções pedidas estão feitas e provadas: (1) a CLI passa ELECTRON_RUN_AS_NODE=1 ao gancho quando roda sob Electron (função pura testada nos dois lados) — sem isso o gancho gravado pela CLI instalada abriria o app a cada commit; (2) verificador ausente recusa com mensagem que diz o caminho e como reinstalar, executado de verdade; (3) o gancho do harness não depende mais de node no PATH: chama o seeya por caminho absoluto (seeya project verify-bash-command), bloqueia com código 2 se o verificador sumir, e é regravado a cada open, fora do git do espaço de trabalho (**/.claude/ no .gitignore). --no-verify medido bloqueado com sessão descartável isolada e a CLI compilada. Limite registrado: a camada do harness não protege a adoção (o Claude Code não lê settings de diretório só --add-dir); os ganchos de git cobrem. Portão verde no po-gate (2735 testes). A armadilha 'a CLI instalada roda sob o Electron' entrou no docs/FLUXO-DE-AGENTES.md.
 ---
 <!-- COMMENTS:END -->
