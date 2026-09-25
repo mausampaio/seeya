@@ -12,6 +12,7 @@ import type { ScheduleStripData } from '../state/schedule-strip.js';
 import type { DaemonControlAvailability } from '../state/daemon-control-panel.js';
 import type { AutostartControlAvailability } from '../state/autostart-control-panel.js';
 import type { SettingsRow, ProjectPolicyLine } from '../state/settings-panel.js';
+import type { ProjectsPanelData } from '../state/projects-panel.js';
 
 export const CHANNELS = {
   /** Renderer → main: open a new tab. */
@@ -134,6 +135,40 @@ export const CHANNELS = {
   getDaemonOwnershipTransitionOffer: 'seeya:get-daemon-ownership-transition-offer',
   /** Renderer → main: the person's answer to the ownership-transition dialog (V2-T13 item 5). */
   answerDaemonOwnershipTransition: 'seeya:answer-daemon-ownership-transition',
+  /** Main → renderer, pushed on the same refresh tick as `sessionsUpdate` and again right after
+   * "New project…"/"Open"/"Adopt…" finish (V2-T30 item 1): the "Projects" section's own data
+   * (`state/projects-panel.ts#buildProjectsPanelData`) — every project the workspace holds, its
+   * lock status, and the sessions grouped under it or left in "Other sessions". */
+  projectsUpdate: 'seeya:projects-update',
+  /** Renderer → main: "New project…" (V2-T30 item 4) — the same `createProject` `seeya project
+   * create` calls. */
+  createProject: 'seeya:create-project',
+  /** Renderer → main: a project's "Open" button (V2-T30 item 3) — the same `openProject` `seeya
+   * project open` calls, with a tab-backed `HarnessLauncher` instead of the CLI's inherited
+   * terminal. Resolves only once the tab closes (however long that takes) — the window itself
+   * never waits on this: the click handler doesn't block on it either, and the tab appears right
+   * away via the reused `resumeTabOpened` push (`electron/project-ipc.ts`'s own docstring). */
+  openProject: 'seeya:open-project',
+  /** Main → renderer: the project is locked by another live session and needs a yes/no before
+   * opening read-only (V2-T35's own three-answer confirmation, in a dialog instead of `readline`). */
+  confirmProjectLockOpenRequest: 'seeya:confirm-project-lock-open-request',
+  /** Renderer → main: the person's answer to one `confirmProjectLockOpenRequest`, by `requestId`. */
+  answerProjectLockOpenConfirm: 'seeya:answer-project-lock-open-confirm',
+  /** Renderer → main: "Adopt…" on an "Other sessions" row (V2-T30 item 5) — the same `adoptSession`
+   * `seeya project adopt` calls. Same non-blocking shape as `openProject` above. */
+  adoptSession: 'seeya:adopt-session',
+  /** Main → renderer: the adoption's own launch explanation, asked BEFORE anything is created
+   * (V2-T29 item 8) — the dialog shows `core/project-adoption-message.ts
+   * #renderAdoptionLaunchExplanationLines`'s own lines, the same text `seeya project adopt` prints. */
+  confirmAdoptionLaunchRequest: 'seeya:confirm-adoption-launch-request',
+  /** Renderer → main: the person's answer to one `confirmAdoptionLaunchRequest`. */
+  answerAdoptionLaunchConfirm: 'seeya:answer-adoption-launch-confirm',
+  /** Main → renderer: the adoption's own commit question, asked once the fork's tab has closed and
+   * something changed inside the project (V2-T29 item 4) — the dialog shows
+   * `core/project-adoption-message.ts#renderAdoptionCommitChangedFilesLines`'s own lines. */
+  confirmAdoptionCommitRequest: 'seeya:confirm-adoption-commit-request',
+  /** Renderer → main: the person's answer to one `confirmAdoptionCommitRequest`. */
+  answerAdoptionCommitConfirm: 'seeya:answer-adoption-commit-confirm',
 } as const;
 
 export interface CreateTabRequest {
@@ -435,4 +470,101 @@ export interface DaemonOwnershipTransitionOfferResponse {
 /** `CHANNELS.answerDaemonOwnershipTransition`'s payload (V2-T13 item 5). */
 export interface AnswerDaemonOwnershipTransitionRequest {
   readonly answer: 'accepted' | 'declined';
+}
+
+/** `CHANNELS.projectsUpdate`'s payload (V2-T30 item 1) — the exact shape
+ * `state/projects-panel.ts#buildProjectsPanelData` produces. */
+export type ProjectsUpdateEvent = ProjectsPanelData;
+
+/** `CHANNELS.createProject`'s payload (V2-T30 item 4). `projectId` is the lowercase-hyphen
+ * identifier `seeya project create <id>` takes — the window never asks for a separate display
+ * name, same as the CLI. */
+export interface CreateProjectRequest {
+  readonly projectId: string;
+}
+
+/** `CHANNELS.createProject`'s response — the same three outcomes
+ * `@seeya-ai/engine/application/workspace.js#CreateProjectResult` has, minus `root` (nothing in
+ * the window shows a filesystem path back). */
+export type CreateProjectResponse =
+  | { readonly kind: 'created'; readonly projectId: string }
+  | { readonly kind: 'invalidId'; readonly projectId: string }
+  | { readonly kind: 'alreadyExists'; readonly projectId: string };
+
+/** `CHANNELS.openProject`'s payload (V2-T30 item 3). */
+export interface OpenProjectRequest {
+  readonly projectId: string;
+}
+
+/** `CHANNELS.openProject`'s response — `state/project-open-result.ts
+ * #formatProjectOpenOutcomeText`'s own short rendering of `OpenProjectResult`, resolved only once
+ * the harness tab has closed (`resume/project-tab-launcher.ts#ProjectOpenTabLauncher`'s own
+ * docstring on why that's still fine for the window). */
+export interface OpenProjectResponse {
+  readonly outcomeText: string;
+}
+
+/** `CHANNELS.confirmProjectLockOpenRequest`'s payload — `questionText` is
+ * `@seeya-ai/engine/core/project-lock-message.js#renderReadOnlyOpenQuestion`'s own sentence, the
+ * same wording `seeya project open`'s `readline` question shows. */
+export interface ConfirmProjectLockOpenRequestEvent {
+  readonly requestId: string;
+  readonly projectId: string;
+  readonly questionText: string;
+}
+
+/** `CHANNELS.answerProjectLockOpenConfirm`'s payload. */
+export interface AnswerProjectLockOpenConfirmRequest {
+  readonly requestId: string;
+  readonly decision: 'proceed' | 'decline';
+}
+
+/** `CHANNELS.adoptSession`'s payload (V2-T30 item 5). `sessionId` is the ORIGINAL discovered
+ * session's own id (never a name/`cwd` — same D-025 reasoning `core/adoption-registry.ts
+ * #selectProjectAdoption`'s own docstring gives for `revert-adoption`'s session argument): the
+ * window already has it from the sidebar row it built the "Adopt…" button from, so there's no
+ * ambiguous reference to resolve the way the CLI's positional argument needs
+ * `session-reference.ts` for. `projectId` may name a project that doesn't exist yet — `adoptSession`
+ * creates it (`ensureProjectExists`), same as the CLI. */
+export interface AdoptSessionRequest {
+  readonly sessionId: string;
+  readonly projectId: string;
+}
+
+/** `CHANNELS.adoptSession`'s response — `state/adopt-session-result.ts
+ * #formatAdoptSessionOutcomeText`'s own short rendering, plus whether the "Open project" button
+ * should show (`isAdoptedResult`'s own discriminant, computed once in `electron/project-ipc.ts`
+ * rather than re-derived in the DOM layer, D-041). */
+export interface AdoptSessionResponse {
+  readonly outcomeText: string;
+  readonly adopted: boolean;
+  readonly projectId: string;
+}
+
+/** `CHANNELS.confirmAdoptionLaunchRequest`'s payload — `explanationLines` is
+ * `@seeya-ai/engine/core/project-adoption-message.js#renderAdoptionLaunchExplanationLines`'s own
+ * lines, the same text `seeya project adopt` prints before asking to continue. */
+export interface ConfirmAdoptionLaunchRequestEvent {
+  readonly requestId: string;
+  readonly explanationLines: readonly string[];
+}
+
+/** `CHANNELS.answerAdoptionLaunchConfirm`'s payload. */
+export interface AnswerAdoptionLaunchConfirmRequest {
+  readonly requestId: string;
+  readonly decision: 'proceed' | 'decline';
+}
+
+/** `CHANNELS.confirmAdoptionCommitRequest`'s payload — `changedFilesLines` is
+ * `@seeya-ai/engine/core/project-adoption-message.js#renderAdoptionCommitChangedFilesLines`'s own
+ * lines. */
+export interface ConfirmAdoptionCommitRequestEvent {
+  readonly requestId: string;
+  readonly changedFilesLines: readonly string[];
+}
+
+/** `CHANNELS.answerAdoptionCommitConfirm`'s payload. */
+export interface AnswerAdoptionCommitConfirmRequest {
+  readonly requestId: string;
+  readonly decision: 'commit' | 'decline';
 }

@@ -44,6 +44,19 @@ import type {
   AutostartControlResponse,
   DaemonOwnershipTransitionOfferResponse,
   AnswerDaemonOwnershipTransitionRequest,
+  ProjectsUpdateEvent,
+  CreateProjectRequest,
+  CreateProjectResponse,
+  OpenProjectRequest,
+  OpenProjectResponse,
+  ConfirmProjectLockOpenRequestEvent,
+  AnswerProjectLockOpenConfirmRequest,
+  AdoptSessionRequest,
+  AdoptSessionResponse,
+  ConfirmAdoptionLaunchRequestEvent,
+  AnswerAdoptionLaunchConfirmRequest,
+  ConfirmAdoptionCommitRequestEvent,
+  AnswerAdoptionCommitConfirmRequest,
 } from '../ipc/channels.js';
 
 export interface SeeyaApi {
@@ -108,6 +121,29 @@ export interface SeeyaApi {
   getDaemonOwnershipTransitionOffer(): Promise<DaemonOwnershipTransitionOfferResponse>;
   /** V2-T13 item 5: the person's answer to the ownership-transition dialog. */
   answerDaemonOwnershipTransition(request: AnswerDaemonOwnershipTransitionRequest): Promise<void>;
+  /** V2-T30 item 1: the "Projects" section's own data, pushed on the same refresh tick as
+   * `onSessionsUpdate` and again right after "New project…"/"Open"/"Adopt…" finish. */
+  onProjectsUpdate(listener: (event: ProjectsUpdateEvent) => void): void;
+  /** V2-T30 item 4: "New project…". */
+  createProject(request: CreateProjectRequest): Promise<CreateProjectResponse>;
+  /** V2-T30 item 3: a project's "Open" button — resolves only once the tab closes. */
+  openProject(request: OpenProjectRequest): Promise<OpenProjectResponse>;
+  /** V2-T30 item 3: the project is locked by another live session — one question at a time. */
+  onConfirmProjectLockOpenRequest(
+    listener: (event: ConfirmProjectLockOpenRequestEvent) => void,
+  ): void;
+  answerProjectLockOpenConfirm(request: AnswerProjectLockOpenConfirmRequest): void;
+  /** V2-T30 item 5: "Adopt…" on an "Other sessions" row — resolves only once the fork's tab closes
+   * and the commit question (if any) has been answered. */
+  adoptSession(request: AdoptSessionRequest): Promise<AdoptSessionResponse>;
+  onConfirmAdoptionLaunchRequest(
+    listener: (event: ConfirmAdoptionLaunchRequestEvent) => void,
+  ): void;
+  answerAdoptionLaunchConfirm(request: AnswerAdoptionLaunchConfirmRequest): void;
+  onConfirmAdoptionCommitRequest(
+    listener: (event: ConfirmAdoptionCommitRequestEvent) => void,
+  ): void;
+  answerAdoptionCommitConfirm(request: AnswerAdoptionCommitConfirmRequest): void;
 }
 
 const api: SeeyaApi = {
@@ -187,6 +223,36 @@ const api: SeeyaApi = {
     ipcRenderer.invoke(CHANNELS.getDaemonOwnershipTransitionOffer),
   answerDaemonOwnershipTransition: (request) =>
     ipcRenderer.invoke(CHANNELS.answerDaemonOwnershipTransition, request),
+  onProjectsUpdate: (listener) => {
+    ipcRenderer.on(CHANNELS.projectsUpdate, (_event, data: ProjectsUpdateEvent) => listener(data));
+  },
+  createProject: (request) => ipcRenderer.invoke(CHANNELS.createProject, request),
+  openProject: (request) => ipcRenderer.invoke(CHANNELS.openProject, request),
+  onConfirmProjectLockOpenRequest: (listener) => {
+    ipcRenderer.on(
+      CHANNELS.confirmProjectLockOpenRequest,
+      (_event, data: ConfirmProjectLockOpenRequestEvent) => listener(data),
+    );
+  },
+  answerProjectLockOpenConfirm: (request) =>
+    ipcRenderer.send(CHANNELS.answerProjectLockOpenConfirm, request),
+  adoptSession: (request) => ipcRenderer.invoke(CHANNELS.adoptSession, request),
+  onConfirmAdoptionLaunchRequest: (listener) => {
+    ipcRenderer.on(
+      CHANNELS.confirmAdoptionLaunchRequest,
+      (_event, data: ConfirmAdoptionLaunchRequestEvent) => listener(data),
+    );
+  },
+  answerAdoptionLaunchConfirm: (request) =>
+    ipcRenderer.send(CHANNELS.answerAdoptionLaunchConfirm, request),
+  onConfirmAdoptionCommitRequest: (listener) => {
+    ipcRenderer.on(
+      CHANNELS.confirmAdoptionCommitRequest,
+      (_event, data: ConfirmAdoptionCommitRequestEvent) => listener(data),
+    );
+  },
+  answerAdoptionCommitConfirm: (request) =>
+    ipcRenderer.send(CHANNELS.answerAdoptionCommitConfirm, request),
 };
 
 contextBridge.exposeInMainWorld('seeya', api);

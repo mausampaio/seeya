@@ -113,6 +113,7 @@ import {
   type OpenedResumeTab,
   type TabResumeOpener,
 } from '../resume/tab-session-resumer.js';
+import { wireProjectIpc } from './project-ipc.js';
 
 /** `TabSessionResumer`'s `claudeCommand` in production — the same default the CLI's own
  * `ClaudeSessionResumer#resolveClaudeBinary` falls back to when nothing overrides it
@@ -484,6 +485,11 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
     openTab: openResumeTab,
     onceExit: (id, listener) => exitListenerRegistry.register(id, listener),
   };
+
+  // V2-T30: the "Projects" section's own IPC (New project/Open/Adopt) — kept in its own module so
+  // this file doesn't grow (see project-ipc.ts's own docstring). Reuses the SAME tabResumeOpener
+  // above: mounting a tab UI for an already-spawned pty was never resume-specific.
+  const projectIpc = wireProjectIpc(window, context, tabResumeOpener, () => latestSidebarRows);
 
   // V2-T3: fetched once by `renderer.ts#main`, before any `new Terminal({...})` is constructed —
   // the two-way handshake (`invoke`, not `send`) matches `createTab` below, the only other channel
@@ -889,6 +895,10 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
       latestSidebarRows = rows;
       const sessionsEvent: SessionsUpdateEvent = { rows };
       window.webContents.send(CHANNELS.sessionsUpdate, sessionsEvent);
+
+      // V2-T30: the "Projects" section, same tick — reuses `rows` above (no second discovery),
+      // plus one small `.seeya-lock` read per project (the task's own declared cost).
+      await projectIpc.pushProjectsUpdate();
 
       const startupTimingPath = process.env.SEEYA_APP_STARTUP_TIMING_PATH;
       if (startupTimingPath !== undefined && !startupTimingWritten) {
