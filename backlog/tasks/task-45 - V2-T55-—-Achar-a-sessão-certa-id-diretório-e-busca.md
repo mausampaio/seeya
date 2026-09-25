@@ -4,7 +4,7 @@ title: 'V2-T55 — Achar a sessão certa: id, diretório e busca'
 status: Review
 assignee: []
 created_date: '2026-09-25 13:35'
-updated_date: '2026-09-25 17:05'
+updated_date: '2026-09-25 18:20'
 labels: []
 milestone: m-2
 dependencies: []
@@ -206,5 +206,11 @@ author: PO
 created: 2026-09-25 17:05
 ---
 Revisão do PO em 2026-09-25: mesclado no po-gate junto com a V2-T52/V2-T55 (entrega única), portão verde (2775 testes) também sem identidade global do git. Conferido: id explícito ignora relevanceHours por uma porta separada (SessionIdLookup) que nunca entra no ciclo de 10 s, custo medido ~20 ms/1.500 e ~100 ms/9.000 transcripts; prefixo ambíguo lista, nunca escolhe; rótulo 'no running process' num lugar só (core/session-state-label.ts), enum continua unknown; lateral agrupada por diretório, modal com id copiável, estado e data; busca por id achou sessão de 30 h. Q-098 aceita. A janela de verificação tocou de novo a chave seeya-dev do registro real (limite documentado) — virou a V2-T57. Falta o aceite do mantenedor.
+---
+
+author: PO
+created: 2026-09-25 18:20
+---
+Aceite do mantenedor em 2026-09-25 (Ubuntu, .deb de 1225753): a busca por id funcionou bem — aceita. Agrupamento por diretório e modal com Adopt funcionaram, com três achados devolvidos ao agente: o rótulo do diretório estica a lateral e cria barra horizontal (vira: fim do caminho com reticências, caminho inteiro no tooltip, lateral nunca rola na horizontal); a lateral não redimensiona (vira: borda arrastável com a largura lembrada, pedido dele); depois de adotar pelo modal, o modal das sessões fica aberto e fechar não devolve o foco ao terminal (vira: iniciar a adoção fecha o modal, e todo diálogo devolve o foco à aba ativa).
 ---
 <!-- COMMENTS:END -->
