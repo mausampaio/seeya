@@ -4,6 +4,7 @@ import type {
   Clock,
   DirectoryExistence,
   DiscoveryResult,
+  ForkActivityCheck,
   ForkCleanup,
   ForkCleanupResult,
   GitEvidenceAcrossRepos,
@@ -15,6 +16,8 @@ import type {
   ProcessControl,
   ProjectLock,
   RejectedDiscoveryRecord,
+  RevertCommitInfo,
+  RevertExecutionOutcome,
   SessionProvider,
   SessionResumer,
   Storage,
@@ -548,6 +551,99 @@ export class FakeWorkspaceRepository implements WorkspaceRepository {
     void root;
     return Promise.resolve(this.changedFilesByProject.get(projectId) ?? []);
   }
+
+  // V2-T32: `project-remove.test.ts`/`project-remove-repo.test.ts`/`project-revert-adoption
+  // .test.ts`'s own hooks — every default reads as "nothing here yet", the same in-memory-fake
+  // convention `changedFilesByProject` above already sets, configured per test with the setters
+  // below rather than a constructor option nobody else needs.
+  private readonly removedProjectDirs: string[] = [];
+  private currentCommitHash: string | null = null;
+  private readonly fileCountByProject = new Map<string, number>();
+  private readonly sessionCommitsByKey = new Map<string, readonly RevertCommitInfo[]>();
+  private readonly commitsAfterByKey = new Map<string, readonly RevertCommitInfo[]>();
+  private revertOutcome: RevertExecutionOutcome = { kind: 'committed' };
+  readonly revertCalls: {
+    readonly projectId: string;
+    readonly commitsNewestFirst: readonly string[];
+    readonly message: string;
+  }[] = [];
+
+  setCurrentCommit(hash: string | null): void {
+    this.currentCommitHash = hash;
+  }
+
+  setFileCount(projectId: string, count: number): void {
+    this.fileCountByProject.set(projectId, count);
+  }
+
+  setSessionCommits(
+    projectId: string,
+    sessionId: string,
+    commits: readonly RevertCommitInfo[],
+  ): void {
+    this.sessionCommitsByKey.set(`${projectId}:${sessionId}`, commits);
+  }
+
+  setCommitsAfter(
+    projectId: string,
+    afterCommit: string,
+    commits: readonly RevertCommitInfo[],
+  ): void {
+    this.commitsAfterByKey.set(`${projectId}:${afterCommit}`, commits);
+  }
+
+  setRevertOutcome(outcome: RevertExecutionOutcome): void {
+    this.revertOutcome = outcome;
+  }
+
+  wasProjectDirRemoved(projectId: string): boolean {
+    return this.removedProjectDirs.includes(projectId);
+  }
+
+  removeProjectDirectory(root: string, projectId: string): Promise<void> {
+    this.projectsOf(root).delete(projectId);
+    this.removedProjectDirs.push(projectId);
+    return Promise.resolve();
+  }
+
+  currentCommit(root: string): Promise<string | null> {
+    void root;
+    return Promise.resolve(this.currentCommitHash);
+  }
+
+  countProjectFiles(root: string, projectId: string): Promise<number> {
+    void root;
+    return Promise.resolve(this.fileCountByProject.get(projectId) ?? 0);
+  }
+
+  findSessionCommits(
+    root: string,
+    projectId: string,
+    sessionId: string,
+  ): Promise<readonly RevertCommitInfo[]> {
+    void root;
+    return Promise.resolve(this.sessionCommitsByKey.get(`${projectId}:${sessionId}`) ?? []);
+  }
+
+  findCommitsAfter(
+    root: string,
+    projectId: string,
+    afterCommit: string,
+  ): Promise<readonly RevertCommitInfo[]> {
+    void root;
+    return Promise.resolve(this.commitsAfterByKey.get(`${projectId}:${afterCommit}`) ?? []);
+  }
+
+  revertCommits(
+    root: string,
+    projectId: string,
+    commitsNewestFirst: readonly string[],
+    message: string,
+  ): Promise<RevertExecutionOutcome> {
+    void root;
+    this.revertCalls.push({ projectId, commitsNewestFirst, message });
+    return Promise.resolve(this.revertOutcome);
+  }
 }
 
 /** Named double for `SessionResumer` (S3-T3, docs/TESTES.md: "duplo de I/O é classe/objeto
@@ -753,6 +849,18 @@ export class FakeForkCleanup implements ForkCleanup {
     this.deletedSessionIds.push(sessionId);
     return Promise.resolve({ sessionId, outcome: 'deleted' });
   }
+
+  // V2-T32: `project-revert-adoption.test.ts`'s own hook — defaults to "no transcript found"
+  // (D-025's least-specific true reading), configured per test with `setForkActivity`.
+  private forkActivityBySessionId = new Map<string, ForkActivityCheck>();
+
+  setForkActivity(sessionId: string, check: ForkActivityCheck): void {
+    this.forkActivityBySessionId.set(sessionId, check);
+  }
+
+  checkForkActivity(sessionId: string): Promise<ForkActivityCheck> {
+    return Promise.resolve(this.forkActivityBySessionId.get(sessionId) ?? { kind: 'notFound' });
+  }
 }
 
 /** A `ForkCleanup` whose `cleanup()` always rejects — for `endDay`'s isolation test: a fork-cleanup
@@ -764,6 +872,10 @@ export class FailingForkCleanup implements ForkCleanup {
 
   deleteFork(): ReturnType<ForkCleanup['deleteFork']> {
     return Promise.reject(new Error('FailingForkCleanup: deleteFork always fails'));
+  }
+
+  checkForkActivity(): ReturnType<ForkCleanup['checkForkActivity']> {
+    return Promise.reject(new Error('FailingForkCleanup: checkForkActivity always fails'));
   }
 }
 
