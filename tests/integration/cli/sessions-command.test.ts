@@ -182,7 +182,7 @@ describe('runSessionsCommand', () => {
     expect(report).toContain('state: ended');
   });
 
-  it('a headless (no-pid) transcript-only session is reported "unknown", never "ended" (D-016/D-025)', async () => {
+  it('a headless (no-pid) transcript-only session is reported "no running process", never "ended" (D-016/D-025, V2-T52)', async () => {
     fixture = await createDiscoveryFixture();
     await writeTranscriptWithContent(
       fixture,
@@ -199,6 +199,8 @@ describe('runSessionsCommand', () => {
     });
 
     expect(report).toContain('1 session found.');
-    expect(report).toContain('state: unknown');
+    // V2-T52: the enum classifyState() produces is still literally 'unknown' (see
+    // tests/unit/core/session-state-label.test.ts for that guard) — only the rendered word changes.
+    expect(report).toContain('state: no running process');
   });
 });

@@ -20,6 +20,8 @@ import {
   type PathPlatformHint,
 } from '@seeya-ai/engine/core/cwd-normalization.js';
 import type { DiscoveredSession } from '@seeya-ai/engine/core/types.js';
+import type { SessionIdLookup } from '@seeya-ai/engine/core/ports.js';
+import { looksLikeSessionIdReference } from '@seeya-ai/engine/core/session-id-shape.js';
 
 /** The three fields any `--session` candidate needs, regardless of whether the underlying value is
  * a `DiscoveredSession` (`end-day`) or a `Handoff` (`start-day`) — both already carry all three. */
@@ -97,4 +99,39 @@ export function resolveSessionReference<T>(
     return { kind: 'ambiguous', matches };
   }
   return first === undefined ? { kind: 'notFound' } : { kind: 'found', item: first };
+}
+
+/**
+ * `seeya project adopt <session> <id>`'s own two-phase resolution (V2-T55 item 1). Phase one is
+ * exactly `resolveSessionReference` above, unchanged — name, cwd, or a `sessionId` prefix, matched
+ * against the CURRENTLY discovered (`relevanceHours`-windowed) sessions, same as every other
+ * `--session` caller. Only when that phase comes up EMPTY, and `value` could plausibly be a
+ * `sessionId` (`looksLikeSessionIdReference` — never a name or `cwd`, which always fail that
+ * check), does this fall through to `sessionIdLookup`: a direct, unwindowed transcript search
+ * (`adapters/discovery/session-id-lookup.ts`) for exactly the case this task exists for — "adopt a
+ * session closed more than `relevanceHours` ago, giving only the id". A value that matched nothing
+ * in the window and doesn't look like an id (a mistyped name, an unrelated cwd) never reaches the
+ * extra scan — the acceptance's own "a busca por nome continua na lista da janela de tempo".
+ *
+ * An `ambiguous` phase-one result is returned as-is, without ever trying phase two: it already has
+ * an answer (retype with more characters), and D-025 gives no reason to also go looking further
+ * back in time for MORE candidates to add to an already-ambiguous match.
+ */
+export async function resolveSessionReferenceForAdoption(
+  candidates: readonly DiscoveredSession[],
+  sessionIdLookup: SessionIdLookup,
+  value: string,
+): Promise<SessionReferenceMatch<DiscoveredSession>> {
+  const windowed = resolveSessionReference(candidates, toDiscoveredSessionReference, value);
+  if (windowed.kind !== 'notFound' || !looksLikeSessionIdReference(value)) {
+    return windowed;
+  }
+  const outcome = await sessionIdLookup.findByIdPrefix(value);
+  if (outcome.kind === 'found') {
+    return { kind: 'found', item: outcome.session };
+  }
+  if (outcome.kind === 'ambiguous') {
+    return { kind: 'ambiguous', matches: outcome.candidates };
+  }
+  return { kind: 'notFound' };
 }

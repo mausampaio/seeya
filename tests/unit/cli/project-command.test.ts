@@ -39,6 +39,7 @@ import {
   FakeHarnessLauncher,
   FakeProjectAuditMarker,
   FakeProjectLock,
+  FakeSessionIdLookup,
   FakeSessionProvider,
   FakeWorkspaceRepository,
   InMemoryDeviceStorage,
@@ -395,9 +396,11 @@ describe('runProjectAdoptCommand', () => {
   it('no match for the session argument: refuses, never touches adoptSession at all', async () => {
     const context = buildContext();
     const sessionProvider = new FakeSessionProvider({ sessions: [], rejected: [] });
+    const sessionIdLookup = new FakeSessionIdLookup();
     const { stdout, output } = collectStdout();
     const exitCode = await runProjectAdoptCommand(
       sessionProvider,
+      sessionIdLookup,
       buildAdoptDeps(context),
       'ghost-session',
       'auth-hardening',
@@ -405,6 +408,48 @@ describe('runProjectAdoptCommand', () => {
     );
     expect(exitCode).toBe(1);
     expect(output()).toContain('No discovered session matches "ghost-session"');
+    // V2-T55 item 1: "ghost-session" doesn't look like a sessionId (has letters outside 0-9a-f),
+    // so the direct, unwindowed transcript scan is never even attempted for a plainly wrong name.
+    expect(sessionIdLookup.calls).toEqual([]);
+  });
+
+  /**
+   * V2-T55 item 1's own motivating case: the maintainer's Ubuntu session, closed more than
+   * `relevanceHours` ago — gone from `seeya sessions`' own windowed list, but still adoptable by
+   * giving its id. `FakeSessionProvider` here has NO sessions at all (simulating "aged out of the
+   * window"); only the direct `sessionIdLookup` fallback knows about it.
+   */
+  it('V2-T55 item 1: an id-shaped reference not in the window falls back to the direct lookup and adopts it', async () => {
+    const context = buildContext();
+    // A `SessionWithoutPid` (D-016: no PID field at all, never a cast on `ORIGINAL`) — this is
+    // exactly what the direct transcript-only lookup can build, unlike the registry strategy.
+    const closedLongAgo: DiscoveredSession = {
+      hasPid: false,
+      sessionId: ORIGINAL.sessionId,
+      cwd: ORIGINAL.cwd,
+      name: ORIGINAL.name,
+      hasTranscript: ORIGINAL.hasTranscript,
+      lastTranscriptWrite: ORIGINAL.lastTranscriptWrite,
+      lastActivity: ORIGINAL.lastActivity,
+    };
+    const sessionProvider = new FakeSessionProvider({ sessions: [], rejected: [] });
+    const sessionIdLookup = new FakeSessionIdLookup({ kind: 'found', session: closedLongAgo });
+    const stdin = new PassThrough();
+    stdin.write('\n');
+    const { stdout, output } = collectStdout();
+
+    const exitCode = await runProjectAdoptCommand(
+      sessionProvider,
+      sessionIdLookup,
+      buildAdoptDeps(context),
+      ORIGINAL.sessionId,
+      'auth-hardening',
+      { stdin, stdout, isTTY: true },
+    );
+
+    expect(exitCode).toBe(0);
+    expect(sessionIdLookup.calls).toEqual([ORIGINAL.sessionId]);
+    expect(output()).toContain('nothing to commit');
   });
 
   it('ambiguous match: refuses, names every candidate sessionId', async () => {
@@ -423,6 +468,7 @@ describe('runProjectAdoptCommand', () => {
     const { stdout, output } = collectStdout();
     const exitCode = await runProjectAdoptCommand(
       sessionProvider,
+      new FakeSessionIdLookup(),
       buildAdoptDeps(context),
       'same-name',
       'auth-hardening',
@@ -443,6 +489,7 @@ describe('runProjectAdoptCommand', () => {
     const { stdout, output } = collectStdout();
     const exitCode = await runProjectAdoptCommand(
       sessionProvider,
+      new FakeSessionIdLookup(),
       buildAdoptDeps(context, { adoptionLauncher }),
       running.name,
       'auth-hardening',
@@ -462,6 +509,7 @@ describe('runProjectAdoptCommand', () => {
 
       const exitCode = await runProjectAdoptCommand(
         sessionProvider,
+        new FakeSessionIdLookup(),
         buildAdoptDeps(context, { adoptionLauncher }),
         ORIGINAL.name,
         'auth-hardening',
@@ -486,6 +534,7 @@ describe('runProjectAdoptCommand', () => {
 
       const exitCode = await runProjectAdoptCommand(
         sessionProvider,
+        new FakeSessionIdLookup(),
         buildAdoptDeps(context, { adoptionLauncher }),
         ORIGINAL.name,
         'auth-hardening',
@@ -516,6 +565,7 @@ describe('runProjectAdoptCommand', () => {
 
       const exitCode = await runProjectAdoptCommand(
         sessionProvider,
+        new FakeSessionIdLookup(),
         buildAdoptDeps(context, { adoptionLauncher: inspectingLauncher }),
         ORIGINAL.name,
         'auth-hardening',
@@ -547,6 +597,7 @@ describe('runProjectAdoptCommand', () => {
 
     const exitCode = await runProjectAdoptCommand(
       sessionProvider,
+      new FakeSessionIdLookup(),
       buildAdoptDeps(context),
       ORIGINAL.name,
       'auth-hardening',
@@ -579,6 +630,7 @@ describe('runProjectAdoptCommand', () => {
 
     const exitCode = await runProjectAdoptCommand(
       sessionProvider,
+      new FakeSessionIdLookup(),
       buildAdoptDeps(context),
       ORIGINAL.name,
       'auth-hardening',
@@ -608,6 +660,7 @@ describe('runProjectAdoptCommand', () => {
 
     const exitCode = await runProjectAdoptCommand(
       sessionProvider,
+      new FakeSessionIdLookup(),
       buildAdoptDeps(context),
       ORIGINAL.name,
       'auth-hardening',

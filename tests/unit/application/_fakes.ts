@@ -20,6 +20,7 @@ import type {
   RejectedDiscoveryRecord,
   RevertCommitInfo,
   RevertExecutionOutcome,
+  SessionIdLookup,
   SessionProvider,
   SessionResumer,
   Storage,
@@ -44,6 +45,7 @@ import type {
   ProjectSkeleton,
   ProtocolScheme,
   RepositoryMapEntry,
+  SessionIdLookupOutcome,
   ResumeFallbackReason,
   ResumeOutcome,
   SessionFacts,
@@ -72,6 +74,20 @@ export class FakeClock implements Clock {
 export class FakeSessionProvider implements SessionProvider {
   constructor(private readonly result: DiscoveryResult) {}
   list(): Promise<DiscoveryResult> {
+    return Promise.resolve(this.result);
+  }
+}
+
+/** V2-T55 item 1: the direct, `relevanceHours`-ignoring lookup — defaults to `notFound`, since
+ * most tests exercising `runProjectAdoptCommand` resolve through `FakeSessionProvider`'s own
+ * windowed list and never need this fallback to answer anything at all. `calls` records every
+ * `idPrefix` asked for, so a test can prove the expensive fallback was (or wasn't) reached at all —
+ * not just what it would have answered. */
+export class FakeSessionIdLookup implements SessionIdLookup {
+  readonly calls: string[] = [];
+  constructor(private readonly result: SessionIdLookupOutcome = { kind: 'notFound' }) {}
+  findByIdPrefix(idPrefix: string): Promise<SessionIdLookupOutcome> {
+    this.calls.push(idPrefix);
     return Promise.resolve(this.result);
   }
 }

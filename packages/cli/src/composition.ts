@@ -22,6 +22,7 @@ import type {
   ProjectAuditMarker,
   ProjectLock,
   SessionAdoptionLauncher,
+  SessionIdLookup,
   SessionProvider,
   SessionResumer,
   Storage,
@@ -49,6 +50,7 @@ import {
   DiscoverySessionProvider,
   DiscoveryForkCleanup,
   discoverEarlyWarnings,
+  DiscoverySessionIdLookup,
 } from '@seeya-ai/engine/adapters/discovery/index.js';
 import { TranscriptFileReader } from '@seeya-ai/engine/adapters/transcript/index.js';
 import { GitAdapter } from '@seeya-ai/engine/adapters/git/index.js';
@@ -609,6 +611,10 @@ export async function buildProjectOpenDeps(context: ProjectContext): Promise<Pro
  */
 export interface ProjectAdoptContext extends ProjectContext {
   readonly sessionProvider: SessionProvider;
+  /** V2-T55 item 1: the direct, `relevanceHours`-ignoring lookup `runProjectAdoptCommand`'s own
+   * `resolveSessionReferenceForAdoption` falls back to once `sessionProvider`'s windowed list has
+   * already come up empty for an id-shaped reference. */
+  readonly sessionIdLookup: SessionIdLookup;
   readonly forkRegistration: ForkRegistration;
   readonly forkCleanup: ForkCleanup;
   readonly adoptionLauncher: SessionAdoptionLauncher;
@@ -625,6 +631,10 @@ export async function buildProjectAdoptContext(
   return {
     ...context,
     sessionProvider: buildSessionProvider(home, clock, realProcessControl, config.relevanceHours),
+    sessionIdLookup: new DiscoverySessionIdLookup({
+      claudeHome: home.claudeHome,
+      seeyaHome: home.seeyaHome,
+    }),
     forkRegistration: new GenerationForkRegistration(home.seeyaHome),
     forkCleanup: new DiscoveryForkCleanup({
       claudeHome: home.claudeHome,

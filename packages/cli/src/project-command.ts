@@ -31,7 +31,8 @@ import { verifyCommit } from '@seeya-ai/engine/application/verify-commit.js';
 import type { VerifyCommitDeps } from '@seeya-ai/engine/application/verify-commit.js';
 import { decideBashCommandGuard } from '@seeya-ai/engine/core/harness-hook-config.js';
 import { parseBashCommandFromHookPayload } from '@seeya-ai/engine/adapters/harness/bash-command-hook-payload-schema.js';
-import { resolveSessionReference, toDiscoveredSessionReference } from './session-reference.js';
+import type { SessionIdLookup } from '@seeya-ai/engine/core/ports.js';
+import { resolveSessionReferenceForAdoption } from './session-reference.js';
 import type { ProjectContext } from './composition.js';
 import {
   formatAddRepoReport,
@@ -239,24 +240,27 @@ function makeAdoptionLaunchConfirmer(reader: ConfirmationReader): ConfirmAdoptio
 
 /**
  * `seeya project adopt <session> <projectId>` (V2-T29) — resolves `session` against real
- * discovery first (`resolveSessionReference`, the same ambiguity-refusing match `--session` uses
- * on `end-day`/`start-day`), then hands the resolved `DiscoveredSession` to `adoptSession`. Takes
- * `SessionProvider`/`AdoptSessionDeps` directly rather than a single `ProjectContext`-shaped bag,
- * same reasoning `runProjectOpenCommand` above already gives for its own `ProjectOpenDeps`: the
- * per-invocation pieces (`forkSessionId`, `pid`, `procStart`) are composition-root concerns
- * (`composition.ts#buildProjectAdoptDeps`), not this function's.
+ * discovery first (`resolveSessionReferenceForAdoption`, the same ambiguity-refusing match
+ * `--session` uses on `end-day`/`start-day`, extended by V2-T55 item 1: an id/prefix that matches
+ * nothing in the current `relevanceHours` window falls through to a direct, unwindowed transcript
+ * search via `sessionIdLookup`), then hands the resolved `DiscoveredSession` to `adoptSession`.
+ * Takes `SessionProvider`/`SessionIdLookup`/`AdoptSessionDeps` directly rather than a single
+ * `ProjectContext`-shaped bag, same reasoning `runProjectOpenCommand` above already gives for its
+ * own `ProjectOpenDeps`: the per-invocation pieces (`forkSessionId`, `pid`, `procStart`) are
+ * composition-root concerns (`composition.ts#buildProjectAdoptDeps`), not this function's.
  */
 export async function runProjectAdoptCommand(
   sessionProvider: SessionProvider,
+  sessionIdLookup: SessionIdLookup,
   deps: AdoptSessionDeps,
   sessionRef: string,
   projectId: string,
   io: ProjectOpenIo,
 ): Promise<number> {
   const discovery = await sessionProvider.list();
-  const match = resolveSessionReference(
+  const match = await resolveSessionReferenceForAdoption(
     discovery.sessions,
-    toDiscoveredSessionReference,
+    sessionIdLookup,
     sessionRef,
   );
   if (match.kind === 'notFound') {

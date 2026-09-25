@@ -496,17 +496,25 @@ projectCommand
   )
   .argument(
     '<session>',
-    'The session, by the name "seeya sessions" shows, a sessionId (or prefix), or its cwd.',
+    'The session, by the name "seeya sessions" shows, a sessionId (or prefix), or its cwd. ' +
+      'A sessionId/prefix also finds a session closed longer ago than "seeya sessions" shows.',
   )
   .argument('<id>', 'The project id, e.g. "auth-hardening".')
   .action(async (session: string, id: string) => {
     const context = await buildProjectAdoptContext();
     const deps = await buildProjectAdoptDeps(context);
-    const exitCode = await runProjectAdoptCommand(context.sessionProvider, deps, session, id, {
-      stdin: process.stdin,
-      stdout: process.stdout,
-      isTTY: process.stdin.isTTY === true,
-    });
+    const exitCode = await runProjectAdoptCommand(
+      context.sessionProvider,
+      context.sessionIdLookup,
+      deps,
+      session,
+      id,
+      {
+        stdin: process.stdin,
+        stdout: process.stdout,
+        isTTY: process.stdin.isTTY === true,
+      },
+    );
     if (exitCode !== 0) {
       process.exitCode = exitCode;
     }

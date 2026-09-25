@@ -5,6 +5,7 @@
  */
 import type { RejectedDiscoveryRecord } from '@seeya-ai/engine/core/ports.js';
 import type { SessionRow } from '@seeya-ai/engine/application/session-view.js';
+import { formatSessionStateLabel } from '@seeya-ai/engine/core/session-state-label.js';
 
 /**
  * `lastActivity: null` is absence of data (D-025), never rendered as a real instant. "unknown",
@@ -27,7 +28,7 @@ function formatSessionLine(row: SessionRow): string {
   const terminate = row.canTerminate ? 'yes' : 'no';
   return (
     `- ${row.name} (${row.cwd})\n` +
-    `    id: ${row.displaySessionId} | state: ${row.state} | ` +
+    `    id: ${row.displaySessionId} | state: ${formatSessionStateLabel(row.state)} | ` +
     `last activity: ${formatLastActivity(row.lastActivity)} | terminate on end-day: ${terminate}`
   );
 }
