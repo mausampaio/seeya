@@ -4,7 +4,7 @@ title: 'V2-T55 — Achar a sessão certa: id, diretório e busca'
 status: Review
 assignee: []
 created_date: '2026-09-25 13:35'
-updated_date: '2026-09-25 18:45'
+updated_date: '2026-09-25 18:54'
 labels: []
 milestone: m-2
 dependencies: []
@@ -238,5 +238,11 @@ Correções do aceite do mantenedor (Ubuntu, .deb de 1225753), 2026-09-25 — a 
 **Portão:** `npm run verificar` verde; repetido com `GIT_CONFIG_GLOBAL`/`GIT_CONFIG_NOSYSTEM=1` (simula CI sem identidade): também verde. Commit único (`fix(app): three PO-acceptance corrections...`) na mesma branch, depois do merge de `origin/main`.
 
 Notas de implementação da tarefa não foram reescritas — este comentário é o registro das três correções.
+---
+
+author: PO
+created: 2026-09-25 18:54
+---
+Revisão do PO em 2026-09-25, rodada de correção do aceite: mesclado no po-gate, portão verde (2793 testes) também sem identidade global do git. Conferido: o rótulo do diretório mostra o fim do caminho (função pura testada), a lateral não rola mais na horizontal (min-width:0 + overflow-x: hidden — a causa era o caminho sem espaço forçando a largura, a mesma classe da V2-T48), a lateral redimensiona com a largura lembrada (seeya.sidebarWidth, no glossário), e o foco volta à aba ativa por um mecanismo único para todos os diálogos (verificado: focusReturnedToTerminal true). A janela de verificação tocou de novo a chave seeya-dev (V2-T57 isola). Falta o aceite do mantenedor com um build novo.
 ---
 <!-- COMMENTS:END -->
