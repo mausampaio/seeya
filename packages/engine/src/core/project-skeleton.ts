@@ -21,8 +21,32 @@
  * that it doesn't buy anything today: the current Claude Code already reads `AGENTS.md` directly,
  * so the pointer file has no reader left to serve. Projects created before this fix keep whatever
  * `CLAUDE.md` they already have — `seeya` never deletes a file a person might have edited.
+ *
+ * **`AGENTS.md` names the project by id, and carries a "Working in this project" section
+ * (V2-T34 item 6).** Found by the maintainer's own test that motivated this task: a session called
+ * its project "the seeya project," generic, because that's literally what the old text said — and
+ * separately rewrote `AGENTS.md` entirely during an adoption, which is exactly why the SAME rules
+ * are also delivered live on every `open` (`core/project-working-rules.ts`'s own docstring on why
+ * one static file was never going to be enough on its own). This section is a summary for a person
+ * reading the file, or a session that hasn't been told yet (before the first `open`) — the one
+ * source that "valer sempre" actually depends on is the live delivery.
+ *
+ * **The Claude Code project hook (V2-T34 item 2, `core/harness-hook-config.ts`) is written here
+ * too — at creation time only, like every other skeleton file.** Unlike the workspace's own git
+ * hook (`core/workspace-hooks.ts`), which lives outside git's tracked content and is reinstalled on
+ * every `open`, this one is ordinary project content: reasserting it on every `open` the same way
+ * would make it look like an uncommitted change to the leftover-changes check (V2-T34 item 4) every
+ * single time, even when nothing was actually touched. A session is free to edit or remove it —
+ * `seeya project audit` (`core/project-audit.ts`) is what catches what a missing hook let through.
  */
 import type { ProjectManifest, ProjectSkeleton, WorkspaceProjectFile } from './types.js';
+import {
+  HARNESS_HOOK_SCRIPT_RELATIVE_PATH,
+  HARNESS_SETTINGS_RELATIVE_PATH,
+  buildHarnessHookScript,
+  buildHarnessSettingsJson,
+} from './harness-hook-config.js';
+import { buildProjectWorkingRulesText } from './project-working-rules.js';
 
 /** `docs/V2-RUMO.md` § "Projeto persistente" — the six subdirectories every project starts with,
  * even though each is empty until `pause`/`checkpoint` (later tasks) or a person writes into one. */
@@ -38,9 +62,9 @@ const PROJECT_DIRECTORIES: readonly string[] = [
 function buildAgentsMd(projectId: string): string {
   return (
     `# ${projectId}\n\n` +
-    'This is a seeya project: a context repository for one line of work, independent of any ' +
-    'single Claude Code, Codex, Gemini or other harness session (see seeya.json for the ' +
-    'machine-readable record).\n\n' +
+    `This is seeya project "${projectId}": a context repository for one line of work, ` +
+    'independent of any single Claude Code, Codex, Gemini or other harness session (see ' +
+    'seeya.json for the machine-readable record).\n\n' +
     'Start at INDEX.md.\n\n' +
     '## Layout\n\n' +
     '- `context/` — system, constraints, glossary\n' +
@@ -49,6 +73,8 @@ function buildAgentsMd(projectId: string): string {
     '- `status/` — current state, open questions, resume point\n' +
     '- `journal/` — what each session/close produced\n' +
     '- `references/` — associated repositories and trackers\n\n' +
+    '## Working in this project\n\n' +
+    `${buildProjectWorkingRulesText(projectId)}\n\n` +
     'This project was just created and has no content yet beyond this skeleton.\n'
   );
 }
@@ -88,6 +114,10 @@ export function buildProjectSkeleton(projectId: string): ProjectSkeleton {
   const files: WorkspaceProjectFile[] = [
     { relativePath: 'AGENTS.md', content: buildAgentsMd(projectId) },
     { relativePath: 'INDEX.md', content: buildIndexMd(projectId) },
+    // V2-T34 item 2 — this module's own docstring on why these two are written once, here, and
+    // never reasserted by `open` the way the workspace's own git hook is.
+    { relativePath: HARNESS_SETTINGS_RELATIVE_PATH, content: buildHarnessSettingsJson() },
+    { relativePath: HARNESS_HOOK_SCRIPT_RELATIVE_PATH, content: buildHarnessHookScript() },
   ];
   return { manifest, files, directories: PROJECT_DIRECTORIES };
 }
