@@ -9121,3 +9121,21 @@ medições de dias diferentes — lição para o método: **piora só se afirma 
 A CPU parada subiu 0,1–0,2 ponto de um núcleo, toda no processo principal: é o custo que a
 especificação da V2-T30 declarou (projetos, adoções e lock lidos no ciclo de 10 s). Aceito como custo
 declarado; nenhuma otimização agora.
+
+## Q-097 — Retomar uma sessão de outro diretório: medição do mantenedor
+
+**Medição do mantenedor (2026-09-25, Windows, com uma sessão real dele).** Ele retomou a mesma sessão
+com `claude --resume <id>` a partir de três diretórios diferentes — a pasta pessoal, um diretório
+pai do repositório, e o próprio repositório. Nas três vezes a sessão **abriu normalmente**, com o
+histórico, mas **sem a memória do diretório original** (as instruções e a memória automática que o
+Claude Code carrega pelo diretório de trabalho). Por dentro de uma sessão já aberta, o `/resume`
+**só lista as sessões daquele diretório**; buscando todas e escolhendo uma de outro diretório, o
+Claude Code avisa que ela pertence a outro diretório e **recusa**.
+
+**O que isto decide:** (1) a afirmação de que "o `--resume` só acha o histórico no diretório
+original", corrigida na V2-T29 como nunca medida, fica agora medida e **falsa** para a linha de
+comando — ela acha de qualquer lugar; (2) o motivo real de a adoção abrir a cópia no diretório
+original continua sendo a memória daquele diretório (V2-T29, decisão de 2026-09-24), e esta
+medição o confirma — retomada de outro lugar perde exatamente isso; (3) qualquer "continuar sessão"
+que o seeya oferecer escolhe o diretório de propósito, sabendo o que ganha e o que perde (ver a
+tarefa de descoberta V2-T53).
