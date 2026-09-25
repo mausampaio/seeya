@@ -174,18 +174,23 @@ async function captureVerificationScreenshot(
   // together for a verification run. SEEYA_APP_AUTO_END_DAY needs much longer: its own click
   // sequence (below) waits through TWO real endDay runs (a dry-run preview, then the real one),
   // each spawning a headless `claude -p` per eligible session — 2500ms is nowhere near enough for
-  // that to finish before this captures. V2-T55's own three flags below (`SEEYA_APP_AUTO_
+  // that to finish before this captures. V2-T55's own flags below (`SEEYA_APP_AUTO_
   // OPEN_OTHER_SESSIONS_DIR`/`SEEYA_APP_AUTO_SEARCH_SESSION_ID`/`SEEYA_APP_AUTO_DECLINE_
-  // DAEMON_OWNERSHIP_TRANSITION`) each start with a defensive dismiss of the (unrelated)
-  // daemon-ownership-transition dialog on a machine where `seeya` is already installed — measured
-  // on one such machine: that dialog's own decline click stays on an async "Working…" state for a
-  // moment before closing, so a verification run using any of the three gets extra room too.
+  // DAEMON_OWNERSHIP_TRANSITION`/`SEEYA_APP_AUTO_VERIFY_DIALOG_FOCUS_RETURN_PATH`) each start with
+  // a defensive dismiss of the (unrelated) daemon-ownership-transition dialog on a machine where
+  // `seeya` is already installed — measured on one such machine: that dialog's own decline click
+  // stays on an async "Working…" state for up to several seconds (its own check queries the real
+  // Windows Task Scheduler, `composition/index.ts#BuildAppContextOverrides`'s own docstring
+  // already measured that at "~1.3-4s on EVERY call") before closing, so a verification run using
+  // any of these flags gets a longer window too.
   const usesV2T55Instrumentation =
     process.env.SEEYA_APP_AUTO_OPEN_OTHER_SESSIONS_DIR === '1' ||
     process.env.SEEYA_APP_AUTO_SEARCH_SESSION_ID !== undefined ||
-    process.env.SEEYA_APP_AUTO_DECLINE_DAEMON_OWNERSHIP_TRANSITION === '1';
+    process.env.SEEYA_APP_AUTO_DECLINE_DAEMON_OWNERSHIP_TRANSITION === '1' ||
+    process.env.SEEYA_APP_AUTO_RESIZE_SIDEBAR === '1' ||
+    process.env.SEEYA_APP_AUTO_VERIFY_DIALOG_FOCUS_RETURN_PATH !== undefined;
   await clock.sleep(
-    process.env.SEEYA_APP_AUTO_END_DAY === '1' ? 8000 : usesV2T55Instrumentation ? 4000 : 2500,
+    process.env.SEEYA_APP_AUTO_END_DAY === '1' ? 8000 : usesV2T55Instrumentation ? 7000 : 2500,
   );
   const image = await window.webContents.capturePage();
   const { writeFile } = await import('node:fs/promises');
@@ -446,6 +451,37 @@ function createWindow(clock: Clock): BrowserWindow {
         .then(() => window.webContents.executeJavaScript(dismissDaemonOwnershipTransitionScript));
     });
   }
+  // SEEYA_APP_AUTO_RESIZE_SIDEBAR: same class (PO acceptance correction 2, 2026-09-25) —
+  // dispatches a REAL synthetic pointer drag sequence (pointerdown on the handle, pointermove,
+  // pointerup) on `#sidebar-resize-handle`, exercising `sidebar-resize-view.ts`'s own drag
+  // listeners exactly as a real mouse would, rather than patching the CSS custom property
+  // directly — the more faithful proof that dragging itself works, not just that the sidebar CAN
+  // be a different width. Never set by `npm run app` or the README.
+  if (process.env.SEEYA_APP_AUTO_RESIZE_SIDEBAR === '1') {
+    window.webContents.once('did-finish-load', () => {
+      void clock
+        .sleep(600)
+        .then(() => window.webContents.executeJavaScript(dismissDaemonOwnershipTransitionScript))
+        .then(() => clock.sleep(600))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            '(() => { ' +
+              "const handle = document.getElementById('sidebar-resize-handle'); " +
+              'if (!handle) { return; } ' +
+              'const rect = handle.getBoundingClientRect(); ' +
+              'const startX = rect.left + rect.width / 2; ' +
+              'const targetX = startX + 140; ' +
+              "handle.dispatchEvent(new PointerEvent('pointerdown', " +
+              '{ clientX: startX, clientY: rect.top, bubbles: true, pointerId: 1 })); ' +
+              "window.dispatchEvent(new PointerEvent('pointermove', " +
+              '{ clientX: targetX, clientY: rect.top, bubbles: true, pointerId: 1 })); ' +
+              "window.dispatchEvent(new PointerEvent('pointerup', " +
+              '{ clientX: targetX, clientY: rect.top, bubbles: true, pointerId: 1 })); ' +
+              '})();',
+          ),
+        );
+    });
+  }
   if (process.env.SEEYA_APP_AUTO_OPEN_OTHER_SESSIONS_DIR === '1') {
     window.webContents.once('did-finish-load', () => {
       void clock
@@ -480,6 +516,43 @@ function createWindow(clock: Clock): BrowserWindow {
               '})();',
           ),
         );
+    });
+  }
+  // SEEYA_APP_AUTO_VERIFY_DIALOG_FOCUS_RETURN_PATH: same "instrumentação só do spike" class as
+  // the flags above (PO acceptance correction 3, 2026-09-25) — opens and closes the real
+  // Settings dialog, then writes whether focus landed back on the active tab's terminal
+  // (`document.activeElement` inside `#terminal-host`) to the file this variable names. Meant to
+  // run together with `SEEYA_APP_AUTO_OPEN_SHELL_TAB=1` (a real terminal has to exist first) — a
+  // screenshot wouldn't show a focus state anyway, so this writes a fact to read back instead.
+  // Never set by `npm run app` or the README.
+  const focusReturnVerificationPath = process.env.SEEYA_APP_AUTO_VERIFY_DIALOG_FOCUS_RETURN_PATH;
+  if (focusReturnVerificationPath !== undefined) {
+    window.webContents.once('did-finish-load', () => {
+      void clock
+        .sleep(1500) // after SEEYA_APP_AUTO_OPEN_SHELL_TAB's own tab has mounted
+        .then(() => window.webContents.executeJavaScript(dismissDaemonOwnershipTransitionScript))
+        .then(() => clock.sleep(300))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('settings-button')?.click();",
+          ),
+        )
+        .then(() => clock.sleep(300))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('settings-dialog-close')?.click();",
+          ),
+        )
+        .then(() => clock.sleep(300))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.activeElement !== null && document.activeElement.closest('#terminal-host') !== null",
+          ),
+        )
+        .then(async (focusReturnedToTerminal: unknown) => {
+          const { writeFile } = await import('node:fs/promises');
+          await writeFile(focusReturnVerificationPath, JSON.stringify({ focusReturnedToTerminal }));
+        });
     });
   }
   return window;

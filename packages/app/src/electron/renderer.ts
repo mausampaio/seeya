@@ -37,6 +37,7 @@ import {
 } from '../state/autostart-control-panel.js';
 import type { SettingsRow, ProjectPolicyLine } from '../state/settings-panel.js';
 import { wireProjectPanel } from './project-panel-view.js';
+import { registerActiveTerminalFocuser, wireDialogFocusReturn } from './dialog-focus-return.js';
 
 declare global {
   interface Window {
@@ -89,6 +90,20 @@ function showTab(id: string): void {
   // its button, or by a resume — takes keyboard focus, so typing starts in the terminal
   // without a second click on it.
   shown?.terminal.focus();
+}
+
+/** PO acceptance of V2-T55, correction 3 (2026-09-25) — the one place that knows which tab is
+ * currently shown, reused by `dialog-focus-return.ts` via `registerActiveTerminalFocuser` (this
+ * function is passed there, once, at startup) so every `<dialog>` on the page returns focus here
+ * on close. No tab open at all: leaves focus wherever it already is (D-025, never guessed) —
+ * mirrors `showTab`'s own `shown?.terminal.focus()` for the identical "no open tab" case. */
+function focusActiveTabTerminal(): void {
+  for (const open of openTabs.values()) {
+    if (!open.container.hidden) {
+      open.terminal.focus();
+      return;
+    }
+  }
 }
 
 function addTabButton(id: string, label: string): void {
@@ -1380,6 +1395,8 @@ async function main(): Promise<void> {
   wireAutostartControl();
   wireSettingsDialog();
   wireDaemonOwnershipTransitionDialog();
+  registerActiveTerminalFocuser(focusActiveTabTerminal);
+  wireDialogFocusReturn();
   wireProjectPanel();
   await refreshTodayPanel();
   // V2-T13 item 5: after every other piece of the window is already wired and usable — the

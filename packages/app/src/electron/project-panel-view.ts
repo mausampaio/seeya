@@ -17,8 +17,11 @@
  *   listener reads `getLatestProjectsPanelData()`, which that earlier registration is what keeps
  *   current — IPC listeners fire in registration order, so this one always sees this tick's data.
  * - `session-search-view.ts` — the id-search field (V2-T55 item 4).
+ * - `sidebar-resize-view.ts` — the sidebar's draggable width (PO acceptance of V2-T55,
+ *   correction 2).
  */
 import { wireSidebarCollapse } from './sidebar-collapse-view.js';
+import { wireSidebarResize } from './sidebar-resize-view.js';
 import { wireProjectsListView } from './projects-list-view.js';
 import { wireNewProjectDialog } from './new-project-dialog-view.js';
 import { wireProjectLockConfirmDialog } from './project-lock-confirm-dialog-view.js';
@@ -29,6 +32,7 @@ import { wireSessionSearchView } from './session-search-view.js';
 /** Wired once, at startup, from `renderer.ts#main`. */
 export function wireProjectPanel(): void {
   wireSidebarCollapse();
+  wireSidebarResize();
   wireProjectsListView();
   wireNewProjectDialog();
   wireProjectLockConfirmDialog();

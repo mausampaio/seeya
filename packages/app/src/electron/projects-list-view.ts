@@ -6,6 +6,7 @@
  * to show; every string here is `text/messages.ts`, never an inline template literal).
  */
 import { MESSAGES } from '../text/messages.js';
+import { shortenDirectoryPath } from '../sidebar/directory-label.js';
 import type { ProjectPanelRow, ProjectsPanelData } from '../state/projects-panel.js';
 import type { ProjectsUpdateEvent } from '../ipc/channels.js';
 
@@ -76,7 +77,11 @@ function renderProjectBlock(project: ProjectPanelRow): HTMLElement {
 
 /** V2-T55 item 2 — one row per directory, never one per session: clicking it opens the modal
  * (`electron/other-sessions-dir-dialog-view.ts`, wired independently — this button only carries
- * `data-dir`, the key that modal looks the group back up by in `getLatestProjectsPanelData()`). */
+ * `data-dir`, the key that modal looks the group back up by in `getLatestProjectsPanelData()`).
+ *
+ * PO acceptance correction 1 (2026-09-25): a long path used to stretch the sidebar and force a
+ * horizontal scrollbar — `shortenDirectoryPath` shows only the distinguishing tail inline; the
+ * full path still lives in `title` (a real tooltip on hover), never lost. */
 function renderOtherSessionsDirectoryRow(group: {
   readonly dir: string;
   readonly sessionCount: number;
@@ -85,7 +90,11 @@ function renderOtherSessionsDirectoryRow(group: {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'other-sessions-dir-row';
-  button.textContent = MESSAGES.otherSessionsDirectoryRowLabel(group.dir, group.sessionCount);
+  button.textContent = MESSAGES.otherSessionsDirectoryRowLabel(
+    shortenDirectoryPath(group.dir),
+    group.sessionCount,
+  );
+  button.title = group.dir;
   button.dataset.dir = group.dir;
   item.appendChild(button);
   return item;

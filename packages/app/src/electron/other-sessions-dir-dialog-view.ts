@@ -42,6 +42,15 @@ function closeDialog(): void {
   }
 }
 
+/** PO acceptance of V2-T55, correction 3 (2026-09-25) — starting an adoption FROM this modal
+ * (`electron/adopt-flow-view.ts`'s own click delegation on `#other-sessions-dir-dialog-sessions`)
+ * closes this dialog first, so the adopt picker never opens stacked on top of an already-open
+ * modal, and this dialog's own `close` event (`dialog-focus-return.ts`) fires exactly once for
+ * the whole interaction. Exported only for that one caller. */
+export function closeOtherSessionsDirDialog(): void {
+  closeDialog();
+}
+
 function openDialog(dir: string): void {
   const group = findGroup(dir);
   if (group === undefined) {
