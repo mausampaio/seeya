@@ -1,10 +1,10 @@
 ---
 id: TASK-22
 title: 'V2-T34 — Fundação da D-047: as guardas'
-status: To Do
+status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-23 10:46'
+updated_date: '2026-09-25 14:21'
 labels:
   - fundacao
   - d-047
@@ -103,3 +103,166 @@ certa; pedir `--no-verify` e o harness recusar (se a medição do item 2 sustent
 mudança pendente e o próximo `open` mostrar a sobra e perguntar; e `seeya project audit` apontar um
 commit feito por fora.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+**Relatório do agente (branch `tarefa/V2-T34-guardas`, worktree isolada, a partir da `main` em
+`59d34b1`).** Os sete itens, nesta ordem, em 5 commits (a divisão real do trabalho não bate 1:1 com
+os 7 itens — os arquivos compartilhados, principalmente `application/project-open.ts`, `core/ports.ts`
+e `adapters/workspace/index.ts`, misturam vários itens; a divisão em commits reflete o que dava para
+separar de verdade, não uma tentativa de forçar sete commits artificiais).
+
+1. **Ganchos de git do espaço de trabalho.** `core/workspace-hooks.ts#buildCommitMsgHookScript` gera
+   um script `#!/bin/sh` (único em qualquer SO — o git do Windows sempre roda ganchos pelo `sh.exe`
+   embutido), chamando de volta `"$nodePath" "$cliEntryPath" project verify-commit "$1"` por caminho
+   ABSOLUTO. A decisão pura é `core/workspace-commit-guard.ts#decideCommitGuard`: acrescenta
+   `Seeya-Project-Id`/`Seeya-Session-Id` quando faltam (sessão de `CLAUDE_CODE_SESSION_ID` ou, sem
+   ela, do lock do projeto tocado; sem nenhuma das duas, `unknown`) e recusa — mais de um projeto no
+   commit, o `.seeya-lock` staged, ou lock de OUTRA sessão viva; um trailer já escrito que contradiz
+   o que o gancho sabe também é recusado. `application/verify-commit.ts#verifyCommit` junta os fatos
+   (arquivos staged via `WorkspaceRepository.listStagedFiles`, a mensagem via a nova porta
+   `CommitMessageFile`, o lock) e aplica a decisão — exposta como `seeya project verify-commit
+   <messageFile>`, o único chamador é o próprio gancho. Instalado por
+   `application/workspace-hooks.ts#ensureWorkspaceHooksInstalled`, chamado em `createProject` (na
+   criação) e no início de `openProject` (a cada `open`).
+
+   **Onde e como os ganchos acham o `seeya`:** `nodePath` é `process.execPath`; `cliEntryPath` é
+   `process.argv[1]` (o script real que lançou o processo `seeya` atual — `packages/cli/src
+   /composition.ts#resolveCliEntryPath`), nunca `PATH`. **Medido de verdade só no Windows** (a
+   máquina de desenvolvimento — `tests/integration/workspace/commit-msg-hook.test.ts`, ver abaixo).
+   `npm run verificar:linux` (o container Linux) **não foi rodado nesta tarefa** — fica sem medição
+   direta em Linux; o mecanismo em si (git para Windows roda ganchos pelo `sh.exe` que ele mesmo
+   empacota, então o script já é POSIX `sh` por necessidade) é o mesmo que um Linux nativo usaria,
+   mas isso é inferência a partir do desenho, não medição (D-025). macOS também não foi medido (sem
+   máquina disponível). Os dois ficam para o aceite do mantenedor.
+
+   **Execução real, não só simulada:** `tests/integration/workspace/commit-msg-hook.test.ts` — um
+   repositório git descartável de verdade, o script gerado instalado de verdade em
+   `.git/hooks/commit-msg`, chamando de volta o `packages/cli/dist/index.js` REAL (compilado por
+   `npm run build`), com `git commit` real via `child_process.spawn`. Seis cenários: (a) permitido —
+   trailers completados com `unknown` quando não há sessão no ambiente; (b) permitido — trailers
+   completados com a sessão real do ambiente; (c) recusado — dois projetos no mesmo commit; (d)
+   recusado — `.seeya-lock` staged; (e) recusado — trailer de projeto contraditório; (f) recusado —
+   lock de outra sessão viva, com um PROCESSO FILHO REAL spawnado como "sessão viva" (mesma técnica de
+   `tests/integration/application/project-lock.test.ts`). Todos os seis passam.
+
+   **Achado real durante o trabalho, registrado aqui (não é uma questão nova — a causa raiz já é
+   conhecida, D-017):** `tests/integration/application/workspace-boundary.test.ts` (já existente,
+   V2-T27) travava porque fixava `sessionId: undefined` enquanto o AMBIENTE real de quem roda a
+   suíte (esta própria sessão do Claude Code) tinha um `CLAUDE_CODE_SESSION_ID` de verdade — o commit
+   trailer que `createProject` escreve (`unknown`) e o que o gancho lê do ambiente (a sessão real)
+   discordavam, e o gancho (corretamente) recusava. Corrigido lendo `process.env.CLAUDE_CODE_SESSION_ID`
+   no teste, a mesma fonte que `composition.ts#readCurrentSessionId` usa em produção — os dois nunca
+   discordam de verdade fora de um teste com fixture hardcoded. Isto só aparece rodando a suíte de
+   dentro de uma sessão real do Claude Code (como este agente); em CI (sem a variável setada) nunca
+   apareceria. Não é regressão de produção, é fragilidade de fixture de teste, corrigida.
+
+2. **Gancho do harness.** `core/harness-hook-config.ts` — `.claude/settings.json` registrando um hook
+   `PreToolUse` no `Bash` (`code.claude.com/docs/en/hooks`: `matcher: "Bash"`, `type: "command"`,
+   `${CLAUDE_PROJECT_DIR}` resolvido pelo próprio Claude Code antes de qualquer shell), rodando
+   `.claude/hooks/verify-bash-command.mjs` (script Node puro, não shell — o gancho do harness não pode
+   presumir o mesmo shell do git): recusa (`exit 2` + `permissionDecision: "deny"` no stdout, formato
+   documentado) um comando Bash contendo `--no-verify` ou `hooksPath`. Escrito só na criação do
+   projeto (nunca reafirmado a cada `open` — reafirmar geraria uma "mudança" não commitada a cada
+   abertura, colidindo com o item 4).
+
+   **Medição do item 2 (a pergunta do despacho):** confirmado que esta camada NÃO protege
+   `seeya project adopt`, por duas vias independentes:
+   - **Documentação oficial**, `code.claude.com/docs/en/permissions`: "[Claude Code] doesn't discover
+     most `.claude/` configuration from these directories" (referindo-se a diretórios liberados só por
+     `--add-dir`) — settings/hooks só são lidos do `cwd` da sessão.
+   - **Medição empírica com uma sessão descartável real**: dois diretórios temporários, cada um com
+     seu próprio `.claude/settings.json`+hook (cada hook grava um arquivo-marcador ao disparar);
+     `claude -p --session-id 77777777-7777-4777-8777-777777777777 --add-dir <projeto> --cwd <original>`
+     rodando um `echo` qualquer via Bash. Resultado: o hook do `cwd` disparou (arquivo-marcador
+     criado, com timestamp real); o hook do diretório só `--add-dir`'d NÃO disparou (nenhum arquivo
+     criado). Sessão e transcript apagados depois (`~/.claude/projects/<slug>/77777777-....jsonl`,
+     removido via PowerShell) — nunca uma sessão real do mantenedor.
+
+   Como `seeya project open` sempre lança com o diretório do projeto como `cwd`, este gancho protege
+   `open` de verdade; a adoção continua coberta só pelos ganchos de git (item 1), que rodam dentro do
+   próprio repositório do espaço de trabalho, nunca dependendo do `cwd` da sessão que chama `git`.
+
+3. **`seeya project audit <id>`.** `core/project-audit.ts#auditCommits` — dado todo commit desde o
+   último marcador (ou a história inteira, na primeira vez), sinaliza o que nunca passou pelo gancho:
+   trailer de projeto ausente/errado, trailer de sessão ausente, commit que também tocou outro
+   projeto (lista de arquivos SEM escopo, ao contrário de `findCommitsAfter` — é o que permite
+   detectar isso), ou commit que inclui o arquivo de lock. `application/project-audit.ts#auditProject`
+   orquestra: lê `.seeya-audit` (novo, porta `ProjectAuditMarker`, mesma disciplina de nunca-commitado
+   do `.seeya-lock`), busca os commits via `WorkspaceRepository.listCommitsForAudit`, decide, grava o
+   novo marcador. Chamada também por `openProject`, ANTES de tomar o lock (relatório sai por
+   `onBeforeLaunch`'s own `audit`).
+
+4. **Sobra de sessão anterior no próximo `open`.** `handleLeftoverChanges` — só quando esta tentativa
+   TOMOU o lock (nunca num `open` para leitura) e `listChangedFiles` não está vazio: pergunta
+   (`ConfirmLeftoverChanges`, três respostas nunca achatadas — `commitNow`/`proceedWithoutCommitting`
+   /`unavailable`). `commitNow` commita com `Seeya-Session-Id: unknown` (D-025); `proceedWithoutCommitting`
+   segue e soma a lista de pendências ao `--append-system-prompt`; sem confirmador, recusa e libera o
+   lock que acabou de tomar (nunca descarta, nunca commita, nunca segue silenciosamente).
+
+5. **Regras de trabalho.** `core/project-working-rules.ts#buildProjectWorkingRulesText` — id do
+   projeto, commitar no caminho sem perguntar, trailers automáticos, um projeto por commit, nunca o
+   `.seeya-lock`, editar os canônicos na hora da decisão (`journal/` como rascunho), segredo por
+   caminho, e onde o guarda-corpo termina (item 7, ver abaixo). Entregue em TODO `open` (nunca só
+   quando há algo a avisar) via o MESMO `--append-system-prompt` do aviso de lock.
+
+   **Tamanho medido:** o texto das regras sozinho tem **1.321 caracteres**; somado a um aviso de lock
+   típico (a forma mais longa do texto que `formatProjectLockWarningLines` produz), **1.598
+   caracteres** — bem abaixo do teto real medido por este projeto para o argumento equivalente de
+   `--resume` (Q-069: ENAMETOOLONG a partir de 32.656 no Windows; o próprio `RESUME_PROMPT_ARG_LIMIT_CHARS`
+   já usa 16.384 como teto conservador). `--append-system-prompt` é uma flag diferente de `--resume`,
+   mas o limite de tamanho de linha de comando do SO é o mesmo mecanismo subjacente.
+
+   **Limite conhecido:** a Q-069 já mediu que `--append-system-prompt` não chega a uma sessão
+   RETOMADA — a adoção (que usa `--resume`) não recebe este texto; a instrução própria dela
+   (`buildAdoptionInstruction`) já cobre o que precisa.
+
+6. **Esqueleto.** `core/project-skeleton.ts#buildAgentsMd` agora nomeia o projeto ("This is seeya
+   project `<id>`...") e ganha a seção `## Working in this project` com o texto do item 5. Inclui
+   também os dois arquivos do item 2 (`.claude/settings.json`, `.claude/hooks/verify-bash-command.mjs`).
+   Projetos já existentes não são reescritos — `writeProjectSkeleton` só roda uma vez, na criação;
+   nada nesta tarefa chama de novo para um projeto já existente (confirmado lendo `application
+   /workspace.ts#createProject`, que só chama depois de `projectExists` ser falso).
+
+7. **Onde o guarda-corpo termina.** Escrito em três lugares: (a) `core/workspace-commit-guard.ts`'s
+   own docstring — cobre commit sem sessão forjada e sem `--no-verify`; não prova identidade além do
+   que o ambiente afirma, nem impede um `git commit --no-verify` de passar batido (o gancho
+   simplesmente não roda); (b) `core/harness-hook-config.ts`'s own docstring — não protege a adoção
+   (medido, item 2); (c) `core/project-audit.ts`'s own docstring — auditoria é detecção, não prova:
+   um `Seeya-Session-Id` sintaticamente válido não prova que foi aquela sessão que commitou. O próprio
+   texto de regras (item 5) também diz isso à sessão, na última frase.
+
+**Sessões descartáveis criadas por este agente:** apenas uma,
+`77777777-7777-4777-8777-777777777777` (medição do item 2), em
+`%TEMP%\claude\C--code-seeya\<sessão-do-agente>\scratchpad\v2t34-hook-probe\cwd-dir`, fora de
+qualquer repositório real. Transcript apagado depois (`~/.claude/projects/C--Users-mausa-AppData-
+Local-Temp-claude-C--code-seeya-...-v2t34-hook-probe-cwd-dir/`). Custo: uma chamada `haiku` com teto
+de US$ 0,05, bem abaixo disso na prática (um `echo`).
+
+**Conferência do `~/.seeya`, do espaço de trabalho e do registro reais (D-025 — conferido, não só
+afirmado):** `~/.seeya/` real tem os arquivos do mantenedor (`config.json`, `estado.json`,
+`workspace/teste-projeto`, `workspace/teste-projeto2`, etc.) — todos com `mtime` anterior ao início
+deste trabalho (mais recente, `estado.json`/`days/`, 25/09 09:45, antes deste agente começar a ler a
+tarefa). `~/.seeya/protocol-handler.json` tem `activeScheme: "seeya-dev"` e a chave do registro
+`HKCU\Software\Classes\seeya-dev` existe — os dois já existiam ANTES deste trabalho (mesmo `mtime`
+anterior); este agente nunca rodou `npm run app` nem `node scripts/build.mjs --dev`, então não foi
+quem escreveu nenhum dos dois. Todo teste/medição deste agente usou `mkdtemp`/diretórios descartáveis
+ou passou `homeDir`/`seeyaHome` explícito — nunca `os.homedir()` implícito contra o real, exceto a
+única chamada real ao `claude` (item 2), que nunca invoca `seeya` e portanto nunca toca `~/.seeya/`.
+
+**Portão:** `npm run verificar` passou inteiro (código de saída 0) — `format:check`, `tsc --noEmit`,
+`eslint`, `build`, `dependencias` (482 módulos, 0 violação), `cobertura` (261 arquivos de teste, 2705
+testes, 4 pulados; `core/` 99,44% linhas / 98,25% branches, `adapters/workspace/` 93,24% linhas /
+80,23% branches — acima do próprio piso de 80% depois de duas rodadas de teste adicional para os dois
+arquivos novos que tinham cobertura baixa (`FsCommitMessageFile`, `FsProjectAuditMarker`), todos os
+demais diretórios tocados acima do piso). `npm run verificar:linux` não foi rodado à parte (o portão
+completo já cobre os testes reais de execução dos ganchos; `verificar:linux` roda a mesma suíte dentro
+de um container Linux e não foi disparado nesta tarefa por tempo — registrado aqui como não
+verificado nesta plataforma, não como "verificado e passou").
+
+**O que fica para o aceite do mantenedor:** medição do item 1 em macOS (só Windows e o mecanismo
+POSIX genérico do gancho de git foram confirmados de verdade); `npm run verificar:linux` de verdade
+(não rodado nesta tarefa); um `seeya project open` real, de um terminal de verdade, vendo o aviso de
+auditoria/as regras de trabalho/a sobra de sessão anterior na tela antes do harness assumir.
+<!-- SECTION:NOTES:END -->
