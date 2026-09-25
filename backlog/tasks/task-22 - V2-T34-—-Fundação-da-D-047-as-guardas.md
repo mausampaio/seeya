@@ -4,7 +4,7 @@ title: 'V2-T34 — Fundação da D-047: as guardas'
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-25 14:21'
+updated_date: '2026-09-25 14:58'
 labels:
   - fundacao
   - d-047
@@ -266,3 +266,23 @@ POSIX genérico do gancho de git foram confirmados de verdade); `npm run verific
 (não rodado nesta tarefa); um `seeya project open` real, de um terminal de verdade, vendo o aviso de
 auditoria/as regras de trabalho/a sobra de sessão anterior na tela antes do harness assumir.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: Claude (agente)
+created: 2026-09-25 14:58
+---
+Revisao do PO (2026-09-25): tres defeitos corrigidos, todos porque os testes originais rodavam a CLI com um `node` comum, nunca o Electron empacotado real.
+
+1. **ELECTRON_RUN_AS_NODE=1 ausente ao chamar o gancho de git.** `resolveCliHookEnv(electronVersion)` em `packages/cli/src/composition.ts` decide de forma pura (testada nos dois ramos); `ProjectContext.hookEnv` carrega o resultado, `buildProjectContext` computa a partir de `process.versions.electron`. Teste de integracao prova que o script gerado para o caso Electron contem a variavel.
+
+2. **Mensagem do verificador ausente no gancho de git.** `buildCommitMsgHookScript` (`packages/engine/src/core/workspace-hooks.ts`) ja recusava (exit 1) quando `nodePath`/`cliEntryPath` sumiam, mas sem dizer por que. Agora ecoa qual caminho faltou e "rode seeya project open <id> para reinstalar os ganchos". De quebra, corrigi um bug de aspas que eu mesmo tinha introduzido: a mensagem tinha aspas duplas dentro de um `echo "..."` tambem em aspas duplas, o que teria truncado a frase na primeira vez que esse caminho rodasse de verdade — trocado por aspas simples, com teste de regressao.
+
+3. **Gancho do harness dependia de `node` no PATH.** Reconstruido sobre o mesmo mecanismo do gancho de git: `seeya` por caminho absoluto, `ELECTRON_RUN_AS_NODE=1` quando Electron, subcomando novo `seeya project verify-bash-command` (le o payload do `PreToolUse` pelo stdin, zod tolerante a campos desconhecidos). Verificador ausente agora sai com codigo 2 (bloqueia), nunca falha aberto — a diferenca de `PreToolUse`: so exit 2 bloqueia, qualquer outro erro e so aviso. Isso tambem corrigiu uma segunda causa de obsolescencia: `.claude/settings.json` deixou de fazer parte do esqueleto versionado do projeto (que nunca era atualizado depois de criado) e passou a ser reescrito a cada `seeya project open`, exatamente como o gancho de git ja fazia; o `.gitignore` do espaco de trabalho passou a ignorar o `.claude/` de cada projeto (`**/.claude/`), medido que o padrao com esse prefixo ignora o diretorio em qualquer profundidade.
+
+Medido de verdade, nao simulado: uma sessao descartavel confirmou que o `command` do hook do Claude Code roda por um shell real (sintaxe `KEY=value cmd` funciona no Windows, nao e argv literal). Outra medicao, isolada num diretorio de rascunho fora do worktree real, com um `seeya` compilado de verdade e duas sessoes descartaveis: uma tentativa de `git commit --no-verify` foi bloqueada pelo gancho reconstruido, um `echo` comum passou. As duas sessoes e seus transcripts foram apagados depois. Limite medido e documentado no docstring do modulo: essa camada nao protege `seeya project adopt` (o Claude Code nao le `.claude/settings.json` de um diretorio liberado so por `--add-dir`) — os ganchos de git continuam cobrindo esse caminho.
+
+`npm run verificar` verde (exit 0) apos as correcoes. `~/.seeya` real, o espaco de trabalho real (teste-projeto/teste-projeto2) e o registro do Windows (`seeya`/`seeya-dev`) conferidos ao final: nada alem do que ja existia antes desta rodada de correcoes.
+---
+<!-- COMMENTS:END -->
