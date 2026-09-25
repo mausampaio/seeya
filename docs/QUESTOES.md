@@ -8982,3 +8982,11 @@ aceitando que uma sessão originalmente aged-out da janela de `relevanceHours` f
 por nome (só por id/prefixo) até essa janela mudar; C) fazer a V2-T29 (schema de `adoptions.json`)
 crescer para guardar um tamanho de referência na adoção, permitindo um "cresceu N bytes" exato
 aqui.
+
+**Resolução da Q-095 (PO, 2026-09-24).** Aceitas as duas escolhas. (1) "A cópia cresceu depois da
+adoção" medido pela data de modificação do transcript contra `adoptedAt`, com "desde quando e
+tamanho atual" na mensagem: `adoptions.json` não guarda tamanho, e acrescentar campo só para isso
+seria mudar formato em disco sem necessidade. O lado do erro é o conservador — transcript sumido
+vira "não sei" e pergunta, com a resposta padrão de manter. (2) `<sessão>` do `revert-adoption`
+casa só por id ou prefixo, da original ou da cópia: a original pode já nem aparecer na descoberta
+(fora de `relevanceHours`), e o `adoptions.json` é a fonte certa para este comando.

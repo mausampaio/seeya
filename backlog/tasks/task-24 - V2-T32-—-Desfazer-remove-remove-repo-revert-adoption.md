@@ -4,7 +4,7 @@ title: 'V2-T32 — Desfazer: remove, remove-repo, revert-adoption'
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-25 00:31'
+updated_date: '2026-09-25 00:36'
 labels:
   - desfazer
   - d-047
@@ -180,3 +180,13 @@ testes (4 pulados), cobertura: `core/` 99.33% linhas/98.26% branches, `applicati
 testes extras dos dois formatos de falha do `run-git.ts` para passar), `cli/src` 94.51%. Zero
 violação de camada (`dependencias`, 438 módulos).
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-25 00:36
+---
+Revisão do PO em 2026-09-24: mesclado no po-gate sem conflito, portão verde (2534 testes). Conferido: os três comandos tomam e soltam o lock e recusam com outra sessão viva; remove confirma com nome e número de arquivos, commita e imprime o HEAD anterior como linha de recuperação, tira as adoções do projeto de adoptions.json sem apagar cópias; remove-repo só tira do mapa o que nenhum outro projeto usa; revert-adoption acha os commits pelo trailer Seeya-Session-Id, recusa nomeando o commit conflitante (provado com conflito real de git revert) e aborta tudo em qualquer falha; a cópia só é apagada sem pergunta se não mudou desde a adoção — mudou ou sumiu, pergunta com padrão manter. Q-095 aceita. Falta o aceite do mantenedor, que precisa de um build novo.
+---
+<!-- COMMENTS:END -->
