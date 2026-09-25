@@ -9034,3 +9034,83 @@ e entre o máximo novo (365,3) e o teto antigo é de ~27,3 MiB (~8,1%); a própr
 registra que esta máquina, com pouca memória livre e outros processos abertos, é sensível a ruído
 de sistema — o agente não tem como garantir que 100% da diferença seja código novo e não variação
 de máquina entre as duas datas.
+
+**Reaberta — a comparação acima não serve (PO review, 2026-09-25).** "Antes" era de 2026-09-20;
+"depois" era de 2026-09-24, com esta tarefa aplicada — dia diferente, estado de máquina diferente,
+sem controle nenhum sobre o que mais rodava em cada momento. Não dá para concluir piora de uma
+comparação assim. Refeita como A/B na MESMA sessão, alternando `main` e a branch desta tarefa.
+
+**Método do A/B.** Duas árvores de trabalho descartáveis, construídas na mesma sessão: `main` no
+commit `b3d5425` (o pai desta branch, via `git archive` — nunca um segundo `git worktree` da
+mesma branch já aberta em outro lugar) e esta branch, cada uma com seu próprio `npm ci` + `npm run
+build` + `node scripts/build.mjs`. Dois cenários — espaço de trabalho vazio ("zero") e um
+descartável pré-semeado com 3 projetos via `seeya project create` (`node packages/cli/dist/
+index.js`, `USERPROFILE` apontando para um diretório temporário — nunca `HOME`, nunca o
+`~/.seeya` real) — e três rodadas por cenário, **alternando** `main`/`branch` a cada rodada (12
+lançamentos no total), em vez de medir todos os lançamentos de uma variante e só depois os da
+outra: qualquer deriva da máquina ao longo da sessão pesa igualmente para os dois lados. Cada
+lançamento: `SEEYA_APP_OFFSCREEN=1`, um `~/.seeya` descartável próprio (ou o de 3 projetos, só
+leitura durante a medição), 15 s de espera (mesmo `SETTLE_MS` de `measure-idle.mjs`), uma
+amostra da árvore de processos, 60 s de janela, uma segunda amostra — memória da primeira
+amostra, CPU pelo delta entre as duas, na mesma fórmula do `process-tree-stats.ps1` já existente.
+Separado **por processo**, com uma variante do script que também devolve o `CommandLine` de cada
+pid (papel inferido pela própria flag `--type=` do Electron: sem `--type` é o processo principal,
+`--type=renderer`/`gpu-process`/`utility` os demais) — o script de medição e a variante do
+`.ps1` foram só desta investigação, não commitados (o mesmo "não otimize, só meça" da régua:
+o entregável é a tabela abaixo, não uma segunda ferramenta permanente).
+
+**Resultado — memória total (MiB), início da janela de 60s:**
+
+| Cenário | Rodada | `main` | branch (V2-T30) |
+|---|---|---|---|
+| zero projetos | 1 | 370,2 | 371,2 |
+| zero projetos | 2 | 382,3 | 367,4 |
+| zero projetos | 3 | 383,4 | 365,0 |
+| 3 projetos | 1 | 382,4 | 367,3 |
+| 3 projetos | 2 | 377,8 | 374,9 |
+| 3 projetos | 3 | 375,9 | 363,8 |
+| **média** | | **zero: 378,6 / three: 378,7** | **zero: 367,9 / three: 368,7** |
+
+**A memória NÃO piorou — a comparação de 2026-09-20 estava errada.** Nas seis rodadas, a branch
+ficou LIGEIRAMENTE abaixo do `main` (≈368 MiB contra ≈379 MiB), a diferença oposta à que a
+comparação entre dias sugeria, e do tamanho do próprio ruído entre rodadas de uma variante só
+(main varia 370,2–383,4, uma faixa de 13,2 MiB sozinha). Não há diferença de memória atribuível
+ao código desta tarefa, nem em repouso nem com 3 projetos no espaço de trabalho.
+
+**Resultado — CPU ocioso (% de um núcleo, janela de 60s), total e por processo:**
+
+| Cenário | Rodada | total `main` | total branch | processo principal `main` | processo principal branch |
+|---|---|---|---|---|---|
+| zero | 1 | 0,34 | 0,65 | 0,29 | 0,44 |
+| zero | 2 | 0,42 | 0,52 | 0,31 | 0,39 |
+| zero | 3 | 0,23 | 0,49 | 0,21 | 0,34 |
+| 3 projetos | 1 | 0,49 | 0,42 | 0,39 | 0,34 |
+| 3 projetos | 2 | 0,29 | 0,76 | 0,23 | 0,55 |
+| 3 projetos | 3 | 0,26 | 0,68 | 0,13 | 0,55 |
+| **média** | | **zero: 0,33 / three: 0,35** | **zero: 0,55 / three: 0,62** | **zero: 0,27 / three: 0,25** | **zero: 0,39 / three: 0,48** |
+
+GPU, utilitário e renderer não mostraram diferença atribuível entre as duas variantes em nenhuma
+rodada (mesmos ~46 MiB de utilitário, ~123–132 MiB de GPU, ~80–83 MiB de renderer nos dois
+lados) — a CPU renderer também ficou dentro do ruído. **A diferença mora inteira no processo
+principal**: a branch consumiu mais CPU ociosa que o `main` em 5 das 6 rodadas (a exceção,
+"3 projetos, rodada 1", saiu ao contrário), ~0,12–0,21 pontos percentuais de UM núcleo a mais na
+média — nesta máquina (8 núcleos lógicos), isso é ~0,015–0,026% da capacidade total, abaixo do
+que qualquer pessoa notaria, mas repetível o bastante para não ser só ruído.
+
+**Interpretação.** É "trabalho por ciclo", não "código carregado": se fosse memória adicional só
+por ter mais módulos residentes (a suspeita original), a MEMÓRIA teria que subir de forma
+consistente — e não subiu, em nenhum cenário. O que subiu foi CPU do processo principal, e só
+dele — exatamente onde `electron/project-ipc.ts#wireProjectIpc`'s own `pushProjectsUpdate` roda a
+cada ciclo de 10s (a leitura de `listProjects`/`readAdoptions`/um `.seeya-lock` por projeto, mais
+o `JSON.stringify`/envio do payload por IPC — tudo no processo principal, nunca no renderer, o que
+bate com o renderer não ter mostrado diferença nenhuma). O aumento de "zero" (0,27%→0,39%, +0,12)
+para "3 projetos" (0,25%→0,48%, +0,23) é consistente com mais leituras por ciclo — mas a amostra
+de três rodadas por cenário é pequena demais para afirmar que a curva é linear no número de
+projetos; só dá para dizer que o custo existe e é pequeno.
+
+**Conclusão para o mantenedor decidir:** memória em repouso — sem piora, a Q-096 original estava
+medindo ruído de dois dias diferentes, não o código desta tarefa; retratada. CPU ociosa — piora
+real, pequena (~0,1–0,2 pontos de um núcleo, ~0,02% da máquina inteira), concentrada no processo
+principal, e explicada pelo próprio custo que a especificação da tarefa já previa e aprovou ("o
+estado do lock e o `adoptions.json` são lidos no ciclo de 10s"). O agente não decide se este custo
+específico, agora medido, ainda é aceitável — só registra o número.
