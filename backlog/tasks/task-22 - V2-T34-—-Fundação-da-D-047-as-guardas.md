@@ -4,7 +4,7 @@ title: 'V2-T34 — Fundação da D-047: as guardas'
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-25 21:51'
+updated_date: '2026-09-25 22:00'
 labels:
   - fundacao
   - d-047
@@ -336,5 +336,11 @@ Correcao:
 4. **Testes com o gancho instalado de verdade**: `tests/integration/workspace/commit-msg-hook.test.ts`'s own "same-process lock-holder authorization" — os cinco fluxos, gancho real, CLI compilada real, sem `CLAUDE_CODE_SESSION_ID` no ambiente e com uma OUTRA sessao no ambiente, todos aceitos; o caso proibido (outra sessao viva, processo errado) continua recusado. **Achado medido ao escrever o teste**: `removeProject` NUNCA precisou desta autorizacao — `removeProjectDirectory` apaga o diretorio do projeto (e o `.seeya-lock` que mora dentro) ANTES do commit, entao o gancho ja ve `lock === null` e cai no mesmo caminho de `createProject`/`addRepository`.
 
 `npm run verificar` verde (exit 0). Rodei tambem `GIT_CONFIG_GLOBAL=<arquivo vazio> GIT_CONFIG_NOSYSTEM=1 npm test` (276 arquivos, 2840 testes, 4 pulados, exit 0) — nada na suite depende da identidade git real da maquina. `~/.seeya` real, o espaco de trabalho real e o registro do Windows conferidos ao final: inalterados. Nenhuma sessao Claude real foi usada nesta rodada — a fixture necessaria (repositorio git descartavel + `.seeya-lock` escrito a mao) provou o mecanismo sem precisar de uma sessao de verdade.
+---
+
+author: PO
+created: 2026-09-25 22:00
+---
+Revisão do PO em 2026-09-25, segunda rodada urgente: aceita. Causa (desenho, erro da especificação do PO: item 1 × item 4): o gancho só aceitava commit com CLAUDE_CODE_SESSION_ID igual ao do lock, e o seeya nunca passa isso — todo commit do seeya segurando o próprio lock era recusado. Corrigido: segundo caminho de autorização pelo processo dono do lock (pid + procStart, SEEYA_LOCK_HOLDER_PID/_PROC_START), passado pelos cinco fluxos; trailers do dono do lock valem como estão (o 'unknown' da sobra deixou de ser 'contradito'); testes de fluxo com o gancho instalado de verdade, cada um sem sessão no ambiente e com a sessão de outra pessoa, e o caso proibido (outro processo vivo com o lock) ainda recusado. Achado do agente: o remove apaga o lock junto com o diretório antes de commitar, então nunca precisou desta correção. Portão verde no po-gate (2840 testes), também sem identidade global do git.
 ---
 <!-- COMMENTS:END -->
