@@ -140,6 +140,13 @@ export const CHANNELS = {
    * (`state/projects-panel.ts#buildProjectsPanelData`) — every project the workspace holds, its
    * lock status, and the sessions grouped under it or left in "Other sessions". */
   projectsUpdate: 'seeya:projects-update',
+  /** Renderer → main: the "Projects" section's own data, fetched once at startup
+   * (`electron/project-panel-view.ts#wireProjectPanel`) — the same "explicit fetch for the first
+   * paint, push for every refresh after" shape `getTodayPanel`/`onTodayUpdate` already establish,
+   * needed because the ambient refresh loop's first tick can otherwise race ahead of the
+   * renderer's own `onProjectsUpdate` registration (see `electron/project-ipc.ts`'s own
+   * docstring). */
+  getProjectsPanel: 'seeya:get-projects-panel',
   /** Renderer → main: "New project…" (V2-T30 item 4) — the same `createProject` `seeya project
    * create` calls. */
   createProject: 'seeya:create-project',
@@ -475,6 +482,10 @@ export interface AnswerDaemonOwnershipTransitionRequest {
 /** `CHANNELS.projectsUpdate`'s payload (V2-T30 item 1) — the exact shape
  * `state/projects-panel.ts#buildProjectsPanelData` produces. */
 export type ProjectsUpdateEvent = ProjectsPanelData;
+
+/** `CHANNELS.getProjectsPanel`'s response — same shape as `ProjectsUpdateEvent`, fetched instead
+ * of pushed. */
+export type ProjectsPanelResponse = ProjectsPanelData;
 
 /** `CHANNELS.createProject`'s payload (V2-T30 item 4). `projectId` is the lowercase-hyphen
  * identifier `seeya project create <id>` takes — the window never asks for a separate display

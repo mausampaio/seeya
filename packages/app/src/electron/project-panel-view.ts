@@ -543,4 +543,7 @@ export function wireProjectPanel(): void {
   wireProjectLockConfirmDialog();
   wireAdoptFlow();
   window.seeya.onProjectsUpdate((data) => renderProjectsPanel(data));
+  // V2-T30 item 1: the first paint — see `CHANNELS.getProjectsPanel`'s own docstring for why this
+  // can't be push-only.
+  void window.seeya.getProjectsPanel().then((data) => renderProjectsPanel(data));
 }

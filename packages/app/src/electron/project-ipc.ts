@@ -60,7 +60,11 @@ import {
 import { ProjectAdoptTabLauncher, ProjectOpenTabLauncher } from '../resume/project-tab-launcher.js';
 import type { TabResumeOpener } from '../resume/tab-session-resumer.js';
 import { PendingConfirmations } from '../resume/pending-confirmations.js';
-import { buildProjectsPanelData, type ProjectWithDirectory } from '../state/projects-panel.js';
+import {
+  buildProjectsPanelData,
+  type ProjectsPanelData,
+  type ProjectWithDirectory,
+} from '../state/projects-panel.js';
 import { formatProjectOpenOutcomeText } from '../state/project-open-result.js';
 import { formatAdoptSessionOutcomeText, isAdoptedResult } from '../state/adopt-session-result.js';
 import type { SidebarRow } from '../sidebar/sidebar-data.js';
@@ -122,18 +126,34 @@ export function wireProjectIpc(
   );
   const pendingCommitConfirmations = new PendingConfirmations<'commit' | 'decline'>('adopt-commit');
 
-  async function pushProjectsUpdate(): Promise<void> {
+  async function computeProjectsPanelData(): Promise<ProjectsPanelData> {
     const { projects, lockStatusByProjectId } = await readProjectsWithLockStatus(context);
     const adoptions = await context.storage.readAdoptions();
-    const data = buildProjectsPanelData(
+    return buildProjectsPanelData(
       getSidebarRows(),
       projects,
       adoptions,
       lockStatusByProjectId,
       context.platformHint,
     );
-    window.webContents.send(CHANNELS.projectsUpdate, data);
   }
+
+  async function pushProjectsUpdate(): Promise<void> {
+    window.webContents.send(CHANNELS.projectsUpdate, await computeProjectsPanelData());
+  }
+
+  // V2-T30 item 1: fetched once, at startup (`electron/project-panel-view.ts#wireProjectPanel`),
+  // the same "explicit request-response for the FIRST paint, push for every refresh after that"
+  // shape `CHANNELS.getTodayPanel`/`onTodayUpdate` already establish. Needed because the ambient
+  // refresh loop's own FIRST tick starts as soon as `wireIpc` runs — before the renderer's own
+  // `<script type="module">` has necessarily finished loading and called `onProjectsUpdate` — so a
+  // push-only design could leave the "Projects" section empty for up to `REFRESH_INTERVAL_MS`
+  // after the window opens (measured while implementing this task: the renderer's first
+  // `console-message` landed roughly 2.6s after this file's own first ambient
+  // `computeProjectsPanelData` call in one real run on this machine).
+  ipcMain.handle(CHANNELS.getProjectsPanel, async (): Promise<ProjectsPanelData> =>
+    computeProjectsPanelData(),
+  );
 
   ipcMain.handle(
     CHANNELS.createProject,

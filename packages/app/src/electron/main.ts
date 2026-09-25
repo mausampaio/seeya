@@ -897,7 +897,9 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
       window.webContents.send(CHANNELS.sessionsUpdate, sessionsEvent);
 
       // V2-T30: the "Projects" section, same tick — reuses `rows` above (no second discovery),
-      // plus one small `.seeya-lock` read per project (the task's own declared cost).
+      // plus one small `.seeya-lock` read per project (the task's own declared cost). The FIRST
+      // paint doesn't depend on this push arriving in time — see `CHANNELS.getProjectsPanel`'s own
+      // docstring.
       await projectIpc.pushProjectsUpdate();
 
       const startupTimingPath = process.env.SEEYA_APP_STARTUP_TIMING_PATH;

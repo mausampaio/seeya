@@ -45,6 +45,7 @@ import type {
   DaemonOwnershipTransitionOfferResponse,
   AnswerDaemonOwnershipTransitionRequest,
   ProjectsUpdateEvent,
+  ProjectsPanelResponse,
   CreateProjectRequest,
   CreateProjectResponse,
   OpenProjectRequest,
@@ -124,6 +125,8 @@ export interface SeeyaApi {
   /** V2-T30 item 1: the "Projects" section's own data, pushed on the same refresh tick as
    * `onSessionsUpdate` and again right after "New project…"/"Open"/"Adopt…" finish. */
   onProjectsUpdate(listener: (event: ProjectsUpdateEvent) => void): void;
+  /** V2-T30 item 1: fetched once, at startup — see `CHANNELS.getProjectsPanel`'s own docstring. */
+  getProjectsPanel(): Promise<ProjectsPanelResponse>;
   /** V2-T30 item 4: "New project…". */
   createProject(request: CreateProjectRequest): Promise<CreateProjectResponse>;
   /** V2-T30 item 3: a project's "Open" button — resolves only once the tab closes. */
@@ -226,6 +229,7 @@ const api: SeeyaApi = {
   onProjectsUpdate: (listener) => {
     ipcRenderer.on(CHANNELS.projectsUpdate, (_event, data: ProjectsUpdateEvent) => listener(data));
   },
+  getProjectsPanel: () => ipcRenderer.invoke(CHANNELS.getProjectsPanel),
   createProject: (request) => ipcRenderer.invoke(CHANNELS.createProject, request),
   openProject: (request) => ipcRenderer.invoke(CHANNELS.openProject, request),
   onConfirmProjectLockOpenRequest: (listener) => {
