@@ -59,6 +59,9 @@ import {
 import type { EndDayDeps } from '@seeya-ai/engine/application/types.js';
 import type { ProjectOpenDeps } from '@seeya-ai/engine/application/project-open.js';
 import type { AdoptSessionDeps } from '@seeya-ai/engine/application/project-adopt.js';
+import type { RemoveProjectDeps } from '@seeya-ai/engine/application/project-remove.js';
+import type { RemoveRepositoryDeps } from '@seeya-ai/engine/application/project-remove-repo.js';
+import type { RevertAdoptionDeps } from '@seeya-ai/engine/application/project-revert-adoption.js';
 import type { DaemonDeps } from '@seeya-ai/engine/scheduler/index.js';
 
 /** D-047: the same `CLAUDE_CODE_SESSION_ID` D-017's own table already strips from a SPAWNED
@@ -459,13 +462,28 @@ export function buildProjectContext(homeDir: string = os.homedir()): ProjectCont
 }
 
 /**
+ * This invocation's own `pid`/`procStart` — captured here, not in `buildProjectContext`, because
+ * most `seeya project` subcommands never need a `procStart` capture at all (S4-T3b's own
+ * `powershell.exe` cost on Windows, 500-880ms even warm, `adapters/process/proc-start.ts`'s own
+ * measurement — paying it for `list`/`show`/`create`/`add-repo` would be pure waste). Shared by
+ * every `build*Deps` below that needs to attribute a `.seeya-lock` acquisition to THIS process
+ * (D-047 items 1/8) — same composition-root-only self-capture `cli/index.ts`'s daemon `worker`
+ * branch already does for `daemon.lock` (D-020), reused rather than repeated once per command.
+ */
+async function capturePidAndProcStart(): Promise<{
+  readonly pid: number;
+  readonly procStart: string | undefined;
+}> {
+  const procStartCapture = await captureObservedProcStart(process.pid, processExists);
+  return {
+    pid: process.pid,
+    procStart: procStartCapture.kind === 'value' ? procStartCapture.value : undefined,
+  };
+}
+
+/**
  * `seeya project open`'s own extra composition (V2-T33, D-047 items 1/4; V2-T35 item 4):
- * `ProjectContext` plus THIS INVOCATION's own `pid`/`procStart` — captured here, not in
- * `buildProjectContext`, because every other `seeya project` subcommand never needs a `procStart`
- * capture at all (S4-T3b's own `powershell.exe` cost on Windows, 500-880ms even warm,
- * `adapters/process/proc-start.ts`'s own measurement — paying it for `list`/`show`/`create`/
- * `add-repo` would be pure waste). Same composition-root-only self-capture `cli/index.ts`'s daemon
- * `worker` branch already does for `daemon.lock` (D-020) — reused, not reimplemented.
+ * `ProjectContext` plus THIS INVOCATION's own `pid`/`procStart`.
  *
  * `launchedSessionId` (V2-T35 item 4): the id `open` generates for the session it's about to
  * launch — `node:crypto#randomUUID`, a plain read of Node's CSPRNG, no new dependency. Generating
@@ -474,9 +492,7 @@ export function buildProjectContext(homeDir: string = os.homedir()): ProjectCont
  * docstring).
  */
 export async function buildProjectOpenDeps(context: ProjectContext): Promise<ProjectOpenDeps> {
-  const procStartCapture = await captureObservedProcStart(process.pid, processExists);
-  const procStart = procStartCapture.kind === 'value' ? procStartCapture.value : undefined;
-  return { ...context, pid: process.pid, procStart, launchedSessionId: randomUUID() };
+  return { ...context, ...(await capturePidAndProcStart()), launchedSessionId: randomUUID() };
 }
 
 /**
@@ -527,7 +543,50 @@ export async function buildProjectAdoptContext(
 export async function buildProjectAdoptDeps(
   context: ProjectAdoptContext,
 ): Promise<AdoptSessionDeps> {
-  const procStartCapture = await captureObservedProcStart(process.pid, processExists);
-  const procStart = procStartCapture.kind === 'value' ? procStartCapture.value : undefined;
-  return { ...context, pid: process.pid, procStart, forkSessionId: randomUUID() };
+  return { ...context, ...(await capturePidAndProcStart()), forkSessionId: randomUUID() };
+}
+
+/**
+ * `seeya project remove <id>`'s own composition (V2-T32): `ProjectContext` plus THIS INVOCATION's
+ * own `pid`/`procStart` (D-047 item 8 — `remove` takes the project lock for the whole of its own,
+ * synchronous run, same as `open`/`adopt`, but never launches anything, so there is no separate
+ * generated session id here — the lock's holder is this invocation itself).
+ */
+export async function buildProjectRemoveDeps(context: ProjectContext): Promise<RemoveProjectDeps> {
+  return { ...context, ...(await capturePidAndProcStart()) };
+}
+
+/** `seeya project remove-repo <id> <name>`'s own composition (V2-T32) — same shape as
+ * `buildProjectRemoveDeps` above; a distinct function only because the two application-layer
+ * `Deps` types are distinct (`RemoveProjectDeps`/`RemoveRepositoryDeps`), even though their own
+ * shape is identical today. */
+export async function buildProjectRemoveRepoDeps(
+  context: ProjectContext,
+): Promise<RemoveRepositoryDeps> {
+  return { ...context, ...(await capturePidAndProcStart()) };
+}
+
+/**
+ * `seeya project revert-adoption <id> [<session>]`'s own composition (V2-T32): `ProjectContext`
+ * plus THIS INVOCATION's own `pid`/`procStart` (same D-047 item 8 reasoning as `buildProjectRemoveDeps`
+ * above) and a `ForkCleanup` — the one extra port this command needs, to check whether the adopted
+ * copy kept writing after being adopted (item 6) and, when authorized, to delete it (D-012). Built
+ * fresh here rather than reused from `ProjectAdoptContext`: `revert-adoption` never needs the rest
+ * of that context (`sessionProvider`/`forkRegistration`/`adoptionLauncher`/`idleMinutes`), and a
+ * plain `ProjectContext` is all its own CLI wiring has in hand.
+ */
+export async function buildProjectRevertAdoptionDeps(
+  context: ProjectContext,
+  homeDir: string = os.homedir(),
+): Promise<RevertAdoptionDeps> {
+  const home = resolveCliHome(homeDir);
+  return {
+    ...context,
+    ...(await capturePidAndProcStart()),
+    forkCleanup: new DiscoveryForkCleanup({
+      claudeHome: home.claudeHome,
+      seeyaHome: home.seeyaHome,
+      clock: systemClock,
+    }),
+  };
 }

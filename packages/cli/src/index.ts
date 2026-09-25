@@ -26,6 +26,9 @@ import {
   buildProjectAdoptDeps,
   buildProjectContext,
   buildProjectOpenDeps,
+  buildProjectRemoveDeps,
+  buildProjectRemoveRepoDeps,
+  buildProjectRevertAdoptionDeps,
   buildSnoozeContext,
   buildStartDayContext,
   resolveCliDaemonOwner,
@@ -60,6 +63,11 @@ import {
   runProjectOpenCommand,
   runProjectShowCommand,
 } from './project-command.js';
+import {
+  runProjectRemoveCommand,
+  runProjectRemoveRepoCommand,
+  runProjectRevertAdoptionCommand,
+} from './project-undo-command.js';
 import { DAEMON_CHILD_ENV_VAR } from '@seeya-ai/engine/adapters/process/daemon-launch.js';
 import { captureObservedProcStart } from '@seeya-ai/engine/adapters/process/proc-start.js';
 import { processExists } from '@seeya-ai/engine/adapters/process/existence.js';
@@ -442,6 +450,69 @@ projectCommand
     const context = await buildProjectAdoptContext();
     const deps = await buildProjectAdoptDeps(context);
     const exitCode = await runProjectAdoptCommand(context.sessionProvider, deps, session, id, {
+      stdin: process.stdin,
+      stdout: process.stdout,
+      isTTY: process.stdin.isTTY === true,
+    });
+    if (exitCode !== 0) {
+      process.exitCode = exitCode;
+    }
+  });
+
+projectCommand
+  .command('remove')
+  .description(
+    'Remove a project from the workspace and commit the removal (V2-T32). Not destructive: the ' +
+      "content stays in the workspace's own git history. Never touches an associated " +
+      'repository, a discovered session or a transcript.',
+  )
+  .argument('<id>', 'The project id, e.g. "auth-hardening".')
+  .action(async (id: string) => {
+    const context = buildProjectContext();
+    const deps = await buildProjectRemoveDeps(context);
+    const exitCode = await runProjectRemoveCommand(deps, id, {
+      stdin: process.stdin,
+      stdout: process.stdout,
+      isTTY: process.stdin.isTTY === true,
+    });
+    if (exitCode !== 0) {
+      process.exitCode = exitCode;
+    }
+  });
+
+projectCommand
+  .command('remove-repo')
+  .description(
+    'Remove a repository association from a project and commit it (V2-T32). The local clone ' +
+      "itself is never touched — only seeya.json's own record, and this device's repository " +
+      'map when no other project still uses the same identity.',
+  )
+  .argument('<id>', 'The project id, e.g. "auth-hardening".')
+  .argument('<name>', 'The repository name, as "seeya project show" lists it.')
+  .action(async (id: string, name: string) => {
+    const context = buildProjectContext();
+    const deps = await buildProjectRemoveRepoDeps(context);
+    console.log(await runProjectRemoveRepoCommand(deps, id, name));
+  });
+
+projectCommand
+  .command('revert-adoption')
+  .description(
+    "Revert an adopted session's own commits from a project, newest to oldest (V2-T32, D-047 " +
+      'item 4). Refuses if a later commit from a different session touched the same files. The ' +
+      'original session becomes adoptable again; the adopted copy is deleted only if it never ' +
+      'wrote anything after being adopted, or with explicit confirmation otherwise.',
+  )
+  .argument('<id>', 'The project id, e.g. "auth-hardening".')
+  .argument(
+    '[session]',
+    "Required only when the project has more than one adoption — the original session's or the " +
+      "adopted copy's own session id (or a prefix of either).",
+  )
+  .action(async (id: string, session: string | undefined) => {
+    const context = buildProjectContext();
+    const deps = await buildProjectRevertAdoptionDeps(context);
+    const exitCode = await runProjectRevertAdoptionCommand(deps, id, session, {
       stdin: process.stdin,
       stdout: process.stdout,
       isTTY: process.stdin.isTTY === true,

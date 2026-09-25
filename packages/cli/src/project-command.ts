@@ -87,8 +87,9 @@ export interface ProjectOpenIo {
 }
 
 /** A `readline.Interface` reader, or `null` when there's no TTY to ask through at all — the same
- * shape `askQuestion` below reads from. */
-type ConfirmationReader = ReturnType<typeof createInterface> | null;
+ * shape `askQuestion` below reads from. Exported for `project-undo-command.ts`'s own confirmations
+ * (`remove`/`revert-adoption`), which share this exact "one reader per invocation" discipline. */
+export type ConfirmationReader = ReturnType<typeof createInterface> | null;
 
 /**
  * Opens ONE `readline` interface for a WHOLE command invocation, never one per question — a
@@ -100,14 +101,17 @@ type ConfirmationReader = ReturnType<typeof createInterface> | null;
  * `io.isTTY` is false, so every confirmation reads the same "no way to ask" signal from one place
  * (AGENTS.md: "nada de duplicação") instead of each checking `io.isTTY` on its own.
  */
-function openConfirmationReader(io: ProjectOpenIo): ConfirmationReader {
+export function openConfirmationReader(io: ProjectOpenIo): ConfirmationReader {
   return io.isTTY ? createInterface({ input: io.stdin, output: io.stdout }) : null;
 }
 
 /** Asks one question through the SHARED reader `openConfirmationReader` opened — `null` (no TTY)
  * always resolves `null` here too, never a guessed answer (D-025); the caller decides what `null`
  * means for its own question. */
-async function askQuestion(reader: ConfirmationReader, prompt: string): Promise<string | null> {
+export async function askQuestion(
+  reader: ConfirmationReader,
+  prompt: string,
+): Promise<string | null> {
   if (reader === null) {
     return null;
   }
