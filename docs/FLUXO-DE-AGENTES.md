@@ -82,6 +82,20 @@ aprovada. É o único que altera os documentos de autoridade.
 > é o que `os.homedir()` lê. Nunca suponha uma variável que você não achou num `grep`. E depois da
 > prova, confira que nada apareceu no home real.
 
+> **Armadilha da janela de desenvolvimento: ela escreve no sistema real, não só no home.** Na
+> V2-T30 (2026-09-25), um agente rodou `node scripts/build.mjs --dev` para verificar a janela — esse
+> modo **sempre** abre uma janela de verdade, herdando o ambiente do shell. Por alguns segundos, ela
+> rodou contra o `~/.seeya` real e, ao abrir, fez o que toda janela faz: registrou o esquema
+> `seeya-dev` no registro do Windows (apontando para o Electron da worktree do agente) e gravou
+> `activeScheme: "seeya-dev"` em `~/.seeya/protocol-handler.json` — o que desviaria o clique dos
+> avisos do daemon do app instalado do mantenedor. O agente relatou "nenhuma escrita"; o PO conferiu
+> e não era verdade. **Nenhum agente roda `npm run app` nem `build.mjs --dev`.** Janela, só com
+> `SEEYA_APP_HOME_OVERRIDE` apontando para um home descartável — e mesmo assim o registro do
+> Windows (`HKCU\Software\Classes\seeya-dev`) continua sendo o real: essa parte não tem isolamento, e
+> quem precisar abrir a janela diz no relatório que a chave foi tocada. Depois de qualquer janela
+> aberta, confira `protocol-handler.json` e a chave, e diga o que encontrou — "não escrevi nada" só
+> vale conferido.
+
 ## Dev — Sonnet 5
 
 Implementa **uma tarefa por vez** do plano de entrega. Lê `AGENTS.md` no início de cada tarefa.

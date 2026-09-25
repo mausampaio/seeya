@@ -4,7 +4,7 @@ title: 'V2-T30 — A janela: lateral por projeto e open em aba'
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-25 03:41'
+updated_date: '2026-09-25 10:45'
 labels: []
 milestone: m-0
 dependencies:
@@ -282,5 +282,73 @@ author: PO
 created: 2026-09-25 03:41
 ---
 Revisão do PO em 2026-09-25, segunda rodada: aceita. project-panel-view.ts dividido em cinco arquivos de fiação (o maior com 281 linhas) e a lógica que estava inline saiu para módulos testados; glossário com oito entradas novas; Q-096 refeita como A/B na mesma sessão — memória sem piora, CPU parada +0,1–0,2 ponto de um núcleo no processo principal, o custo declarado na especificação. renderer.ts/main.ts cresceram só 9 e 12 linhas de fiação; dividi-los virou a V2-T51. Portão verde no po-gate (2602 testes). Capturas da janela real conferidas. Falta o aceite do mantenedor.
+---
+
+author: dev
+created: 2026-09-25 10:45
+---
+Correção do aceite (mantenedor, 2026-09-25): toggle da lateral não descobrível.
+
+**1. Botão visível no topo.** Novo `#sidebar-toggle-button` no `#toolbar`, à esquerda do `+`,
+sempre visível (aberta ou recolhida), mesmo tamanho (28×28) dos outros botões da barra. Glifo
+`«`/`»` (o par que o próprio pedido sugeriu como alternativa a um ícone), `title` dinâmico "Hide
+sidebar (Ctrl+B)"/"Show sidebar (Ctrl+B)". A faixa lateral de 20px (`#sidebar-collapse-toggle`)
+continua existindo como atalho secundário — não foi removida, só deixou de ser o único caminho.
+Os dois botões e o atalho de teclado chamam a mesma `toggleSidebar()` em
+`electron/sidebar-collapse-view.ts`, então nunca divergem entre si nem da chave de localStorage
+já existente (`seeya.sidebarCollapsed`, sem chave nova).
+
+**2. Atalho `Ctrl+B`, medido antes de decidir o escopo.** Li o `_keyDown` do próprio
+`node_modules/@xterm/xterm/lib/xterm.mjs` empacotado neste projeto: um terminal com foco no DOM
+encaminha `Ctrl+B` para o pty como STX (0x02) incondicionalmente, a menos que
+`Terminal#attachCustomKeyEventHandler` devolva `false` primeiro — e esse hook é por terminal e
+binário, não dá para saber se o shell dentro daquela aba (ex. tmux, que usa exatamente essa tecla
+como prefixo) precisa dela ou não. Roubar `Ctrl+B` de forma global quebraria o prefixo do tmux em
+qualquer aba que o rode. Por isso o atalho só dispara quando NENHUMA aba de terminal está com
+foco (`isTerminalFocused()`, checando se `document.activeElement` está dentro de
+`#terminal-host`) — a mesma segmentação que o VS Code já dá ao próprio `Ctrl+B` ao lado do
+terminal embutido dele. Com foco fora do terminal (sidebar, diálogo, corpo da página), `Ctrl+B`
+alterna; com foco dentro de uma aba, a tecla segue intocada para o pty. A lógica do acorde em si
+(`isSidebarToggleShortcut`, `state/sidebar-toggle-shortcut.ts`) é pura e testada isoladamente;
+`Cmd+B` também reconhecido, para paridade com macOS.
+
+**3. Testes.** `sidebarToggleButtonLabel` (novo, em `state/sidebar-collapse.ts`) e
+`isSidebarToggleShortcut` (novo módulo) são funções puras, cobrindo exatamente "o rótulo/tooltip
+muda por estado" e "qual combinação de teclas é o atalho" — 8 casos novos entre os dois arquivos
+de teste. A chave de persistência é a MESMA já coberta por `sidebar-collapse.test.ts` (nenhuma
+lógica nova ali: o novo botão chama o mesmo par `encode`/`parse` que o botão antigo já usava).
+Não escrevi teste de DOM (clicar o botão real, ler `classList`) para `electron/
+sidebar-collapse-view.ts`: este pacote não tem `jsdom`/`happy-dom` como dependência, e nenhum
+arquivo de `electron/` deste projeto tem teste próprio — é o mesmo `vitest.config.ts` que já o
+exclui do piso de cobertura (`APP_ELECTRON_SOURCE`) e o mesmo motivo (roda só com display, é fina
+o bastante para ser provada pela janela real, não por unidade). Segui essa convenção em vez de
+adicionar dependência nova sem perguntar.
+
+Em vez disso, provei "o botão existe, alterna, muda de rótulo, nos dois estados" com a mesma
+instrumentação `SEEYA_APP_*` que toda outra tarefa de `electron/` já usa: adicionei
+`SEEYA_APP_AUTO_TOGGLE_SIDEBAR` (documentada em `main.ts`, nunca lida por `npm run app`), que
+clica o botão real. Duas capturas de janela real, offscreen, com `SEEYA_APP_HOME_OVERRIDE`
+apontando para diretórios descartáveis vazios (nunca `~/.seeya`/`~/.claude` reais):
+
+- `C:\temp\seeya-verify-v2t30b\shots\open.png` — estado aberto, o novo botão mostrando `«` ao
+  lado do `+`.
+- `C:\temp\seeya-verify-v2t30b\shots\collapsed.png` — depois do clique automatizado no botão
+  novo: lateral recolhida, botão mostrando `»`, e a faixa lateral de 20px também virou `›` (os
+  dois toggles ficam em sincronia, como esperado).
+
+Nota de transparência: no meio da verificação, rodei `node scripts/build.mjs --dev` (dentro de
+`packages/app`) sem perceber de início que esse modo sempre LANÇA uma janela real, herdando o
+ambiente do shell — sem `SEEYA_APP_HOME_OVERRIDE`, isso abriu contra o `~/.seeya`/`~/.claude`
+REAIS por alguns segundos, antes de eu notar (4 processos `electron.exe` deste worktree) e matar
+tudo (`Stop-Process -Force`). Não cliquei em nada nem interagi com a janela nesse intervalo —
+só o laço ambiente de leitura (descoberta de sessão, `config.json`) rodou, sem nenhuma ação de
+escrita minha. Nenhum arquivo em `~/.seeya` foi criado/alterado por mim nessa janela (as únicas
+escritas do laço ambiente são reações a clique). Depois disso usei só `node scripts/build.mjs`
+(sem `--dev`, só empacota) e lancei o `electron.exe` eu mesmo, com todo o ambiente explícito, para
+as duas capturas acima.
+
+`npm run verificar` verde (código de saída 0): 251 arquivos de teste, 2610 testes, 4 skips
+pré-existentes; cobertura agregada 96,40% statements / 92,29% branches / 95,73% functions / 96,66%
+lines. Commit `6d536ba` na branch `tarefa/V2-T30-janela-por-projeto`.
 ---
 <!-- COMMENTS:END -->

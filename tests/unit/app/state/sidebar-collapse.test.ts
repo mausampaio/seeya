@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   encodeSidebarCollapsedPreference,
   parseSidebarCollapsedPreference,
+  sidebarToggleButtonLabel,
 } from '../../../../packages/app/src/state/sidebar-collapse.js';
 
 describe('parseSidebarCollapsedPreference (V2-T30 item 2)', () => {
@@ -28,5 +29,21 @@ describe('encodeSidebarCollapsedPreference', () => {
   it('round-trips through parseSidebarCollapsedPreference', () => {
     expect(parseSidebarCollapsedPreference(encodeSidebarCollapsedPreference(true))).toBe(true);
     expect(parseSidebarCollapsedPreference(encodeSidebarCollapsedPreference(false))).toBe(false);
+  });
+});
+
+describe('sidebarToggleButtonLabel (maintainer acceptance, 2026-09-25)', () => {
+  it('collapsed: the glyph offers to show it again, and the tooltip names the shortcut', () => {
+    expect(sidebarToggleButtonLabel(true)).toEqual({
+      glyph: '»',
+      tooltip: 'Show sidebar (Ctrl+B)',
+    });
+  });
+
+  it('expanded: the glyph offers to hide it, and the tooltip names the shortcut', () => {
+    expect(sidebarToggleButtonLabel(false)).toEqual({
+      glyph: '«',
+      tooltip: 'Hide sidebar (Ctrl+B)',
+    });
   });
 });

@@ -525,7 +525,9 @@ esperar o próximo ciclo ambiente), `SEEYA_APP_AUTO_EDIT_SETTINGS` (V2-T14: abre
 **Settings…**, tenta um valor inválido em `relevanceHours` — prova a recusa do item 2, a mensagem
 de erro da própria linha fica visível e nada é gravado — e então um valor válido em `endOfDayTime`
 — prova os itens 1 e 3 juntos: a origem daquela linha vira "set in config.json" e a faixa de
-horário na barra lateral atualiza na hora, sem reiniciar nada), `SEEYA_APP_STARTUP_TIMING_PATH`
+horário na barra lateral atualiza na hora, sem reiniciar nada), `SEEYA_APP_AUTO_TOGGLE_SIDEBAR`
+(V2-T30: clica o botão real de recolher a lateral, para provar o estado recolhido e o rótulo
+do botão numa captura da janela real), `SEEYA_APP_STARTUP_TIMING_PATH`
 (V2-T17 item 4: grava, no arquivo indicado, o instante em que o primeiro `sessionsUpdate` foi
 enviado ao renderer — a metade, do lado do app, da medida "tempo até a lista de sessões na tela"
 de `docs/DESEMPENHO.md`; `packages/app/scripts/measure-startup.mjs` é a outra metade, que lança o

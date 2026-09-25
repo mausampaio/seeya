@@ -253,6 +253,15 @@ export const MESSAGES = {
   // V2-T30 — the "Projects" section, its dialogs, and the sidebar's collapse toggle.
   sidebarCollapseToggleCollapsed: '›',
   sidebarCollapseToggleExpanded: '‹',
+  // Maintainer acceptance, 2026-09-25: the side-strip toggle above wasn't discoverable ("um
+  // controle que só se acha sabendo que existe é defeito") — this second, obvious button lives in
+  // the toolbar next to "+" instead, with its own glyph pair and a tooltip naming the keyboard
+  // shortcut (state/sidebar-toggle-shortcut.ts's own docstring has why it's scoped to "no terminal
+  // focused").
+  sidebarToggleButtonShow: '»',
+  sidebarToggleButtonHide: '«',
+  sidebarToggleTooltipShow: 'Show sidebar (Ctrl+B)',
+  sidebarToggleTooltipHide: 'Hide sidebar (Ctrl+B)',
   projectsHeading: 'Projects',
   otherSessionsHeading: 'Other sessions',
   projectsEmpty: 'No projects yet.',
