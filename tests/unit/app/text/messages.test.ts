@@ -32,6 +32,20 @@ describe('MESSAGES', () => {
     });
   });
 
+  // V2-T30: the "Projects"/"Other sessions" row labels — pulled out of
+  // electron/projects-list-view.ts's own DOM-building code so the text assembly has its own test.
+  it('projectSessionRowLabel names the session and its state', () => {
+    expect(MESSAGES.projectSessionRowLabel('demo-project-session', 'ended')).toBe(
+      'demo-project-session (ended)',
+    );
+  });
+
+  it('otherSessionRowLabel names the session, its cwd, and its state', () => {
+    expect(MESSAGES.otherSessionRowLabel('unrelated-session', '/code/unrelated', 'ended')).toBe(
+      'unrelated-session (/code/unrelated) — ended',
+    );
+  });
+
   it('todaySummaryResumedWithoutPlanNote wraps the bare fact in a sentence, distinct from the fallback note', () => {
     const text = MESSAGES.todaySummaryResumedWithoutPlanNote(
       'it was 20000 characters, over the 16384-character limit',

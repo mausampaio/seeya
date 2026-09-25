@@ -259,6 +259,12 @@ export const MESSAGES = {
   otherSessionsEmpty: 'No other sessions.',
   projectOpenButton: 'Open',
   projectLockLabel: (lockText: string): string => `Lock: ${lockText}`,
+  // Pulled out of electron/projects-list-view.ts's own row-building code (PO review, 2026-09-25):
+  // "montagem de texto" belongs here, concentrated, like every other user-facing string in this
+  // project — not inline template literals inside a DOM-building function.
+  projectSessionRowLabel: (name: string, state: string): string => `${name} (${state})`,
+  otherSessionRowLabel: (name: string, cwd: string, state: string): string =>
+    `${name} (${cwd}) — ${state}`,
   adoptButton: 'Adopt…',
   newProjectButton: 'New project…',
   newProjectDialogTitle: 'New project',

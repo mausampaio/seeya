@@ -9,7 +9,7 @@ import { formatLockHolderDescription } from '@seeya-ai/engine/core/project-lock-
 import type { AdoptSessionResult } from '@seeya-ai/engine/application/project-adopt.js';
 
 /** Whether `result` is the one case the "Open project" button follows — kept here so
- * `electron/project-panel-view.ts` never re-derives the discriminant check on its own (D-041). */
+ * `electron/adopt-flow-view.ts` never re-derives the discriminant check on its own (D-041). */
 export function isAdoptedResult(
   result: AdoptSessionResult,
 ): result is Extract<AdoptSessionResult, { readonly kind: 'adopted' }> {
@@ -58,4 +58,18 @@ export function formatAdoptSessionOutcomeText(result: AdoptSessionResult): strin
     case 'adopted':
       return `Project "${result.projectId}": adopted.`;
   }
+}
+
+/**
+ * `electron/adopt-flow-view.ts`'s own refusal when the session an "Adopt…" click named is no
+ * longer in the latest discovery (D-025: aged past `relevanceHours`, or the record vanished — never
+ * guessed, reported as its own outcome). Pulled out of the IPC handler (PO review, 2026-09-25) so
+ * this one line of "mapeamento de resultado" has the same test coverage every other outcome text in
+ * this file already gets.
+ *
+ * @example
+ * formatSessionNotDiscoverableText('11111111-1111-4111-8111-111111111111')
+ */
+export function formatSessionNotDiscoverableText(sessionId: string): string {
+  return `seeya: session ${sessionId} is no longer discoverable.`;
 }

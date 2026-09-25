@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatAdoptSessionOutcomeText,
+  formatSessionNotDiscoverableText,
   isAdoptedResult,
 } from '../../../../packages/app/src/state/adopt-session-result.js';
 import type { AdoptSessionResult } from '@seeya-ai/engine/application/project-adopt.js';
@@ -130,5 +131,13 @@ describe('isAdoptedResult', () => {
       }),
     ).toBe(true);
     expect(isAdoptedResult({ kind: 'noChanges', projectId: 'x', forkSessionId: 'y' })).toBe(false);
+  });
+});
+
+describe('formatSessionNotDiscoverableText (V2-T30 item 5)', () => {
+  it('names the session id that no longer resolves', () => {
+    expect(formatSessionNotDiscoverableText('11111111-1111-4111-8111-111111111111')).toBe(
+      'seeya: session 11111111-1111-4111-8111-111111111111 is no longer discoverable.',
+    );
   });
 });
