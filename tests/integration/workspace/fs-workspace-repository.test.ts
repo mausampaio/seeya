@@ -784,7 +784,24 @@ describe('FsWorkspaceRepository', () => {
       await workspace.writeProjectSkeleton(dir, 'billing-v2', buildProjectSkeleton('billing-v2'));
       await writeFile(path.join(dir, 'auth-hardening', 'status', 'current.md'), 'x\n');
       await runGit(dir, ['add', 'auth-hardening', 'billing-v2']);
-      await runGit(dir, ['commit', '-m', 'Sneaky two-project commit']);
+      // The committer identity has to come from the test itself: CI runners (Ubuntu, Windows) have
+      // no `user.name`/`user.email`, so a bare `git commit` there fails — and `runGit` never
+      // rejects, so the failure used to surface three lines later as "expected undefined to be
+      // true" (CI run 36151748585). Same non-address-shaped value as `tests/integration/git/
+      // _fixtures.ts#commitAt`, for the same leak-guard reason.
+      const commit = await runGit(dir, ['commit', '-m', 'Sneaky two-project commit'], {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'Seeya Test',
+        GIT_AUTHOR_EMAIL: 'seeya-test-fixture',
+        GIT_COMMITTER_NAME: 'Seeya Test',
+        GIT_COMMITTER_EMAIL: 'seeya-test-fixture',
+      });
+      expect(commit, `the hand-made commit itself failed: ${JSON.stringify(commit)}`).toMatchObject(
+        {
+          ran: true,
+          exitCode: 0,
+        },
+      );
       const commits = await workspace.listCommitsForAudit(dir, 'auth-hardening', null);
       const sneaky = commits.find((c) => c.message.includes('Sneaky'));
       expect(sneaky?.files.some((f) => f.startsWith('billing-v2/'))).toBe(true);
