@@ -39,3 +39,25 @@ export function buildProjectCommitMessage(
     `${SESSION_ID_TRAILER_KEY}: ${sessionValue}`
   );
 }
+
+/**
+ * Reads one trailer's value out of a full commit message — shared by
+ * `core/workspace-commit-guard.ts` (V2-T34 item 1, deciding what a commit-in-progress is missing)
+ * and `core/project-audit.ts` (V2-T34 item 3, deciding what a commit already in history is missing)
+ * so the same trailer syntax is parsed in exactly one place (AGENTS.md: "nada de duplicação").
+ * `null` when the key never appears as its own `Key: value` line (D-025) — never mistaken for an
+ * empty-string value, which this pattern can't produce anyway (`.+` requires at least one
+ * character).
+ *
+ * @example
+ * extractCommitTrailer('Fix bug\n\nSeeya-Project-Id: auth\nSeeya-Session-Id: unknown', 'Seeya-Project-Id')
+ * // 'auth'
+ */
+export function extractCommitTrailer(message: string, key: string): string | null {
+  const pattern = new RegExp(`^${key}:\\s*(.+)$`, 'm');
+  const match = message.match(pattern);
+  if (match === null || match[1] === undefined) {
+    return null;
+  }
+  return match[1].trim();
+}

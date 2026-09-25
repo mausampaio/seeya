@@ -7,6 +7,7 @@ import {
   SESSION_ID_TRAILER_KEY,
   UNKNOWN_SESSION_TRAILER_VALUE,
   buildProjectCommitMessage,
+  extractCommitTrailer,
 } from '@seeya-ai/engine/core/project-commit.js';
 
 describe('buildProjectCommitMessage', () => {
@@ -34,5 +35,28 @@ describe('buildProjectCommitMessage', () => {
       undefined,
     );
     expect(message).toContain(`${PROJECT_ID_TRAILER_KEY}: auth-hardening`);
+  });
+});
+
+describe('extractCommitTrailer', () => {
+  it('finds a trailer value by key', () => {
+    const message = buildProjectCommitMessage('Fix bug', 'auth-hardening', 'session-abc');
+    expect(extractCommitTrailer(message, PROJECT_ID_TRAILER_KEY)).toBe('auth-hardening');
+    expect(extractCommitTrailer(message, SESSION_ID_TRAILER_KEY)).toBe('session-abc');
+  });
+
+  it('returns null when the key never appears (D-025)', () => {
+    expect(
+      extractCommitTrailer('Fix bug\n\nSome-Other-Trailer: x', PROJECT_ID_TRAILER_KEY),
+    ).toBeNull();
+  });
+
+  it('trims surrounding whitespace from the value', () => {
+    expect(
+      extractCommitTrailer(
+        'Fix bug\n\nSeeya-Project-Id:   auth-hardening  ',
+        PROJECT_ID_TRAILER_KEY,
+      ),
+    ).toBe('auth-hardening');
   });
 });
