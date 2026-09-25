@@ -22,6 +22,8 @@ import {
 } from '../../../packages/cli/src/composition.js';
 import { captureObservedProcStart } from '@seeya-ai/engine/adapters/process/proc-start.js';
 import { processExists } from '@seeya-ai/engine/adapters/process/existence.js';
+import { buildCommitMsgHookScript } from '@seeya-ai/engine/core/workspace-hooks.js';
+import { buildHarnessSettingsJson } from '@seeya-ai/engine/core/harness-hook-config.js';
 import {
   createDiscoveryFixture,
   removeDiscoveryFixture,
@@ -326,6 +328,42 @@ describe('buildProjectContext', () => {
     };
     await context.projectLock.write(workspaceRoot, 'auth-hardening', lockInfo);
     expect(await context.projectLock.read(workspaceRoot, 'auth-hardening')).toEqual(lockInfo);
+  });
+
+  it('hookEnv is empty for a plain Node process, by default (no electronVersion override)', async () => {
+    fixture = await createDiscoveryFixture();
+    // Real `process.versions.electron` — this suite always runs under plain Node (vitest), never
+    // Electron, so the default parameter itself proves the "no override" path really reads it.
+    expect(buildProjectContext(fixture.root).hookEnv).toEqual({});
+  });
+
+  it('hookEnv carries ELECTRON_RUN_AS_NODE=1 when electronVersion is given (V2-T34, PO review)', async () => {
+    fixture = await createDiscoveryFixture();
+    expect(buildProjectContext(fixture.root, '30.0.0').hookEnv).toEqual({
+      ELECTRON_RUN_AS_NODE: '1',
+    });
+  });
+
+  it("the Electron-case hookEnv reaches the actual generated git hook script's own text", async () => {
+    fixture = await createDiscoveryFixture();
+    const context = buildProjectContext(fixture.root, '30.0.0');
+    const script = buildCommitMsgHookScript(
+      context.nodePath,
+      context.cliEntryPath,
+      context.hookEnv,
+    );
+    expect(script).toContain('ELECTRON_RUN_AS_NODE=1 exec');
+  });
+
+  it("the Electron-case hookEnv reaches the actual generated harness hook command's own text", async () => {
+    fixture = await createDiscoveryFixture();
+    const context = buildProjectContext(fixture.root, '30.0.0');
+    const settings = buildHarnessSettingsJson(
+      context.nodePath,
+      context.cliEntryPath,
+      context.hookEnv,
+    );
+    expect(settings).toContain('ELECTRON_RUN_AS_NODE=1');
   });
 });
 

@@ -5,7 +5,7 @@
  * documents for `GitReader`.
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FsWorkspaceRepository } from '@seeya-ai/engine/adapters/workspace/index.js';
@@ -418,17 +418,20 @@ describe('FsWorkspaceRepository', () => {
     expect(await workspace.currentCommit(root)).toBe(head.ran ? head.stdout.trim() : null);
   });
 
-  it('countProjectFiles counts the tracked files inside one project (AGENTS.md, INDEX.md, seeya.json)', async () => {
+  it('countProjectFiles counts the tracked files inside one project', async () => {
     root = await makeTmpDir();
     const workspace = new FsWorkspaceRepository();
     await workspace.initialize(root);
-    await workspace.writeProjectSkeleton(
-      root,
-      'auth-hardening',
-      buildProjectSkeleton('auth-hardening'),
-    );
+    const skeleton = buildProjectSkeleton('auth-hardening');
+    await workspace.writeProjectSkeleton(root, 'auth-hardening', skeleton);
     await workspace.commitAll(root, 'auth-hardening', 'Create project auth-hardening');
-    expect(await workspace.countProjectFiles(root, 'auth-hardening')).toBe(3);
+    // AGENTS.md, INDEX.md, seeya.json, plus the two V2-T34 item 2 harness-hook files
+    // (.claude/settings.json, .claude/hooks/verify-bash-command.mjs) — never a magic number that
+    // silently goes stale the next time the skeleton grows a file (`skeleton.files.length` plus the
+    // one file `writeProjectSkeleton` always adds beyond `skeleton.files` itself, `seeya.json`).
+    expect(await workspace.countProjectFiles(root, 'auth-hardening')).toBe(
+      skeleton.files.length + 1,
+    );
   });
 
   it('removeProjectDirectory deletes the project, and commitAll then commits the removal', async () => {
@@ -691,6 +694,117 @@ describe('FsWorkspaceRepository', () => {
       );
       expect(outcome.kind).toBe('failed');
       expect(outcome.kind === 'failed' && outcome.reason).not.toMatch(/^exit /);
+    });
+  });
+
+  describe('listStagedFiles / installCommitMsgHook / listCommitsForAudit (V2-T34)', () => {
+    async function setUpTwoProjects(): Promise<{ root: string; workspace: FsWorkspaceRepository }> {
+      const dir = await makeTmpDir();
+      root = dir;
+      const workspace = new FsWorkspaceRepository();
+      await workspace.initialize(dir);
+      await workspace.writeProjectSkeleton(
+        dir,
+        'auth-hardening',
+        buildProjectSkeleton('auth-hardening'),
+      );
+      await workspace.commitAll(
+        dir,
+        'auth-hardening',
+        buildProjectCommitMessage('Create project auth-hardening', 'auth-hardening', undefined),
+      );
+      return { root: dir, workspace };
+    }
+
+    it('listStagedFiles is empty before staging, lists exactly what was git-added after', async () => {
+      const { root: dir, workspace } = await setUpTwoProjects();
+      expect(await workspace.listStagedFiles(dir)).toEqual([]);
+      await writeFile(path.join(dir, 'auth-hardening', 'status', 'current.md'), 'x\n');
+      await runGit(dir, ['add', 'auth-hardening']);
+      expect(await workspace.listStagedFiles(dir)).toEqual(['auth-hardening/status/current.md']);
+    });
+
+    it('listStagedFiles throws with the raw reason (not an exit code) when the workingDir does not exist at all', async () => {
+      const parent = await makeTmpDir();
+      root = parent;
+      const missing = path.join(parent, 'never-created');
+      const workspace = new FsWorkspaceRepository();
+      await expect(workspace.listStagedFiles(missing)).rejects.toThrow(/git diff failed/);
+    });
+
+    it('installCommitMsgHook writes an executable file at .git/hooks/commit-msg', async () => {
+      const { root: dir, workspace } = await setUpTwoProjects();
+      await workspace.installCommitMsgHook(dir, '#!/bin/sh\necho hi\n');
+      const hookPath = path.join(dir, '.git', 'hooks', 'commit-msg');
+      const content = await readFile(hookPath, 'utf8');
+      expect(content).toBe('#!/bin/sh\necho hi\n');
+      const stats = await stat(hookPath);
+      // On POSIX, the executable bit is what git actually checks before running a hook by this
+      // exact name; on Windows this bit is meaningless but harmless to assert regardless.
+      if (process.platform !== 'win32') {
+        expect(stats.mode & 0o111).not.toBe(0);
+      }
+    });
+
+    it('installCommitMsgHook overwrites an existing hook — reinstalled, never merged', async () => {
+      const { root: dir, workspace } = await setUpTwoProjects();
+      await workspace.installCommitMsgHook(dir, '#!/bin/sh\necho old\n');
+      await workspace.installCommitMsgHook(dir, '#!/bin/sh\necho new\n');
+      const content = await readFile(path.join(dir, '.git', 'hooks', 'commit-msg'), 'utf8');
+      expect(content).toBe('#!/bin/sh\necho new\n');
+    });
+
+    it('listCommitsForAudit(sinceCommit: null) returns the whole history, oldest first, unscoped files', async () => {
+      const { root: dir, workspace } = await setUpTwoProjects();
+      const commits = await workspace.listCommitsForAudit(dir, 'auth-hardening', null);
+      expect(commits).toHaveLength(1);
+      expect(commits[0]?.message).toContain('Create project auth-hardening');
+      expect(commits[0]?.files).toContain('auth-hardening/AGENTS.md');
+    });
+
+    it('listCommitsForAudit(sinceCommit) excludes everything at or before that commit', async () => {
+      const { root: dir, workspace } = await setUpTwoProjects();
+      const first = (await workspace.listCommitsForAudit(dir, 'auth-hardening', null))[0];
+      await writeFile(path.join(dir, 'auth-hardening', 'status', 'current.md'), 'second\n');
+      await workspace.commitAll(
+        dir,
+        'auth-hardening',
+        buildProjectCommitMessage('Second commit', 'auth-hardening', 'session-a'),
+      );
+      const since = await workspace.listCommitsForAudit(dir, 'auth-hardening', first?.hash ?? null);
+      expect(since).toHaveLength(1);
+      expect(since[0]?.message).toContain('Second commit');
+    });
+
+    it('listCommitsForAudit sees a file OUTSIDE the project too — unscoped, unlike findCommitsAfter', async () => {
+      const { root: dir, workspace } = await setUpTwoProjects();
+      // A commit made by hand touching a SECOND project alongside the audited one — the exact case
+      // `core/project-audit.ts#touchesOtherProjects` exists to catch, which requires the files list
+      // NOT be scoped to `auth-hardening` the way `findCommitsAfter` deliberately is.
+      await workspace.writeProjectSkeleton(dir, 'billing-v2', buildProjectSkeleton('billing-v2'));
+      await writeFile(path.join(dir, 'auth-hardening', 'status', 'current.md'), 'x\n');
+      await runGit(dir, ['add', 'auth-hardening', 'billing-v2']);
+      await runGit(dir, ['commit', '-m', 'Sneaky two-project commit']);
+      const commits = await workspace.listCommitsForAudit(dir, 'auth-hardening', null);
+      const sneaky = commits.find((c) => c.message.includes('Sneaky'));
+      expect(sneaky?.files.some((f) => f.startsWith('billing-v2/'))).toBe(true);
+    });
+
+    it('listCommitsForAudit throws with the raw reason (not an exit code) when the workingDir does not exist at all', async () => {
+      const parent = await makeTmpDir();
+      root = parent;
+      const missing = path.join(parent, 'never-created');
+      const workspace = new FsWorkspaceRepository();
+      await expect(workspace.listCommitsForAudit(missing, 'auth-hardening', null)).rejects.toThrow(
+        /git log failed/,
+      );
+    });
+
+    it('listCommitsForAudit throws when sinceCommit does not exist as a real commit', async () => {
+      const { root: dir, workspace } = await setUpTwoProjects();
+      await expect(
+        workspace.listCommitsForAudit(dir, 'auth-hardening', 'not-a-real-commit-hash'),
+      ).rejects.toThrow(/git log failed/);
     });
   });
 });

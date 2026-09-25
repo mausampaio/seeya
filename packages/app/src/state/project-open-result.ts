@@ -37,6 +37,11 @@ export function formatProjectOpenOutcomeText(result: OpenProjectResult): string 
         `Project "${result.projectId}" is locked by ${formatLockHolderDescription(result.heldBy)} ` +
         '— refusing to open without confirmation.'
       );
+    case 'leftoverChangesConfirmationUnavailable':
+      return (
+        `Project "${result.projectId}" has ${result.changedFiles.length} uncommitted change(s) ` +
+        'left by a previous session — refusing to open without confirmation.'
+      );
     case 'opened':
       return (
         `Project "${result.projectId}" closed (exit code ${result.exitCode}). ` +

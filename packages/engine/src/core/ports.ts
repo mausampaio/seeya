@@ -27,6 +27,7 @@ import type {
   RepositoryMapEntry,
   SessionFacts,
 } from './types.js';
+import type { AuditableCommit } from './project-audit.js';
 
 /**
  * The project's single source of "now" (D-019). Implemented in `adapters/clock/`. No other
@@ -1256,6 +1257,50 @@ export interface WorkspaceRepository {
     commitsNewestFirst: readonly string[],
     message: string,
   ): Promise<RevertExecutionOutcome>;
+
+  /**
+   * V2-T34 item 1: `git diff --cached --name-only`, workspace-relative and UNSCOPED — the guard
+   * (`core/workspace-commit-guard.ts`) needs to see every staged file, across every project, to
+   * refuse a commit that touches more than one. Called by `application/verify-commit.ts` from
+   * inside the workspace's own `commit-msg` hook, always with `root` as the hook's own `cwd` (git
+   * runs every hook at the top of the working tree).
+   */
+  listStagedFiles(root: string): Promise<readonly string[]>;
+
+  /**
+   * V2-T34 item 1: writes `<root>/.git/hooks/commit-msg` (D-047 item 5's own "ganchos de git...
+   * instalados e reafirmados pelo seeya") and marks it executable. Called once at
+   * `application/workspace.ts#createProject` (right after `initialize()`) and again at the start of
+   * every `application/project-open.ts#openProject` — "um gancho apagado volta sozinho." Always
+   * overwrites: this hook is `seeya`'s own generated text, never something a person is expected to
+   * hand-edit (`core/workspace-hooks.ts#buildCommitMsgHookScript`'s own comment).
+   */
+  installCommitMsgHook(root: string, scriptContent: string): Promise<void>;
+
+  /**
+   * V2-T34 item 3: every commit inside `root/projectId`'s own history, oldest first, since
+   * `sinceCommit` (exclusive) — or the WHOLE history when `sinceCommit` is `null` (no audit has run
+   * for this project yet). Unlike `findSessionCommits`/`findCommitsAfter`, each commit's `files` is
+   * UNSCOPED (every file it touched, in every project) — `core/project-audit.ts`'s own
+   * `touchesOtherProjects` check needs to see a commit that secretly reached into a second project,
+   * which a `projectId`-scoped file list would hide by construction.
+   */
+  listCommitsForAudit(
+    root: string,
+    projectId: string,
+    sinceCommit: string | null,
+  ): Promise<readonly AuditableCommit[]>;
+
+  /**
+   * V2-T34 item 2 (PO review): writes `<root>/<projectId>/.claude/settings.json` — the Claude Code
+   * project hook (`core/harness-hook-config.ts`). Called at the start of every
+   * `application/project-open.ts#openProject`, the SAME "reinstalled by every open" discipline
+   * `installCommitMsgHook` above already has, for the identical reason: the content embeds this
+   * machine's current, absolute `seeya` path, which only `open` can know is fresh. Never
+   * committed — the workspace's own `.gitignore` excludes every project's own `.claude/` directory
+   * (`adapters/workspace/index.ts`'s own gitignore reassertion, extended to cover this).
+   */
+  installHarnessHook(root: string, projectId: string, settingsJsonContent: string): Promise<void>;
 }
 
 /**
@@ -1438,4 +1483,38 @@ export interface SessionAdoptionLauncher {
     originalSessionId: string,
     forkSessionId: string,
   ): Promise<HarnessOpenResult>;
+}
+
+// Own block at the end of the file on purpose (V2-T34), same pattern every earlier "one port per
+// task" addition above already established.
+
+/**
+ * V2-T34 item 1: the workspace's `commit-msg` hook's own I/O with the temp file git hands it — read
+ * the draft message, write back whatever `core/workspace-commit-guard.ts#decideCommitGuard` decided
+ * (unchanged, or with trailers completed). A degenerate two-method port rather than plain `node:fs`
+ * calls inside `application/verify-commit.ts` directly, for the same reason every other access to
+ * the world in this project goes through one (AGENTS.md § "Dependências"): it lets that
+ * orchestration be tested with a fake in-memory file instead of a real temp path. Implemented by
+ * `adapters/workspace/commit-message-file.ts`, plain (non-atomic) `fs` reads/writes — this file's
+ * whole lifecycle already belongs to `git` itself (it deletes it once the hook exits), so there is
+ * no "torn read" for a rename-based swap to protect against, unlike everything under `~/.seeya/`.
+ */
+export interface CommitMessageFile {
+  read(path: string): Promise<string>;
+  write(path: string, content: string): Promise<void>;
+}
+
+/**
+ * V2-T34 item 3: `seeya project audit <id>`'s own "since the last audit" marker — the commit hash
+ * `listCommitsForAudit` should treat as `sinceCommit`. Lives INSIDE `root/projectId` (like
+ * `.seeya-lock`, never `~/.seeya/`) and is never committed (the same workspace `.gitignore`
+ * `ensureWorkspaceGitignoreIgnoresProjectLock` reasserts on every `commitAll` — V2-T34 extends it to
+ * cover this file's own name too): it's this DEVICE's own bookkeeping of when it last looked, not
+ * project content. Implemented by `adapters/workspace/project-audit-marker.ts#FsProjectAuditMarker`.
+ */
+export interface ProjectAuditMarker {
+  /** `null` when this project has never been audited on this device (D-025) —
+   * `listCommitsForAudit`'s own `sinceCommit: null` reads the WHOLE history in that case. */
+  read(root: string, projectId: string): Promise<string | null>;
+  write(root: string, projectId: string, commitHash: string): Promise<void>;
 }

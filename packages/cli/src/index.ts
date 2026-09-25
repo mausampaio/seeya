@@ -24,6 +24,7 @@ import {
   buildEndDayContext,
   buildProjectAdoptContext,
   buildProjectAdoptDeps,
+  buildProjectAuditDeps,
   buildProjectContext,
   buildProjectOpenDeps,
   buildProjectRemoveDeps,
@@ -31,6 +32,7 @@ import {
   buildProjectRevertAdoptionDeps,
   buildSnoozeContext,
   buildStartDayContext,
+  buildVerifyCommitDeps,
   resolveCliDaemonOwner,
 } from './composition.js';
 import { runSessionsCommand } from './sessions-command.js';
@@ -58,10 +60,13 @@ import {
 import {
   runProjectAddRepoCommand,
   runProjectAdoptCommand,
+  runProjectAuditCommand,
   runProjectCreateCommand,
   runProjectListCommand,
   runProjectOpenCommand,
   runProjectShowCommand,
+  runProjectVerifyCommitCommand,
+  runProjectVerifyBashCommandCommand,
 } from './project-command.js';
 import {
   runProjectRemoveCommand,
@@ -428,6 +433,54 @@ projectCommand
       stdout: process.stdout,
       isTTY: process.stdin.isTTY === true,
     });
+    if (exitCode !== 0) {
+      process.exitCode = exitCode;
+    }
+  });
+
+projectCommand
+  .command('audit')
+  .description(
+    "Check a project's commit history since the last audit against the same rules the " +
+      'workspace\'s own git hook enforces (D-047), and report what escaped it. "seeya project ' +
+      'open\" already runs this same check before taking the lock — this is for checking a ' +
+      'project without opening it.',
+  )
+  .argument('<id>', 'The project id, e.g. "auth-hardening".')
+  .action(async (id: string) => {
+    const context = buildProjectContext();
+    const deps = buildProjectAuditDeps(context);
+    console.log(await runProjectAuditCommand(deps, id));
+  });
+
+projectCommand
+  .command('verify-commit')
+  .description(
+    "Internal: called by the workspace's own commit-msg git hook (D-047, V2-T34) with the path " +
+      'git hands it — not meant to be run by hand.',
+  )
+  .argument('<messageFile>', 'Path to the commit message file git hands the hook.')
+  .action(async (messageFile: string) => {
+    const deps = buildVerifyCommitDeps();
+    const exitCode = await runProjectVerifyCommitCommand(
+      deps,
+      process.cwd(),
+      messageFile,
+      process.stderr,
+    );
+    if (exitCode !== 0) {
+      process.exitCode = exitCode;
+    }
+  });
+
+projectCommand
+  .command('verify-bash-command')
+  .description(
+    "Internal: called by a project's own Claude Code hook (D-047, V2-T34) — reads the " +
+      'PreToolUse payload from stdin, not meant to be run by hand.',
+  )
+  .action(async () => {
+    const exitCode = await runProjectVerifyBashCommandCommand(process.stdin, process.stdout);
     if (exitCode !== 0) {
       process.exitCode = exitCode;
     }

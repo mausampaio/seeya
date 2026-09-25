@@ -9,7 +9,7 @@
  * WorkspaceRepository`'s own docstring on why), so a single instance is safe to reuse across every
  * `seeya project` command a CLI invocation runs (`packages/cli/src/composition.ts`).
  */
-import { mkdir, readdir, readFile, rm, stat } from 'node:fs/promises';
+import { chmod, mkdir, readdir, readFile, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import type {
   RejectedDiscoveryRecord,
@@ -17,6 +17,7 @@ import type {
   RevertExecutionOutcome,
   WorkspaceRepository,
 } from '../../core/ports.js';
+import type { AuditableCommit } from '../../core/project-audit.js';
 import type { ProjectManifest, ProjectSkeleton } from '../../core/types.js';
 import { runGit } from '../git/run-git.js';
 import { writeFileAtomic } from '../storage/atomic-write.js';
@@ -28,9 +29,14 @@ import {
   serializeProjectManifestDocument,
 } from './project-manifest-schema.js';
 import { PROJECT_LOCK_FILE_NAME } from './project-lock.js';
+import { PROJECT_AUDIT_FILE_NAME } from './project-audit-marker.js';
+import { COMMIT_MSG_HOOK_FILE_NAME } from '../../core/workspace-hooks.js';
 import { findCommitsAfter, findSessionCommits, revertCommitSequence } from './revert.js';
+import { listCommitsForAudit as listCommitsForAuditImpl } from './audit.js';
 
 export { FsProjectLock } from './project-lock.js';
+export { FsProjectAuditMarker } from './project-audit-marker.js';
+export { FsCommitMessageFile } from './commit-message-file.js';
 
 /** `seeya`'s own author/committer identity for every commit it makes in the workspace — never the
  * operator's real `git config user.*` (this file's own module comment; same technique
@@ -60,6 +66,26 @@ const GITIGNORE_FILE_NAME = '.gitignore';
  * future. Idempotent: a `.gitignore` that already has the line is left untouched (no rewrite, no
  * extra commit).
  */
+/** V2-T34 item 3: `.seeya-audit` (the audit marker, `adapters/workspace/project-audit-marker.ts`)
+ * is device bookkeeping, not project content — same "never committed" discipline as the lock file
+ * right above it, and reasserted the exact same way, at the exact same call site.
+ *
+ * `**\/.claude/` (V2-T34 item 2, PO review): the Claude Code project hook config
+ * (`core/harness-hook-config.ts`), regenerated fresh by every `openProject` — same reasoning, but a
+ * DIRECTORY pattern, not a bare name: a plain `.claude/settings.json` line here would only match at
+ * the workspace ROOT (git anchors any pattern containing a `/` to the `.gitignore`'s own
+ * directory), never inside `<projectId>/.claude/settings.json` one level down. Confirmed for real:
+ * `git status --porcelain --ignored=matching` against a disposable fixture with this exact line
+ * reported `<project>/.claude/` as `!!` (ignored). */
+const IGNORED_OPERATIONAL_FILE_NAMES: readonly string[] = [
+  PROJECT_LOCK_FILE_NAME,
+  PROJECT_AUDIT_FILE_NAME,
+];
+const IGNORED_WORKSPACE_PATTERNS: readonly string[] = [
+  ...IGNORED_OPERATIONAL_FILE_NAMES,
+  '**/.claude/',
+];
+
 async function ensureWorkspaceGitignoreIgnoresProjectLock(root: string): Promise<void> {
   const gitignorePath = path.join(root, GITIGNORE_FILE_NAME);
   let current: string;
@@ -71,13 +97,14 @@ async function ensureWorkspaceGitignoreIgnoresProjectLock(root: string): Promise
     }
     current = '';
   }
-  const alreadyPresent = current.split('\n').some((line) => line.trim() === PROJECT_LOCK_FILE_NAME);
-  if (alreadyPresent) {
+  const lines = current.split('\n').map((line) => line.trim());
+  const missing = IGNORED_WORKSPACE_PATTERNS.filter((name) => !lines.includes(name));
+  if (missing.length === 0) {
     return;
   }
   const withTrailingNewline =
     current.length === 0 || current.endsWith('\n') ? current : `${current}\n`;
-  await writeFileAtomic(gitignorePath, `${withTrailingNewline}${PROJECT_LOCK_FILE_NAME}\n`);
+  await writeFileAtomic(gitignorePath, `${withTrailingNewline}${missing.join('\n')}\n`);
 }
 
 /** Shared by `writeProjectSkeleton` and `writeProjectManifest` (V2-T28) — the one place that
@@ -380,5 +407,55 @@ export class FsWorkspaceRepository implements WorkspaceRepository {
   ): Promise<RevertExecutionOutcome> {
     void projectId; // `commitsNewestFirst` already came from THIS project's own history.
     return revertCommitSequence(root, commitsNewestFirst, message);
+  }
+
+  /** V2-T34 item 1: `git diff --cached --name-only`, unscoped — every file staged for the NEXT
+   * commit, across every project, so `core/workspace-commit-guard.ts` can tell whether it touches
+   * more than one. */
+  async listStagedFiles(root: string): Promise<readonly string[]> {
+    const diff = await runGit(root, ['diff', '--cached', '--name-only']);
+    if (!diff.ran || diff.exitCode !== 0) {
+      throw new Error(
+        `git diff failed in workspace at "${root}": ` +
+          `${diff.ran ? `exit ${diff.exitCode}` : diff.reason}`,
+      );
+    }
+    return diff.stdout.split('\n').filter((line) => line.trim().length > 0);
+  }
+
+  /** V2-T34 item 1: (re)writes `<root>/.git/hooks/commit-msg` and marks it executable — a no-op
+   * read-back, always overwrites (`core/workspace-hooks.ts`'s own docstring: this file is
+   * `seeya`'s own generated text, "reinstalled by every open"). `chmod` is a no-op on Windows
+   * (NTFS has no POSIX executable bit) — harmless there; Git for Windows' own bundled `sh.exe`
+   * doesn't check it before running a hook by that exact file name anyway (only a non-Windows git
+   * checks the bit before invoking a hook file directly).
+   */
+  async installCommitMsgHook(root: string, scriptContent: string): Promise<void> {
+    const hookPath = path.join(root, '.git', 'hooks', COMMIT_MSG_HOOK_FILE_NAME);
+    await writeFileAtomic(hookPath, scriptContent);
+    await chmod(hookPath, 0o755);
+  }
+
+  listCommitsForAudit(
+    root: string,
+    projectId: string,
+    sinceCommit: string | null,
+  ): Promise<readonly AuditableCommit[]> {
+    return listCommitsForAuditImpl(root, projectId, sinceCommit);
+  }
+
+  /** V2-T34 item 2 (PO review): writes `<root>/<projectId>/.claude/settings.json` — always
+   * overwrites, same "seeya's own generated text" discipline `installCommitMsgHook` already has. No
+   * executable bit needed (unlike the git hook): this is plain JSON Claude Code itself reads, never
+   * executed directly. */
+  async installHarnessHook(
+    root: string,
+    projectId: string,
+    settingsJsonContent: string,
+  ): Promise<void> {
+    await writeFileAtomic(
+      path.join(root, projectId, '.claude', 'settings.json'),
+      settingsJsonContent,
+    );
   }
 }

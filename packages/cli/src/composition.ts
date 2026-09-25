@@ -8,6 +8,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import type {
   Autostart,
   Clock,
@@ -18,6 +19,7 @@ import type {
   HarnessLauncher,
   Notifier,
   ProcessControl,
+  ProjectAuditMarker,
   ProjectLock,
   SessionAdoptionLauncher,
   SessionProvider,
@@ -34,7 +36,13 @@ import { systemClock } from '@seeya-ai/engine/adapters/clock/index.js';
 import { StorageAdapter } from '@seeya-ai/engine/adapters/storage/index.js';
 import { FsDirectoryExistence } from '@seeya-ai/engine/adapters/filesystem/index.js';
 import { buildAutostart } from '@seeya-ai/engine/adapters/autostart/index.js';
-import { FsWorkspaceRepository, FsProjectLock } from '@seeya-ai/engine/adapters/workspace/index.js';
+import {
+  FsWorkspaceRepository,
+  FsProjectLock,
+  FsProjectAuditMarker,
+  FsCommitMessageFile,
+} from '@seeya-ai/engine/adapters/workspace/index.js';
+import { PROJECT_LOCK_FILE_NAME } from '@seeya-ai/engine/adapters/workspace/project-lock.js';
 import { buildAppInstallation } from '@seeya-ai/engine/adapters/installation/index.js';
 import { resolveDaemonOwner } from '@seeya-ai/engine/application/daemon-ownership.js';
 import {
@@ -58,6 +66,8 @@ import {
 } from '@seeya-ai/engine/adapters/notification/index.js';
 import type { EndDayDeps } from '@seeya-ai/engine/application/types.js';
 import type { ProjectOpenDeps } from '@seeya-ai/engine/application/project-open.js';
+import type { VerifyCommitDeps } from '@seeya-ai/engine/application/verify-commit.js';
+import type { ProjectAuditDeps } from '@seeya-ai/engine/application/project-audit.js';
 import type { AdoptSessionDeps } from '@seeya-ai/engine/application/project-adopt.js';
 import type { RemoveProjectDeps } from '@seeya-ai/engine/application/project-remove.js';
 import type { RemoveRepositoryDeps } from '@seeya-ai/engine/application/project-remove-repo.js';
@@ -72,6 +82,44 @@ import type { DaemonDeps } from '@seeya-ai/engine/scheduler/index.js';
  * (D-025) — read only here, in the composition root, never inside `application/`. */
 function readCurrentSessionId(): string | undefined {
   return process.env['CLAUDE_CODE_SESSION_ID'];
+}
+
+/** V2-T34 item 1: the absolute path this invocation's own CLI entry point was launched from —
+ * `process.argv[1]` is that path for any Node process, whether launched by `node dist/index.js ...`
+ * or through the `seeya` shebang symlink `npm link` installs (Node resolves either the same way
+ * before setting `argv[1]`). Falls back to this MODULE's own compiled path
+ * (`fileURLToPath(import.meta.url)`, `composition.js` next to `index.js` in the same flat `dist/`
+ * — `packages/cli/tsconfig.build.json`'s own `rootDir`) only in the practically-unreachable case
+ * `argv[1]` is somehow absent; either path resolves inside the same `dist/` this invocation was
+ * built from, so the workspace's own `commit-msg` hook (`node "<this>" project verify-commit ...`)
+ * calls back into a working `seeya`. */
+function resolveCliEntryPath(): string {
+  return process.argv[1] ?? fileURLToPath(import.meta.url);
+}
+
+/**
+ * V2-T34 (PO review, defect 1): when THIS `seeya` invocation is itself running under Electron —
+ * the packaged app's own executable, `bin/seeya.cmd` → `seeya.exe` on Windows, `/usr/bin/seeya` →
+ * the app's own binary on Linux, both launched with `ELECTRON_RUN_AS_NODE=1` already in THEIR OWN
+ * environment to make Electron behave as plain Node — `process.execPath` at this exact point IS
+ * that Electron binary (`nodePath` in `ProjectContext`). A git/harness hook generated from here and
+ * later `exec`ing `"$nodePath" ...` needs that SAME env variable, or running it directly launches
+ * the GUI app instead of verifying a commit. `packages/app/src/composition/index.ts
+ * #projectHookIdentity` already sets this unconditionally (the app IS always Electron); this is the
+ * missing half for the CLI, which is Electron only when installed this way — a plain `node
+ * dist/index.js` invocation (a checkout, `npm link`) needs nothing here, and gets nothing (`{}`).
+ *
+ * Pure function, parameterized by `electronVersion` rather than reading `process.versions.electron`
+ * itself, so both cases are unit-testable without mutating a global.
+ *
+ * @example
+ * resolveCliHookEnv(undefined) // {} — a plain Node checkout
+ * resolveCliHookEnv('30.0.0') // { ELECTRON_RUN_AS_NODE: '1' } — the packaged app's own CLI
+ */
+export function resolveCliHookEnv(
+  electronVersion: string | undefined,
+): Readonly<Record<string, string>> {
+  return electronVersion === undefined ? {} : { ELECTRON_RUN_AS_NODE: '1' };
 }
 
 export interface CliHome {
@@ -435,6 +483,18 @@ export interface ProjectContext {
   readonly seeyaHome: string;
   /** V2-T33: `readCurrentSessionId()`'s own docstring above. */
   readonly sessionId: string | undefined;
+  /** V2-T34 item 1: `open`/`create`'s own hook-reinstall — `resolveCliEntryPath()`'s own docstring
+   * above. */
+  readonly nodePath: string;
+  readonly cliEntryPath: string;
+  /** V2-T34 item 3: `open`'s own pre-lock audit (`application/project-audit.ts`). */
+  readonly auditMarker: ProjectAuditMarker;
+  /** `adapters/workspace/project-lock.ts#PROJECT_LOCK_FILE_NAME` — threaded through rather than
+   * imported a second time by `application/` (D-020's own matrix: `application/` cannot import
+   * `adapters/`). */
+  readonly lockFileName: string;
+  /** V2-T34 (PO review): `resolveCliHookEnv()`'s own docstring below. */
+  readonly hookEnv: Readonly<Record<string, string>>;
 }
 
 /**
@@ -444,8 +504,15 @@ export interface ProjectContext {
  * adapter this port has — D-020 means naming it here is this file's job, not
  * `application/workspace.ts`'s). No config read: unlike every other `build*Context` above, none
  * of these five commands needs `config.json` for anything.
+ *
+ * `electronVersion` (V2-T34, PO review) defaults to the real `process.versions.electron` — a real
+ * caller never passes it; tests inject a fake value to prove `hookEnv`'s own wiring without
+ * mutating `process.versions` itself (`tests/integration/cli/composition.test.ts`).
  */
-export function buildProjectContext(homeDir: string = os.homedir()): ProjectContext {
+export function buildProjectContext(
+  homeDir: string = os.homedir(),
+  electronVersion: string | undefined = process.versions.electron,
+): ProjectContext {
   const home = resolveCliHome(homeDir);
   return {
     storage: buildStorage(home),
@@ -458,6 +525,41 @@ export function buildProjectContext(homeDir: string = os.homedir()): ProjectCont
     clock: systemClock,
     seeyaHome: home.seeyaHome,
     sessionId: readCurrentSessionId(),
+    nodePath: process.execPath,
+    cliEntryPath: resolveCliEntryPath(),
+    auditMarker: new FsProjectAuditMarker(),
+    lockFileName: PROJECT_LOCK_FILE_NAME,
+    hookEnv: resolveCliHookEnv(electronVersion),
+  };
+}
+
+/**
+ * `seeya project verify-commit <messageFile>`'s own composition (V2-T34 item 1) — the workspace's
+ * `commit-msg` hook's one caller. No `homeDir` parameter: the hook already runs with `root` as its
+ * own `cwd` (git's own hook-execution contract, `core/workspace-hooks.ts`'s own module comment), so
+ * this needs no `~/.seeya/` lookup at all, unlike every other `build*Context` above.
+ */
+export function buildVerifyCommitDeps(): VerifyCommitDeps {
+  return {
+    workspace: new FsWorkspaceRepository(),
+    projectLock: new FsProjectLock(),
+    processControl: realProcessControl,
+    commitMessageFile: new FsCommitMessageFile(),
+    lockFileName: PROJECT_LOCK_FILE_NAME,
+    currentSessionId: readCurrentSessionId(),
+  };
+}
+
+/** `seeya project audit <id>`'s own composition (V2-T34 item 3) — a thin slice of
+ * `ProjectContext`, built the same way rather than reused wholesale: `auditProject` never needs a
+ * `HarnessLauncher`/`GitReader`/`DirectoryExistence` at all. */
+export function buildProjectAuditDeps(context: ProjectContext): ProjectAuditDeps {
+  return {
+    storage: context.storage,
+    workspace: context.workspace,
+    auditMarker: context.auditMarker,
+    seeyaHome: context.seeyaHome,
+    lockFileName: context.lockFileName,
   };
 }
 

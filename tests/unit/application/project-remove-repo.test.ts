@@ -59,6 +59,8 @@ async function setUpProjectsForOneRepo(
       processControl: new ControllableProcessControl(),
       seeyaHome: SEEYA_HOME,
       sessionId: undefined,
+      nodePath: 'node',
+      cliEntryPath: '/fake/cli-entry.js',
     },
     'auth-hardening',
   );
@@ -104,6 +106,8 @@ describe('removeRepository', () => {
         processControl: new ControllableProcessControl(),
         seeyaHome: SEEYA_HOME,
         sessionId: undefined,
+        nodePath: 'node',
+        cliEntryPath: '/fake/cli-entry.js',
       },
       'auth-hardening',
     );
@@ -172,6 +176,8 @@ describe('removeRepository', () => {
         processControl: new ControllableProcessControl(),
         seeyaHome: SEEYA_HOME,
         sessionId: undefined,
+        nodePath: 'node',
+        cliEntryPath: '/fake/cli-entry.js',
       },
       'billing-v2',
     );
@@ -204,6 +210,8 @@ describe('removeRepository', () => {
         processControl: new ControllableProcessControl(),
         seeyaHome: SEEYA_HOME,
         sessionId: undefined,
+        nodePath: 'node',
+        cliEntryPath: '/fake/cli-entry.js',
       },
       'auth-hardening',
     );

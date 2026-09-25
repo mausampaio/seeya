@@ -14,6 +14,8 @@ import type {
   ProjectOpenLockOutcome,
 } from '@seeya-ai/engine/application/project-open.js';
 import type { ProjectLockInfo } from '@seeya-ai/engine/core/project-lock.js';
+import { buildProjectWorkingRulesText } from '@seeya-ai/engine/core/project-working-rules.js';
+import type { ProjectAuditReport } from '@seeya-ai/engine/application/project-audit.js';
 import {
   ControllableProcessControl,
   DEFAULT_TEST_CONFIG,
@@ -21,6 +23,7 @@ import {
   FakeDirectoryExistence,
   FakeGitReaderWithRemote,
   FakeHarnessLauncher,
+  FakeProjectAuditMarker,
   FakeProjectLock,
   FakeWorkspaceRepository,
   InMemoryDeviceStorage,
@@ -61,6 +64,10 @@ function buildOpenDeps(
     pid: THIS_PID,
     procStart: undefined,
     launchedSessionId: LAUNCHED_SESSION_ID,
+    nodePath: 'node',
+    cliEntryPath: '/fake/cli-entry.js',
+    auditMarker: new FakeProjectAuditMarker(),
+    lockFileName: '.seeya-lock',
     ...overrides,
   };
 }
@@ -82,6 +89,8 @@ describe('openProject', () => {
         processControl: new ControllableProcessControl(),
         seeyaHome: SEEYA_HOME,
         sessionId: undefined,
+        nodePath: 'node',
+        cliEntryPath: '/fake/cli-entry.js',
       },
       'auth-hardening',
     );
@@ -130,13 +139,14 @@ describe('openProject', () => {
       finalLockStatus: { kind: 'unlocked' },
     });
     // item 4: `open`'s own generated id, never the caller's `deps.sessionId` (`undefined` here) —
-    // and item 2: no system prompt append for a genuinely free lock (nothing to warn about).
+    // and item 2: a genuinely free lock adds no lock warning, but the working rules (V2-T34 item
+    // 5) are always present, on every open.
     expect(harnessLauncher.calls).toEqual([
       {
         cwd: PROJECT_DIR,
         addDirs: [],
         sessionId: LAUNCHED_SESSION_ID,
-        systemPromptAppend: null,
+        systemPromptAppend: buildProjectWorkingRulesText('auth-hardening'),
       },
     ]);
   });
@@ -175,7 +185,7 @@ describe('openProject', () => {
         cwd: PROJECT_DIR,
         addDirs: [REPO_PATH],
         sessionId: LAUNCHED_SESSION_ID,
-        systemPromptAppend: null,
+        systemPromptAppend: buildProjectWorkingRulesText('auth-hardening'),
       },
     ]);
   });
@@ -213,7 +223,7 @@ describe('openProject', () => {
         cwd: PROJECT_DIR,
         addDirs: [],
         sessionId: LAUNCHED_SESSION_ID,
-        systemPromptAppend: null,
+        systemPromptAppend: buildProjectWorkingRulesText('auth-hardening'),
       },
     ]);
   });
@@ -463,6 +473,157 @@ describe('openProject', () => {
         'claude',
       );
       expect(await projectLock.read(WORKSPACE_ROOT, 'auth-hardening')).toBeNull();
+    });
+  });
+
+  describe('V2-T34 item 1/3: the workspace hook is reasserted, and the project is audited, before the lock', () => {
+    it('installs the commit-msg hook before doing anything else', async () => {
+      // `beforeEach` already ran `createProject` once (its own reassert, item 1's own "criar o
+      // espaço de trabalho") — `openProject` reasserts it AGAIN, "reafirmados a cada open".
+      const before = workspace.installedCommitMsgHookCalls.length;
+      const result = await openProject(
+        buildOpenDeps(storage, workspace),
+        'auth-hardening',
+        'claude',
+      );
+      expect(result.kind).toBe('opened');
+      expect(workspace.installedCommitMsgHookCalls).toHaveLength(before + 1);
+      expect(workspace.installedCommitMsgHookCalls.at(-1)?.scriptContent).toContain(
+        'project verify-commit',
+      );
+    });
+
+    it('installs the harness hook (V2-T34 item 2, PO review) alongside the git hook', async () => {
+      const result = await openProject(
+        buildOpenDeps(storage, workspace),
+        'auth-hardening',
+        'claude',
+      );
+      expect(result.kind).toBe('opened');
+      const call = workspace.installedHarnessHookCalls.at(-1);
+      expect(call?.projectId).toBe('auth-hardening');
+      expect(call?.settingsJsonContent).toContain('project verify-bash-command');
+    });
+
+    it('reports what the audit found via onBeforeLaunch, before the lock is even checked', async () => {
+      workspace.setCommitsForAudit([
+        { hash: 'abc', message: 'no trailers', files: ['auth-hardening/x'] },
+      ]);
+      const captured: { audit: ProjectAuditReport | null } = { audit: null };
+      const result = await openProject(
+        buildOpenDeps(storage, workspace),
+        'auth-hardening',
+        'claude',
+        {
+          onBeforeLaunch: ({ audit }) => {
+            captured.audit = audit;
+          },
+        },
+      );
+      expect(result.kind).toBe('opened');
+      expect(captured.audit).not.toBeNull();
+      expect(captured.audit?.escaped).toHaveLength(1);
+    });
+
+    it('reports an empty audit when nothing escaped', async () => {
+      const captured: { audit: ProjectAuditReport | null } = { audit: null };
+      await openProject(buildOpenDeps(storage, workspace), 'auth-hardening', 'claude', {
+        onBeforeLaunch: ({ audit }) => {
+          captured.audit = audit;
+        },
+      });
+      expect(captured.audit?.escaped).toEqual([]);
+    });
+  });
+
+  describe('V2-T34 item 4: changes a previous session left uncommitted', () => {
+    it('proceeds untouched when nothing was left uncommitted', async () => {
+      const result = await openProject(
+        buildOpenDeps(storage, workspace),
+        'auth-hardening',
+        'claude',
+      );
+      expect(result.kind).toBe('opened');
+    });
+
+    it('commits them (as an unidentified session) when the person says so', async () => {
+      workspace.setChangedFiles('auth-hardening', ['auth-hardening/status/current.md']);
+      const result = await openProject(
+        buildOpenDeps(storage, workspace),
+        'auth-hardening',
+        'claude',
+        { confirmLeftoverChanges: () => Promise.resolve('commitNow') },
+      );
+      expect(result.kind).toBe('opened');
+      expect(workspace.commitMessages.at(-1)).toContain('Seeya-Session-Id: unknown');
+      expect(workspace.commitMessages.at(-1)).toContain(
+        'Commit changes left uncommitted before opening auth-hardening',
+      );
+    });
+
+    it('proceeds without committing when the person says so, and tells the new session what is pending', async () => {
+      workspace.setChangedFiles('auth-hardening', ['auth-hardening/status/current.md']);
+      const harnessLauncher = new FakeHarnessLauncher();
+      // `beforeEach` already produced one commit (`createProject`) — nothing here should add a
+      // second one.
+      const commitsBefore = workspace.commitMessages.length;
+      const result = await openProject(
+        buildOpenDeps(storage, workspace, { harnessLauncher }),
+        'auth-hardening',
+        'claude',
+        { confirmLeftoverChanges: () => Promise.resolve('proceedWithoutCommitting') },
+      );
+      expect(result.kind).toBe('opened');
+      // Never auto-committed — the file is still "changed" from this fake's own point of view.
+      expect(workspace.commitMessages).toHaveLength(commitsBefore);
+      expect(harnessLauncher.calls[0]?.systemPromptAppend).toContain(
+        'auth-hardening/status/current.md',
+      );
+    });
+
+    it('refuses (and releases the lock it just took) when there is no way to ask', async () => {
+      workspace.setChangedFiles('auth-hardening', ['auth-hardening/status/current.md']);
+      const projectLock = new FakeProjectLock();
+      const harnessLauncher = new FakeHarnessLauncher();
+      const result = await openProject(
+        buildOpenDeps(storage, workspace, { projectLock, harnessLauncher }),
+        'auth-hardening',
+        'claude',
+      );
+      expect(result).toEqual({
+        kind: 'leftoverChangesConfirmationUnavailable',
+        projectId: 'auth-hardening',
+        changedFiles: ['auth-hardening/status/current.md'],
+      });
+      expect(harnessLauncher.calls).toHaveLength(0);
+      expect(await projectLock.read(WORKSPACE_ROOT, 'auth-hardening')).toBeNull();
+    });
+
+    it('never asks at all for a read-only open — a session that never writes has nothing to reconcile', async () => {
+      const projectLock = new FakeProjectLock();
+      await projectLock.write(WORKSPACE_ROOT, 'auth-hardening', {
+        sessionId: 'other-session',
+        pid: 555,
+        procStart: undefined,
+        acquiredAt: new Date('2026-09-20T09:00:00.000Z'),
+      });
+      workspace.setChangedFiles('auth-hardening', ['auth-hardening/status/current.md']);
+      const processControl = new ControllableProcessControl(new Map([[555, true]]));
+      let leftoverAsked = false;
+      const result = await openProject(
+        buildOpenDeps(storage, workspace, { projectLock, processControl }),
+        'auth-hardening',
+        'claude',
+        {
+          confirmReadOnlyOpen: () => Promise.resolve('proceed'),
+          confirmLeftoverChanges: () => {
+            leftoverAsked = true;
+            return Promise.resolve('commitNow');
+          },
+        },
+      );
+      expect(result.kind).toBe('opened');
+      expect(leftoverAsked).toBe(false);
     });
   });
 });

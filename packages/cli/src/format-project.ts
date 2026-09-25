@@ -28,6 +28,11 @@ import type {
   OpenProjectResult,
 } from '@seeya-ai/engine/application/project-open.js';
 import type { AdoptSessionResult } from '@seeya-ai/engine/application/project-adopt.js';
+import type {
+  AuditProjectOutcome,
+  ProjectAuditReport,
+} from '@seeya-ai/engine/application/project-audit.js';
+import type { CommitEscapeReason } from '@seeya-ai/engine/core/project-audit.js';
 
 export { formatProjectLockWarningLines };
 
@@ -197,6 +202,102 @@ export function formatMissingRepositoryLines(
   return missing.map((entry) => formatMissingRepositoryLine(projectId, entry));
 }
 
+/** V2-T34 item 3: one `core/project-audit.ts#CommitEscapeReason` in plain English — shared by the
+ * `onBeforeLaunch` warning `open` prints (`formatAuditLines` below) and `seeya project audit <id>`'s
+ * own report (`formatAuditCommandReport`), so the two never drift into two different wordings for
+ * the same fact. */
+function describeCommitEscapeReason(reason: CommitEscapeReason): string {
+  switch (reason.kind) {
+    case 'missingOrWrongProjectTrailer':
+      return reason.found === null
+        ? 'missing Seeya-Project-Id trailer'
+        : `wrong Seeya-Project-Id trailer ("${reason.found}")`;
+    case 'missingSessionTrailer':
+      return 'missing Seeya-Session-Id trailer';
+    case 'touchesOtherProjects':
+      return `also touches: ${reason.otherProjects.join(', ')}`;
+    case 'includesLockFile':
+      return 'includes the project lock file';
+  }
+}
+
+function formatEscapedCommitLine(commit: ProjectAuditReport['escaped'][number]): string {
+  const reasons = commit.reasons.map(describeCommitEscapeReason).join('; ');
+  return `  ${commit.hash.slice(0, 12)} — ${reasons}`;
+}
+
+/** V2-T34 item 3: `open`'s own pre-lock audit warning — `[]` when there's nothing to report
+ * (nothing escaped, or the audit itself couldn't resolve — `application/project-open.ts`'s own
+ * docstring on when that happens). */
+export function formatAuditLines(audit: ProjectAuditReport | null): string[] {
+  if (audit === null || audit.escaped.length === 0) {
+    return [];
+  }
+  return [
+    `seeya: audit found ${audit.escaped.length} commit(s) in "${audit.projectId}" that never went ` +
+      'through the commit-msg hook:',
+    ...audit.escaped.map(formatEscapedCommitLine),
+  ];
+}
+
+/** `seeya project audit <id>` (V2-T34 item 3) — the standalone command's own report, sharing
+ * `describeCommitEscapeReason`/`formatEscapedCommitLine` with the `open`-time warning above. */
+export function formatAuditCommandReport(outcome: AuditProjectOutcome): string {
+  switch (outcome.kind) {
+    case 'invalidId':
+      return formatInvalidIdLine(outcome.projectId);
+    case 'notFound':
+      return `Project "${outcome.projectId}" not found.`;
+    case 'audited': {
+      const { report } = outcome;
+      if (report.escaped.length === 0) {
+        return (
+          `Project "${report.projectId}": ${report.commitsChecked} commit(s) checked since the ` +
+          'last audit, none escaped the commit-msg hook.'
+        );
+      }
+      return [
+        `Project "${report.projectId}": ${report.commitsChecked} commit(s) checked since the ` +
+          `last audit, ${report.escaped.length} escaped the commit-msg hook:`,
+        ...report.escaped.map(formatEscapedCommitLine),
+      ].join('\n');
+    }
+  }
+}
+
+/** V2-T34 item 4: the question `open` asks when it just acquired the lock and found changes a
+ * previous session left uncommitted — same shape as `renderReadOnlyOpenConfirmation` above, but
+ * three-way (D-024): anything other than an explicit "c" or "p" is read as "no way to act on this
+ * safely," same as no terminal at all (`parseLeftoverChangesAnswer`'s own docstring). */
+export function renderLeftoverChangesConfirmation(changedFiles: readonly string[]): string {
+  const fileLines = changedFiles.map((file) => `  ${file}`).join('\n');
+  return (
+    `Project has ${changedFiles.length} change(s) left uncommitted by a previous session:\n` +
+    `${fileLines}\n` +
+    'Commit them now (attributed to an unidentified session), or continue without committing ' +
+    '(the new session will be told what is pending)? [c = commit now, p = proceed, ' +
+    'anything else cancels] '
+  );
+}
+
+/** `null` for anything that isn't exactly "c"/"commit" or "p"/"proceed" — `null` is not itself one
+ * of `LeftoverChangesAnswer`'s three cases; `cli/project-command.ts#makeLeftoverChangesConfirmer`
+ * maps it to `'unavailable'` (D-025: an answer that doesn't parse is not an answer this project acts
+ * on, the same discipline every other confirmation here already follows for a blank/garbled reply,
+ * `parseReadOnlyOpenConfirmation`'s own "never guess yes"). */
+export function parseLeftoverChangesAnswer(
+  raw: string,
+): 'commitNow' | 'proceedWithoutCommitting' | null {
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === 'c' || normalized === 'commit') {
+    return 'commitNow';
+  }
+  if (normalized === 'p' || normalized === 'proceed') {
+    return 'proceedWithoutCommitting';
+  }
+  return null;
+}
+
 /** `seeya project open <id> [--with <harness>]` (V2-T28). V2-T35 item 3: the `opened` case never repeats the `missing` list (that already streamed via
  * `formatMissingRepositoryLines` before the harness launched, same as before this task) — it DOES
  * repeat the lock warning, because that one is the whole bug this task fixes: "o claude abre por
@@ -240,6 +341,16 @@ export function formatOpenProjectReport(result: OpenProjectResult): string {
         `${formatLockHolderDescription(result.heldBy)} — refusing to open without a way to ask ` +
         'for confirmation (no interactive terminal attached). Run this from a real terminal, or ' +
         'wait for the lock to be released.'
+      );
+    // V2-T34 item 4: this attempt acquired the lock, then found changes a previous session left
+    // uncommitted — same "no way to ask, refuse rather than guess" shape as the case above.
+    case 'leftoverChangesConfirmationUnavailable':
+      return (
+        `seeya: project "${result.projectId}" has ${result.changedFiles.length} change(s) left ` +
+        'uncommitted by a previous session — refusing to open without a way to ask whether to ' +
+        'commit them now or proceed without committing (no interactive terminal attached). Run ' +
+        'this from a real terminal.\n' +
+        result.changedFiles.map((file) => `  ${file}`).join('\n')
       );
     case 'opened':
       return formatOpenedReport(result);

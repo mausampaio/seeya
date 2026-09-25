@@ -2,6 +2,7 @@ import type { FallbackConfirmer } from '@seeya-ai/engine/application/start-day.j
 import type {
   Briefing,
   Clock,
+  CommitMessageFile,
   DirectoryExistence,
   DiscoveryResult,
   ForkActivityCheck,
@@ -14,6 +15,7 @@ import type {
   HarnessLauncher,
   HarnessOpenResult,
   ProcessControl,
+  ProjectAuditMarker,
   ProjectLock,
   RejectedDiscoveryRecord,
   RevertCommitInfo,
@@ -27,6 +29,7 @@ import type {
   WorkspaceRepository,
 } from '@seeya-ai/engine/core/ports.js';
 import type { ProjectLockInfo } from '@seeya-ai/engine/core/project-lock.js';
+import type { AuditableCommit } from '@seeya-ai/engine/core/project-audit.js';
 import type {
   AdoptionRecord,
   Config,
@@ -644,6 +647,57 @@ export class FakeWorkspaceRepository implements WorkspaceRepository {
     this.revertCalls.push({ projectId, commitsNewestFirst, message });
     return Promise.resolve(this.revertOutcome);
   }
+
+  // V2-T34: `project-open.test.ts`/`verify-commit.test.ts`/`project-audit.test.ts`'s own hooks —
+  // same "nothing configured reads as the least-specific true default" convention every setter
+  // above already follows.
+  private stagedFilesValue: readonly string[] = [];
+  readonly installedCommitMsgHookCalls: {
+    readonly root: string;
+    readonly scriptContent: string;
+  }[] = [];
+  private commitsForAudit: readonly AuditableCommit[] = [];
+
+  setStagedFiles(files: readonly string[]): void {
+    this.stagedFilesValue = files;
+  }
+
+  listStagedFiles(root: string): Promise<readonly string[]> {
+    void root;
+    return Promise.resolve(this.stagedFilesValue);
+  }
+
+  installCommitMsgHook(root: string, scriptContent: string): Promise<void> {
+    this.installedCommitMsgHookCalls.push({ root, scriptContent });
+    return Promise.resolve();
+  }
+
+  setCommitsForAudit(commits: readonly AuditableCommit[]): void {
+    this.commitsForAudit = commits;
+  }
+
+  listCommitsForAudit(
+    root: string,
+    projectId: string,
+    sinceCommit: string | null,
+  ): Promise<readonly AuditableCommit[]> {
+    void root;
+    void projectId;
+    void sinceCommit;
+    return Promise.resolve(this.commitsForAudit);
+  }
+
+  // V2-T34 (PO review): `project-open.test.ts`'s own hook for the harness's own project settings.
+  readonly installedHarnessHookCalls: {
+    readonly root: string;
+    readonly projectId: string;
+    readonly settingsJsonContent: string;
+  }[] = [];
+
+  installHarnessHook(root: string, projectId: string, settingsJsonContent: string): Promise<void> {
+    this.installedHarnessHookCalls.push({ root, projectId, settingsJsonContent });
+    return Promise.resolve();
+  }
 }
 
 /** Named double for `SessionResumer` (S3-T3, docs/TESTES.md: "duplo de I/O é classe/objeto
@@ -952,6 +1006,49 @@ export class FakeProjectLock implements ProjectLock {
 
   clear(root: string, projectId: string): Promise<void> {
     this.locks.delete(this.key(root, projectId));
+    return Promise.resolve();
+  }
+}
+
+/** `CommitMessageFile` double (V2-T34 item 1) — an in-memory map from path to content, seeded by
+ * `setContent` the way a real commit-msg hook's temp file would already exist before `verifyCommit`
+ * ever reads it. */
+export class FakeCommitMessageFile implements CommitMessageFile {
+  private readonly files = new Map<string, string>();
+
+  setContent(path: string, content: string): void {
+    this.files.set(path, content);
+  }
+
+  read(path: string): Promise<string> {
+    const content = this.files.get(path);
+    if (content === undefined) {
+      return Promise.reject(new Error(`FakeCommitMessageFile has no content set for ${path}`));
+    }
+    return Promise.resolve(content);
+  }
+
+  write(path: string, content: string): Promise<void> {
+    this.files.set(path, content);
+    return Promise.resolve();
+  }
+}
+
+/** `ProjectAuditMarker` double (V2-T34 item 3) — same in-memory key shape as `FakeProjectLock`
+ * above, for the same reason (one file per `root`+`projectId` pair in reality). */
+export class FakeProjectAuditMarker implements ProjectAuditMarker {
+  private readonly markers = new Map<string, string>();
+
+  private key(root: string, projectId: string): string {
+    return `${root}\u0000${projectId}`;
+  }
+
+  read(root: string, projectId: string): Promise<string | null> {
+    return Promise.resolve(this.markers.get(this.key(root, projectId)) ?? null);
+  }
+
+  write(root: string, projectId: string, commitHash: string): Promise<void> {
+    this.markers.set(this.key(root, projectId), commitHash);
     return Promise.resolve();
   }
 }

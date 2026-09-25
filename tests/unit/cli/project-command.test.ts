@@ -13,15 +13,21 @@ import { describe, expect, it } from 'vitest';
 import {
   runProjectAddRepoCommand,
   runProjectAdoptCommand,
+  runProjectAuditCommand,
   runProjectCreateCommand,
   runProjectListCommand,
   runProjectOpenCommand,
   runProjectShowCommand,
+  runProjectVerifyCommitCommand,
+  runProjectVerifyBashCommandCommand,
 } from '../../../packages/cli/src/project-command.js';
 import type { ProjectContext } from '../../../packages/cli/src/composition.js';
 import type { ProjectOpenDeps } from '@seeya-ai/engine/application/project-open.js';
 import type { AdoptSessionDeps } from '@seeya-ai/engine/application/project-adopt.js';
+import type { ProjectAuditDeps } from '@seeya-ai/engine/application/project-audit.js';
+import type { VerifyCommitDeps } from '@seeya-ai/engine/application/verify-commit.js';
 import type { DiscoveredSession } from '@seeya-ai/engine/core/types.js';
+import { buildProjectWorkingRulesText } from '@seeya-ai/engine/core/project-working-rules.js';
 import {
   ControllableProcessControl,
   DEFAULT_TEST_CONFIG,
@@ -29,7 +35,9 @@ import {
   FakeDirectoryExistence,
   FakeForkCleanup,
   FakeGitReaderWithRemote,
+  FakeCommitMessageFile,
   FakeHarnessLauncher,
+  FakeProjectAuditMarker,
   FakeProjectLock,
   FakeSessionProvider,
   FakeWorkspaceRepository,
@@ -55,6 +63,11 @@ function buildContext(overrides: Partial<ProjectContext> = {}): ProjectContext {
     clock: new FakeClock(new Date('2026-09-22T10:00:00.000Z')),
     seeyaHome: SEEYA_HOME,
     sessionId: undefined,
+    nodePath: 'node',
+    cliEntryPath: '/fake/cli-entry.js',
+    auditMarker: new FakeProjectAuditMarker(),
+    lockFileName: '.seeya-lock',
+    hookEnv: {},
     ...overrides,
   };
 }
@@ -255,7 +268,7 @@ describe('runProjectOpenCommand', () => {
         cwd: path.join(SEEYA_HOME, 'workspace', 'auth-hardening'),
         addDirs: [REPO_PATH],
         sessionId: LAUNCHED_SESSION_ID,
-        systemPromptAppend: null,
+        systemPromptAppend: buildProjectWorkingRulesText('auth-hardening'),
       },
     ]);
   });
@@ -603,5 +616,142 @@ describe('runProjectAdoptCommand', () => {
 
     expect(exitCode).toBe(0);
     expect(collected).toContain('declined');
+  });
+});
+
+describe('runProjectAuditCommand (V2-T34 item 3)', () => {
+  function buildAuditDeps(
+    storage: InMemoryDeviceStorage,
+    workspace: FakeWorkspaceRepository,
+    auditMarker: FakeProjectAuditMarker = new FakeProjectAuditMarker(),
+  ): ProjectAuditDeps {
+    return { storage, workspace, auditMarker, seeyaHome: SEEYA_HOME, lockFileName: '.seeya-lock' };
+  }
+
+  it('reports a clean audit for a real project', async () => {
+    const storage = new InMemoryDeviceStorage(DEFAULT_TEST_CONFIG);
+    const workspace = new FakeWorkspaceRepository();
+    const context = buildContext({ storage, workspace });
+    await runProjectCreateCommand(context, 'auth-hardening');
+
+    const text = await runProjectAuditCommand(buildAuditDeps(storage, workspace), 'auth-hardening');
+    expect(text).toContain('none escaped');
+  });
+
+  it('reports notFound for a project that was never created', async () => {
+    const storage = new InMemoryDeviceStorage(DEFAULT_TEST_CONFIG);
+    const workspace = new FakeWorkspaceRepository();
+    const text = await runProjectAuditCommand(buildAuditDeps(storage, workspace), 'ghost');
+    expect(text).toBe('Project "ghost" not found.');
+  });
+});
+
+describe('runProjectVerifyCommitCommand (V2-T34 item 1)', () => {
+  const ROOT = 'C:\\workspace';
+  const MESSAGE_FILE = 'C:\\workspace\\.git\\COMMIT_EDITMSG';
+
+  function buildVerifyDeps(overrides: Partial<VerifyCommitDeps> = {}): VerifyCommitDeps {
+    return {
+      workspace: new FakeWorkspaceRepository(),
+      projectLock: new FakeProjectLock(),
+      processControl: new ControllableProcessControl(),
+      commitMessageFile: new FakeCommitMessageFile(),
+      lockFileName: '.seeya-lock',
+      currentSessionId: undefined,
+      ...overrides,
+    };
+  }
+
+  function collectStderr(): { readonly stderr: PassThrough; readonly output: () => string } {
+    const stderr = new PassThrough();
+    let collected = '';
+    stderr.on('data', (chunk: Buffer) => (collected += chunk.toString('utf8')));
+    return { stderr, output: () => collected };
+  }
+
+  it('exits 0 and writes nothing to stderr when the commit is allowed', async () => {
+    const workspace = new FakeWorkspaceRepository();
+    workspace.setStagedFiles(['auth-hardening/AGENTS.md']);
+    const commitMessageFile = new FakeCommitMessageFile();
+    commitMessageFile.setContent(MESSAGE_FILE, 'Edit AGENTS.md');
+    const { stderr, output } = collectStderr();
+
+    const exitCode = await runProjectVerifyCommitCommand(
+      buildVerifyDeps({ workspace, commitMessageFile }),
+      ROOT,
+      MESSAGE_FILE,
+      stderr,
+    );
+
+    expect(exitCode).toBe(0);
+    expect(output()).toBe('');
+  });
+
+  it('exits non-zero and writes the reason to stderr when the commit is refused', async () => {
+    const workspace = new FakeWorkspaceRepository();
+    workspace.setStagedFiles(['auth-hardening/AGENTS.md', 'billing-v2/AGENTS.md']);
+    const commitMessageFile = new FakeCommitMessageFile();
+    commitMessageFile.setContent(MESSAGE_FILE, 'Touch two projects');
+    const { stderr, output } = collectStderr();
+
+    const exitCode = await runProjectVerifyCommitCommand(
+      buildVerifyDeps({ workspace, commitMessageFile }),
+      ROOT,
+      MESSAGE_FILE,
+      stderr,
+    );
+
+    expect(exitCode).toBe(1);
+    expect(output()).toContain('one project per commit');
+  });
+});
+
+describe('runProjectVerifyBashCommandCommand (V2-T34 item 2, PO review)', () => {
+  function stdinWith(content: string): PassThrough {
+    const stream = new PassThrough();
+    stream.end(content);
+    return stream;
+  }
+
+  function collectStdout(): { readonly stdout: PassThrough; readonly output: () => string } {
+    const stdout = new PassThrough();
+    let collected = '';
+    stdout.on('data', (chunk: Buffer) => (collected += chunk.toString('utf8')));
+    return { stdout, output: () => collected };
+  }
+
+  it('exits 0 silently for an allowed command', async () => {
+    const { stdout, output } = collectStdout();
+    const payload = JSON.stringify({ tool_input: { command: 'git commit -m "normal"' } });
+
+    const exitCode = await runProjectVerifyBashCommandCommand(stdinWith(payload), stdout);
+
+    expect(exitCode).toBe(0);
+    expect(output()).toBe('');
+  });
+
+  it('exits 2 with a deny JSON on stdout for a --no-verify command', async () => {
+    const { stdout, output } = collectStdout();
+    const payload = JSON.stringify({ tool_input: { command: 'git commit --no-verify -m "x"' } });
+
+    const exitCode = await runProjectVerifyBashCommandCommand(stdinWith(payload), stdout);
+
+    expect(exitCode).toBe(2);
+    const parsed: unknown = JSON.parse(output());
+    expect(parsed).toMatchObject({
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'deny',
+      },
+    });
+  });
+
+  it('exits 0 silently for a payload it cannot parse (D-025)', async () => {
+    const { stdout, output } = collectStdout();
+
+    const exitCode = await runProjectVerifyBashCommandCommand(stdinWith('not json'), stdout);
+
+    expect(exitCode).toBe(0);
+    expect(output()).toBe('');
   });
 });

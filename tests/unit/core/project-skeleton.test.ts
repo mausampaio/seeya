@@ -19,10 +19,18 @@ describe('buildProjectSkeleton', () => {
     expect(skeleton.manifest.trackers).toEqual([]);
   });
 
-  it('writes exactly AGENTS.md and INDEX.md — never CLAUDE.md (D-030), never seeya.json (the adapter serializes that itself)', () => {
+  it('writes exactly AGENTS.md and INDEX.md — never CLAUDE.md (D-030), never seeya.json (the adapter serializes that itself), and never the harness hook config (V2-T34, PO review: regenerated fresh by every "open" instead, never tracked)', () => {
     const skeleton = buildProjectSkeleton('auth-hardening');
     const paths = skeleton.files.map((file) => file.relativePath).sort();
     expect(paths).toEqual(['AGENTS.md', 'INDEX.md']);
+  });
+
+  it('AGENTS.md names the project by id and has a "Working in this project" section (V2-T34 item 6)', () => {
+    const skeleton = buildProjectSkeleton('auth-hardening');
+    const agentsMd = skeleton.files.find((file) => file.relativePath === 'AGENTS.md');
+    expect(agentsMd?.content).toContain('seeya project "auth-hardening"');
+    expect(agentsMd?.content).toContain('## Working in this project');
+    expect(agentsMd?.content).toContain('Commit as you go');
   });
 
   it('creates the six directories docs/V2-RUMO.md lays out', () => {

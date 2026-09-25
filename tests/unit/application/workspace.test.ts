@@ -39,6 +39,8 @@ function buildDeps(
     processControl: new ControllableProcessControl(),
     seeyaHome: SEEYA_HOME,
     sessionId: undefined,
+    nodePath: 'node',
+    cliEntryPath: '/fake/cli-entry.js',
   };
 }
 
