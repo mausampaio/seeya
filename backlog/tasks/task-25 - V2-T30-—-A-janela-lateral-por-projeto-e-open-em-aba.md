@@ -4,7 +4,7 @@ title: 'V2-T30 — A janela: lateral por projeto e open em aba'
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-25 02:51'
+updated_date: '2026-09-25 03:35'
 labels: []
 milestone: m-0
 dependencies:
@@ -221,5 +221,60 @@ author: PO
 created: 2026-09-24 17:28
 ---
 Requisitos do mantenedor em 2026-09-24, para entrar na especificação: (1) PROJETOS como foco da listagem — a lateral organiza por projeto, não por sessão solta; (2) a lateral esquerda precisa RECOLHER — hoje ocupa espaço demais da tela. A interface pode continuar provisória no resto; estes dois pontos não esperam. Motivo declarado: ele precisa usar o seeya no dia a dia, e a dor principal hoje são sessões perdendo memória — projetos e adoção são o foco agora. A V2-T48 (barras de rolagem) entra junto com esta.
+---
+
+author: dev
+created: 2026-09-25 03:35
+---
+Resposta à revisão do PO de 2026-09-25 (três pontos):
+
+**1. `electron/project-panel-view.ts` (549 linhas) dividido por responsabilidade.** Cinco arquivos
+novos, nenhum com decisão própria: `sidebar-collapse-view.ts` (68 linhas, toggle de recolher),
+`projects-list-view.ts` (162 linhas, listas Projects/Other sessions + Open), `new-project-dialog-view.ts`
+(46 linhas), `project-lock-confirm-dialog-view.ts` (47 linhas), `adopt-flow-view.ts` (281 linhas,
+o fluxo inteiro de adoção — mantido junto por ser UMA máquina de estados, não quatro diálogos
+independentes). `project-panel-view.ts` agora é um agregador de 29 linhas; o import do `renderer.ts`
+não mudou. `electron/project-ipc.ts` ficou em 284 linhas (já estava abaixo do teto, mas revisado
+igual).
+
+Lógica que estava escondida em template literals/ternários inline saiu para módulos testados:
+`state/create-project-result.ts` (o texto de erro do diálogo "New project"), `state/
+adopt-session-result.ts` ganhou `formatSessionNotDiscoverableText`, `state/adopt-picker.ts`
+(`resolveChosenAdoptProjectId` — qual `projectId` o rádio/select/input do picker resolveu),
+`text/messages.ts` ganhou `projectSessionRowLabel`/`otherSessionRowLabel` (as duas linhas de rótulo
+que antes eram template literal direto no código de DOM). Quatro arquivos de teste novos/ampliados
+para essas quatro peças.
+
+**2. Glossário do AGENTS.md.** Oito linhas novas na tabela, mesmo formato das vizinhas: agrupamento
+de sessão por projeto (`groupSessionsByProject`/`resolveAdoptEligibility`), painel de projetos
+(`buildProjectsPanelData`), lateral recolhível (`state/sidebar-collapse.ts`, chave de localStorage
+`seeya.sidebarCollapsed`), os dois lançadores de aba (`ProjectOpenTabLauncher`/
+`ProjectAdoptTabLauncher`), a máquina de estados do fluxo de adoção (`state/adopt-panel.ts`), o
+texto compartilhado da adoção (`core/project-adoption-message.ts`), a pergunta do lock legível
+compartilhada (`renderReadOnlyOpenQuestion`), e os canais de IPC novos.
+
+**3. Q-096 refeita como A/B na mesma sessão.** `main` (commit b3d5425, via `git archive` — nunca um
+segundo worktree da mesma branch) contra esta branch, três rodadas cada, ALTERNADAS, com zero
+projetos e depois com 3 projetos (`seeya project create` × 3, `USERPROFILE` para um diretório
+descartável, nunca `HOME`, nunca o `~/.seeya` real), separado por processo (principal/renderer/
+GPU/utilitário, via uma variante só-desta-investigação de `process-tree-stats.ps1` lendo o
+`CommandLine`/`--type=` de cada pid).
+
+**Resultado: a memória NÃO piorou** — a comparação original (2026-09-20 vs. 2026-09-24) media dois
+dias e dois estados de máquina diferentes, não o código desta tarefa; retratada em `docs/QUESTOES.md`.
+Nas seis rodadas do A/B, a branch ficou ligeiramente ABAIXO do `main` (~368 MiB vs. ~379 MiB), dentro
+do próprio ruído entre rodadas.
+
+**CPU ociosa tem uma diferença real, mas pequena e localizada**: a branch consumiu mais CPU que o
+`main` em 5 das 6 rodadas, ~0,1–0,2 pontos percentuais de UM núcleo a mais na média (~0,02% da
+máquina inteira de 8 núcleos) — e a diferença mora inteira no processo PRINCIPAL (GPU/utilitário/
+renderer saíram estatisticamente iguais nas duas variantes). Bate com o próprio custo que a
+especificação já previa e aprovou: `listProjects`/`readAdoptions`/um `.seeya-lock` por projeto a
+cada ciclo de 10s, tudo no processo principal. Tabela bruta completa e a leitura, em `docs/
+QUESTOES.md` (Q-096, seção "Reaberta").
+
+`npm run verificar` verde depois de tudo isso (96,40% statements geral, `core/` 99,33%, `app/src/
+state` 98,81%). Scripts de investigação do A/B (o `.mjs` e a variante do `.ps1`) não foram
+commitados — instrumentação de uma medição só, não ferramenta permanente.
 ---
 <!-- COMMENTS:END -->
