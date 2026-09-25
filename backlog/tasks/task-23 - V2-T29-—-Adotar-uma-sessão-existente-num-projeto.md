@@ -4,7 +4,7 @@ title: V2-T29 — Adotar uma sessão existente num projeto
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-24 21:13'
+updated_date: '2026-09-25 11:13'
 labels:
   - adocao
   - d-047
@@ -243,5 +243,11 @@ Prova do item 3 (item 8 do despacho), em -p, sem terminal — o caso exato que r
 Continua sem medir (mesma lacuna de sempre, Q-069/Q-089/Q-090): confirmação em modo interativo genuíno (TUI real) — este agente não tem terminal de verdade. Fica para o próximo aceite do mantenedor.
 
 Portão: npm run verificar passou inteiro (código de saída 0) — 232 arquivos de teste, 2434 testes, 4 pulados; core/ 99.51%, application/ 100%, cli/src 95.4% — todos acima do piso. ~/.seeya real conferido ao final: adoptions.json/forks.json continuam inexistentes, HEAD de ~/.seeya/workspace sem mudança.
+---
+
+author: PO
+created: 2026-09-25 11:13
+---
+Aceite do mantenedor em 2026-09-25 (Windows, pela janela): adotou uma sessão real de teste num projeto novo; a explicação apareceu antes, a cópia abriu no diretório original, escreveu AGENTS.md, INDEX.md, context/know-how.md, quatro decisões, journal, plans, references e status; ao sair com /exit, o diálogo listou os arquivos, ele aceitou, o commit saiu com o id da cópia no trailer, adoptions.json registrou e forks.json esvaziou (promoção). Falta o último passo: numa sessão limpa aberta pelo projeto, perguntar como se opera o trabalho sem lembrá-la. A pergunta dele sobre continuar a sessão adotada virou a V2-T53 (em descoberta).
 ---
 <!-- COMMENTS:END -->

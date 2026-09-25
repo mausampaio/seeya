@@ -4,7 +4,7 @@ title: 'V2-T30 — A janela: lateral por projeto e open em aba'
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-25 10:45'
+updated_date: '2026-09-25 11:13'
 labels: []
 milestone: m-0
 dependencies:
@@ -350,5 +350,11 @@ as duas capturas acima.
 `npm run verificar` verde (código de saída 0): 251 arquivos de teste, 2610 testes, 4 skips
 pré-existentes; cobertura agregada 96,40% statements / 92,29% branches / 95,73% functions / 96,66%
 lines. Commit `6d536ba` na branch `tarefa/V2-T30-janela-por-projeto`.
+---
+
+author: PO
+created: 2026-09-25 11:13
+---
+Aceite do mantenedor em 2026-09-25 (Windows, instalador de e272610): passos 1 a 6 certos — projetos no topo com lock e sessões; open pela janela tomou o lock e mostrou na lista; o open pela CLI no mesmo projeto avisou que outra sessão segurava; recolher e lembrar o estado funcionando; primeira maximização sem barra de rolagem; criou um projeto pela janela, adotou nele uma sessão de teste pela lista, aceitou o commit no diálogo e o 'Open project' abriu o projeto. Achados: o controle de recolher não era descobrível (corrigido em 3482397 com botão no topo e Ctrl+B, ainda sem o aceite dele) e sessão fechada aparece como 'unknown' (V2-T52). Fecha quando ele vir o botão novo.
 ---
 <!-- COMMENTS:END -->
