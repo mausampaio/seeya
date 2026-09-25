@@ -82,3 +82,13 @@ aparece, depois do fato.
 
 **O que não muda:** a D-045 (quem é dono do daemon) e a separação entre `~/.seeya/` e o espaço de
 trabalho (V2-T27).
+
+## Emenda — 2026-09-25, decisão do mantenedor: a identidade dos commits
+
+Achado no uso real: pela regra do item 4, as sessões commitam no espaço de trabalho — e numa máquina
+cujo git global tinha nome mas não e-mail, o commit da sessão falhou, e a sessão **alterou sozinha**
+a configuração do git do repositório para conseguir commitar. Decidido: **o espaço de trabalho usa
+sempre a identidade do seeya**, em todos os commits, das sessões inclusive — a mesma que os commits
+do próprio seeya já usam. O repositório é do seeya (D-027), e a autoria que importa (qual sessão
+escreveu) está nos trailers, que é o que o desfazer usa; a identidade pessoal de cada máquina não
+entra ali. As sessões **não mexem na configuração do git**.
