@@ -44,6 +44,7 @@ import {
   FsCommitMessageFile,
 } from '@seeya-ai/engine/adapters/workspace/index.js';
 import { PROJECT_LOCK_FILE_NAME } from '@seeya-ai/engine/adapters/workspace/project-lock.js';
+import { readLockHolderProcess } from '@seeya-ai/engine/adapters/workspace/lock-holder-env.js';
 import { buildAppInstallation } from '@seeya-ai/engine/adapters/installation/index.js';
 import { resolveDaemonOwner } from '@seeya-ai/engine/application/daemon-ownership.js';
 import {
@@ -549,6 +550,11 @@ export function buildVerifyCommitDeps(): VerifyCommitDeps {
     commitMessageFile: new FsCommitMessageFile(),
     lockFileName: PROJECT_LOCK_FILE_NAME,
     currentSessionId: readCurrentSessionId(),
+    // V2-T34 hotfix (PO review, 2026-09-25): `SEEYA_LOCK_HOLDER_PID`/`SEEYA_LOCK_HOLDER_PROC_START`
+    // — set by `adapters/workspace/index.ts#commitAll`/`revert.ts#revertCommitSequence` on the
+    // `git commit` this hook is running inside of, only when `seeya` itself made that commit while
+    // holding the touched project's own lock.
+    currentProcess: readLockHolderProcess(process.env),
   };
 }
 

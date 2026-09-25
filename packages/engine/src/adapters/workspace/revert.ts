@@ -6,8 +6,10 @@
  * — never a second way to shell out to git.
  */
 import type { RevertCommitInfo, RevertExecutionOutcome } from '../../core/ports.js';
+import type { LockHolderProcess } from '../../core/lock-holder-process.js';
 import { SESSION_ID_TRAILER_KEY } from '../../core/project-commit.js';
 import { runGit } from '../git/run-git.js';
+import { buildLockHolderEnv } from './lock-holder-env.js';
 
 const COMMIT_IDENTITY_ENV: NodeJS.ProcessEnv = {
   GIT_AUTHOR_NAME: 'seeya',
@@ -124,6 +126,7 @@ export async function revertCommitSequence(
   root: string,
   commitsNewestFirst: readonly string[],
   message: string,
+  lockHolder?: LockHolderProcess,
 ): Promise<RevertExecutionOutcome> {
   for (const hash of commitsNewestFirst) {
     const failureReason = await revertOneWithoutCommitting(root, hash);
@@ -142,9 +145,13 @@ export async function revertCommitSequence(
   if (!diff.ran) {
     throw new Error(`git diff failed in workspace at "${root}": ${diff.reason}`);
   }
+  // V2-T34 hotfix (PO review, 2026-09-25): same lock-holder authorization `index.ts#commitAll`
+  // already has — a revert's own final commit is exactly the kind of "seeya committing while
+  // holding the project's own lock" this fix targets.
   const commit = await runGit(root, ['commit', '-m', message], {
     ...process.env,
     ...COMMIT_IDENTITY_ENV,
+    ...buildLockHolderEnv(lockHolder),
   });
   if (!commit.ran || commit.exitCode !== 0) {
     throw new Error(

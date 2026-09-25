@@ -711,6 +711,7 @@ describe('runProjectVerifyCommitCommand (V2-T34 item 1)', () => {
       commitMessageFile: new FakeCommitMessageFile(),
       lockFileName: '.seeya-lock',
       currentSessionId: undefined,
+      currentProcess: undefined,
       ...overrides,
     };
   }

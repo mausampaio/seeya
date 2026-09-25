@@ -26,7 +26,25 @@
  * its own `cwd` (V2-T34 item 2's own docstring on where THAT layer stops, too). Neither one covers
  * history rewritten after the fact outside any hook at all — `seeya project audit` is what looks at
  * what already landed and reports what escaped, later (`core/project-audit.ts`).
+ *
+ * **V2-T34 hotfix (PO review, 2026-09-25): a same-process authorization, alongside the session
+ * one.** The maintainer found, on real use, that EVERY commit `seeya` itself makes while holding a
+ * project's own lock was refused by this very guard — `open`'s own leftover-changes commit, an
+ * adoption's commit, `remove`/`remove-repo`/`revert-adoption` — because none of them run inside a
+ * Claude Code session whose `CLAUDE_CODE_SESSION_ID` happens to equal the lock's `sessionId` (that
+ * field is either a freshly generated id `open`/`adopt` invented for a session that hasn't started
+ * running yet, or simply absent when `seeya` runs from a plain terminal or the packaged app — and
+ * an ABSENT `lock.sessionId` was never treated as matching an ABSENT `currentSessionId` either,
+ * D-025's own "don't guess an identity" cutting the wrong way here). `decideSessionConflict` now
+ * ALSO accepts a commit whose `currentProcess` (`LockHolderProcess`, `core/lock-holder-process.ts`)
+ * matches the lock's own `pid`/`procStart` — the process itself, not a session inside it, is who's
+ * asking. **Where THIS one ends (same "cobre o descuido" discipline as the session id above):** a
+ * forged `SEEYA_LOCK_HOLDER_PID`/`SEEYA_LOCK_HOLDER_PROC_START` pair that happens to match a real
+ * lock authorizes the commit the same way the real thing would — this covers the same class of
+ * accident the session id already covers, never a deliberate attempt to defeat the guard from a
+ * shell that already has permission to set arbitrary environment variables in the first place.
  */
+import type { LockHolderProcess } from './lock-holder-process.js';
 import {
   PROJECT_ID_TRAILER_KEY,
   SESSION_ID_TRAILER_KEY,
@@ -41,6 +59,9 @@ import { distinctProjectDirs } from './workspace-paths.js';
 export interface CommitGuardLockFact {
   readonly sessionId: string | undefined;
   readonly pid: number;
+  /** V2-T34 hotfix: compared against `CommitGuardInput.currentProcess` for the same-process
+   * authorization above — `ProjectLockInfo.procStart`'s own tolerance (D-025), unchanged here. */
+  readonly procStart: string | undefined;
   readonly isAlive: boolean;
   readonly acquiredAt: Date;
 }
@@ -56,6 +77,11 @@ export interface CommitGuardInput {
    * every other reader of this variable in this project does (composition-root-adjacent, never
    * inside `core/`). */
   readonly currentSessionId: string | undefined;
+  /** V2-T34 hotfix: `SEEYA_LOCK_HOLDER_PID`/`SEEYA_LOCK_HOLDER_PROC_START`, read by
+   * `application/verify-commit.ts`'s own caller the same composition-root-adjacent way
+   * `currentSessionId` already is. `undefined` for an ordinary commit `seeya` isn't making while
+   * holding the touched project's own lock (a person's own `git commit`, most commonly). */
+  readonly currentProcess: LockHolderProcess | undefined;
   /** `null` when the touched project has never had a lock taken (D-025) — never confused with a
    * lock that WAS taken but died, which is `{ ..., isAlive: false }` instead. */
   readonly lock: CommitGuardLockFact | null;
@@ -72,29 +98,54 @@ export type CommitGuardDecision =
   | { readonly kind: 'allow'; readonly message: string }
   | { readonly kind: 'refuse'; readonly reason: string };
 
-/** `null` when there's no conflict — a free lock, a stale (dead-process) one, or a live one this
- * same session already holds. Otherwise the refusal text, naming who holds it and since when
+/** D-024: named, not a boolean — a commit that's fine either has no conflict to speak of, or was
+ * authorized specifically by the SAME-PROCESS check (`authorizedBySameProcess: true`), a
+ * distinction `decideCommitGuard` needs below to decide whether an ALREADY-WRITTEN session trailer
+ * should be trusted as-is (V2-T34 hotfix item 2) rather than recomputed and possibly contradicted. */
+type SessionConflictOutcome =
+  | { readonly kind: 'ok'; readonly authorizedBySameProcess: boolean }
+  | { readonly kind: 'conflict'; readonly reason: string };
+
+function isLockHolderProcess(
+  currentProcess: LockHolderProcess | undefined,
+  lock: CommitGuardLockFact,
+): boolean {
+  if (currentProcess === undefined) {
+    return false;
+  }
+  return currentProcess.pid === lock.pid && currentProcess.procStart === lock.procStart;
+}
+
+/** `'ok'` for a free lock, a stale (dead-process) one, a live one this same SESSION already holds,
+ * or — the V2-T34 hotfix — a live one this same PROCESS holds (`isLockHolderProcess` above).
+ * Otherwise the refusal text, naming who holds it and since when
  * (`core/project-lock-message.ts#formatLockHolderDescription`'s own wording, duplicated in spirit
  * rather than imported: that module formats a full `ProjectLockInfo`, this one only ever has the
  * narrower `CommitGuardLockFact`). */
 function decideSessionConflict(
   projectId: string,
   currentSessionId: string | undefined,
+  currentProcess: LockHolderProcess | undefined,
   lock: CommitGuardLockFact | null,
-): string | null {
+): SessionConflictOutcome {
   if (lock === null || !lock.isAlive) {
-    return null;
+    return { kind: 'ok', authorizedBySameProcess: false };
   }
   if (lock.sessionId !== undefined && lock.sessionId === currentSessionId) {
-    return null;
+    return { kind: 'ok', authorizedBySameProcess: false };
+  }
+  if (isLockHolderProcess(currentProcess, lock)) {
+    return { kind: 'ok', authorizedBySameProcess: true };
   }
   const holder =
     lock.sessionId === undefined ? 'an unidentified session' : `session ${lock.sessionId}`;
-  return (
-    `project "${projectId}" is locked by ${holder} (pid ${lock.pid}) since ` +
-    `${lock.acquiredAt.toISOString()} — only that session may commit here until it releases the ` +
-    'lock (D-047 item 4).'
-  );
+  return {
+    kind: 'conflict',
+    reason:
+      `project "${projectId}" is locked by ${holder} (pid ${lock.pid}) since ` +
+      `${lock.acquiredAt.toISOString()} — only that session may commit here until it releases the ` +
+      'lock (D-047 item 4).',
+  };
 }
 
 type TrailerCheck =
@@ -118,11 +169,22 @@ function decideTrailerValue(existing: string | null, computed: string, key: stri
 }
 
 /** Appends only the trailer(s) actually missing — a trailer already present with the right value is
- * left exactly where it was, never duplicated. */
+ * left exactly where it was, never duplicated.
+ *
+ * `trustExistingSessionTrailer` (V2-T34 hotfix item 2): when the same-process check authorized
+ * this commit, an ALREADY-PRESENT `Seeya-Session-Id` trailer is accepted verbatim, never compared
+ * against `sessionId` — `sessionId` in that case is at best a fallback for a MISSING trailer
+ * (`decideCommitGuard`'s own computation below), never a value the trailer that's already there
+ * could be said to "contradict." Without this, `open`'s own leftover-changes commit (trailer
+ * deliberately `unknown`, D-025 — nobody present can say whose it was) would be refused by THIS
+ * function for "not matching" the lock's own `sessionId` (`launchedSessionId`, a real id that
+ * describes the lock, not who wrote this particular catch-up commit) — the exact defect the
+ * maintainer found. */
 function decideTrailers(
   rawMessage: string,
   projectId: string,
   sessionId: string,
+  trustExistingSessionTrailer: boolean,
 ): CommitGuardDecision {
   const project = decideTrailerValue(
     extractCommitTrailer(rawMessage, PROJECT_ID_TRAILER_KEY),
@@ -132,11 +194,11 @@ function decideTrailers(
   if (project.kind === 'conflict') {
     return { kind: 'refuse', reason: project.reason };
   }
-  const session = decideTrailerValue(
-    extractCommitTrailer(rawMessage, SESSION_ID_TRAILER_KEY),
-    sessionId,
-    SESSION_ID_TRAILER_KEY,
-  );
+  const existingSession = extractCommitTrailer(rawMessage, SESSION_ID_TRAILER_KEY);
+  const session: TrailerCheck =
+    trustExistingSessionTrailer && existingSession !== null
+      ? { kind: 'present' }
+      : decideTrailerValue(existingSession, sessionId, SESSION_ID_TRAILER_KEY);
   if (session.kind === 'conflict') {
     return { kind: 'refuse', reason: session.reason };
   }
@@ -160,6 +222,7 @@ function decideTrailers(
  *   stagedFiles: ['auth-hardening/status/current.md'],
  *   rawMessage: 'Write the current status\n',
  *   currentSessionId: '11111111-1111-4111-8111-111111111111',
+ *   currentProcess: undefined,
  *   lock: null,
  *   lockFileName: '.seeya-lock',
  * });
@@ -191,11 +254,21 @@ export function decideCommitGuard(input: CommitGuardInput): CommitGuardDecision 
         `(D-047 item 2). Unstage it: git restore --staged ${lockFilePath}`,
     };
   }
-  const conflict = decideSessionConflict(projectId, input.currentSessionId, input.lock);
-  if (conflict !== null) {
-    return { kind: 'refuse', reason: conflict };
+  const conflict = decideSessionConflict(
+    projectId,
+    input.currentSessionId,
+    input.currentProcess,
+    input.lock,
+  );
+  if (conflict.kind === 'conflict') {
+    return { kind: 'refuse', reason: conflict.reason };
   }
-  const sessionId =
-    input.currentSessionId ?? input.lock?.sessionId ?? UNKNOWN_SESSION_TRAILER_VALUE;
-  return decideTrailers(input.rawMessage, projectId, sessionId);
+  // V2-T34 hotfix item 2: authorized by the SAME-PROCESS check, `lock.sessionId` never enters the
+  // fallback chain — it describes the lock, not who wrote THIS commit, and could contradict a
+  // trailer seeya itself already wrote correctly (`decideTrailers`'s own docstring has the full
+  // reasoning, and `trustExistingSessionTrailer` below is what actually protects it either way).
+  const sessionId = conflict.authorizedBySameProcess
+    ? (input.currentSessionId ?? UNKNOWN_SESSION_TRAILER_VALUE)
+    : (input.currentSessionId ?? input.lock?.sessionId ?? UNKNOWN_SESSION_TRAILER_VALUE);
+  return decideTrailers(input.rawMessage, projectId, sessionId, conflict.authorizedBySameProcess);
 }
