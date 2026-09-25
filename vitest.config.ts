@@ -119,6 +119,11 @@ const PROCESS_HEAVY_INTEGRATION_FILES = [
   // tests/integration/cli/daemon-command.test.ts above, now exercised through
   // AppContext#startDaemon/#stopDaemon instead of the CLI's own runDaemonLauncher/runDaemonStop.
   'tests/integration/app/daemon-launch.test.ts',
+  // V2-T34: same real-spawned-child-process shape as project-lock.test.ts above (one scenario), plus
+  // a real `git commit` shelling out to the real, compiled `packages/cli/dist/index.js` for every
+  // scenario in the file — the whole point of this suite is proving the generated hook script for
+  // real, never simulated.
+  'tests/integration/workspace/commit-msg-hook.test.ts',
 ];
 
 /**

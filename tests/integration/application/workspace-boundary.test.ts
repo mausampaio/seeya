@@ -12,12 +12,20 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { StorageAdapter } from '@seeya-ai/engine/adapters/storage/index.js';
 import { FsWorkspaceRepository, FsProjectLock } from '@seeya-ai/engine/adapters/workspace/index.js';
 import { processControl } from '@seeya-ai/engine/adapters/process/index.js';
 import { runGit } from '@seeya-ai/engine/adapters/git/run-git.js';
 import { createProject } from '@seeya-ai/engine/application/workspace.js';
 import type { WorkspaceCommandDeps } from '@seeya-ai/engine/application/workspace.js';
+
+// V2-T34 item 1: `createProject` now installs a REAL commit-msg hook (`ensureWorkspaceHooksInstalled`)
+// before its own `commitAll` — a fake `cliEntryPath` would make that real `git commit` genuinely
+// fail (the hook itself fails to even run `node <fake path>`), so this points at the real, compiled
+// CLI entry, same technique `tests/integration/workspace/commit-msg-hook.test.ts` uses.
+const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
+const CLI_ENTRY_PATH = path.join(REPO_ROOT, 'packages', 'cli', 'dist', 'index.js');
 
 function buildDeps(
   storage: StorageAdapter,
@@ -30,7 +38,17 @@ function buildDeps(
     projectLock: new FsProjectLock(),
     processControl,
     seeyaHome,
-    sessionId: undefined,
+    // The SAME source `packages/cli/src/composition.ts#readCurrentSessionId` reads in production
+    // — never a hardcoded `undefined`. `createProject`'s own commit trailer (`buildProjectCommitMessage`)
+    // and the REAL commit-msg hook this test now installs both end up reading THIS exact value
+    // (the hook through its own environment, inherited from this very process): a mismatch here
+    // would make the hook refuse its own caller's commit as "a contradicting trailer" — genuinely
+    // reproduced when running this suite inside a live Claude Code session, whose own
+    // CLAUDE_CODE_SESSION_ID would otherwise leak into the spawned `git commit`/hook while this
+    // constant claimed `undefined`.
+    sessionId: process.env['CLAUDE_CODE_SESSION_ID'],
+    nodePath: process.execPath,
+    cliEntryPath: CLI_ENTRY_PATH,
   };
 }
 
