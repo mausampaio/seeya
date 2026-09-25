@@ -15,7 +15,6 @@ import { createTab, isRunning, markExited, withPid, type Tab } from '../tabs/tab
 import { MESSAGES } from '../text/messages.js';
 import { TERMINAL_THEME } from '../state/terminal-theme.js';
 import type { SeeyaApi } from './preload.js';
-import type { SidebarRow } from '../sidebar/sidebar-data.js';
 import type {
   EndDayPreviewResponse,
   FallbackConfirmRequestEvent,
@@ -37,6 +36,7 @@ import {
   type AutostartControlState,
 } from '../state/autostart-control-panel.js';
 import type { SettingsRow, ProjectPolicyLine } from '../state/settings-panel.js';
+import { wireProjectPanel } from './project-panel-view.js';
 
 declare global {
   interface Window {
@@ -261,9 +261,11 @@ function wireIncomingEvents(): void {
     }
     markTabButtonExited(id, exitCode);
   });
-  window.seeya.onSessionsUpdate(({ rows }) => {
-    renderSidebar(rows);
-  });
+  // V2-T30: the flat session list (`renderSidebar`, `#session-list`) is retired — the sidebar now
+  // shows the SAME rows grouped by project (`onProjectsUpdate`, wired by
+  // `project-panel-view.ts#wireProjectPanel`). `onSessionsUpdate` itself is left unlistened here;
+  // `main.ts` still sends it (V2-T9 item 4's own Today-panel liveness index still needs that same
+  // tick's discovery internally), harmless with no renderer listener registered for it.
   // V2-T18 item 2: the "Today" panel, same refresh tick as onSessionsUpdate above — a session
   // opened outside the window now shows "running now" on its own, without reopening.
   window.seeya.onTodayUpdate((data) => {
@@ -1283,43 +1285,49 @@ async function handleResumeSelected(day: string): Promise<void> {
   renderResumeSummary(response);
 }
 
-/** Renders the sidebar's session list — same rows `seeya sessions` would print
- * (docs/PLANO-DE-ENTREGA.md V2-T2), one `<li>` per discovered session, marked `.matched` when it
- * corresponds to a tab open in this window (by pid, D-025: no correspondence, no mark). */
-function renderSidebar(rows: readonly SidebarRow[]): void {
-  const list = document.getElementById('session-list') as HTMLElement;
-  list.textContent = '';
-  if (rows.length === 0) {
-    const empty = document.createElement('li');
-    empty.textContent = MESSAGES.sidebarEmpty;
-    list.appendChild(empty);
-    return;
-  }
-  for (const row of rows) {
-    const item = document.createElement('li');
-    item.textContent = `${row.name} (${row.state})`;
-    item.title = row.cwd;
-    if (row.matchedTabId !== null) {
-      item.classList.add('matched');
-    }
-    list.appendChild(item);
+/** Re-fits every open tab's terminal to its (now current) container size and pushes the new
+ * cols/rows to its pty — the one thing every trigger below needs, extracted so none of them
+ * duplicates the V2-T6 refresh-after-resize fix. */
+function fitAllOpenTabs(): void {
+  for (const [id, open] of openTabs) {
+    open.fitAddon.fit();
+    window.seeya.resizeTab({ id, cols: open.terminal.cols, rows: open.terminal.rows });
+    // V2-T6: measured defect — after a resize+scroll, orphaned characters stayed at the left
+    // edge of a Claude Code tab (its TUI redraws its own block with erase-to-end-of-line
+    // sequences, and a row-wrap disagreement between ConPTY and xterm.js right after a resize
+    // is what paints those wrong). A full refresh forces xterm.js to repaint every row from its
+    // own buffer — cheap, and a no-op when nothing was actually stale.
+    open.terminal.refresh(0, open.terminal.rows - 1);
   }
 }
 
-/** Resizing the window resizes every open tab's pty (docs/PLANO-DE-ENTREGA.md V2-T2, item 3). */
+/**
+ * V2-T30/V2-T48 item 6: a `ResizeObserver` on `#terminal-host`, not `window.addEventListener
+ * ('resize', ...)` — two reasons, one measured and one structural:
+ *
+ * - **Structural, and enough on its own:** the lateral's own collapse toggle (item 2) changes
+ *   `#terminal-host`'s width by re-flowing the sidebar/main flexbox — it never touches the
+ *   window's own outer size, so `window`'s `resize` event **never fires** for it at all. Any
+ *   fix for "the terminal reflows when the sidebar collapses" has to watch the terminal's own
+ *   container, not the window.
+ * - **Measured, inconclusive on this machine:** a temporary instrumentation run during this task
+ *   (a `ResizeObserver` and a `window.resize` listener on `#terminal-host`, both logging the
+ *   container's own rect, around a programmatic `window.maximize()`) showed the two firing within
+ *   a millisecond of each other, both already reporting the POST-maximize size, in this sandbox's
+ *   own `SEEYA_APP_OFFSCREEN` mode — the same mode `docs/DESEMPENHO.md` already notes doesn't fully
+ *   represent a real, composited desktop. It did not reproduce the maintainer's own first-maximize
+ *   defect (real Windows, a real display) one way or the other; a `ResizeObserver` fires strictly
+ *   AFTER layout for every box-size change of the element it observes (the documented reason
+ *   `@xterm/addon-fit`'s own README recommends it over a window-level listener), so it can only
+ *   read a size at least as fresh as `window.resize` would, never staler.
+ *
+ * `#sidebar`'s own collapse also resizes `#terminal-host` indirectly (the flex layout above), so
+ * one observer on the terminal's own container covers both triggers — no second observer needed
+ * on `#sidebar` itself.
+ */
 function wireWindowResize(): void {
-  window.addEventListener('resize', () => {
-    for (const [id, open] of openTabs) {
-      open.fitAddon.fit();
-      window.seeya.resizeTab({ id, cols: open.terminal.cols, rows: open.terminal.rows });
-      // V2-T6: measured defect — after a resize+scroll, orphaned characters stayed at the left
-      // edge of a Claude Code tab (its TUI redraws its own block with erase-to-end-of-line
-      // sequences, and a row-wrap disagreement between ConPTY and xterm.js right after a resize
-      // is what paints those wrong). A full refresh forces xterm.js to repaint every row from its
-      // own buffer — cheap, and a no-op when nothing was actually stale.
-      open.terminal.refresh(0, open.terminal.rows - 1);
-    }
-  });
+  const observer = new ResizeObserver(() => fitAllOpenTabs());
+  observer.observe(terminalHost());
 }
 
 function commandBar(): HTMLFormElement {
@@ -1372,6 +1380,7 @@ async function main(): Promise<void> {
   wireAutostartControl();
   wireSettingsDialog();
   wireDaemonOwnershipTransitionDialog();
+  wireProjectPanel();
   await refreshTodayPanel();
   // V2-T13 item 5: after every other piece of the window is already wired and usable — the
   // ownership-transition question never blocks tabs/sidebar/settings from working.

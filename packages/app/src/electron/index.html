@@ -9,25 +9,32 @@
   <body>
     <div id="app">
       <aside id="sidebar">
-        <h2>Today</h2>
-        <div id="today-panel"></div>
-        <h2>Sessions</h2>
-        <ul id="session-list"></ul>
-        <h2>Status</h2>
-        <pre id="status-panel"></pre>
-        <div id="schedule-strip">
-          <p id="schedule-strip-text"></p>
-          <button id="schedule-strip-snooze-15" type="button" hidden></button>
-          <button id="schedule-strip-snooze-30" type="button" hidden></button>
-          <button id="schedule-strip-snooze-1h" type="button" hidden></button>
-          <button id="schedule-strip-skip" type="button" hidden></button>
+        <button id="sidebar-collapse-toggle" type="button">‹</button>
+        <div id="sidebar-content">
+          <h2>Projects</h2>
+          <button id="new-project-button" type="button"></button>
+          <div id="projects-list"></div>
+          <p id="project-open-result-text"></p>
+          <h2>Other sessions</h2>
+          <ul id="other-sessions-list"></ul>
+          <h2>Today</h2>
+          <div id="today-panel"></div>
+          <h2>Status</h2>
+          <pre id="status-panel"></pre>
+          <div id="schedule-strip">
+            <p id="schedule-strip-text"></p>
+            <button id="schedule-strip-snooze-15" type="button" hidden></button>
+            <button id="schedule-strip-snooze-30" type="button" hidden></button>
+            <button id="schedule-strip-snooze-1h" type="button" hidden></button>
+            <button id="schedule-strip-skip" type="button" hidden></button>
+          </div>
+          <button id="end-day-button" type="button"></button>
+          <button id="daemon-control-button" type="button"></button>
+          <p id="daemon-control-result"></p>
+          <button id="autostart-control-button" type="button" hidden></button>
+          <p id="autostart-control-result"></p>
+          <button id="settings-button" type="button"></button>
         </div>
-        <button id="end-day-button" type="button"></button>
-        <button id="daemon-control-button" type="button"></button>
-        <p id="daemon-control-result"></p>
-        <button id="autostart-control-button" type="button" hidden></button>
-        <p id="autostart-control-result"></p>
-        <button id="settings-button" type="button"></button>
       </aside>
       <main id="main">
         <div id="toolbar">
@@ -88,6 +95,72 @@
       <div id="daemon-ownership-transition-actions">
         <button id="daemon-ownership-transition-accept" type="button"></button>
         <button id="daemon-ownership-transition-decline" type="button"></button>
+      </div>
+    </dialog>
+    <dialog id="new-project-dialog" class="project-dialog">
+      <h3 id="new-project-dialog-title"></h3>
+      <form id="new-project-form">
+        <label>
+          Project id
+          <input id="new-project-id-input" type="text" placeholder="auth-hardening" />
+        </label>
+        <p id="new-project-error" class="project-dialog-error"></p>
+        <div class="project-dialog-actions">
+          <button type="submit" id="new-project-submit"></button>
+          <button type="button" id="new-project-cancel"></button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="project-lock-confirm-dialog" class="project-dialog">
+      <h3 id="project-lock-confirm-title"></h3>
+      <p id="project-lock-confirm-question"></p>
+      <div class="project-dialog-actions">
+        <button id="project-lock-confirm-proceed" type="button"></button>
+        <button id="project-lock-confirm-decline" type="button"></button>
+      </div>
+    </dialog>
+    <dialog id="adopt-pick-dialog" class="project-dialog">
+      <h3 id="adopt-pick-title"></h3>
+      <form id="adopt-pick-form">
+        <label>
+          <input type="radio" name="adopt-target" id="adopt-target-existing" checked />
+          Existing project
+        </label>
+        <select id="adopt-existing-select"></select>
+        <label>
+          <input type="radio" name="adopt-target" id="adopt-target-new" />
+          New project
+        </label>
+        <input id="adopt-new-project-id-input" type="text" placeholder="auth-hardening" disabled />
+        <p id="adopt-pick-error" class="project-dialog-error"></p>
+        <div class="project-dialog-actions">
+          <button type="submit" id="adopt-pick-submit"></button>
+          <button type="button" id="adopt-pick-cancel"></button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="adopt-launch-confirm-dialog" class="project-dialog">
+      <h3 id="adopt-launch-confirm-title"></h3>
+      <div id="adopt-launch-confirm-lines"></div>
+      <div class="project-dialog-actions">
+        <button id="adopt-launch-confirm-proceed" type="button"></button>
+        <button id="adopt-launch-confirm-decline" type="button"></button>
+      </div>
+    </dialog>
+    <dialog id="adopt-commit-confirm-dialog" class="project-dialog">
+      <h3 id="adopt-commit-confirm-title"></h3>
+      <div id="adopt-commit-confirm-lines"></div>
+      <div class="project-dialog-actions">
+        <button id="adopt-commit-confirm-commit" type="button"></button>
+        <button id="adopt-commit-confirm-decline" type="button"></button>
+      </div>
+    </dialog>
+    <dialog id="adopt-result-dialog" class="project-dialog">
+      <h3 id="adopt-result-title"></h3>
+      <p id="adopt-result-text"></p>
+      <div class="project-dialog-actions">
+        <button id="adopt-result-open-project" type="button" hidden></button>
+        <button id="adopt-result-close" type="button"></button>
       </div>
     </dialog>
     <script type="module" src="renderer.js"></script>
