@@ -20,6 +20,7 @@ import {
   writeForksJson,
   writeForksJsonRaw,
   writeTranscript,
+  writeTranscriptWithContent,
   writeUnreadableTranscriptPlaceholder,
   type DiscoveryFixture,
 } from './_fixtures.js';
@@ -327,5 +328,45 @@ describe('DiscoveryForkCleanup.deleteFork', () => {
     const outcome = await cleanup.deleteFork(STALE_MISSING_FORK);
 
     expect(outcome).toStrictEqual({ sessionId: STALE_MISSING_FORK, outcome: 'alreadyAbsent' });
+  });
+});
+
+/** V2-T32: `checkForkActivity` — the `stat` `application/project-revert-adoption.ts` bases its own
+ * "did the adopted copy keep writing after being adopted" decision on. Never reads `forks.json` —
+ * a promoted (adopted) fork isn't listed there any more (`core/ports.ts#ForkActivityCheck`'s own
+ * docstring). */
+describe('DiscoveryForkCleanup.checkForkActivity', () => {
+  it("reports the transcript's own mtime and size when it exists", async () => {
+    const mtime = new Date('2026-09-24T15:00:00.000Z');
+    await writeTranscriptWithContent(
+      fixture,
+      'slug-forks',
+      RECENT_FORK,
+      '{"type":"user"}\n',
+      mtime,
+    );
+
+    const cleanup = new DiscoveryForkCleanup({
+      claudeHome: fixture.claudeHome,
+      seeyaHome: fixture.seeyaHome,
+      clock: new FakeClock(NOW),
+    });
+    const check = await cleanup.checkForkActivity(RECENT_FORK);
+
+    expect(check.kind).toBe('found');
+    expect(check.kind === 'found' && check.lastWrite.getTime()).toBe(mtime.getTime());
+    expect(check.kind === 'found' && check.sizeBytes).toBe(
+      Buffer.byteLength('{"type":"user"}\n', 'utf8'),
+    );
+  });
+
+  it('is notFound for a sessionId with no matching transcript anywhere (D-025)', async () => {
+    const cleanup = new DiscoveryForkCleanup({
+      claudeHome: fixture.claudeHome,
+      seeyaHome: fixture.seeyaHome,
+      clock: new FakeClock(NOW),
+    });
+
+    expect(await cleanup.checkForkActivity(STALE_MISSING_FORK)).toStrictEqual({ kind: 'notFound' });
   });
 });

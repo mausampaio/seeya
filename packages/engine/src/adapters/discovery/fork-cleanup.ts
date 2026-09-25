@@ -12,10 +12,11 @@
  * `locateTranscriptFile` — the same lookup `adapters/transcript` uses to find a real transcript to
  * open for reading, used here once, to delete.
  */
-import { unlink } from 'node:fs/promises';
+import { stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import type {
   Clock,
+  ForkActivityCheck,
   ForkCleanup,
   ForkCleanupOutcome,
   ForkCleanupResult,
@@ -155,5 +156,32 @@ export class DiscoveryForkCleanup implements ForkCleanup {
    */
   async deleteFork(sessionId: string): Promise<ForkCleanupOutcome> {
     return deleteOneFork(this.options.claudeHome, sessionId);
+  }
+
+  /**
+   * V2-T32: `stat`s a fork's transcript file by `sessionId` alone, reusing the SAME
+   * `locateTranscriptFile` lookup `deleteFork` above already uses — never `forks.json`, which a
+   * promoted (adopted) fork isn't listed in any more (`core/ports.ts#ForkActivityCheck`'s own
+   * docstring). `notFound` covers both "never had a transcript" and "the file is gone" — the same
+   * D-025 tolerance `deleteOneFork`'s own `alreadyAbsent` already applies to the identical lookup.
+   */
+  async checkForkActivity(sessionId: string): Promise<ForkActivityCheck> {
+    const projectsDir = path.join(this.options.claudeHome, 'projects');
+    const transcriptPath = await locateTranscriptFile(projectsDir, sessionId);
+    if (transcriptPath === null) {
+      return { kind: 'notFound' };
+    }
+    try {
+      const stats = await stat(transcriptPath);
+      return { kind: 'found', lastWrite: new Date(stats.mtimeMs), sizeBytes: stats.size };
+    } catch (error) {
+      // A TOCTOU window (the file vanished between `locateTranscriptFile` finding it and this
+      // `stat`) — same "not found" reading `deleteOneFork` gives the identical race, never a throw
+      // for what is, from this call's own point of view, indistinguishable from "never existed".
+      if (isEnoent(error)) {
+        return { kind: 'notFound' };
+      }
+      throw error;
+    }
   }
 }

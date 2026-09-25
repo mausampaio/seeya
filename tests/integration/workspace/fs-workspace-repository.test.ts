@@ -11,6 +11,10 @@ import path from 'node:path';
 import { FsWorkspaceRepository } from '@seeya-ai/engine/adapters/workspace/index.js';
 import { runGit } from '@seeya-ai/engine/adapters/git/run-git.js';
 import { buildProjectSkeleton } from '@seeya-ai/engine/core/project-skeleton.js';
+import { buildProjectCommitMessage } from '@seeya-ai/engine/core/project-commit.js';
+
+const FORK_SESSION_ID = '22222222-2222-4222-8222-222222222222';
+const OTHER_SESSION_ID = '33333333-3333-4333-8333-333333333333';
 
 async function makeTmpDir(): Promise<string> {
   return mkdtemp(path.join(tmpdir(), 'seeya-workspace-'));
@@ -395,5 +399,298 @@ describe('FsWorkspaceRepository', () => {
     await expect(workspace.listChangedFiles(root, 'auth-hardening')).rejects.toThrow(
       /git status failed/,
     );
+  });
+
+  // V2-T32: `seeya project remove`'s own two reads.
+  it('currentCommit is null before any commit, the HEAD hash after one', async () => {
+    root = await makeTmpDir();
+    const workspace = new FsWorkspaceRepository();
+    await workspace.initialize(root);
+    expect(await workspace.currentCommit(root)).toBeNull();
+
+    await workspace.writeProjectSkeleton(
+      root,
+      'auth-hardening',
+      buildProjectSkeleton('auth-hardening'),
+    );
+    await workspace.commitAll(root, 'auth-hardening', 'Create project auth-hardening');
+    const head = await runGit(root, ['rev-parse', 'HEAD']);
+    expect(await workspace.currentCommit(root)).toBe(head.ran ? head.stdout.trim() : null);
+  });
+
+  it('countProjectFiles counts the tracked files inside one project (AGENTS.md, INDEX.md, seeya.json)', async () => {
+    root = await makeTmpDir();
+    const workspace = new FsWorkspaceRepository();
+    await workspace.initialize(root);
+    await workspace.writeProjectSkeleton(
+      root,
+      'auth-hardening',
+      buildProjectSkeleton('auth-hardening'),
+    );
+    await workspace.commitAll(root, 'auth-hardening', 'Create project auth-hardening');
+    expect(await workspace.countProjectFiles(root, 'auth-hardening')).toBe(3);
+  });
+
+  it('removeProjectDirectory deletes the project, and commitAll then commits the removal', async () => {
+    root = await makeTmpDir();
+    const workspace = new FsWorkspaceRepository();
+    await workspace.initialize(root);
+    await workspace.writeProjectSkeleton(
+      root,
+      'auth-hardening',
+      buildProjectSkeleton('auth-hardening'),
+    );
+    await workspace.commitAll(root, 'auth-hardening', 'Create project auth-hardening');
+
+    await workspace.removeProjectDirectory(root, 'auth-hardening');
+    expect(await workspace.projectExists(root, 'auth-hardening')).toBe(false);
+    await workspace.commitAll(root, 'auth-hardening', 'Remove project auth-hardening');
+
+    const { manifests } = await workspace.listProjects(root);
+    expect(manifests).toEqual([]);
+    const log = await runGit(root, ['log', '-1', '--name-status', '--pretty=format:']);
+    expect(log.ran && log.stdout).toMatch(/D\s+auth-hardening\/AGENTS\.md/);
+  });
+
+  it('removeProjectDirectory tolerates a directory that is already gone (D-025)', async () => {
+    root = await makeTmpDir();
+    const workspace = new FsWorkspaceRepository();
+    await workspace.initialize(root);
+    await expect(workspace.removeProjectDirectory(root, 'ghost')).resolves.toBeUndefined();
+  });
+
+  describe('findSessionCommits / findCommitsAfter / revertCommits (V2-T32, D-047 item 4)', () => {
+    async function setUpProjectWithForkCommit(): Promise<{
+      workspace: FsWorkspaceRepository;
+      forkCommit: string;
+    }> {
+      const workspace = new FsWorkspaceRepository();
+      await workspace.initialize(root as string);
+      await workspace.writeProjectSkeleton(
+        root as string,
+        'auth-hardening',
+        buildProjectSkeleton('auth-hardening'),
+      );
+      // The "create project" commit itself carries no session trailer that matches the fork's own
+      // id (same as `application/project-adopt.ts#ensureProjectExists`'s real caller trailer) —
+      // `findSessionCommits` must never pick this one up.
+      await workspace.commitAll(
+        root as string,
+        'auth-hardening',
+        buildProjectCommitMessage('Create project auth-hardening', 'auth-hardening', undefined),
+      );
+
+      await writeFile(
+        path.join(root as string, 'auth-hardening', 'context', 'know-how.md'),
+        'how this project is operated\n',
+        'utf8',
+      );
+      await workspace.commitAll(
+        root as string,
+        'auth-hardening',
+        buildProjectCommitMessage(
+          'Adopt session into project auth-hardening',
+          'auth-hardening',
+          FORK_SESSION_ID,
+        ),
+      );
+      const forkCommitResult = await runGit(root as string, ['rev-parse', 'HEAD']);
+      const forkCommit = forkCommitResult.ran ? forkCommitResult.stdout.trim() : '';
+      return { workspace, forkCommit };
+    }
+
+    it('findSessionCommits finds only the trailer-matching commit, scoped to the project', async () => {
+      root = await makeTmpDir();
+      const { workspace, forkCommit } = await setUpProjectWithForkCommit();
+
+      const commits = await workspace.findSessionCommits(root, 'auth-hardening', FORK_SESSION_ID);
+      expect(commits).toEqual([
+        { hash: forkCommit, files: [path.posix.join('auth-hardening', 'context', 'know-how.md')] },
+      ]);
+    });
+
+    it('findSessionCommits is empty when the session never committed inside this project (D-025)', async () => {
+      root = await makeTmpDir();
+      await setUpProjectWithForkCommit();
+      const workspace = new FsWorkspaceRepository();
+
+      expect(await workspace.findSessionCommits(root, 'auth-hardening', OTHER_SESSION_ID)).toEqual(
+        [],
+      );
+    });
+
+    it('findCommitsAfter returns every later commit touching the project, oldest first', async () => {
+      root = await makeTmpDir();
+      const { workspace, forkCommit } = await setUpProjectWithForkCommit();
+
+      await writeFile(
+        path.join(root, 'auth-hardening', 'INDEX.md'),
+        'updated by someone else\n',
+        'utf8',
+      );
+      await workspace.commitAll(
+        root,
+        'auth-hardening',
+        buildProjectCommitMessage('Update INDEX.md', 'auth-hardening', OTHER_SESSION_ID),
+      );
+      const laterCommitResult = await runGit(root, ['rev-parse', 'HEAD']);
+      const laterCommit = laterCommitResult.ran ? laterCommitResult.stdout.trim() : '';
+
+      const commitsAfter = await workspace.findCommitsAfter(root, 'auth-hardening', forkCommit);
+      expect(commitsAfter).toEqual([
+        { hash: laterCommit, files: [path.posix.join('auth-hardening', 'INDEX.md')] },
+      ]);
+    });
+
+    it("findCommitsAfter is empty when the fork's commit is the newest one touching the project", async () => {
+      root = await makeTmpDir();
+      const { workspace, forkCommit } = await setUpProjectWithForkCommit();
+      expect(await workspace.findCommitsAfter(root, 'auth-hardening', forkCommit)).toEqual([]);
+    });
+
+    it('revertCommits reverts one commit and makes a single new commit with the given message', async () => {
+      root = await makeTmpDir();
+      const { workspace, forkCommit } = await setUpProjectWithForkCommit();
+
+      const outcome = await workspace.revertCommits(
+        root,
+        'auth-hardening',
+        [forkCommit],
+        'Revert adoption of session from project auth-hardening',
+      );
+
+      expect(outcome).toStrictEqual({ kind: 'committed' });
+      expect(
+        await workspace.findSessionCommits(root, 'auth-hardening', FORK_SESSION_ID),
+      ).toHaveLength(1); // the ORIGINAL commit is still there — reverting adds a new commit, never rewrites history
+      const log = await runGit(root, ['log', '-1', '--pretty=format:%s']);
+      expect(log.ran && log.stdout).toBe('Revert adoption of session from project auth-hardening');
+      const filePath = path.join(root, 'auth-hardening', 'context', 'know-how.md');
+      await expect(readFile(filePath, 'utf8')).rejects.toThrow();
+    });
+
+    it('revertCommits reports noChanges (never an empty commit) when the reverts cancel out to a net-zero diff', async () => {
+      root = await makeTmpDir();
+      const workspace = new FsWorkspaceRepository();
+      await workspace.initialize(root);
+      await workspace.writeProjectSkeleton(
+        root,
+        'auth-hardening',
+        buildProjectSkeleton('auth-hardening'),
+      );
+      await workspace.commitAll(root, 'auth-hardening', 'Create project auth-hardening');
+
+      await writeFile(path.join(root, 'auth-hardening', 'scratch.md'), 'temporary\n', 'utf8');
+      await workspace.commitAll(
+        root,
+        'auth-hardening',
+        buildProjectCommitMessage('Add scratch.md', 'auth-hardening', FORK_SESSION_ID),
+      );
+      const addCommitResult = await runGit(root, ['rev-parse', 'HEAD']);
+      const addCommit = addCommitResult.ran ? addCommitResult.stdout.trim() : '';
+
+      await rm(path.join(root, 'auth-hardening', 'scratch.md'));
+      await workspace.commitAll(
+        root,
+        'auth-hardening',
+        buildProjectCommitMessage('Remove scratch.md', 'auth-hardening', FORK_SESSION_ID),
+      );
+      const removeCommitResult = await runGit(root, ['rev-parse', 'HEAD']);
+      const removeCommit = removeCommitResult.ran ? removeCommitResult.stdout.trim() : '';
+
+      // Newest first: revert the removal (scratch.md comes back), then revert the add (it's gone
+      // again) — net result identical to HEAD before either ran.
+      const outcome = await workspace.revertCommits(
+        root,
+        'auth-hardening',
+        [removeCommit, addCommit],
+        'Revert adoption',
+      );
+      expect(outcome).toStrictEqual({ kind: 'noChanges' });
+    });
+
+    it('revertCommits stops at the first commit that fails to apply cleanly and aborts (never a partial revert)', async () => {
+      root = await makeTmpDir();
+      const workspace = new FsWorkspaceRepository();
+      await workspace.initialize(root);
+      await workspace.writeProjectSkeleton(
+        root,
+        'auth-hardening',
+        buildProjectSkeleton('auth-hardening'),
+      );
+      await workspace.commitAll(root, 'auth-hardening', 'Create project auth-hardening');
+
+      await writeFile(path.join(root, 'auth-hardening', 'scratch.md'), 'line1\n', 'utf8');
+      await workspace.commitAll(root, 'auth-hardening', 'Add scratch.md');
+      const addCommitResult = await runGit(root, ['rev-parse', 'HEAD']);
+      const addCommit = addCommitResult.ran ? addCommitResult.stdout.trim() : '';
+
+      // A later, real change to the SAME line — reverting the ADD commit alone (without also
+      // reverting this one) can't find the original line any more, a genuine `git revert` conflict.
+      await writeFile(path.join(root, 'auth-hardening', 'scratch.md'), 'line1-changed\n', 'utf8');
+      await workspace.commitAll(root, 'auth-hardening', 'Change scratch.md');
+
+      const outcome = await workspace.revertCommits(
+        root,
+        'auth-hardening',
+        [addCommit],
+        'Revert (should fail)',
+      );
+      expect(outcome.kind).toBe('failed');
+      expect(outcome.kind === 'failed' && outcome.hash).toBe(addCommit);
+      expect(outcome.kind === 'failed' && outcome.reason).toContain('exit');
+
+      // Aborted cleanly — no revert left mid-flight, no stray commit.
+      const status = await runGit(root, ['status', '--porcelain']);
+      expect(status.ran && status.stdout.trim()).toBe('');
+      const content = await readFile(path.join(root, 'auth-hardening', 'scratch.md'), 'utf8');
+      // `.trim()` here, not an exact-string match: a real `git` on Windows may normalize line
+      // endings on checkout (`core.autocrlf`) — a fact about the machine running the test, not
+      // about `revertCommits`'s own abort behavior, which is what this test is actually proving.
+      expect(content.trim()).toBe('line1-changed');
+    });
+
+    it('findSessionCommits/findCommitsAfter/revertCommits all throw when root is not a git repository at all', async () => {
+      root = await makeTmpDir();
+      const workspace = new FsWorkspaceRepository();
+      await expect(
+        workspace.findSessionCommits(root, 'auth-hardening', FORK_SESSION_ID),
+      ).rejects.toThrow(/git log failed/);
+      await expect(workspace.findCommitsAfter(root, 'auth-hardening', 'deadbeef')).rejects.toThrow(
+        /git log failed/,
+      );
+    });
+
+    // `ran: false` — git never even starts (the `cwd` itself doesn't exist), the OTHER failure
+    // shape `adapters/git/run-git.ts#GitCommandResult` distinguishes from a real nonzero exit code
+    // (same technique `tests/integration/git/primitives.test.ts` already uses for the identical
+    // distinction).
+    it('findSessionCommits/findCommitsAfter throw with the raw reason (not an exit code) when the workingDir does not exist at all', async () => {
+      const parent = await makeTmpDir();
+      root = parent;
+      const missing = path.join(parent, 'never-created');
+      const workspace = new FsWorkspaceRepository();
+      await expect(
+        workspace.findSessionCommits(missing, 'auth-hardening', FORK_SESSION_ID),
+      ).rejects.toThrow(/git log failed/);
+      await expect(
+        workspace.findCommitsAfter(missing, 'auth-hardening', 'deadbeef'),
+      ).rejects.toThrow(/git log failed/);
+    });
+
+    it('revertCommits reports failed (never throws) when the workingDir does not exist at all', async () => {
+      const parent = await makeTmpDir();
+      root = parent;
+      const missing = path.join(parent, 'never-created');
+      const workspace = new FsWorkspaceRepository();
+      const outcome = await workspace.revertCommits(
+        missing,
+        'auth-hardening',
+        ['deadbeef'],
+        'Revert (should fail to even start)',
+      );
+      expect(outcome.kind).toBe('failed');
+      expect(outcome.kind === 'failed' && outcome.reason).not.toMatch(/^exit /);
+    });
   });
 });

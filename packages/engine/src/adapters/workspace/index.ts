@@ -9,9 +9,14 @@
  * WorkspaceRepository`'s own docstring on why), so a single instance is safe to reuse across every
  * `seeya project` command a CLI invocation runs (`packages/cli/src/composition.ts`).
  */
-import { mkdir, readdir, readFile, stat } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
-import type { RejectedDiscoveryRecord, WorkspaceRepository } from '../../core/ports.js';
+import type {
+  RejectedDiscoveryRecord,
+  RevertCommitInfo,
+  RevertExecutionOutcome,
+  WorkspaceRepository,
+} from '../../core/ports.js';
 import type { ProjectManifest, ProjectSkeleton } from '../../core/types.js';
 import { runGit } from '../git/run-git.js';
 import { writeFileAtomic } from '../storage/atomic-write.js';
@@ -23,6 +28,7 @@ import {
   serializeProjectManifestDocument,
 } from './project-manifest-schema.js';
 import { PROJECT_LOCK_FILE_NAME } from './project-lock.js';
+import { findCommitsAfter, findSessionCommits, revertCommitSequence } from './revert.js';
 
 export { FsProjectLock } from './project-lock.js';
 
@@ -315,5 +321,64 @@ export class FsWorkspaceRepository implements WorkspaceRepository {
       .split('\n')
       .filter((line) => line.trim().length > 0)
       .map((line) => line.slice(3));
+  }
+
+  /** V2-T32: `seeya project remove`'s own physical deletion — `root/projectId` only, `commitAll`
+   * (a separate, explicit call) is what stages and commits the removal afterward. Tolerates the
+   * directory already being gone (D-025: nothing left to remove is not a failure). */
+  async removeProjectDirectory(root: string, projectId: string): Promise<void> {
+    await rm(path.join(root, projectId), { recursive: true, force: true });
+  }
+
+  /** V2-T32: `git rev-parse HEAD` — `null` when the workspace has no commits yet (D-025), same
+   * "absence, not corruption" reading every other `null` on this port already carries. */
+  async currentCommit(root: string): Promise<string | null> {
+    const result = await runGit(root, ['rev-parse', 'HEAD']);
+    if (!result.ran) {
+      throw new Error(`git rev-parse failed in workspace at "${root}": ${result.reason}`);
+    }
+    // Real git exit code 128 here means "unknown revision" — an empty repository, never a
+    // different kind of failure `rev-parse` reports this same way (D-025: the least-specific true
+    // reading of "HEAD doesn't resolve").
+    return result.exitCode === 0 ? result.stdout.trim() : null;
+  }
+
+  /** V2-T32: `git ls-files -- projectId` — the count of files tracked inside one project, scoped
+   * the same way every other project-scoped git call on this port already is. */
+  async countProjectFiles(root: string, projectId: string): Promise<number> {
+    const result = await runGit(root, ['ls-files', '--', projectId]);
+    if (!result.ran || result.exitCode !== 0) {
+      throw new Error(
+        `git ls-files failed in workspace at "${root}": ` +
+          `${result.ran ? `exit ${result.exitCode}` : result.reason}`,
+      );
+    }
+    return result.stdout.split('\n').filter((line) => line.trim().length > 0).length;
+  }
+
+  findSessionCommits(
+    root: string,
+    projectId: string,
+    sessionId: string,
+  ): Promise<readonly RevertCommitInfo[]> {
+    return findSessionCommits(root, projectId, sessionId);
+  }
+
+  findCommitsAfter(
+    root: string,
+    projectId: string,
+    afterCommit: string,
+  ): Promise<readonly RevertCommitInfo[]> {
+    return findCommitsAfter(root, projectId, afterCommit);
+  }
+
+  revertCommits(
+    root: string,
+    projectId: string,
+    commitsNewestFirst: readonly string[],
+    message: string,
+  ): Promise<RevertExecutionOutcome> {
+    void projectId; // `commitsNewestFirst` already came from THIS project's own history.
+    return revertCommitSequence(root, commitsNewestFirst, message);
   }
 }
