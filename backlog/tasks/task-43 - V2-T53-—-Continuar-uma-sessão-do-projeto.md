@@ -4,6 +4,7 @@ title: V2-T53 — Continuar uma sessão do projeto
 status: To Do
 assignee: []
 created_date: '2026-09-25 11:12'
+updated_date: '2026-09-25 13:35'
 labels: []
 milestone: m-0
 dependencies: []
@@ -36,3 +37,13 @@ porque duas perguntas precisam de resposta antes:
 **O que o uso real deve responder:** nos próximos dias, trabalhando com `open`, o mantenedor sentiu
 falta de algo que só uma sessão anterior tinha? De qual sessão, e para quê?
 <!-- SECTION:DESCRIPTION:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-25 13:35
+---
+Ligação em 2026-09-25: a primeira pergunta desta tarefa (como identificar a sessão certa entre muitas com o mesmo nome) passa a ter duas respostas concretas em outras tarefas — V2-T55 (id explícito sem a janela de 12 h, agrupamento por diretório, modal com id/estado/data, busca por id) e V2-T56 (nome e descrição dados pela pessoa, ideia dela). Esta tarefa continua em descoberta para a segunda pergunta (vale continuar a sessão adotada?).
+---
+<!-- COMMENTS:END -->
