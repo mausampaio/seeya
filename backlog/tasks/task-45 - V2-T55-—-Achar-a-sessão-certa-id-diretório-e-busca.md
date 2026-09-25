@@ -4,6 +4,7 @@ title: 'V2-T55 — Achar a sessão certa: id, diretório e busca'
 status: To Do
 assignee: []
 created_date: '2026-09-25 13:35'
+updated_date: '2026-09-25 13:40'
 labels: []
 milestone: m-2
 dependencies: []
@@ -56,3 +57,13 @@ módulos próprios); nenhuma sessão real do mantenedor retomada; nada no `~/.se
 só o id; na janela, achar uma sessão pelo id na busca, abrir o modal de um diretório e ver as sessões
 com id, estado e data.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-25 13:40
+---
+Acréscimo do PO em 2026-09-25, a partir de outro uso do mantenedor no Ubuntu: a mesma sessão aparecia como '<diretório>-<código>' enquanto aberta e só como '<diretório>' depois do exit. Causa: o nome com código é o que o próprio Claude Code grava no registro de sessões vivas (nameSource derived, adapters/discovery); fechada, o registro some e o seeya deriva o nome do diretório (deriveNameFromCwd). Item 5 desta tarefa: em todo lugar que lista sessão — lateral, modal, painel Hoje — o id curto (application/session-id-display.ts, o mesmo do seeya sessions) aparece SEMPRE ao lado do nome, aberta ou fechada; é o que identifica a sessão de verdade. Guardar o nome do Claude Code visto em vida fica de fora (arquivo novo em disco para um nome que não é da pessoa); o nome dado pela pessoa é a V2-T56.
+---
+<!-- COMMENTS:END -->
