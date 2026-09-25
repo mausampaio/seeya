@@ -188,6 +188,15 @@ body {
   height: 28px;
 }
 
+/* Maintainer acceptance, 2026-09-25: the discoverable sidebar toggle — same size as the other
+ * toolbar buttons, always visible (open or collapsed), to the left of "+". The 20px side-strip
+ * toggle (#sidebar-collapse-toggle above) stays as a secondary shortcut, not replaced. */
+#sidebar-toggle-button {
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+}
+
 #tab-strip {
   display: flex;
   gap: 4px;
