@@ -396,6 +396,9 @@ aqui antes de entrar no código.**
 | modal de sessões de um diretório (V2-T55 item 3) | `electron/other-sessions-dir-dialog-view.ts` — abre ao clicar uma linha de `#other-sessions-list` (`.other-sessions-dir-row`), lista via `electron/session-row-view.ts#renderSessionActionRow` (nome, id curto **copiável**, rótulo de estado, última atividade, **Adopt…**) — o MESMO row shape/markup que o resultado da busca por id usa, nunca duas renderizações para o mesmo fato; `refreshOtherSessionsDirDialog` mantém o modal aberto atualizado a cada `projectsUpdate` |
 | id curto ao lado do nome, sempre (V2-T55 item 5) | `ProjectPanelSessionRow.displaySessionId`/`TodaySessionRow.displaySessionId` — o mesmo `application/session-id-display.ts#computeDisplaySessionIds` que `seeya sessions` já usa, agora também na lateral, no modal e no painel Hoje, aberta ou fechada a sessão (antes, só a CLI mostrava) |
 | campo de busca por id (V2-T55 item 4) | `electron/session-search-view.ts` (o campo, `#session-search-form`) + `electron/session-search-ipc.ts` (o handler, canal `findSessionById`) — aceita id inteiro ou prefixo, nunca nome/`cwd` (é um campo dedicado, D-024); `state/session-search.ts#buildSessionSearchRows` classifica frescamente (`classifyState`) o que `findSessionByIdOrPrefix` achar pela busca direta, escopando ids curtos só ao lote do resultado (nunca ao lote inteiro da lateral) |
+| rótulo de diretório encurtado (aceite do mantenedor da V2-T55, correção 1) | `sidebar/directory-label.ts#shortenDirectoryPath(path, maxLength?)` — pura, testada em Windows e POSIX: mostra o FIM do caminho (a parte que distingue um diretório do outro) com reticência à esquerda quando não cabe em `maxLength` caracteres (padrão 32); o caminho inteiro sempre vai para o `title` da linha (`electron/projects-list-view.ts`), nunca perdido. Backstop em CSS: `#sidebar-content { overflow-x: hidden }` — a lateral nunca ganha barra de rolagem horizontal, mesmo se este número um dia ficar errado para a fonte/zoom de alguém |
+| lateral redimensionável (aceite do mantenedor da V2-T55, correção 2) | `state/sidebar-width.ts` (`parseSidebarWidthPreference`/`encodeSidebarWidthPreference`/`clampSidebarWidth`, puras, mesmo padrão de leitura protegida de `state/sidebar-collapse.ts` — ausência, valor malformado ou `localStorage` lançando → largura padrão) — `localStorage` do renderer, chave **`seeya.sidebarWidth`**, valor a largura em px, sempre dentro de `[MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH]`. `electron/sidebar-resize-view.ts#wireSidebarResize` é a fiação: a borda arrastável `#sidebar-resize-handle` (escondida quando a lateral está recolhida) grava a largura como a custom property CSS `--sidebar-width` (nunca `style.width` direto — a regra `#sidebar.collapsed { width: auto }` já vence por especificidade, então recolher continua funcionando mesmo com uma largura arrastada gravada). O terminal se reajusta sozinho: o mesmo `ResizeObserver` de `#terminal-host` da V2-T30/V2-T48 item 6 já cobre qualquer mudança de tamanho de `#main`, arrasto incluído |
+| foco devolvido ao terminal ao fechar um diálogo (aceite do mantenedor da V2-T55, correção 3) | `electron/dialog-focus-return.ts` — mecanismo único, reusado por todo `<dialog>` da janela (nunca um remendo por diálogo): um listener no evento nativo `close` de CADA `<dialog>` já presente no `index.html` (disparado em toda forma de fechar — `.close()`, Esc, um `<form method="dialog">`), que chama de volta a função registrada por `renderer.ts#registerActiveTerminalFocuser` na inicialização (o próprio `renderer.ts`, dono de `openTabs`, é quem sabe qual aba está visível — este módulo nunca importa `renderer.ts` de volta, evitaria um ciclo, já que `renderer.ts` chega até aqui pela cadeia `project-panel-view.ts`). Sem aba aberta, o foco fica onde já estava (D-025, nunca adivinha). Item complementar: adotar a partir do modal de diretório agora fecha aquele modal antes de abrir o seletor de projeto da adoção (`electron/adopt-flow-view.ts`, `other-sessions-dir-dialog-view.ts#closeOtherSessionsDirDialog`, exportada só para isso) |
 | sessão descoberta | `DiscoveredSession` |
 | sessão com PID / sem PID | `SessionWithPid` / `SessionWithoutPid` |
 | estado da sessão | `SessionState` |
@@ -550,11 +553,18 @@ primeira linha de diretório de "Other sessions", para provar que o modal abre c
 nome, id curto, rótulo de estado, última atividade, **Adopt…**), `SEEYA_APP_AUTO_SEARCH_SESSION_ID`
 (V2-T55 item 4: única destas variáveis que carrega um VALOR, não só `'1'` — o id ou prefixo a
 digitar no campo de busca; envia o formulário e prova um resultado real, inclusive de uma sessão
-fora de `relevanceHours`) e `SEEYA_APP_AUTO_DECLINE_DAEMON_OWNERSHIP_TRANSITION` (dispensa
+fora de `relevanceHours`), `SEEYA_APP_AUTO_RESIZE_SIDEBAR` (aceite do mantenedor da V2-T55,
+correção 2: dispara uma sequência real de eventos de ponteiro — `pointerdown`/`pointermove`/
+`pointerup` — na borda arrastável `#sidebar-resize-handle`, exercitando de verdade os listeners de
+arrasto em vez de só trocar a custom property CSS diretamente), `SEEYA_APP_AUTO_DECLINE_DAEMON_OWNERSHIP_TRANSITION` (dispensa
 defensivamente o diálogo de transição de posse do daemon — que aparece sempre que a máquina que
 roda a verificação já tem o `seeya` instalado de verdade, sem relação nenhuma com a tarefa sendo
 provada — antes de qualquer uma das duas capturas acima; as duas também a dispensam sozinhas,
-como parte do próprio clique) —
+como parte do próprio clique) e `SEEYA_APP_AUTO_VERIFY_DIALOG_FOCUS_RETURN_PATH` (aceite do
+mantenedor da V2-T55, correção 3: abre e fecha o diálogo real de **Settings…** — combinada com
+`SEEYA_APP_AUTO_OPEN_SHELL_TAB=1`, que já abre uma aba real antes — e grava, no arquivo indicado,
+se o foco voltou para o terminal da aba ativa; uma captura de tela não mostraria estado de foco
+nenhum, então esta grava o fato em vez de uma imagem) —
 mesma categoria de `SEEYA_DAEMON_CHILD`
 acima (nunca vão para disco, ninguém digita), mas nenhuma delas é lida por `npm run app` nem
 documentada no `README.md`: existem só para um agente sem tela/teclado próprios provar a janela

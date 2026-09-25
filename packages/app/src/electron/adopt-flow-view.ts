@@ -9,6 +9,7 @@ import { MESSAGES } from '../text/messages.js';
 import { reduceAdoptPanel, type AdoptPanelState } from '../state/adopt-panel.js';
 import { resolveChosenAdoptProjectId } from '../state/adopt-picker.js';
 import { getLatestProjectsPanelData, triggerProjectOpen } from './projects-list-view.js';
+import { closeOtherSessionsDirDialog } from './other-sessions-dir-dialog-view.js';
 import type {
   AnswerAdoptionCommitConfirmRequest,
   AnswerAdoptionLaunchConfirmRequest,
@@ -164,6 +165,12 @@ export function wireAdoptFlow(): void {
         sessionId !== undefined &&
         sessionName !== undefined
       ) {
+        // PO acceptance correction 3 (2026-09-25): starting an adoption from INSIDE the directory
+        // modal closes it first, so the picker never opens stacked on top of an already-open
+        // dialog. `session-search-result` has no modal of its own to close.
+        if (containerId === 'other-sessions-dir-dialog-sessions') {
+          closeOtherSessionsDirDialog();
+        }
         apply(reduceAdoptPanel(state, { kind: 'pickerOpened', sessionId, sessionName }));
       }
     });

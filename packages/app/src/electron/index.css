@@ -34,8 +34,14 @@ body {
   height: 100vh;
 }
 
+/* PO acceptance of V2-T55, correction 2 (2026-09-25): the width is a CSS custom property, not a
+ * plain `width` declaration, on purpose — `electron/sidebar-resize-view.ts` sets
+ * `--sidebar-width` while dragging, and the fallback below (`260px`) is what a first-ever launch
+ * (nothing in localStorage yet) uses. A custom property set inline still loses to a MORE SPECIFIC
+ * selector in the cascade, which is exactly what keeps `#sidebar.collapsed` (below) winning
+ * regardless of whatever width was last dragged. */
 #sidebar {
-  width: 260px;
+  width: var(--sidebar-width, 260px);
   flex: none;
   display: flex;
   border-right: 1px solid #333;
@@ -44,9 +50,29 @@ body {
 
 /* V2-T30 item 2: recolhida — the toggle button stays, everything else collapses to zero width so
  * #main (the terminal) takes the freed space. The button itself never disappears (the task's own
- * "um botão sempre visível alterna entre aberta e recolhida"). */
+ * "um botão sempre visível alterna entre aberta e recolhida"). Higher specificity than #sidebar
+ * above (id + class beats id alone), so this always wins over --sidebar-width while collapsed. */
 #sidebar.collapsed {
   width: auto;
+}
+
+/* PO acceptance of V2-T55, correction 2 — the draggable border between the sidebar and the tab
+ * area. Hidden while collapsed (adjacent-sibling selector below): dragging a collapsed sidebar
+ * makes no sense, and the handle would otherwise sit awkwardly against the 20px collapse strip. */
+#sidebar-resize-handle {
+  flex: none;
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+}
+
+#sidebar-resize-handle:hover,
+#sidebar-resize-handle.dragging {
+  background: #4a90d9;
+}
+
+#sidebar.collapsed + #sidebar-resize-handle {
+  display: none;
 }
 
 #sidebar-collapse-toggle {
@@ -64,6 +90,12 @@ body {
   flex: 1;
   min-width: 0;
   overflow-y: auto;
+  /* PO acceptance of V2-T55, correction 1 (2026-09-25): "a lateral nunca rola na horizontal" —
+   * the same rule V2-T30/V2-T48 item 6 already gives the whole document (line 24 above), one
+   * level down. Without an explicit `overflow-x`, setting `overflow-y: auto` alone makes the UA
+   * compute `overflow-x` as `auto` too (a CSS overflow-spec quirk) — this is what actually turned
+   * a long unwrapped path into a real horizontal scrollbar instead of just visually overflowing. */
+  overflow-x: hidden;
   padding: 8px;
   box-sizing: border-box;
 }
@@ -152,8 +184,29 @@ body {
   border-bottom: 1px solid #333;
 }
 
-#other-sessions-list li span {
+/* PO acceptance of V2-T55, correction 1 (2026-09-25): a long, unbroken path (no whitespace for
+ * the browser to wrap at) forced this row past the sidebar's own width — same class of bug V2-T48
+ * item 2 already fixed once for the autostart line, below. `min-width: 0` lets this flex item
+ * actually shrink instead of insisting on its content's natural (unwrapped) width; `shortenDirectoryPath`
+ * (`sidebar/directory-label.ts`) already keeps the STRING itself short, this is the backstop for
+ * whatever it doesn't cover (a very narrow window, an unusual font). */
+.other-sessions-dir-row {
+  width: 100%;
+  min-width: 0;
+  text-align: left;
   overflow-wrap: anywhere;
+}
+
+.session-action-row {
+  overflow-wrap: anywhere;
+}
+
+.session-id-copy {
+  font-size: 11px;
+}
+
+.session-last-activity {
+  color: #a0a0a0;
 }
 
 .adopt-button {

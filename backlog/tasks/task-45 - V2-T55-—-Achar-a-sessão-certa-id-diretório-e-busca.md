@@ -4,7 +4,7 @@ title: 'V2-T55 — Achar a sessão certa: id, diretório e busca'
 status: Review
 assignee: []
 created_date: '2026-09-25 13:35'
-updated_date: '2026-09-25 18:20'
+updated_date: '2026-09-25 18:45'
 labels: []
 milestone: m-2
 dependencies: []
@@ -212,5 +212,31 @@ author: PO
 created: 2026-09-25 18:20
 ---
 Aceite do mantenedor em 2026-09-25 (Ubuntu, .deb de 1225753): a busca por id funcionou bem — aceita. Agrupamento por diretório e modal com Adopt funcionaram, com três achados devolvidos ao agente: o rótulo do diretório estica a lateral e cria barra horizontal (vira: fim do caminho com reticências, caminho inteiro no tooltip, lateral nunca rola na horizontal); a lateral não redimensiona (vira: borda arrastável com a largura lembrada, pedido dele); depois de adotar pelo modal, o modal das sessões fica aberto e fechar não devolve o foco ao terminal (vira: iniciar a adoção fecha o modal, e todo diálogo devolve o foco à aba ativa).
+---
+
+author: dev
+created: 2026-09-25 18:45
+---
+Correções do aceite do mantenedor (Ubuntu, .deb de 1225753), 2026-09-25 — a busca por id foi aceita sem queixas; três correções na lateral, mesma branch (`tarefa/V2-T55-achar-sessao`), `git merge origin/main` feito antes (trouxe a revisão do PO, Q-098 resolvida, V2-T57 especificada).
+
+**1. Rótulo de diretório estourava a largura da lateral (barra de rolagem horizontal).** `sidebar/directory-label.ts#shortenDirectoryPath(path, maxLength?)` — pura, testada (Windows, POSIX, caminho curto que cabe inteiro, caminho sem separador, limite exato, `maxLength` customizado): mostra o FIM do caminho com reticência à esquerda; o caminho inteiro vai para o `title` (tooltip). Causa raiz real, não só cosmética: `.other-sessions-dir-row` (um `<button>` dentro de um `<li>` flex) não tinha `min-width: 0`/`overflow-wrap`, então um caminho sem espaço (só `\`) virava uma "palavra" única que forçava a largura — mesma classe de bug que a V2-T48 item 2 já corrigiu uma vez para outra linha. `#sidebar-content` ganhou `overflow-x: hidden` explícito como backstop — sem ele, `overflow-y: auto` sozinho já fazia o UA computar `overflow-x: auto` também (peculiaridade da spec de overflow), o que de fato virava a barra relatada.
+
+**2. Lateral redimensionável.** `state/sidebar-width.ts` (`parseSidebarWidthPreference`/`encodeSidebarWidthPreference`/`clampSidebarWidth`, puras, mesmo padrão de leitura protegida de `state/sidebar-collapse.ts`) — `localStorage`, chave `seeya.sidebarWidth`, glossário atualizado ANTES do código. `electron/sidebar-resize-view.ts#wireSidebarResize` arrasta `#sidebar-resize-handle` (nova borda entre a lateral e as abas, escondida quando recolhida) e grava a largura como a custom property CSS `--sidebar-width` — nunca `style.width` direto, para que `#sidebar.collapsed { width: auto }` continue vencendo por especificidade mesmo com uma largura arrastada gravada. O terminal se reajusta sozinho pelo `ResizeObserver` que a V2-T30/V2-T48 item 6 já tem em `#terminal-host`; nenhum código novo para isso.
+
+**3. Foco depois de fechar um diálogo.** `electron/dialog-focus-return.ts` — mecanismo único: um listener no evento nativo `close` de TODO `<dialog>` já presente no `index.html`, que devolve o foco à aba ativa via uma função registrada por `renderer.ts` na inicialização (só `renderer.ts` conhece `openTabs`; o módulo nunca importa `renderer.ts` de volta — evitaria um ciclo, já que `renderer.ts` chega até ele pela cadeia `project-panel-view.ts`). Sem aba aberta, o foco fica onde já estava (D-025). Complementar: adotar a partir do modal de diretório agora fecha aquele modal antes de abrir o seletor de projeto (`other-sessions-dir-dialog-view.ts#closeOtherSessionsDirDialog`, exportada só para isso).
+
+**Verificação real na janela** — build via `node scripts/build.mjs` (nunca `--dev`), `electron.exe` lançado manualmente com `SEEYA_APP_HOME_OVERRIDE` descartável, nunca `npm run app`:
+- Captura com um diretório de caminho bem comprido: linha mostra `…do-mesmo-de-verdade\pasta-final (1 session)`, sem barra de rolagem horizontal — a lateral inteira renderiza dentro da própria largura.
+- Captura da lateral redimensionada: arrasto real simulado via sequência de `PointerEvent` (`pointerdown`/`pointermove`/`pointerup`, nova instrumentação `SEEYA_APP_AUTO_RESIZE_SIDEBAR`, exercitando os listeners de verdade, não só a custom property) — a lateral ficou visivelmente mais larga, linhas que antes quebravam em duas ficaram numa só.
+- Foco: nova instrumentação `SEEYA_APP_AUTO_VERIFY_DIALOG_FOCUS_RETURN_PATH` (abre uma aba real, abre e fecha o diálogo real de Settings…, grava o resultado num JSON em vez de uma captura — foco não é visível numa imagem) — resultado: `{"focusReturnedToTerminal":true}`.
+
+**Conferência pós-janela (cinco lançamentos nesta rodada):**
+- `~/.seeya` real: nenhum arquivo com mtime dentro da janela de teste desta rodada; `protocol-handler.json` real seguiu com mtime de antes desta sessão.
+- `~/.claude` real: não lido nem escrito (só a fixture descartável, reaproveitada e estendida com um diretório de caminho comprido).
+- **`HKCU\Software\Classes\seeya-dev`: continua tocado** — mesmo estado documentado na entrega original (aponta para o `electron.exe`/`main.js` desta worktree, que some quando ela for recolhida). Nenhuma mudança de comportamento aqui — é exatamente o que a V2-T57 (ainda não implementada) vai isolar; nenhum processo `electron.exe` ficou pendurado depois dos cinco lançamentos.
+
+**Portão:** `npm run verificar` verde; repetido com `GIT_CONFIG_GLOBAL`/`GIT_CONFIG_NOSYSTEM=1` (simula CI sem identidade): também verde. Commit único (`fix(app): three PO-acceptance corrections...`) na mesma branch, depois do merge de `origin/main`.
+
+Notas de implementação da tarefa não foram reescritas — este comentário é o registro das três correções.
 ---
 <!-- COMMENTS:END -->
