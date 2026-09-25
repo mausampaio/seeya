@@ -4,7 +4,7 @@ title: 'V2-T34 — Fundação da D-047: as guardas'
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-25 19:29'
+updated_date: '2026-09-25 21:51'
 labels:
   - fundacao
   - d-047
@@ -318,5 +318,23 @@ author: PO
 created: 2026-09-25 19:29
 ---
 Revisão do PO em 2026-09-25, rodada urgente (defeito de produção achado pelo mantenedor no uso real): aceita. Causa confirmada — os ganchos testavam a existência do verificador pelo caminho DENTRO do app.asar, que o shell não enxerga; na instalação real, todo commit do espaço de trabalho era recusado e todo Bash das sessões de projeto bloqueado; no aceite, uma adoção real ficou sem commit (motivo engolido: stderr descartado), com o lock preso (sem finally) e a janela recusando o open por falta do diálogo da sobra. Corrigido com teste de regressão em cada item: checagem que para no .asar (execução real nos dois ganchos), stderr no erro do commit, try/finally no lock de todos os fluxos, commitFailed explícito na CLI e na janela, e o diálogo da sobra na janela. Conflito de código com a correção da V2-T55 em adopt-flow-view.ts resolvido pelo PO (dois imports, ambos necessários). Portão verde no po-gate (2812 testes), também sem identidade global do git. A lição do .asar entrou na armadilha da CLI instalada em docs/FLUXO-DE-AGENTES.md.
+---
+
+author: Claude (agente)
+created: 2026-09-25 21:51
+---
+Defeito de producao (2026-09-25), achado pelo mantenedor logo depois da correcao do asar ("agora o motivo aparece"): `core/workspace-commit-guard.ts#decideSessionConflict` so aceitava um commit quando `CLAUDE_CODE_SESSION_ID` do ambiente era IGUAL ao `sessionId` gravado no lock. Todo commit que o proprio seeya faz segurando o lock do projeto — a sobra do `open`, o commit da adocao, `remove`, `remove-repo`, `revert-adoption` — nunca roda dentro de uma sessao cujo env bate com o lock (o `sessionId` do lock e um id recem-gerado para uma sessao que ainda nem comecou, ou esta ausente), e um lock com `sessionId` ausente nunca "batia" com um `currentSessionId` tambem ausente (`undefined !== undefined`, D-025 cortando do jeito errado). Estava escondido porque o defeito do asar recusava tudo antes de chegar a esta checagem.
+
+Correcao:
+
+1. **`core/lock-holder-process.ts#LockHolderProcess`** (`{ pid, procStart }`, mesmo par que o `.seeya-lock` ja grava) — uma SEGUNDA forma de autorizacao em `decideSessionConflict`: aceita quando `currentProcess` bate com `pid`/`procStart` do lock, mesmo sem sessao em comum. Carregada pelas duas pontas do processo `git commit` por `SEEYA_LOCK_HOLDER_PID`/`SEEYA_LOCK_HOLDER_PROC_START` (`adapters/workspace/lock-holder-env.ts`, mesmo padrao de `DAEMON_CHILD_ENV_VAR` — a constante mora com quem escreve o env real, a CLI le pelo subcaminho publico). `commitAll`/`revertCommits` ganharam `lockHolder?` opcional; `project-open.ts` (sobra do `open`), `project-adopt.ts`, `project-remove.ts`, `project-remove-repo.ts` e `project-revert-adoption.ts` passam o proprio `deps.pid`/`deps.procStart`.
+
+2. **Trailer ja escrito vale como esta**: `decideTrailers` (`trustExistingSessionTrailer`) aceita um `Seeya-Session-Id` ja presente na mensagem sem recomputar contra o `sessionId` do lock quando autorizado por processo — sem isso, a sobra do `open` (trailer deliberadamente `unknown`, D-025) seria recusada por "contradizer" o `launchedSessionId` do lock.
+
+3. **Onde este guarda-corpo termina**: as duas variaveis podem ser forjadas por quem rodar um processo com o pid/procStart certos — cobre o descuido, nao o contorno deliberado, o mesmo limite ja documentado para `CLAUDE_CODE_SESSION_ID` forjada.
+
+4. **Testes com o gancho instalado de verdade**: `tests/integration/workspace/commit-msg-hook.test.ts`'s own "same-process lock-holder authorization" — os cinco fluxos, gancho real, CLI compilada real, sem `CLAUDE_CODE_SESSION_ID` no ambiente e com uma OUTRA sessao no ambiente, todos aceitos; o caso proibido (outra sessao viva, processo errado) continua recusado. **Achado medido ao escrever o teste**: `removeProject` NUNCA precisou desta autorizacao — `removeProjectDirectory` apaga o diretorio do projeto (e o `.seeya-lock` que mora dentro) ANTES do commit, entao o gancho ja ve `lock === null` e cai no mesmo caminho de `createProject`/`addRepository`.
+
+`npm run verificar` verde (exit 0). Rodei tambem `GIT_CONFIG_GLOBAL=<arquivo vazio> GIT_CONFIG_NOSYSTEM=1 npm test` (276 arquivos, 2840 testes, 4 pulados, exit 0) — nada na suite depende da identidade git real da maquina. `~/.seeya` real, o espaco de trabalho real e o registro do Windows conferidos ao final: inalterados. Nenhuma sessao Claude real foi usada nesta rodada — a fixture necessaria (repositorio git descartavel + `.seeya-lock` escrito a mao) provou o mecanismo sem precisar de uma sessao de verdade.
 ---
 <!-- COMMENTS:END -->

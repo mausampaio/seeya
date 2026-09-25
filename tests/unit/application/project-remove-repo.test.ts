@@ -155,6 +155,9 @@ describe('removeRepository', () => {
     expect(workspace.commitMessages.at(-1)).toContain(
       'Remove repository app-api from project auth-hardening',
     );
+    // V2-T34 hotfix (PO review, 2026-09-25): same same-process authorization every other
+    // lock-holding commit needs.
+    expect(workspace.commitAllLockHolders.at(-1)).toEqual({ pid: THIS_PID, procStart: undefined });
   });
 
   it('releases the lock even when the removal commit throws (V2-T34 production defect, PO review 2026-09-25)', async () => {

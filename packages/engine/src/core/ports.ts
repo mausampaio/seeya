@@ -28,6 +28,7 @@ import type {
   SessionFacts,
 } from './types.js';
 import type { AuditableCommit } from './project-audit.js';
+import type { LockHolderProcess } from './lock-holder-process.js';
 
 /**
  * The project's single source of "now" (D-019). Implemented in `adapters/clock/`. No other
@@ -1170,8 +1171,23 @@ export interface WorkspaceRepository {
    * made reverting one project's commits also undo the other's). `message` arrives fully built —
    * `core/project-commit.ts#buildProjectCommitMessage` already folded in both D-047 item 4
    * trailers — so this method's only job is to run git, never to assemble trailer text itself.
+   *
+   * `lockHolder` (V2-T34 hotfix, PO review 2026-09-25): supplied by every caller that's committing
+   * WHILE holding the touched project's own lock (`application/project-open.ts`'s own
+   * leftover-changes commit, `project-adopt.ts`, `project-remove.ts`, `project-remove-repo.ts` —
+   * their own `deps.pid`/`deps.procStart`, the SAME pair each already wrote into `.seeya-lock`).
+   * Folded into the spawned `git commit`'s own environment
+   * (`adapters/workspace/lock-holder-env.ts#buildLockHolderEnv`) so the workspace's own commit-msg
+   * hook can authorize it without a matching `CLAUDE_CODE_SESSION_ID` — `core/
+   * workspace-commit-guard.ts`'s own docstring has the full reasoning for why session id alone
+   * can't. `undefined` for `createProject`/`addRepository`, which never take a lock at all.
    */
-  commitAll(root: string, projectId: string, message: string): Promise<void>;
+  commitAll(
+    root: string,
+    projectId: string,
+    message: string,
+    lockHolder?: LockHolderProcess,
+  ): Promise<void>;
 
   /**
    * D-022's "both sides", for the workspace's own collection of projects: every immediate
@@ -1270,12 +1286,16 @@ export interface WorkspaceRepository {
    * sequential revert is the expected case; `failed` is the safety net for the unexpected one.
    * `noChanges` is the rarer edge case where the reverts cancel out to a net-zero diff against
    * `HEAD` (same "no-op, not an empty commit" contract `commitAll` already has).
+   *
+   * `lockHolder` (V2-T34 hotfix): same meaning and same caller obligation as `commitAll`'s own —
+   * `application/project-revert-adoption.ts`'s own `deps.pid`/`deps.procStart`.
    */
   revertCommits(
     root: string,
     projectId: string,
     commitsNewestFirst: readonly string[],
     message: string,
+    lockHolder?: LockHolderProcess,
   ): Promise<RevertExecutionOutcome>;
 
   /**

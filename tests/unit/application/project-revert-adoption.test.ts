@@ -305,6 +305,12 @@ describe('revertAdoption', () => {
       expect(workspace.revertCalls[0]?.message).toContain(
         `Revert adoption of session ${FORK_SESSION_ID} from project auth-hardening`,
       );
+      // V2-T34 hotfix (PO review, 2026-09-25): same same-process authorization every other
+      // lock-holding commit needs.
+      expect(workspace.revertCommitsLockHolders.at(-1)).toEqual({
+        pid: THIS_PID,
+        procStart: undefined,
+      });
     });
 
     it('deletes the copy WITHOUT asking when it never wrote after being adopted (unchanged)', async () => {

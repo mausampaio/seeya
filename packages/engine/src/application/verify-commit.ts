@@ -11,6 +11,7 @@ import type {
   ProjectLock,
   WorkspaceRepository,
 } from '../core/ports.js';
+import type { LockHolderProcess } from '../core/lock-holder-process.js';
 import type { CommitGuardLockFact } from '../core/workspace-commit-guard.js';
 import { decideCommitGuard } from '../core/workspace-commit-guard.js';
 import { distinctProjectDirs } from '../core/workspace-paths.js';
@@ -27,6 +28,12 @@ export interface VerifyCommitDeps {
    * other `project` subcommand already reads it as (`packages/cli/src/composition.ts
    * #readCurrentSessionId`). */
   readonly currentSessionId: string | undefined;
+  /** V2-T34 hotfix (PO review, 2026-09-25): `SEEYA_LOCK_HOLDER_PID`/`SEEYA_LOCK_HOLDER_PROC_START`
+   * (`adapters/workspace/lock-holder-env.ts#readLockHolderProcess`), read once at the composition
+   * root the same way `currentSessionId` above already is — `core/workspace-commit-guard.ts`'s own
+   * docstring on why session id alone can never authorize a commit `seeya` makes while holding the
+   * touched project's own lock. */
+  readonly currentProcess: LockHolderProcess | undefined;
 }
 
 export type VerifyCommitResult =
@@ -50,7 +57,13 @@ async function resolveLockFact(
     return null;
   }
   const isAlive = await deps.processControl.isAlive(lock.pid, lock.procStart);
-  return { sessionId: lock.sessionId, pid: lock.pid, isAlive, acquiredAt: lock.acquiredAt };
+  return {
+    sessionId: lock.sessionId,
+    pid: lock.pid,
+    procStart: lock.procStart,
+    isAlive,
+    acquiredAt: lock.acquiredAt,
+  };
 }
 
 /**
@@ -75,6 +88,7 @@ export async function verifyCommit(
     stagedFiles,
     rawMessage,
     currentSessionId: deps.currentSessionId,
+    currentProcess: deps.currentProcess,
     lock,
     lockFileName: deps.lockFileName,
   });

@@ -139,7 +139,12 @@ async function writeManifestWithoutRepository(
     projectId,
     deps.sessionId,
   );
-  await deps.workspace.commitAll(root, projectId, message);
+  // V2-T34 hotfix (PO review, 2026-09-25): same lock-holder authorization `project-remove.ts
+  // #finishRemoval` already needs, for the identical reason.
+  await deps.workspace.commitAll(root, projectId, message, {
+    pid: deps.pid,
+    procStart: deps.procStart,
+  });
 }
 
 /**

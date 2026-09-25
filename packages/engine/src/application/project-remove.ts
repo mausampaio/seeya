@@ -143,7 +143,14 @@ async function finishRemoval(
     projectId,
     deps.sessionId,
   );
-  await deps.workspace.commitAll(root, projectId, message);
+  // V2-T34 hotfix (PO review, 2026-09-25): this invocation holds the lock under `deps.sessionId`
+  // (`undefined` from a plain terminal — never matching `currentSessionId`'s own `undefined` by
+  // the guard's session check alone, D-025's "don't guess" cutting the wrong way there);
+  // `lockHolder` is how the hook recognizes this exact process instead.
+  await deps.workspace.commitAll(root, projectId, message, {
+    pid: deps.pid,
+    procStart: deps.procStart,
+  });
   const removedAdoptions = await dropProjectAdoptions(deps.storage, projectId);
   await releaseProjectLock(deps, root, projectId, deps.pid);
   return { kind: 'removed', projectId, fileCount, previousCommit, removedAdoptions };

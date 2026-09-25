@@ -19,7 +19,9 @@ import type {
 } from '../../core/ports.js';
 import type { AuditableCommit } from '../../core/project-audit.js';
 import type { ProjectManifest, ProjectSkeleton } from '../../core/types.js';
+import type { LockHolderProcess } from '../../core/lock-holder-process.js';
 import { runGit } from '../git/run-git.js';
+import { buildLockHolderEnv } from './lock-holder-env.js';
 import { writeFileAtomic } from '../storage/atomic-write.js';
 import { resolveSchemaVersion } from '../storage/schema-version.js';
 import { isEnoent } from './fs-errors.js';
@@ -243,7 +245,12 @@ export class FsWorkspaceRepository implements WorkspaceRepository {
     await writeManifestFile(root, projectId, manifest);
   }
 
-  async commitAll(root: string, projectId: string, message: string): Promise<void> {
+  async commitAll(
+    root: string,
+    projectId: string,
+    message: string,
+    lockHolder?: LockHolderProcess,
+  ): Promise<void> {
     // D-047 item 3's own bug fix: `git add <projectId> .gitignore`, never `-A` — a second
     // project's own pending change must never ride along on this commit (see this method's own
     // regression test, "commitAll only ever stages the one project it was called for").
@@ -264,9 +271,14 @@ export class FsWorkspaceRepository implements WorkspaceRepository {
     if (!diff.ran) {
       throw new Error(`git diff failed in workspace at "${root}": ${diff.reason}`);
     }
+    // V2-T34 hotfix (PO review, 2026-09-25): folds SEEYA_LOCK_HOLDER_PID/_PROC_START into the
+    // commit's own env when `lockHolder` is given, so the workspace's own commit-msg hook can
+    // authorize a commit `seeya` makes while holding this project's lock even though it never runs
+    // inside a Claude Code session whose CLAUDE_CODE_SESSION_ID matches the lock's own sessionId.
     const commit = await runGit(root, ['commit', '-m', message], {
       ...process.env,
       ...COMMIT_IDENTITY_ENV,
+      ...buildLockHolderEnv(lockHolder),
     });
     if (!commit.ran || commit.exitCode !== 0) {
       // V2-T34 production defect (PO review, 2026-09-25): the commit-msg hook's own refusal
@@ -409,9 +421,10 @@ export class FsWorkspaceRepository implements WorkspaceRepository {
     projectId: string,
     commitsNewestFirst: readonly string[],
     message: string,
+    lockHolder?: LockHolderProcess,
   ): Promise<RevertExecutionOutcome> {
     void projectId; // `commitsNewestFirst` already came from THIS project's own history.
-    return revertCommitSequence(root, commitsNewestFirst, message);
+    return revertCommitSequence(root, commitsNewestFirst, message, lockHolder);
   }
 
   /** V2-T34 item 1: `git diff --cached --name-only`, unscoped — every file staged for the NEXT

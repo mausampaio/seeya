@@ -501,6 +501,10 @@ describe('adoptSession', () => {
     const lastCommit = workspace.commitMessages.at(-1);
     expect(lastCommit).toContain(`Seeya-Session-Id: ${FORK_SESSION_ID}`);
     expect(lastCommit).not.toContain('Seeya-Session-Id: caller-session');
+    // V2-T34 hotfix (PO review, 2026-09-25): this commit is made while THIS adoption holds the
+    // project's own lock under `FORK_SESSION_ID`, never `caller-session` — the workspace's own
+    // commit-msg hook authorizes it via this process's own pid/procStart instead.
+    expect(workspace.commitAllLockHolders.at(-1)).toEqual({ pid: THIS_PID, procStart: undefined });
     // Promoted: dropped from forks.json (never deleted — deleteFork is never called for accept).
     expect(forkRegistration.isRegistered(FORK_SESSION_ID)).toBe(false);
     expect(forkCleanup.deletedSessionIds).toEqual([]);

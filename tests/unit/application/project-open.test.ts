@@ -559,6 +559,13 @@ describe('openProject', () => {
       expect(workspace.commitMessages.at(-1)).toContain(
         'Commit changes left uncommitted before opening auth-hardening',
       );
+      // V2-T34 hotfix (PO review, 2026-09-25): this commit is made while THIS attempt holds the
+      // project's own lock (under a freshly generated `launchedSessionId`, never matching any
+      // CLAUDE_CODE_SESSION_ID) — the workspace's own commit-msg hook authorizes it via this pair.
+      expect(workspace.commitAllLockHolders.at(-1)).toEqual({
+        pid: THIS_PID,
+        procStart: undefined,
+      });
     });
 
     it('releases the lock even when committing leftover changes throws (V2-T34 production defect, PO review 2026-09-25)', async () => {

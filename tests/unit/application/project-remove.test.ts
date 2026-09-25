@@ -171,6 +171,11 @@ describe('removeProject', () => {
     });
     expect(workspace.wasProjectDirRemoved('auth-hardening')).toBe(true);
     expect(workspace.commitMessages.at(-1)).toContain('Remove project auth-hardening');
+    // V2-T34 hotfix (PO review, 2026-09-25): from a plain terminal (no CLAUDE_CODE_SESSION_ID),
+    // the lock's own sessionId is undefined too — the workspace's own commit-msg hook authorizes
+    // this commit via this process's own pid/procStart, never a session-id match that would never
+    // happen here.
+    expect(workspace.commitAllLockHolders.at(-1)).toEqual({ pid: THIS_PID, procStart: undefined });
   });
 
   it('releases the lock even when the removal commit throws (V2-T34 production defect, PO review 2026-09-25)', async () => {
