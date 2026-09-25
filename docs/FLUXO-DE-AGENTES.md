@@ -82,6 +82,17 @@ aprovada. É o único que altera os documentos de autoridade.
 > é o que `os.homedir()` lê. Nunca suponha uma variável que você não achou num `grep`. E depois da
 > prova, confira que nada apareceu no home real.
 
+> **Armadilha da CLI instalada: ela roda sob o Electron, não sob o `node`.** Na instalação real, o
+> `seeya` que a pessoa digita é o próprio executável do app, com `ELECTRON_RUN_AS_NODE=1`
+> (Windows: `bin\seeya.cmd` → `seeya.exe`; Linux: `/usr/bin/seeya` → `/opt/seeya/seeya`). Então
+> `process.execPath` é o Electron, e qualquer coisa que o seeya grave para ser chamada depois — gancho
+> de git, gancho do harness, autostart — precisa levar a variável junto, senão o Electron abre o app
+> em vez de rodar o script. Os testes rodam a CLI com um `node` comum e **não pegam isto**: na V2-T34
+> (2026-09-25) o gancho de git gravado pela CLI teria aberto uma janela a cada commit, e só a revisão
+> achou. Quem grava um comando para ser executado depois testa o caso Electron também (a decisão
+> "estou sob Electron?" vira função pura testada nos dois lados), e nunca depende de `node` no PATH —
+> o Claude Code e o app podem existir numa máquina sem Node.
+
 > **Armadilha da janela de desenvolvimento: ela escreve no sistema real, não só no home.** Na
 > V2-T30 (2026-09-25), um agente rodou `node scripts/build.mjs --dev` para verificar a janela — esse
 > modo **sempre** abre uma janela de verdade, herdando o ambiente do shell. Por alguns segundos, ela
