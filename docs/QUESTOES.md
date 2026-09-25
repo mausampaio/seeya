@@ -9139,3 +9139,28 @@ original continua sendo a memória daquele diretório (V2-T29, decisão de 2026-
 medição o confirma — retomada de outro lugar perde exatamente isso; (3) qualquer "continuar sessão"
 que o seeya oferecer escolhe o diretório de propósito, sabendo o que ganha e o que perde (ver a
 tarefa de descoberta V2-T53).
+
+## Q-098 — "Parece um id de sessão": o critério que a V2-T55 teve que inventar
+
+**O que a tarefa deixou em aberto.** O item 1 diz que um id/prefixo, ao contrário de nome/`cwd`,
+ignora `relevanceHours` — mas não diz como distinguir "isto é um id" de "isto é um nome". A
+resolução de hoje (`cli/session-reference.ts#resolveSessionReference`) já trata `sessionId`,
+nome e `cwd` como um teste combinado, e só o `sessionId` usa prefixo; nome e `cwd` exigem
+igualdade exata. Ou seja: um valor que é PREFIXO de algo só pode fazer sentido como prefixo de
+`sessionId` — a ambiguidade real é bem mais estreita do que parecia à primeira vista.
+
+**A decisão tomada** (`core/session-id-shape.ts#looksLikeSessionIdReference`): um valor "parece um
+id" quando tem pelo menos 2 caracteres e só contém dígitos hexadecimais e hífens — nunca valida a
+posição dos hífens contra os limites de grupo de um UUID de verdade. Isto exclui todo `cwd` (tem
+separador de caminho) e quase todo nome derivado (`deriveNameFromCwd`'s own exemplo "code-6d" já
+tem uma letra fora de hex, `o`). Um nome que por acaso só use hex+hífen custa uma varredura extra
+(já sob demanda, nunca no ciclo de 10s) que não acha nada — nunca um casamento ERRADO, porque a
+varredura direta só casa por `sessionId` de verdade.
+
+**Por que decidi e segui, em vez de parar.** A alternativa — parar e esperar resposta — não tinha
+a quem perguntar dentro desta entrega (agente sem canal para o PO em tempo real); o critério
+escolhido é conservador (o pior caso é custo, nunca erro) e documentado no próprio código
+(`core/session-id-shape.ts`'s own docstring). Registro aqui para o PO revisar o critério, não para
+justificar tê-lo pulado — se houver um critério melhor (por exemplo, validar a posição dos hífens
+contra os cinco limites de grupo que `application/session-id-display.ts#UUID_GROUP_BOUNDARIES` já
+fixa), é troca pequena e isolada num módulo só.
