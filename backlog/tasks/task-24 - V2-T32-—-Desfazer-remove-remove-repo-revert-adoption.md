@@ -1,10 +1,10 @@
 ---
 id: TASK-24
 title: 'V2-T32 — Desfazer: remove, remove-repo, revert-adoption'
-status: To Do
+status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-23 10:46'
+updated_date: '2026-09-25 00:31'
 labels:
   - desfazer
   - d-047
@@ -78,3 +78,105 @@ que o comando imprime. E, com uma adoção de teste aceita, rodar `revert-adopti
 adoção somem do projeto, a sessão original volta a poder ser adotada, e a cópia só é apagada
 depois da pergunta.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+**Relatório do agente (branch `tarefa/V2-T32-desfazer`, worktree isolada, a partir da `main`/po-gate).**
+
+**Três comandos entregues, cada um com lock (D-047 item 8) e sem dependência nova.**
+
+1. **`seeya project remove <id>`** — `application/project-remove.ts#removeProject`. Toma o lock
+   do projeto (recusa se outra sessão viva o segura; toma e solta no fim, como o `open`), pede
+   confirmação com o nome e o número de arquivos rastreados (`WorkspaceRepository.countProjectFiles`,
+   `git ls-files` escopado), e, aceita, `WorkspaceRepository.removeProjectDirectory` (apaga o
+   diretório) + `commitAll` (nunca `-A`; `git add <projectId>` já registra a remoção, confirmado por
+   teste real). A saída sempre repete o `HEAD` de ANTES da remoção
+   (`WorkspaceRepository.currentCommit`) como linha de recuperação (`git checkout <commit> --
+   <projectId>`). Nunca apaga repositório associado, sessão ou transcript — nenhum vive dentro de
+   `root/projectId`. Item 7: tira de `adoptions.json` toda adoção do projeto removido (as originais
+   voltam a poder ser adotadas) e reporta quais eram; as cópias promovidas continuam intocadas.
+
+2. **`seeya project remove-repo <id> <nome>`** — `application/project-remove-repo.ts#removeRepository`.
+   Mesmo lock; sem confirmação (precedente do próprio `add-repo`: reversível pelo histórico do
+   espaço de trabalho). Tira o `AssociatedRepository` de `seeya.json` e commita; a entrada em
+   `repository-map.json` só sai se nenhum OUTRO projeto ainda usa a mesma `RepositoryIdentity`
+   (repositório sem remoto é sempre exclusivo do projeto que o registrou, sai sempre).
+
+3. **`seeya project revert-adoption <id> [<sessão>]`** — `application/project-revert-adoption.ts#revertAdoption`.
+
+   - **Acha os commits:** `WorkspaceRepository.findSessionCommits(root, projectId, forkSessionId)`
+     — `git log --grep` no trailer `Seeya-Session-Id` (D-047 item 4, escrito desde a V2-T33),
+     escopado ao projeto, mais antigo primeiro, cada um já com os arquivos que tocou
+     (`git show --name-only`, mesmo escopo). Nunca lê pelo `originalSessionId` — só a cópia
+     (o fork) commita, então só o trailer dela aparece.
+   - **Decide se pode reverter:** `core/project-revert.ts#planAdoptionRevert` (puro) — compara os
+     arquivos de TODOS os commits da sessão com os de TODO commit posterior
+     (`WorkspaceRepository.findCommitsAfter`, a partir do último commit da sessão). Havendo
+     interseção, recusa e nomeia o primeiro commit posterior que colide (`blocked`); senão, devolve
+     os hashes do mais novo para o mais antigo.
+   - **Reverte:** confirmação mostrando a lista de commits, depois `WorkspaceRepository.revertCommits`
+     — `git revert --no-commit` em sequência (mais novo → mais antigo) e UM commit final; qualquer
+     falha no meio aborta a sequência inteira (`git revert --abort`) e nada é commitado — "nunca
+     reverte pela metade" garantido tanto pelo pré-check quanto pela execução (testado com um
+     conflito real de `git revert`, não simulado).
+   - **A cópia adotada (item 6):** `ForkCleanup.checkForkActivity` (novo método do mesmo port,
+     `stat` do transcript por `sessionId`, sem tocar `forks.json` — a cópia promovida não está mais
+     lá) + `core/adopted-copy-growth.ts#decideAdoptedCopyGrowth` (puro): compara o `mtime` do
+     transcript com `adoptedAt`. **Não cresceu** (mtime ≤ adoptedAt): apaga sem perguntar
+     (`ForkCleanup.deleteFork`, a mesma exceção do D-012). **Cresceu**, ou o transcript sumiu
+     (`unknown` — D-025, nunca lido como "não cresceu"): pergunta, com resposta padrão "manter".
+   - **`<sessão>` opcional (item 5):** obrigatória só quando o projeto tem mais de uma adoção;
+     casa por id exato ou prefixo de `originalSessionId`/`forkSessionId`
+     (`core/adoption-registry.ts#selectProjectAdoption`) — **não** por nome/`cwd` (Q-095 explica
+     por quê: `adoptions.json` só guarda os dois ids).
+   - **Depois de reverter:** tira o registro de `adoptions.json` sempre (a original volta a poder
+     ser adotada), independente do destino da cópia.
+
+**Nomes novos, todos em memória — nenhum campo novo em disco.** `RevertCommitInfo`/
+`RevertExecutionOutcome`/`ForkActivityCheck` (`core/ports.ts`); `planAdoptionRevert`
+(`core/project-revert.ts`); `decideAdoptedCopyGrowth`/`AdoptedCopyGrowth`
+(`core/adopted-copy-growth.ts`); `selectProjectAdoption`/`AdoptionSelection`
+(`core/adoption-registry.ts`). Seis métodos novos em `WorkspaceRepository`
+(`removeProjectDirectory`/`currentCommit`/`countProjectFiles`/`findSessionCommits`/
+`findCommitsAfter`/`revertCommits`) e `ForkCleanup.checkForkActivity`. `adoptions.json`/
+`.seeya-lock`/`repository-map.json` continuam com o mesmo schema — nenhuma migração.
+
+**Q-095 registra duas escolhas mínimas** (nenhuma bloqueia, ambas já implementadas): (1) "diz
+quanto cresceu" virou "desde quando e qual o tamanho atual" via `mtime`, não um delta em bytes —
+`adoptions.json` nunca guardou um tamanho de referência e mudar o schema da V2-T29 para isso
+pareceu desproporcional a esta tarefa; (2) `revert-adoption` casa `<sessão>` só por id/prefixo,
+nunca por nome/`cwd` (que exigiria cruzar com a descoberta ao vivo e poderia não achar uma sessão
+original fora de `relevanceHours`).
+
+**Testes.** Pura (`core/`): `planAdoptionRevert`, `decideAdoptedCopyGrowth`, `selectProjectAdoption`
+— casos de fronteira explícitos. Adaptador (`git` real em `tmpdir`,
+`tests/integration/workspace/fs-workspace-repository.test.ts`): todo método novo, incluindo os dois
+formatos de falha do `run-git.ts` (`ran:true` com exit real e `ran:false` quando o `cwd` nem existe)
+e um `git revert` que falha de verdade (conflito real, não simulado) provando o abort. Aplicação
+(`application/project-remove.test.ts`/`project-remove-repo.test.ts`/`project-revert-adoption.test.ts`):
+lock recusa/reclama, confirmações (proceed/decline/unavailable), os quatro destinos da cópia
+adotada, remoção de adoções. CLI (`project-undo-command.test.ts`/`format-project-undo.test.ts`):
+fiação real com `readline` sobre `PassThrough`, duas perguntas em sequência sobre o mesmo reader.
+
+**Prova pela CLI (home descartável, nunca o `~/.seeya` real).** `USERPROFILE` apontado para um
+diretório temporário DENTRO da worktree (nunca `HOME`, que o sandbox bloqueou por injetar
+configuração de git) — `seeya project create`/`show`/`remove-repo` (repositório inexistente)/
+`revert-adoption` (sem adoção)/`remove` (sem terminal, recusa) rodaram contra um espaço de trabalho
+descartável de verdade, com git real, sem tocar `~/.seeya`. O caminho interativo completo (dizer
+"y" de verdade) já está coberto pelos testes de unidade com `isTTY: true`; este agente não tem um
+pseudo-terminal real para uma prova adicional (mesma lacuna de sempre, Q-069/Q-089/Q-090). Diretório
+descartável apagado ao final.
+
+**Conferência do `~/.seeya` real:** `adoptions.json` e `forks.json` continuam inexistentes;
+`~/.seeya/workspace` só tem o `teste-projeto` do aceite da V2-T28, sem nenhum comando `git` deste
+agente rodado contra ele (nenhuma verificação de `HEAD` por `git` foi feita — o sandbox recusa
+qualquer comando com `git -C`/`HOME` apontando para fora da worktree; a listagem de arquivos por si
+só já mostra que nada novo apareceu).
+
+**Portão:** `npm run verificar` passou inteiro (código de saída 0) — 239 arquivos de teste, 2534
+testes (4 pulados), cobertura: `core/` 99.33% linhas/98.26% branches, `application/` 99.87%,
+`adapters/workspace/` 93.29% linhas/81.69% branches (acima do piso de 80%, a única faixa que exigiu
+testes extras dos dois formatos de falha do `run-git.ts` para passar), `cli/src` 94.51%. Zero
+violação de camada (`dependencias`, 438 módulos).
+<!-- SECTION:NOTES:END -->
