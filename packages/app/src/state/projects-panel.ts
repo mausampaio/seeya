@@ -60,7 +60,9 @@ function toSessionRow(row: SidebarRow): ProjectPanelSessionRow {
   };
 }
 
-function formatLockText(status: ProjectLockStatus): string {
+/** Plain English for a `ProjectLockStatus` — exported so `state/project-open-result.ts` can show
+ * the SAME wording for "how it ended up" after a tab closes (never a second phrasing). */
+export function formatLockText(status: ProjectLockStatus): string {
   switch (status.kind) {
     case 'unlocked':
       return 'unlocked';
