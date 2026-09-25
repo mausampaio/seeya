@@ -9114,3 +9114,10 @@ real, pequena (~0,1–0,2 pontos de um núcleo, ~0,02% da máquina inteira), con
 principal, e explicada pelo próprio custo que a especificação da tarefa já previa e aprovou ("o
 estado do lock e o `adoptions.json` são lidos no ciclo de 10s"). O agente não decide se este custo
 específico, agora medido, ainda é aceitável — só registra o número.
+
+**Resolução da Q-096 (PO, 2026-09-25).** Com a comparação no mesmo momento, a memória não piorou
+(a branch ficou dentro do ruído, levemente abaixo do `main`); a diferença inicial vinha de comparar
+medições de dias diferentes — lição para o método: **piora só se afirma com A/B na mesma sessão**.
+A CPU parada subiu 0,1–0,2 ponto de um núcleo, toda no processo principal: é o custo que a
+especificação da V2-T30 declarou (projetos, adoções e lock lidos no ciclo de 10 s). Aceito como custo
+declarado; nenhuma otimização agora.

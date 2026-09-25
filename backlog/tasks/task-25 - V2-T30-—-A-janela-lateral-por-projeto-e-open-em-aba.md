@@ -4,7 +4,7 @@ title: 'V2-T30 — A janela: lateral por projeto e open em aba'
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-25 03:35'
+updated_date: '2026-09-25 03:41'
 labels: []
 milestone: m-0
 dependencies:
@@ -276,5 +276,11 @@ QUESTOES.md` (Q-096, seção "Reaberta").
 `npm run verificar` verde depois de tudo isso (96,40% statements geral, `core/` 99,33%, `app/src/
 state` 98,81%). Scripts de investigação do A/B (o `.mjs` e a variante do `.ps1`) não foram
 commitados — instrumentação de uma medição só, não ferramenta permanente.
+---
+
+author: PO
+created: 2026-09-25 03:41
+---
+Revisão do PO em 2026-09-25, segunda rodada: aceita. project-panel-view.ts dividido em cinco arquivos de fiação (o maior com 281 linhas) e a lógica que estava inline saiu para módulos testados; glossário com oito entradas novas; Q-096 refeita como A/B na mesma sessão — memória sem piora, CPU parada +0,1–0,2 ponto de um núcleo no processo principal, o custo declarado na especificação. renderer.ts/main.ts cresceram só 9 e 12 linhas de fiação; dividi-los virou a V2-T51. Portão verde no po-gate (2602 testes). Capturas da janela real conferidas. Falta o aceite do mantenedor.
 ---
 <!-- COMMENTS:END -->
