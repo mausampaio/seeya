@@ -10,6 +10,7 @@ import type { ProjectLockInfo } from '@seeya-ai/engine/core/project-lock.js';
 import {
   formatLockHolderDescription,
   formatProjectLockWarningLines,
+  renderLeftoverChangesLines,
   renderReadOnlyOpenQuestion,
 } from '@seeya-ai/engine/core/project-lock-message.js';
 import {
@@ -268,16 +269,19 @@ export function formatAuditCommandReport(outcome: AuditProjectOutcome): string {
 /** V2-T34 item 4: the question `open` asks when it just acquired the lock and found changes a
  * previous session left uncommitted — same shape as `renderReadOnlyOpenConfirmation` above, but
  * three-way (D-024): anything other than an explicit "c" or "p" is read as "no way to act on this
- * safely," same as no terminal at all (`parseLeftoverChangesAnswer`'s own docstring). */
+ * safely," same as no terminal at all (`parseLeftoverChangesAnswer`'s own docstring).
+ *
+ * **The lines moved to `core/project-lock-message.ts#renderLeftoverChangesLines`** (PO review,
+ * 2026-09-25 production defect) — this function now only joins them with `\n` and appends the
+ * `readline`-specific prompt suffix onto the last one, same split `renderReadOnlyOpenConfirmation`
+ * already has for the lock question. */
 export function renderLeftoverChangesConfirmation(changedFiles: readonly string[]): string {
-  const fileLines = changedFiles.map((file) => `  ${file}`).join('\n');
-  return (
-    `Project has ${changedFiles.length} change(s) left uncommitted by a previous session:\n` +
-    `${fileLines}\n` +
-    'Commit them now (attributed to an unidentified session), or continue without committing ' +
-    '(the new session will be told what is pending)? [c = commit now, p = proceed, ' +
-    'anything else cancels] '
-  );
+  const lines = renderLeftoverChangesLines(changedFiles);
+  const lastLine = lines[lines.length - 1] ?? '';
+  return [
+    ...lines.slice(0, -1),
+    `${lastLine} [c = commit now, p = proceed, anything else cancels] `,
+  ].join('\n');
 }
 
 /** `null` for anything that isn't exactly "c"/"commit" or "p"/"proceed" — `null` is not itself one
@@ -502,6 +506,18 @@ export function formatAdoptSessionReport(result: AdoptSessionResult): string {
         `Project "${result.projectId}": adopted. The fork (${result.forkSessionId}) is now this ` +
         `project's own session. Committed:\n${formatAdoptedChangedFiles(result.changedFiles)}\n` +
         `Continue the work with: seeya project open ${result.projectId}`
+      );
+    // V2-T34 production defect (PO review, 2026-09-25): the commit itself failed (most often the
+    // workspace's own git hook refusing it) — `result.reason` carries git's own stderr
+    // (`adapters/workspace/index.ts#commitAll`'s own fix, same PO review). Nothing was discarded:
+    // the fork (`${result.forkSessionId}`) stays registered as pending and its written files stay
+    // on disk, exactly like `confirmationUnavailable` above — a later "seeya project adopt" on the
+    // same original session finds the fork exactly as it was left.
+    case 'commitFailed':
+      return (
+        `seeya: project "${result.projectId}" — the fork (${result.forkSessionId}) wrote changes, ` +
+        `but committing them failed: ${result.reason}\nNothing was discarded — the fork is still ` +
+        `registered, and it had written:\n${formatAdoptedChangedFiles(result.changedFiles)}`
       );
   }
 }

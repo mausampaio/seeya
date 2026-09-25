@@ -11,6 +11,9 @@
  *   (items 1/3).
  * - `new-project-dialog-view.ts` — "New project…" (item 4).
  * - `project-lock-confirm-dialog-view.ts` — the read-only-open confirmation (item 3).
+ * - `project-leftover-changes-confirm-dialog-view.ts` — the leftover-uncommitted-changes
+ *   confirmation (V2-T34 production defect, PO review 2026-09-25 — the window never asked this at
+ *   all before).
  * - `adopt-flow-view.ts` — the whole "Adopt…" flow (item 5).
  * - `other-sessions-dir-dialog-view.ts` — the directory modal a "Other sessions" row opens
  *   (V2-T55 item 3). Wired AFTER `projectsListView` on purpose: its own `onProjectsUpdate`
@@ -25,6 +28,7 @@ import { wireSidebarResize } from './sidebar-resize-view.js';
 import { wireProjectsListView } from './projects-list-view.js';
 import { wireNewProjectDialog } from './new-project-dialog-view.js';
 import { wireProjectLockConfirmDialog } from './project-lock-confirm-dialog-view.js';
+import { wireLeftoverChangesConfirmDialog } from './project-leftover-changes-confirm-dialog-view.js';
 import { wireAdoptFlow } from './adopt-flow-view.js';
 import { wireOtherSessionsDirDialog } from './other-sessions-dir-dialog-view.js';
 import { wireSessionSearchView } from './session-search-view.js';
@@ -36,6 +40,7 @@ export function wireProjectPanel(): void {
   wireProjectsListView();
   wireNewProjectDialog();
   wireProjectLockConfirmDialog();
+  wireLeftoverChangesConfirmDialog();
   wireAdoptFlow();
   wireOtherSessionsDirDialog();
   wireSessionSearchView();

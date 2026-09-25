@@ -561,6 +561,28 @@ describe('openProject', () => {
       );
     });
 
+    it('releases the lock even when committing leftover changes throws (V2-T34 production defect, PO review 2026-09-25)', async () => {
+      workspace.setChangedFiles('auth-hardening', ['auth-hardening/status/current.md']);
+      workspace.failNextCommitWith(
+        'git commit failed in workspace at "/x": exit 1: seeya: the workspace\'s own git hooks ' +
+          '(D-047) refused this commit.',
+      );
+      const projectLock = new FakeProjectLock();
+
+      await expect(
+        openProject(
+          buildOpenDeps(storage, workspace, { projectLock }),
+          'auth-hardening',
+          'claude',
+          { confirmLeftoverChanges: () => Promise.resolve('commitNow') },
+        ),
+      ).rejects.toThrow(/git commit failed/);
+
+      // The pre-fix version leaked the lock here: `commitAll` throwing from inside
+      // `handleLeftoverChanges` skipped every `releaseProjectLock` call this function has.
+      expect(await projectLock.read(WORKSPACE_ROOT, 'auth-hardening')).toBeNull();
+    });
+
     it('proceeds without committing when the person says so, and tells the new session what is pending', async () => {
       workspace.setChangedFiles('auth-hardening', ['auth-hardening/status/current.md']);
       const harnessLauncher = new FakeHarnessLauncher();

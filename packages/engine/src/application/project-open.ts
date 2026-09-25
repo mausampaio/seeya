@@ -444,28 +444,40 @@ export async function openProject(
   const lock = await acquireOpenLock(deps, root, projectId);
   callbacks?.onBeforeLaunch?.({ missing, lock, audit });
 
-  const blocked = await blockedByLock(callbacks, projectId, lock);
-  if (blocked !== null) {
-    return blocked;
-  }
+  // V2-T34 production defect (PO review, 2026-09-25): a `finally` around everything from here on,
+  // on top of (not instead of) the explicit releases below — `handleLeftoverChanges`'s own
+  // `commitAll` call can throw exactly the way `application/project-adopt.ts#commitAdoption`'s did
+  // (the workspace's own git hook refusing the commit), and that throw used to skip every release
+  // this function has. `releaseProjectLock` only ever clears a lock file whose `pid` is THIS
+  // process's own (`core/project-lock.ts#decideProjectLockRelease`), so calling it again here after
+  // an explicit release already ran (the normal path) is a safe, idempotent no-op — never another
+  // session's lock, never a double-release error.
+  try {
+    const blocked = await blockedByLock(callbacks, projectId, lock);
+    if (blocked !== null) {
+      return blocked;
+    }
 
-  const leftover = await handleLeftoverChanges(deps, callbacks, root, projectId, lock);
-  if ('result' in leftover) {
-    // This attempt already acquired the lock (`handleLeftoverChanges` only asks in that case) —
-    // release it before refusing, same best-effort discipline `finishOpen` uses for every other
-    // early return after acquisition.
+    const leftover = await handleLeftoverChanges(deps, callbacks, root, projectId, lock);
+    if ('result' in leftover) {
+      // This attempt already acquired the lock (`handleLeftoverChanges` only asks in that case) —
+      // release it before refusing, same best-effort discipline `finishOpen` uses for every other
+      // early return after acquisition.
+      await releaseProjectLock(deps, root, projectId, deps.pid);
+      return leftover.result;
+    }
+
+    const projectDir = path.join(root, projectId);
+    const result = await deps.harnessLauncher.open(
+      projectDir,
+      addDirs,
+      deps.launchedSessionId,
+      systemPromptAppendFor(projectId, lock, leftover.pendingFiles),
+    );
+    return await finishOpen(deps, root, projectId, { harness, addDirs, missing, lock }, result);
+  } finally {
     await releaseProjectLock(deps, root, projectId, deps.pid);
-    return leftover.result;
   }
-
-  const projectDir = path.join(root, projectId);
-  const result = await deps.harnessLauncher.open(
-    projectDir,
-    addDirs,
-    deps.launchedSessionId,
-    systemPromptAppendFor(projectId, lock, leftover.pendingFiles),
-  );
-  return finishOpen(deps, root, projectId, { harness, addDirs, missing, lock }, result);
 }
 
 /** The tail of `openProject`, after the harness has already closed — releases the lock (only when

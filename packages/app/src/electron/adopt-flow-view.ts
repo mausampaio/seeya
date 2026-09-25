@@ -10,6 +10,7 @@ import { reduceAdoptPanel, type AdoptPanelState } from '../state/adopt-panel.js'
 import { resolveChosenAdoptProjectId } from '../state/adopt-picker.js';
 import { getLatestProjectsPanelData, triggerProjectOpen } from './projects-list-view.js';
 import { closeOtherSessionsDirDialog } from './other-sessions-dir-dialog-view.js';
+import { renderDialogLines } from './dialog-lines.js';
 import type {
   AnswerAdoptionCommitConfirmRequest,
   AnswerAdoptionLaunchConfirmRequest,
@@ -74,18 +75,6 @@ function renderAdoptDialogs(state: AdoptPanelState): void {
     if (!resultDialog.open) {
       resultDialog.showModal();
     }
-  }
-}
-
-/** One paragraph per line, into `containerId` — the shape both the launch and the commit
- * confirmations need for their own explanation/changed-files lines. */
-function renderDialogLines(containerId: string, lines: readonly string[]): void {
-  const container = document.getElementById(containerId) as HTMLElement;
-  container.textContent = '';
-  for (const line of lines) {
-    const paragraph = document.createElement('p');
-    paragraph.textContent = line;
-    container.appendChild(paragraph);
   }
 }
 
@@ -212,16 +201,34 @@ export function wireAdoptFlow(): void {
     }
     const { sessionId } = state;
     apply(reduceAdoptPanel(state, { kind: 'pickerSubmitted' }));
-    void window.seeya.adoptSession({ sessionId, projectId }).then((response) => {
-      apply(
-        reduceAdoptPanel(state, {
-          kind: 'resultReceived',
-          outcomeText: response.outcomeText,
-          adopted: response.adopted,
-          projectId: response.projectId,
-        }),
-      );
-    });
+    void window.seeya
+      .adoptSession({ sessionId, projectId })
+      .then((response) => {
+        apply(
+          reduceAdoptPanel(state, {
+            kind: 'resultReceived',
+            outcomeText: response.outcomeText,
+            adopted: response.adopted,
+            projectId: response.projectId,
+          }),
+        );
+      })
+      .catch((error: unknown) => {
+        // V2-T34 production defect (PO review, 2026-09-25): the dialog is `idle` (closed) right
+        // now, waiting for this promise — with no `.catch()`, an UNEXPECTED rejection here (never
+        // the workspace's own git hook refusing a commit any more, that's `commitFailed` above and
+        // resolves normally, but any other genuine throw) used to leave the dialog silently closed
+        // forever, reading to the person as "it must have worked." `resultReceived` is accepted
+        // from ANY state (`state/adopt-panel.ts`'s own reducer), so this reopens it with the error.
+        apply(
+          reduceAdoptPanel(state, {
+            kind: 'resultReceived',
+            outcomeText: `seeya: adoption failed unexpectedly (${error instanceof Error ? error.message : String(error)}).`,
+            adopted: false,
+            projectId,
+          }),
+        );
+      });
   });
 
   function answerLaunch(decision: 'proceed' | 'decline'): void {

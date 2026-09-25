@@ -180,15 +180,25 @@ export async function removeProject(
     return { kind: 'projectLocked', projectId, heldBy: lock.decision.heldBy };
   }
 
-  const fileCount = await deps.workspace.countProjectFiles(root, projectId);
-  const answer = await confirmRemove(callbacks, projectId, manifest.name, fileCount);
-  if (answer !== 'proceed') {
-    await releaseProjectLock(deps, root, projectId, deps.pid);
-    return {
-      kind: answer === 'decline' ? 'confirmationDeclined' : 'confirmationUnavailable',
-      projectId,
-    };
-  }
+  // V2-T34 production defect (PO review, 2026-09-25): same "finally on top of the explicit
+  // releases, never instead of them" fix as `application/project-open.ts#openProject` — `commitAll`
+  // (inside `finishRemoval`) can throw for the same reason `project-adopt.ts#commitAdoption`'s did.
+  // `releaseProjectLock` is idempotent (`core/project-lock.ts#decideProjectLockRelease` only ever
+  // clears a lock this process's own pid holds), so this is safe even after the explicit release
+  // below already ran.
+  try {
+    const fileCount = await deps.workspace.countProjectFiles(root, projectId);
+    const answer = await confirmRemove(callbacks, projectId, manifest.name, fileCount);
+    if (answer !== 'proceed') {
+      await releaseProjectLock(deps, root, projectId, deps.pid);
+      return {
+        kind: answer === 'decline' ? 'confirmationDeclined' : 'confirmationUnavailable',
+        projectId,
+      };
+    }
 
-  return finishRemoval(deps, root, projectId, fileCount);
+    return await finishRemoval(deps, root, projectId, fileCount);
+  } finally {
+    await releaseProjectLock(deps, root, projectId, deps.pid);
+  }
 }

@@ -107,6 +107,20 @@ describe('formatAdoptSessionOutcomeText (V2-T30 item 5)', () => {
     expect(formatAdoptSessionOutcomeText(result)).toContain('nothing to commit');
   });
 
+  it('commitFailed names the reason and says the copy/fork are still there (V2-T34 production defect, PO review 2026-09-25)', () => {
+    const result: AdoptSessionResult = {
+      kind: 'commitFailed',
+      projectId: 'auth-hardening',
+      forkSessionId: '22222222-2222-4222-8222-222222222222',
+      changedFiles: ['AGENTS.md'],
+      reason: 'git commit failed in workspace at "/x": exit 1: hook refused',
+    };
+    const text = formatAdoptSessionOutcomeText(result);
+    expect(text).toContain('committing them failed');
+    expect(text).toContain('hook refused');
+    expect(text).toContain('still on disk');
+  });
+
   it('adopted is short, no changed-files list repeated (the commit dialog already showed it)', () => {
     const result: AdoptSessionResult = {
       kind: 'adopted',

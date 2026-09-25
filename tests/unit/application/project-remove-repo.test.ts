@@ -157,6 +157,21 @@ describe('removeRepository', () => {
     );
   });
 
+  it('releases the lock even when the removal commit throws (V2-T34 production defect, PO review 2026-09-25)', async () => {
+    await setUpProjectsForOneRepo(storage, workspace);
+    workspace.failNextCommitWith(
+      'git commit failed in workspace at "/x": exit 1: seeya: the workspace\'s own git hooks ' +
+        '(D-047) refused this commit.',
+    );
+    const projectLock = new FakeProjectLock();
+
+    await expect(
+      removeRepository(buildDeps(storage, workspace, { projectLock }), 'auth-hardening', 'app-api'),
+    ).rejects.toThrow(/git commit failed/);
+
+    expect(await projectLock.read(WORKSPACE_ROOT, 'auth-hardening')).toBeNull();
+  });
+
   it('drops the identity-keyed map entry when no other project still uses it', async () => {
     await setUpProjectsForOneRepo(storage, workspace);
     expect(await storage.readRepositoryMap()).toHaveLength(1);

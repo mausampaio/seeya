@@ -161,6 +161,15 @@ export const CHANNELS = {
   confirmProjectLockOpenRequest: 'seeya:confirm-project-lock-open-request',
   /** Renderer → main: the person's answer to one `confirmProjectLockOpenRequest`, by `requestId`. */
   answerProjectLockOpenConfirm: 'seeya:answer-project-lock-open-confirm',
+  /** Main → renderer: a previous session left uncommitted changes in this project, and THIS `open`
+   * took the lock — a real dialog instead of the flat "refusing to open without confirmation"
+   * refusal `openProject` used to fall back to every time (V2-T34 production defect, PO review
+   * 2026-09-25: the window never wired `confirmLeftoverChanges` at all, so every leftover-changes
+   * open from the window hit `leftoverChangesConfirmationUnavailable`, the same three-answer
+   * confirmation `seeya project open`'s own `readline` question already gives the CLI). */
+  confirmLeftoverChangesOpenRequest: 'seeya:confirm-leftover-changes-open-request',
+  /** Renderer → main: the person's answer to one `confirmLeftoverChangesOpenRequest`. */
+  answerLeftoverChangesOpenConfirm: 'seeya:answer-leftover-changes-open-confirm',
   /** Renderer → main: "Adopt…" on an "Other sessions" row (V2-T30 item 5) — the same `adoptSession`
    * `seeya project adopt` calls. Same non-blocking shape as `openProject` above. */
   adoptSession: 'seeya:adopt-session',
@@ -533,6 +542,25 @@ export interface ConfirmProjectLockOpenRequestEvent {
 export interface AnswerProjectLockOpenConfirmRequest {
   readonly requestId: string;
   readonly decision: 'proceed' | 'decline';
+}
+
+/** `CHANNELS.confirmLeftoverChangesOpenRequest`'s payload — `questionLines` is
+ * `@seeya-ai/engine/core/project-lock-message.js#renderLeftoverChangesLines`'s own lines, the same
+ * wording `seeya project open`'s own `readline` question shows (`cli/format-project.ts
+ * #renderLeftoverChangesConfirmation` just joins them with `\n` and appends the `readline`-specific
+ * prompt suffix). One paragraph per line, same shape `ConfirmAdoptionCommitRequestEvent
+ * .changedFilesLines` already uses. */
+export interface ConfirmLeftoverChangesOpenRequestEvent {
+  readonly requestId: string;
+  readonly projectId: string;
+  readonly questionLines: readonly string[];
+}
+
+/** `CHANNELS.answerLeftoverChangesOpenConfirm`'s payload — the same three answers
+ * `ConfirmLeftoverChanges` itself returns (D-024, never flattened to a boolean). */
+export interface AnswerLeftoverChangesOpenConfirmRequest {
+  readonly requestId: string;
+  readonly decision: 'commitNow' | 'proceedWithoutCommitting';
 }
 
 /** `CHANNELS.adoptSession`'s payload (V2-T30 item 5). `sessionId` is the ORIGINAL discovered

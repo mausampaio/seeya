@@ -57,6 +57,17 @@ export function formatAdoptSessionOutcomeText(result: AdoptSessionResult): strin
       );
     case 'adopted':
       return `Project "${result.projectId}": adopted.`;
+    // V2-T34 production defect (PO review, 2026-09-25): the workspace's own git hook (or any other
+    // git failure) refused the commit — the copy's files stay on disk and the fork stays
+    // registered as pending, so this is recoverable, never silently discarded. `result.reason`
+    // already carries git's own stderr (`adapters/workspace/index.ts#commitAll`'s own fix, same PO
+    // review).
+    case 'commitFailed':
+      return (
+        `seeya: project "${result.projectId}" — the copy wrote changes, but committing them ` +
+        `failed (${result.reason}). The files are still on disk; the fork stays registered so a ` +
+        'later attempt to adopt this session again finds it exactly as it was left.'
+      );
   }
 }
 

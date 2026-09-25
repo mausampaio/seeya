@@ -513,4 +513,54 @@ describe('adoptSession', () => {
       },
     ]);
   });
+
+  describe('commitFailed (V2-T34 production defect, PO review 2026-09-25)', () => {
+    it('reports commitFailed with the reason, releases the lock, keeps the fork pending, never records the adoption', async () => {
+      const storage = new InMemoryDeviceStorage(DEFAULT_TEST_CONFIG);
+      const workspace = new FakeWorkspaceRepository();
+      // A first, ordinary adoption creates the project (same "two calls, first just to create the
+      // project" idiom this file's own "writes into an existing project" test already uses).
+      await adoptSession(
+        buildAdoptDeps(storage, workspace),
+        ORIGINAL_ENDED,
+        'auth-hardening',
+        buildCallbacks(),
+      );
+
+      workspace.setChangedFiles('auth-hardening', ['auth-hardening/AGENTS.md']);
+      workspace.failNextCommitWith(
+        'git commit failed in workspace at "/x": exit 1: seeya: the workspace\'s own git hooks ' +
+          '(D-047) refused this commit — Seeya-Project-Id conflicts with a project already ' +
+          'touched by this commit.',
+      );
+      const forkRegistration = new FakeForkRegistration();
+      const forkCleanup = new FakeForkCleanup();
+      const projectLock = new FakeProjectLock();
+
+      const result = await adoptSession(
+        buildAdoptDeps(storage, workspace, { forkRegistration, forkCleanup, projectLock }),
+        createSessionWithPid({
+          sessionId: '20202020-2020-4202-8202-202020202020',
+          processIsAlive: false,
+        }),
+        'auth-hardening',
+        buildCallbacks({ confirmCommit: () => Promise.resolve('commit') }),
+      );
+
+      expect(result.kind).toBe('commitFailed');
+      expect(result).toMatchObject({
+        kind: 'commitFailed',
+        projectId: 'auth-hardening',
+        forkSessionId: FORK_SESSION_ID,
+        changedFiles: ['auth-hardening/AGENTS.md'],
+      });
+      expect(result.kind === 'commitFailed' && result.reason).toContain('refused this commit');
+      // Fork stays registered as pending — never unregistered, never deleted, never adopted.
+      expect(forkRegistration.isRegistered(FORK_SESSION_ID)).toBe(true);
+      expect(forkCleanup.deletedSessionIds).toEqual([]);
+      expect(await storage.readAdoptions()).toEqual([]);
+      // The lock this attempt took is released even though commitAll threw.
+      expect(await projectLock.read(WORKSPACE_ROOT, 'auth-hardening')).toBeNull();
+    });
+  });
 });

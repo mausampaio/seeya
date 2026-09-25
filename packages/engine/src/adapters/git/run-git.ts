@@ -21,8 +21,19 @@ import { spawnHidden } from '../process/spawn.js';
  * "no data" (D-025), while `ran: false` for one *worktree* is what D-022 calls a rejectable item
  * (most commonly, `git worktree list` still remembering a directory that's gone from disk).
  */
+/**
+ * `stderr` (V2-T34 production defect, PO review 2026-09-25): captured alongside `stdout` so a
+ * caller whose git command fails for a reason git itself explains — most importantly `commitAll`
+ * below, when the workspace's own commit-msg hook refuses a commit — can put that reason in front
+ * of the person who ran it, instead of a bare exit code nobody could act on.
+ */
 export type GitCommandResult =
-  | { readonly ran: true; readonly stdout: string; readonly exitCode: number }
+  | {
+      readonly ran: true;
+      readonly stdout: string;
+      readonly stderr: string;
+      readonly exitCode: number;
+    }
   | { readonly ran: false; readonly reason: string };
 
 /**
@@ -49,13 +60,17 @@ export function runGit(
     // either way.
     const child = spawnHidden('git', args, {
       cwd: workingDir,
-      stdio: ['ignore', 'pipe', 'ignore'],
+      stdio: ['ignore', 'pipe', 'pipe'],
       shell: false,
       ...(env !== undefined ? { env } : {}),
     });
     let stdout = '';
+    let stderr = '';
     child.stdout.on('data', (chunk: Buffer) => {
       stdout += chunk.toString('utf8');
+    });
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString('utf8');
     });
     child.on('error', (error) => resolve({ ran: false, reason: String(error) }));
     child.on('close', (code, signal) => {
@@ -63,7 +78,7 @@ export function runGit(
         resolve({ ran: false, reason: `terminated by signal ${signal ?? 'unknown'}` });
         return;
       }
-      resolve({ ran: true, stdout, exitCode: code });
+      resolve({ ran: true, stdout, stderr, exitCode: code });
     });
   });
 }

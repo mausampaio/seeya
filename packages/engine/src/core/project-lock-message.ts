@@ -48,6 +48,34 @@ export function renderReadOnlyOpenQuestion(heldBy: ProjectLockInfo): string {
   );
 }
 
+/**
+ * V2-T34 item 4, moved here from `cli/format-project.ts` (PO review, 2026-09-25 production
+ * defect): the question `open` asks when it just acquired the lock and found changes a previous
+ * session left uncommitted, as separate lines — one per changed file, same "list, then ask" shape
+ * `core/project-adoption-message.ts#renderAdoptionCommitChangedFilesLines` already established,
+ * so the window's own dialog (`electron/project-leftover-changes-confirm-dialog-view.ts`, one
+ * paragraph per line via `electron/dialog-lines.ts#renderDialogLines`) can render it without
+ * collapsing the list into a single run-on sentence. The window never asked this at all before
+ * this fix; `cli/format-project.ts#renderLeftoverChangesConfirmation` joins these lines with `\n`
+ * and appends its own `[c = commit now, p = proceed, ...]` suffix onto the last one, for
+ * `readline`.
+ *
+ * @example
+ * renderLeftoverChangesLines(['auth-hardening/status/current.md'])
+ * // ['Project has 1 change(s) left uncommitted by a previous session:',
+ * //  '  auth-hardening/status/current.md',
+ * //  'Commit them now (attributed to an unidentified session), or continue without ' +
+ * //    'committing (the new session will be told what is pending)?']
+ */
+export function renderLeftoverChangesLines(changedFiles: readonly string[]): string[] {
+  return [
+    `Project has ${changedFiles.length} change(s) left uncommitted by a previous session:`,
+    ...changedFiles.map((file) => `  ${file}`),
+    'Commit them now (attributed to an unidentified session), or continue without committing ' +
+      '(the new session will be told what is pending)?',
+  ];
+}
+
 export function formatProjectLockWarningLines(
   projectId: string,
   lock: ProjectOpenLockOutcome,

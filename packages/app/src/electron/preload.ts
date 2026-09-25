@@ -52,6 +52,8 @@ import type {
   OpenProjectResponse,
   ConfirmProjectLockOpenRequestEvent,
   AnswerProjectLockOpenConfirmRequest,
+  ConfirmLeftoverChangesOpenRequestEvent,
+  AnswerLeftoverChangesOpenConfirmRequest,
   AdoptSessionRequest,
   AdoptSessionResponse,
   ConfirmAdoptionLaunchRequestEvent,
@@ -138,6 +140,13 @@ export interface SeeyaApi {
     listener: (event: ConfirmProjectLockOpenRequestEvent) => void,
   ): void;
   answerProjectLockOpenConfirm(request: AnswerProjectLockOpenConfirmRequest): void;
+  /** V2-T34 production defect (PO review, 2026-09-25): a previous session left uncommitted
+   * changes, and THIS `open` took the lock — one question at a time, same shape as the lock
+   * confirmation above. */
+  onConfirmLeftoverChangesOpenRequest(
+    listener: (event: ConfirmLeftoverChangesOpenRequestEvent) => void,
+  ): void;
+  answerLeftoverChangesOpenConfirm(request: AnswerLeftoverChangesOpenConfirmRequest): void;
   /** V2-T30 item 5: "Adopt…" on an "Other sessions" row — resolves only once the fork's tab closes
    * and the commit question (if any) has been answered. */
   adoptSession(request: AdoptSessionRequest): Promise<AdoptSessionResponse>;
@@ -245,6 +254,14 @@ const api: SeeyaApi = {
   },
   answerProjectLockOpenConfirm: (request) =>
     ipcRenderer.send(CHANNELS.answerProjectLockOpenConfirm, request),
+  onConfirmLeftoverChangesOpenRequest: (listener) => {
+    ipcRenderer.on(
+      CHANNELS.confirmLeftoverChangesOpenRequest,
+      (_event, data: ConfirmLeftoverChangesOpenRequestEvent) => listener(data),
+    );
+  },
+  answerLeftoverChangesOpenConfirm: (request) =>
+    ipcRenderer.send(CHANNELS.answerLeftoverChangesOpenConfirm, request),
   adoptSession: (request) => ipcRenderer.invoke(CHANNELS.adoptSession, request),
   onConfirmAdoptionLaunchRequest: (listener) => {
     ipcRenderer.on(

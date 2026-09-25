@@ -263,6 +263,22 @@ describe('revertAdoption', () => {
     expect(await storage.readAdoptions()).toEqual([RECORD]);
   });
 
+  it('releases the lock even when revertCommits itself throws (V2-T34 production defect, PO review 2026-09-25)', async () => {
+    workspace.failNextRevertCommitsWith('git revert failed: exit 1: unexpected git failure');
+    const projectLock = new FakeProjectLock();
+
+    await expect(
+      revertAdoption(
+        buildDeps(storage, workspace, forkCleanup, { projectLock }),
+        'auth-hardening',
+        undefined,
+        { confirmRevert: () => Promise.resolve('proceed') },
+      ),
+    ).rejects.toThrow(/unexpected git failure/);
+
+    expect(await projectLock.read(WORKSPACE_ROOT, 'auth-hardening')).toBeNull();
+  });
+
   describe('once the revert itself succeeds', () => {
     function revertSuccessfully(overrides: Partial<RevertAdoptionDeps> = {}) {
       return revertAdoption(
