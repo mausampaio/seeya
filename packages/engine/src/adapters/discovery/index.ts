@@ -53,3 +53,14 @@ export {
   type EarlyWarningDiscoveryResult,
 } from './early-warnings.js';
 export { DiscoveryForkCleanup, type DiscoveryForkCleanupOptions } from './fork-cleanup.js';
+/**
+ * V2-T55 item 1: `SessionIdLookup`'s implementation — a direct, unwindowed transcript search by
+ * `sessionId` prefix, deliberately separate from the `SessionProvider` strategies above (see
+ * `core/ports.ts#SessionIdLookup`'s own docstring on why it's a different port, never a second
+ * method squeezed onto `SessionProvider`).
+ */
+export {
+  DiscoverySessionIdLookup,
+  findSessionByIdPrefix,
+  type SessionIdLookupOptions,
+} from './session-id-lookup.js';

@@ -123,6 +123,26 @@ export interface SessionProvider {
   list(): Promise<DiscoveryResult>;
 }
 
+// Own import line on purpose (V2-T55), same self-contained pattern already established above
+// (`DayState`, `DaemonLockInfo`): `SessionIdLookupOutcome` is this task's own new type.
+import type { SessionIdLookupOutcome } from './types.js';
+
+/**
+ * On-demand, `relevanceHours`-ignoring session lookup by `sessionId` or a prefix of it (V2-T55
+ * item 1) — deliberately a SEPARATE port from `SessionProvider.list()`, never a parameter or a
+ * second method on it, precisely so nothing wires this into a periodic cycle by accident (the
+ * sidebar's 10s refresh tick, `scheduler/poll.ts`'s own loop): every call this port answers means
+ * a full, unwindowed walk of every transcript under `~/.claude/projects/`
+ * (`adapters/discovery/session-id-lookup.ts`), worth paying only when a person is actually looking
+ * for one specific, possibly long-closed session (`seeya project adopt <id>`, the window's own
+ * id-search field) — never for "what's on screen right now".
+ *
+ * Implemented in `adapters/discovery/` (D-020: `core/` never implements a port, only declares it).
+ */
+export interface SessionIdLookup {
+  findByIdPrefix(idPrefix: string): Promise<SessionIdLookupOutcome>;
+}
+
 // Own import line on purpose (S4-T3), same self-contained pattern already established below
 // (`GitFacts`, `ResumeOutcome`): `DayState` now exists (S4-T2) for `readState`/`saveState` below,
 // and `DaemonLockInfo` (`core/daemon-lock.ts`) is this task's own new type for the daemon lock.

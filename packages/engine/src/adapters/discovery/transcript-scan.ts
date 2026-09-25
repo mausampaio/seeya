@@ -51,7 +51,10 @@ import { isEnoent } from './fs-errors.js';
  * here to make this walk match a `**` glob you read somewhere, this comment is the reason not
  * to.
  */
-const TRANSCRIPT_EXTENSION = '.jsonl';
+// Exported for `session-id-lookup.ts` (V2-T55 item 1): the direct id-prefix lookup strips this
+// same suffix off a candidate's basename before comparing against the typed prefix — shared here
+// rather than a second '.jsonl' literal (AGENTS.md: "nada de duplicação").
+export const TRANSCRIPT_EXTENSION = '.jsonl';
 const MS_PER_HOUR = 3_600_000;
 
 /** The Claude Code session UUID, same requirement `registry.ts`'s `sessionRecordSchema` places on
@@ -109,8 +112,14 @@ async function listSlugTranscripts(slugDir: string): Promise<string[] | Rejected
 
 /** Lists every `.jsonl` under `projectsDir`, across every slug. A missing `projectsDir` (no
  * transcript has ever been written on this machine) is the normal empty case, not an error —
- * same treatment `transcript-lookup.ts` and `registry.ts` give their own missing directories. */
-async function collectCandidateFiles(
+ * same treatment `transcript-lookup.ts` and `registry.ts` give their own missing directories.
+ *
+ * Exported for `session-id-lookup.ts` (V2-T55 item 1): the direct id-prefix lookup needs the exact
+ * same file-name listing this module already builds (one `readdir` per project slug, no `stat`, no
+ * content read) — reused as-is rather than a second directory walk (AGENTS.md: "nada de
+ * duplicação"). It's also this task's own answer to "what does a direct search cost": listing
+ * every slug is the only work a search pays for a prefix that matches nothing. */
+export async function collectCandidateFiles(
   projectsDir: string,
 ): Promise<{ readonly files: string[]; readonly rejected: RejectedTranscriptRecord[] }> {
   let slugs: string[];
@@ -151,8 +160,11 @@ async function collectCandidateFiles(
 /** `stat`s one candidate for its mtime — the only thing read before the relevance-window decision
  * is made. A failure here (permission denied, file removed between listing and this call) is a
  * per-file rejection, never a crash and never a silent "skip" that would look identical to a file
- * legitimately outside the window (D-025: "couldn't check" isn't the same claim as "too old"). */
-async function statMtimeMs(filePath: string): Promise<number | RejectedTranscriptRecord> {
+ * legitimately outside the window (D-025: "couldn't check" isn't the same claim as "too old").
+ *
+ * Exported for `session-id-lookup.ts` (V2-T55 item 1), which needs the same mtime for
+ * `lastTranscriptWrite`/`lastActivity` but never uses it to skip a file (no window there). */
+export async function statMtimeMs(filePath: string): Promise<number | RejectedTranscriptRecord> {
   try {
     const stats = await stat(filePath);
     return stats.mtimeMs;
@@ -161,7 +173,7 @@ async function statMtimeMs(filePath: string): Promise<number | RejectedTranscrip
   }
 }
 
-type FileOutcome =
+export type FileOutcome =
   | { readonly kind: 'accepted'; readonly session: SessionWithoutPid }
   | { readonly kind: 'rejected'; readonly rejection: RejectedTranscriptRecord }
   | { readonly kind: 'excluded' };
@@ -173,8 +185,13 @@ type FileOutcome =
  * `cwd` from content and assemble the `SessionWithoutPid`. Wrapped in one `try`/`catch` so *any*
  * unexpected failure here is isolated as this file's own rejection, never crashing the whole batch
  * (same guarantee `registry.ts#processSessionFile` gives for its strategy).
+ *
+ * Exported for `session-id-lookup.ts` (V2-T55 item 1) — same per-file work, called there for a
+ * candidate confirmed to match an id PREFIX instead of a relevance window; "already confirmed to
+ * be relevant" in this docstring covers either reason equally, nothing below reads `mtimeMs` for a
+ * cutoff decision.
  */
-async function processTranscriptFile(
+export async function processTranscriptFile(
   filePath: string,
   mtimeMs: number,
   knownForkSessionIds: ReadonlySet<string>,

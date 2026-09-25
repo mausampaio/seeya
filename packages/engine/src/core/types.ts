@@ -142,6 +142,21 @@ export interface SessionWithoutPid extends CommonSessionFields {
 export type SessionState = 'alive' | 'idle' | 'ended' | 'unknown';
 
 /**
+ * `SessionIdLookup.findByIdPrefix`'s own result (V2-T55 item 1, `core/ports.ts`) — a direct,
+ * unwindowed transcript search by `sessionId` or a prefix of it, never picking among several
+ * matches on its own (D-025): `found` only for exactly one match, `ambiguous` names every
+ * candidate so the caller can ask for more characters, `notFound` when nothing matched at all.
+ * `session` is always a `SessionWithoutPid` in practice today (`adapters/discovery/
+ * session-id-lookup.ts` only scans transcripts, never the registry), but the type stays the wider
+ * `DiscoveredSession` — this is a session lookup, not a "headless session" lookup, and a future
+ * caller shouldn't have to narrow a type this module never promised to narrow for it.
+ */
+export type SessionIdLookupOutcome =
+  | { readonly kind: 'found'; readonly session: DiscoveredSession }
+  | { readonly kind: 'ambiguous'; readonly candidates: readonly DiscoveredSession[] }
+  | { readonly kind: 'notFound' };
+
+/**
  * Per-project override, keyed by `cwd` in `Config.projectPolicy` (S1-T5). Keyed by `cwd`, not
  * `sessionId` — a project's policy has to survive across many sessions coming and going in that
  * same directory, while `sessionId` changes every time (D-002).
