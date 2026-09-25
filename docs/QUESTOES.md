@@ -8940,3 +8940,45 @@ local relevante para o projeto, em `-p`/`acceptEdits`. Não prova (e não é afi
 aqui) nada sobre o que `--resume` consegue achar fora do diretório original — a razão de abrir ali
 é a disponibilidade de `CLAUDE.md`/memória/configuração/skills locais, não uma limitação medida do
 `--resume`. Modo interativo genuíno segue sem medição por este agente (mesma lacuna de sempre).
+
+## Q-095 — V2-T32 (`revert-adoption`): duas escolhas mínimas que a revisão do PO deixou em aberto
+
+**Tarefa:** V2-T32
+**Bloqueia:** não — decisão tomada pelo agente, registrada aqui para o PO confirmar ou corrigir.
+
+**Contexto 1 — "compara o transcript da cópia com o momento da adoção... diz quanto".** O item 6
+da revisão do PO (2026-09-24) pede que o `revert-adoption` compare o transcript da cópia adotada
+com `adoptedAt` e, se cresceu, diga quanto. `adoptions.json` (schema da V2-T29) não guarda um
+tamanho de referência no momento da adoção — acrescentar um campo novo ali para isso teria sido
+uma mudança de schema maior (versão, migração) para uma tarefa que é sobre desfazer, não sobre
+adoção em si.
+
+**O que o agente fez.** Como o transcript é append-only, comparar o **mtime** do arquivo (`stat`,
+`ForkCleanup.checkForkActivity`, `core/adopted-copy-growth.ts#decideAdoptedCopyGrowth`) contra
+`adoptedAt` já basta para saber SE algo foi escrito depois — não precisa de um tamanho de
+referência para isso. "Diz quanto" virou "diz desde quando e qual o tamanho atual" (a última
+escrita e os bytes atuais), não um delta preciso em bytes desde a adoção — o agente julgou essa
+leitura suficiente para a pessoa decidir, sem inventar uma medição que a V2-T29 nunca capturou.
+Sem transcript nenhum (apagado à mão, por exemplo), o resultado é `unknown` — tratado exatamente
+como "cresceu" (pergunta, resposta padrão mantém), nunca como "não cresceu" (D-025).
+
+**Contexto 2 — "identificada pelo nome ou prefixo, como no adopt" (item 5).** O `adopt` resolve o
+argumento de sessão contra a descoberta real (`resolveSessionReference`: sessionId, prefixo, nome
+de exibição, `cwd`). `adoptions.json`, porém, só guarda os dois ids (original e cópia) — nenhum
+nome nem `cwd`. Resolver por nome exigiria cruzar com a descoberta ao vivo, que pode não encontrar
+mais a sessão original (fora de `Config.relevanceHours`) mesmo com o registro de adoção ainda
+válido.
+
+**O que o agente fez.** `core/adoption-registry.ts#selectProjectAdoption` casa `<sessão>` contra
+`originalSessionId`/`forkSessionId` de cada adoção do projeto — exato primeiro, depois por
+prefixo de qualquer um dos dois ids — nunca por nome ou `cwd`. Quando há mais de uma adoção e
+nenhuma referência bate, a listagem de ambíguos (`formatRevertAdoptionAmbiguous`) já mostra os
+dois ids de cada uma, então a pessoa sempre tem o que colar na próxima tentativa — o mesmo
+princípio que `formatAdoptAmbiguousMatchMessage` já usa para `adopt`.
+
+**Opções que enxergo:** A) manter as duas escolhas acima (o que o código faz hoje); B) fazer o
+`revert-adoption` também consultar `SessionProvider`/descoberta para resolver por nome/`cwd`,
+aceitando que uma sessão originalmente aged-out da janela de `relevanceHours` fique inalcançável
+por nome (só por id/prefixo) até essa janela mudar; C) fazer a V2-T29 (schema de `adoptions.json`)
+crescer para guardar um tamanho de referência na adoção, permitindo um "cresceu N bytes" exato
+aqui.
