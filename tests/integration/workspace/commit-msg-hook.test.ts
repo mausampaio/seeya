@@ -240,4 +240,41 @@ describe('the workspace commit-msg hook — real execution', () => {
       child.kill();
     }
   }, 30_000);
+
+  it('refuses with a clear message (never a raw shell error) when the recorded seeya binary is missing (V2-T34, PO review defect 2)', async () => {
+    const dir = await makeTmpDir();
+    root = dir;
+    const workspace = new FsWorkspaceRepository();
+    await workspace.initialize(dir);
+    await workspace.writeProjectSkeleton(
+      dir,
+      'auth-hardening',
+      buildProjectSkeleton('auth-hardening'),
+    );
+    await workspace.commitAll(
+      dir,
+      'auth-hardening',
+      buildProjectCommitMessage('Create project auth-hardening', 'auth-hardening', undefined),
+    );
+    const beforeHash = await headHash(dir);
+    // A path that genuinely does not exist on this machine — the real scenario is "seeya moved or
+    // was uninstalled since the last open," reproduced here without needing either.
+    const missingNodePath = path.join(dir, 'this-node-binary-does-not-exist');
+    await workspace.installCommitMsgHook(
+      dir,
+      buildCommitMsgHookScript(missingNodePath, CLI_ENTRY_PATH),
+    );
+
+    await writeFile(path.join(dir, 'auth-hardening', 'status', 'current.md'), 'x\n');
+    await runGit(dir, ['add', 'auth-hardening']);
+    const attempt = await realCommit(dir, 'Edit with a stale hook', process.env);
+
+    expect(attempt.exitCode).not.toBe(0);
+    // The FIX under test: a clear, actionable message — not sh's own raw "No such file or
+    // directory" for a plain `exec` on a path that doesn't exist (the pre-fix behavior).
+    expect(attempt.stderr).toContain(missingNodePath);
+    expect(attempt.stderr).toContain('seeya project open');
+    expect(attempt.stderr).not.toContain('No such file or directory');
+    expect(await headHash(dir)).toBe(beforeHash);
+  }, 30_000);
 });

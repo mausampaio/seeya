@@ -24,6 +24,24 @@ describe('buildCommitMsgHookScript', () => {
 
   it('never prepends anything when no extra env is given', () => {
     const script = buildCommitMsgHookScript('/usr/bin/node', '/opt/seeya/dist/index.js');
-    expect(script).toContain('\nexec "/usr/bin/node"');
+    expect(script).toContain('then exec "/usr/bin/node"');
+  });
+
+  it('checks both paths exist before calling them, with a clear message and exit 1 when missing (PO review)', () => {
+    const script = buildCommitMsgHookScript('/usr/bin/node', '/opt/seeya/dist/index.js');
+    expect(script).toContain('if [ -f "/usr/bin/node" ] && [ -f "/opt/seeya/dist/index.js" ]');
+    expect(script).toContain('seeya project open <id>');
+    expect(script).toContain('exit 1');
+    // No unescaped double quote inside the echoed message itself — it would end the outer
+    // double-quoted echo string early (this test is the regression proof: it failed before the
+    // fix, when the message wrapped each path in its own literal double quotes).
+    const echoLine = script.split('\n').find((line) => line.includes('echo "seeya:'));
+    expect(echoLine).toBeDefined();
+    const messageBody = echoLine?.slice(
+      echoLine.indexOf('echo "') + 'echo "'.length,
+      echoLine.lastIndexOf('" >&2'),
+    );
+    expect(messageBody).toBeDefined();
+    expect(messageBody).not.toContain('"');
   });
 });
