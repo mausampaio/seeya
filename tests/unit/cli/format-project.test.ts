@@ -567,6 +567,20 @@ describe('formatAdoptSessionReport', () => {
     // Item 9: the follow-up repeated after the fact.
     expect(text).toContain('seeya project open auth-hardening');
   });
+
+  it('commitFailed names the reason, says nothing was discarded, and lists what was written (V2-T34 production defect, PO review 2026-09-25)', () => {
+    const text = formatAdoptSessionReport({
+      kind: 'commitFailed',
+      projectId: 'auth-hardening',
+      forkSessionId: '22222222-2222-4222-8222-222222222222',
+      changedFiles: ['auth-hardening/AGENTS.md'],
+      reason: 'git commit failed in workspace at "/x": exit 1: hook refused',
+    });
+    expect(text).toContain('committing them failed');
+    expect(text).toContain('hook refused');
+    expect(text).toContain('Nothing was discarded');
+    expect(text).toContain('auth-hardening/AGENTS.md');
+  });
 });
 
 describe('formatAuditLines (V2-T34 item 3)', () => {

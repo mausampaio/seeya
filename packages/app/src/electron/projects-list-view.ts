@@ -135,9 +135,18 @@ function renderProjectsPanel(data: ProjectsUpdateEvent): void {
 export function triggerProjectOpen(projectId: string): void {
   const resultText = document.getElementById('project-open-result-text') as HTMLElement;
   resultText.textContent = '';
-  void window.seeya.openProject({ projectId }).then((response) => {
-    resultText.textContent = response.outcomeText;
-  });
+  void window.seeya
+    .openProject({ projectId })
+    .then((response) => {
+      resultText.textContent = response.outcomeText;
+    })
+    .catch((error: unknown) => {
+      // V2-T34 production defect (PO review, 2026-09-25): without this, an unexpected rejection
+      // (the workspace's own git hook refusing a leftover-changes commit, or any other genuine
+      // throw from `openProject`) left `resultText` blank forever — no error, no explanation,
+      // reading as if nothing had happened.
+      resultText.textContent = `seeya: open failed unexpectedly (${error instanceof Error ? error.message : String(error)}).`;
+    });
 }
 
 function wireProjectOpenButtons(): void {
