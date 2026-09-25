@@ -206,13 +206,25 @@ export function wireProjectIpc(
     CHANNELS.adoptSession,
     async (_event, request: AdoptSessionRequest): Promise<AdoptSessionResponse> => {
       const discovery = await context.sessionProvider.list();
-      const original = discovery.sessions.find(
+      const windowedMatch = discovery.sessions.find(
         (session) => session.sessionId === request.sessionId,
       );
+      // V2-T55 item 1: a click can name a session the window already found only through the
+      // id-search field's own direct, unwindowed lookup (`session.sessionId` here is always a
+      // FULL id, never a prefix — the click carried the exact row's own id, so `found` is the
+      // only outcome this ever reasonably produces). Mirrors `cli/session-reference.ts
+      // #resolveSessionReferenceForAdoption`'s own fallback for the identical reason: a session
+      // closed longer ago than `relevanceHours` has no entry in `discovery.sessions` at all.
+      const fallback =
+        windowedMatch === undefined
+          ? await context.sessionIdLookup.findByIdPrefix(request.sessionId)
+          : null;
+      const original = windowedMatch ?? (fallback?.kind === 'found' ? fallback.session : undefined);
       if (original === undefined) {
         // D-025: the session this click referred to is no longer discoverable (aged past
-        // relevanceHours, or the record vanished) — never guessed, reported as its own outcome
-        // rather than thrown, so a stray click never crashes the handler.
+        // relevanceHours AND not found by a direct id lookup, or the record vanished) — never
+        // guessed, reported as its own outcome rather than thrown, so a stray click never crashes
+        // the handler.
         return {
           outcomeText: formatSessionNotDiscoverableText(request.sessionId),
           adopted: false,

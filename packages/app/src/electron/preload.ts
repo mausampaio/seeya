@@ -58,6 +58,8 @@ import type {
   AnswerAdoptionLaunchConfirmRequest,
   ConfirmAdoptionCommitRequestEvent,
   AnswerAdoptionCommitConfirmRequest,
+  FindSessionByIdRequest,
+  FindSessionByIdResponse,
 } from '../ipc/channels.js';
 
 export interface SeeyaApi {
@@ -147,6 +149,9 @@ export interface SeeyaApi {
     listener: (event: ConfirmAdoptionCommitRequestEvent) => void,
   ): void;
   answerAdoptionCommitConfirm(request: AnswerAdoptionCommitConfirmRequest): void;
+  /** V2-T55 item 4: the id-search field — an id or the start of it, straight to the session, even
+   * outside the 12-hour window. */
+  findSessionById(request: FindSessionByIdRequest): Promise<FindSessionByIdResponse>;
 }
 
 const api: SeeyaApi = {
@@ -257,6 +262,7 @@ const api: SeeyaApi = {
   },
   answerAdoptionCommitConfirm: (request) =>
     ipcRenderer.send(CHANNELS.answerAdoptionCommitConfirm, request),
+  findSessionById: (request) => ipcRenderer.invoke(CHANNELS.findSessionById, request),
 };
 
 contextBridge.exposeInMainWorld('seeya', api);

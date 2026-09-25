@@ -8,15 +8,18 @@
  * `state/status-panel.ts` already draw.
  */
 import { formatLockHolderDescription } from '@seeya-ai/engine/core/project-lock-message.js';
+import { formatSessionStateLabel } from '@seeya-ai/engine/core/session-state-label.js';
 import type { PathPlatformHint } from '@seeya-ai/engine/core/cwd-normalization.js';
 import type { AdoptionRecord, ProjectManifest, SessionState } from '@seeya-ai/engine/core/types.js';
 import type { ProjectLockStatus } from '@seeya-ai/engine/application/project-lock.js';
 import {
+  groupOtherSessionsByDirectory,
   groupSessionsByProject,
   resolveAdoptEligibility,
   type AdoptEligibility,
 } from '../sidebar/project-sessions.js';
 import type { SidebarRow } from '../sidebar/sidebar-data.js';
+import { MESSAGES } from '../text/messages.js';
 
 export interface ProjectWithDirectory {
   readonly manifest: ProjectManifest;
@@ -25,9 +28,20 @@ export interface ProjectWithDirectory {
 
 export interface ProjectPanelSessionRow {
   readonly sessionId: string;
+  /** V2-T55 item 5: the same short id `seeya sessions` already shows
+   * (`@seeya-ai/engine/application/session-id-display.js`) — always shown alongside the name in
+   * every session listing the window has, aberta or fechada, so the id a person can paste into
+   * `seeya project adopt <id>` is always visible right next to the row it identifies. */
+  readonly displaySessionId: string;
   readonly name: string;
   readonly cwd: string;
   readonly state: SessionState;
+  /** V2-T52: the word a person reads for `state` (`core/session-state-label.ts`) — `state` itself
+   * stays the raw enum for logic (`resolveAdoptEligibility`'s own `alive`/`idle` check), this is
+   * the already-formatted text the DOM layer renders instead of `state` directly. */
+  readonly stateLabel: string;
+  /** `null` is absence of data (D-025), never rendered as a real instant by the view layer. */
+  readonly lastActivity: Date | null;
   readonly matchedTabId: string | null;
 }
 
@@ -45,17 +59,30 @@ export interface ProjectPanelOtherSessionRow extends ProjectPanelSessionRow {
   readonly adopt: AdoptEligibility;
 }
 
+/** V2-T55 item 2 — one row per directory in "Other sessions", not one per session (with many
+ * Claude Code sessions on a machine, a flat list was the exact problem the maintainer hit on
+ * Ubuntu). Clicking a directory opens the modal (`electron/other-sessions-dir-dialog-view.ts`)
+ * listing `sessions` (item 3: name, short id, state label, last activity, Adopt…). */
+export interface OtherSessionDirectoryPanelRow {
+  readonly dir: string;
+  readonly sessionCount: number;
+  readonly sessions: readonly ProjectPanelOtherSessionRow[];
+}
+
 export interface ProjectsPanelData {
   readonly projects: readonly ProjectPanelRow[];
-  readonly otherSessions: readonly ProjectPanelOtherSessionRow[];
+  readonly otherSessionsByDirectory: readonly OtherSessionDirectoryPanelRow[];
 }
 
 function toSessionRow(row: SidebarRow): ProjectPanelSessionRow {
   return {
     sessionId: row.sessionId,
+    displaySessionId: row.displaySessionId,
     name: row.name,
     cwd: row.cwd,
     state: row.state,
+    stateLabel: formatSessionStateLabel(row.state),
+    lastActivity: row.lastActivity,
     matchedTabId: row.matchedTabId,
   };
 }
@@ -71,6 +98,16 @@ export function formatLockText(status: ProjectLockStatus): string {
     case 'staleLock':
       return `stale — last held by ${formatLockHolderDescription(status.lock)} (reclaimable)`;
   }
+}
+
+/** V2-T55 item 3/4 — the modal's/search result's own "last activity" text, exported so both reuse
+ * the identical formatting instead of each rendering `Date` differently. `null` is absence of
+ * data (D-025), never a real instant; `toLocaleString()` gives a date AND time, per the task's
+ * own acceptance ("data e hora"). */
+export function formatSessionLastActivityText(lastActivity: Date | null): string {
+  return lastActivity === null
+    ? MESSAGES.sessionLastActivityUnknown
+    : lastActivity.toLocaleString();
 }
 
 /** `heldByLiveSession`/`staleLock`'s own `lock.sessionId`, when known (D-025: an unidentified
@@ -122,9 +159,16 @@ export function buildProjectsPanelData(
     ),
     sessions: (grouping.sessionsByProjectId.get(project.manifest.id) ?? []).map(toSessionRow),
   }));
-  const otherSessions = grouping.otherSessions.map((row): ProjectPanelOtherSessionRow => ({
-    ...toSessionRow(row),
-    adopt: resolveAdoptEligibility(row, adoptions),
+  const otherSessionsByDirectory = groupOtherSessionsByDirectory(
+    grouping.otherSessions,
+    platform,
+  ).map((group): OtherSessionDirectoryPanelRow => ({
+    dir: group.dir,
+    sessionCount: group.sessionCount,
+    sessions: group.sessions.map((row): ProjectPanelOtherSessionRow => ({
+      ...toSessionRow(row),
+      adopt: resolveAdoptEligibility(row, adoptions),
+    })),
   }));
-  return { projects: projectRows, otherSessions };
+  return { projects: projectRows, otherSessionsByDirectory };
 }

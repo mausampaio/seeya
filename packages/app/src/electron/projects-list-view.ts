@@ -6,32 +6,36 @@
  * to show; every string here is `text/messages.ts`, never an inline template literal).
  */
 import { MESSAGES } from '../text/messages.js';
-import type {
-  ProjectPanelOtherSessionRow,
-  ProjectPanelRow,
-  ProjectsPanelData,
-} from '../state/projects-panel.js';
+import type { ProjectPanelRow, ProjectsPanelData } from '../state/projects-panel.js';
 import type { ProjectsUpdateEvent } from '../ipc/channels.js';
 
 // V2-T30 item 5: the last `ProjectsPanelData` this window received — `electron/adopt-flow-view.ts`'s
 // own "existing project" dropdown is built from it (never a second IPC round trip just to list
 // projects again; the lateral already has the freshest copy from its own last refresh tick).
-let latestProjectsPanelData: ProjectsPanelData = { projects: [], otherSessions: [] };
+// V2-T55 item 3: `electron/other-sessions-dir-dialog-view.ts` reads the same latest copy to
+// refresh an open directory modal in place, for the identical reason.
+let latestProjectsPanelData: ProjectsPanelData = { projects: [], otherSessionsByDirectory: [] };
 
-/** `electron/adopt-flow-view.ts`'s own read of the latest push — kept as a function, not an export
- * of the mutable binding itself, so nothing outside this file can reassign it. */
+/** `electron/adopt-flow-view.ts`'s/`other-sessions-dir-dialog-view.ts`'s own read of the latest
+ * push — kept as a function, not an export of the mutable binding itself, so nothing outside this
+ * file can reassign it. */
 export function getLatestProjectsPanelData(): ProjectsPanelData {
   return latestProjectsPanelData;
 }
 
 function renderProjectSessionRow(session: {
   readonly name: string;
+  readonly displaySessionId: string;
   readonly cwd: string;
-  readonly state: string;
+  readonly stateLabel: string;
   readonly matchedTabId: string | null;
 }): HTMLLIElement {
   const item = document.createElement('li');
-  item.textContent = MESSAGES.projectSessionRowLabel(session.name, session.state);
+  item.textContent = MESSAGES.projectSessionRowLabel(
+    session.name,
+    session.displaySessionId,
+    session.stateLabel,
+  );
   item.title = session.cwd;
   if (session.matchedTabId !== null) {
     item.classList.add('matched');
@@ -70,24 +74,20 @@ function renderProjectBlock(project: ProjectPanelRow): HTMLElement {
   return container;
 }
 
-function renderOtherSessionRow(row: ProjectPanelOtherSessionRow): HTMLLIElement {
+/** V2-T55 item 2 — one row per directory, never one per session: clicking it opens the modal
+ * (`electron/other-sessions-dir-dialog-view.ts`, wired independently — this button only carries
+ * `data-dir`, the key that modal looks the group back up by in `getLatestProjectsPanelData()`). */
+function renderOtherSessionsDirectoryRow(group: {
+  readonly dir: string;
+  readonly sessionCount: number;
+}): HTMLLIElement {
   const item = document.createElement('li');
-  const label = document.createElement('span');
-  label.textContent = MESSAGES.otherSessionRowLabel(row.name, row.cwd, row.state);
-  item.appendChild(label);
-
-  const adoptButton = document.createElement('button');
-  adoptButton.type = 'button';
-  adoptButton.className = 'adopt-button';
-  adoptButton.textContent = MESSAGES.adoptButton;
-  adoptButton.dataset.sessionId = row.sessionId;
-  adoptButton.dataset.sessionName = row.name;
-  if (row.adopt.kind === 'unavailable') {
-    adoptButton.disabled = true;
-    adoptButton.title = row.adopt.reason;
-  }
-  item.appendChild(adoptButton);
-
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'other-sessions-dir-row';
+  button.textContent = MESSAGES.otherSessionsDirectoryRowLabel(group.dir, group.sessionCount);
+  button.dataset.dir = group.dir;
+  item.appendChild(button);
   return item;
 }
 
@@ -114,14 +114,14 @@ function renderProjectsPanel(data: ProjectsUpdateEvent): void {
 
   const otherList = document.getElementById('other-sessions-list') as HTMLElement;
   otherList.textContent = '';
-  if (data.otherSessions.length === 0) {
+  if (data.otherSessionsByDirectory.length === 0) {
     const empty = document.createElement('li');
     empty.id = 'other-sessions-empty';
     empty.textContent = MESSAGES.otherSessionsEmpty;
     otherList.appendChild(empty);
   } else {
-    for (const row of data.otherSessions) {
-      otherList.appendChild(renderOtherSessionRow(row));
+    for (const group of data.otherSessionsByDirectory) {
+      otherList.appendChild(renderOtherSessionsDirectoryRow(group));
     }
   }
 }

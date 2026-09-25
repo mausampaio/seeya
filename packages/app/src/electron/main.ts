@@ -114,6 +114,7 @@ import {
   type TabResumeOpener,
 } from '../resume/tab-session-resumer.js';
 import { wireProjectIpc } from './project-ipc.js';
+import { wireSessionSearchIpc } from './session-search-ipc.js';
 
 /** `TabSessionResumer`'s `claudeCommand` in production — the same default the CLI's own
  * `ClaudeSessionResumer#resolveClaudeBinary` falls back to when nothing overrides it
@@ -173,8 +174,19 @@ async function captureVerificationScreenshot(
   // together for a verification run. SEEYA_APP_AUTO_END_DAY needs much longer: its own click
   // sequence (below) waits through TWO real endDay runs (a dry-run preview, then the real one),
   // each spawning a headless `claude -p` per eligible session — 2500ms is nowhere near enough for
-  // that to finish before this captures.
-  await clock.sleep(process.env.SEEYA_APP_AUTO_END_DAY === '1' ? 8000 : 2500);
+  // that to finish before this captures. V2-T55's own three flags below (`SEEYA_APP_AUTO_
+  // OPEN_OTHER_SESSIONS_DIR`/`SEEYA_APP_AUTO_SEARCH_SESSION_ID`/`SEEYA_APP_AUTO_DECLINE_
+  // DAEMON_OWNERSHIP_TRANSITION`) each start with a defensive dismiss of the (unrelated)
+  // daemon-ownership-transition dialog on a machine where `seeya` is already installed — measured
+  // on one such machine: that dialog's own decline click stays on an async "Working…" state for a
+  // moment before closing, so a verification run using any of the three gets extra room too.
+  const usesV2T55Instrumentation =
+    process.env.SEEYA_APP_AUTO_OPEN_OTHER_SESSIONS_DIR === '1' ||
+    process.env.SEEYA_APP_AUTO_SEARCH_SESSION_ID !== undefined ||
+    process.env.SEEYA_APP_AUTO_DECLINE_DAEMON_OWNERSHIP_TRANSITION === '1';
+  await clock.sleep(
+    process.env.SEEYA_APP_AUTO_END_DAY === '1' ? 8000 : usesV2T55Instrumentation ? 4000 : 2500,
+  );
   const image = await window.webContents.capturePage();
   const { writeFile } = await import('node:fs/promises');
   await writeFile(screenshotPath, image.toPNG());
@@ -402,6 +414,74 @@ function createWindow(clock: Clock): BrowserWindow {
         );
     });
   }
+  // SEEYA_APP_AUTO_OPEN_OTHER_SESSIONS_DIR: same "instrumentação só do spike" class as the six
+  // above (V2-T55 item 3) — clicks the first "Other sessions" directory row, for an agent with no
+  // mouse of its own to prove the modal opens with the real, grouped session list (name, short id,
+  // state label, last activity, Adopt…) in a single real screenshot. 1200ms (not the usual 500ms):
+  // the directory list only exists once the FIRST `projectsUpdate` push/fetch has landed
+  // (`electron/project-ipc.ts`'s own docstring measured that at up to ~2.6s in one real run), so
+  // this waits longer before clicking a row that might not exist in the DOM yet. Never set by
+  // `npm run app` or the README.
+  // Both flags below share this: a verification run's own machine may have `seeya` already
+  // installed, which pops the (unrelated) daemon-ownership-transition dialog on top of everything
+  // else the moment its own async check resolves (`AppContext#checkDaemonOwnershipTransitionOffer`)
+  // — dismissed defensively, before either flag's own click, so it never blocks a screenshot this
+  // task's own verification never meant to be about that dialog at all.
+  // Also defensively re-expands the sidebar: `localStorage`'s own collapse preference
+  // (`state/sidebar-collapse.ts`) lives in this Electron binary's own userData, not under
+  // `SEEYA_APP_HOME_OVERRIDE` — a PRIOR verification run against this same unpackaged binary
+  // (V2-T30's own `SEEYA_APP_AUTO_TOGGLE_SIDEBAR`) can leave it collapsed for every run after,
+  // hiding the very rows this task's own flags exist to screenshot.
+  const dismissDaemonOwnershipTransitionScript =
+    "document.getElementById('daemon-ownership-transition-decline')?.click(); " +
+    "if (document.getElementById('sidebar')?.classList.contains('collapsed')) { " +
+    "document.getElementById('sidebar-toggle-button')?.click(); }";
+  // SEEYA_APP_AUTO_DECLINE_DAEMON_OWNERSHIP_TRANSITION: standalone version of the same dismiss —
+  // for a verification screenshot that isn't about either flag below but still needs the dialog
+  // out of the way on a machine where `seeya` happens to be installed. Never set by `npm run app`.
+  if (process.env.SEEYA_APP_AUTO_DECLINE_DAEMON_OWNERSHIP_TRANSITION === '1') {
+    window.webContents.once('did-finish-load', () => {
+      void clock
+        .sleep(600)
+        .then(() => window.webContents.executeJavaScript(dismissDaemonOwnershipTransitionScript));
+    });
+  }
+  if (process.env.SEEYA_APP_AUTO_OPEN_OTHER_SESSIONS_DIR === '1') {
+    window.webContents.once('did-finish-load', () => {
+      void clock
+        .sleep(600)
+        .then(() => window.webContents.executeJavaScript(dismissDaemonOwnershipTransitionScript))
+        .then(() => clock.sleep(600))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.querySelector('.other-sessions-dir-row')?.click();",
+          ),
+        );
+    });
+  }
+  // SEEYA_APP_AUTO_SEARCH_SESSION_ID: same class, carrying a VALUE (the id or prefix to search
+  // for, unlike the six flags above) — types it into the real id-search field (V2-T55 item 4) and
+  // submits the form, for an agent with no keyboard of its own to prove a real search hit renders.
+  // `JSON.stringify` escapes the value before it's embedded in the injected script. Never set by
+  // `npm run app` or the README.
+  const autoSearchSessionId = process.env.SEEYA_APP_AUTO_SEARCH_SESSION_ID;
+  if (autoSearchSessionId !== undefined) {
+    window.webContents.once('did-finish-load', () => {
+      void clock
+        .sleep(600)
+        .then(() => window.webContents.executeJavaScript(dismissDaemonOwnershipTransitionScript))
+        .then(() => clock.sleep(600))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            '(() => { ' +
+              "const input = document.getElementById('session-search-input'); " +
+              `if (input) { input.value = ${JSON.stringify(autoSearchSessionId)}; ` +
+              "document.getElementById('session-search-form')?.requestSubmit(); } " +
+              '})();',
+          ),
+        );
+    });
+  }
   return window;
 }
 
@@ -508,6 +588,9 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // this file doesn't grow (see project-ipc.ts's own docstring). Reuses the SAME tabResumeOpener
   // above: mounting a tab UI for an already-spawned pty was never resume-specific.
   const projectIpc = wireProjectIpc(window, context, tabResumeOpener, () => latestSidebarRows);
+  // V2-T55 item 4: the id-search field's own IPC — same "own module, main.ts doesn't grow" split
+  // `wireProjectIpc` already established.
+  wireSessionSearchIpc(context);
 
   // V2-T3: fetched once by `renderer.ts#main`, before any `new Terminal({...})` is constructed —
   // the two-way handshake (`invoke`, not `send`) matches `createTab` below, the only other channel

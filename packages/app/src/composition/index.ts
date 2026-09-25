@@ -34,6 +34,7 @@ import {
 import {
   DiscoverySessionProvider,
   DiscoveryForkCleanup,
+  DiscoverySessionIdLookup,
 } from '@seeya-ai/engine/adapters/discovery/index.js';
 import { StorageAdapter } from '@seeya-ai/engine/adapters/storage/index.js';
 import { FsDirectoryExistence } from '@seeya-ai/engine/adapters/filesystem/index.js';
@@ -78,6 +79,7 @@ import type {
   ProcessControl,
   ProjectLock,
   SessionAdoptionLauncher,
+  SessionIdLookup,
   SessionProvider,
   Storage,
   TranscriptReader,
@@ -125,6 +127,12 @@ export interface AppContext {
   /** The same `SessionProvider` `seeya sessions` uses (`cli/composition.ts#buildSessionProvider`,
    * same wiring) — the sidebar's "same list as `seeya sessions`" (docs/PLANO-DE-ENTREGA.md V2-T2). */
   readonly sessionProvider: SessionProvider;
+  /** V2-T55 item 1/4: the direct, `relevanceHours`-ignoring lookup — the window's own id-search
+   * field (`electron/session-search-ipc.ts`) and, mirroring the CLI, the "Adopt…" fallback when a
+   * click refers to a session that aged out of `sessionProvider`'s own windowed list between two
+   * refresh ticks (`electron/project-ipc.ts`'s own `adoptSession` handler). Never wired into the
+   * ambient 10s refresh cycle — see `core/ports.ts#SessionIdLookup`'s own docstring for why. */
+  readonly sessionIdLookup: SessionIdLookup;
   /** For the status panel's daemon section (`@seeya-ai/engine/scheduler/daemon-state.js`) — same
    * two ports `cli/status-command.ts` needs for the identical purpose. */
   readonly storage: Storage;
@@ -499,6 +507,10 @@ export async function buildAppContext(
     clock,
     relevanceHours: config.relevanceHours,
   });
+  const sessionIdLookup = new DiscoverySessionIdLookup({
+    claudeHome: home.claudeHome,
+    seeyaHome: home.seeyaHome,
+  });
   const platform = process.platform;
   // V2-T9 item 2 (Q-079's own correction): the same `platform` read above, reshaped into
   // `PathPlatformHint` once, here — `application/cwd-history.ts` never reads `process.platform`.
@@ -650,6 +662,7 @@ export async function buildAppContext(
     buildPtyManager: (callbacks) =>
       new PtyManager(new NodePtyAdapter({ useConptyDll: platform === 'win32' }), callbacks),
     sessionProvider,
+    sessionIdLookup,
     storage,
     processControl: realProcessControl,
     autostart,

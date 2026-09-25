@@ -22,7 +22,7 @@ import {
   normalizeCwdForComparison,
   type PathPlatformHint,
 } from '@seeya-ai/engine/core/cwd-normalization.js';
-import type { AdoptionRecord } from '@seeya-ai/engine/core/types.js';
+import type { AdoptionRecord, SessionState } from '@seeya-ai/engine/core/types.js';
 import type { SidebarRow } from './sidebar-data.js';
 
 export interface ProjectDirectory {
@@ -110,13 +110,22 @@ export function groupSessionsByProject(
 export type AdoptEligibility =
   { readonly kind: 'available' } | { readonly kind: 'unavailable'; readonly reason: string };
 
+/** The two fields `resolveAdoptEligibility` actually reads — a structural subset of `SidebarRow`
+ * (never the whole thing: this function has no use for `cwd`/`matchedTabId`/etc.), so a caller
+ * with only a bare `DiscoveredSession` plus a freshly classified `state` (V2-T55's own id-search
+ * result, `state/session-search.ts`) can call it too, without building a fake `SidebarRow`. */
+export interface AdoptEligibilityInput {
+  readonly sessionId: string;
+  readonly state: SessionState;
+}
+
 /**
  * Mirrors `application/project-adopt.ts#checkAdoptionPreconditions`'s two refusals (running right
  * now; already adopted elsewhere) for display purposes only — `adoptSession` itself is still the
  * one that enforces them; this is what lets the list show the reason BEFORE a click would fail.
  */
 export function resolveAdoptEligibility(
-  row: SidebarRow,
+  row: AdoptEligibilityInput,
   adoptions: readonly AdoptionRecord[],
 ): AdoptEligibility {
   if (row.state === 'alive' || row.state === 'idle') {
@@ -130,4 +139,41 @@ export function resolveAdoptEligibility(
     return { kind: 'unavailable', reason: `already adopted into project "${existing.projectId}"` };
   }
   return { kind: 'available' };
+}
+
+export interface OtherSessionDirectoryGroup {
+  readonly dir: string;
+  readonly sessionCount: number;
+  readonly sessions: readonly SidebarRow[];
+}
+
+/**
+ * V2-T55 item 2 — groups "Other sessions" by directory instead of one row per session: with many
+ * Claude Code sessions on a machine, a flat list of every one became the exact problem the
+ * maintainer hit on Ubuntu ("a lista fica confusa"). Grouped by NORMALIZED `cwd` (same criterion
+ * `sessionBelongsToProject` above already uses), so a different separator/case/trailing slash still
+ * collapses into one directory; the group's own `dir` is the first row's un-normalized spelling
+ * (display only — never used for comparison again). Sorted by directory name for a stable listing.
+ */
+export function groupOtherSessionsByDirectory(
+  otherSessions: readonly SidebarRow[],
+  platform: PathPlatformHint,
+): readonly OtherSessionDirectoryGroup[] {
+  const byNormalizedDir = new Map<string, { dir: string; sessions: SidebarRow[] }>();
+  for (const row of otherSessions) {
+    const key = normalizeCwdForComparison(row.cwd, platform);
+    const existing = byNormalizedDir.get(key);
+    if (existing === undefined) {
+      byNormalizedDir.set(key, { dir: row.cwd, sessions: [row] });
+    } else {
+      existing.sessions.push(row);
+    }
+  }
+  return [...byNormalizedDir.values()]
+    .map((group) => ({
+      dir: group.dir,
+      sessionCount: group.sessions.length,
+      sessions: group.sessions,
+    }))
+    .sort((a, b) => a.dir.localeCompare(b.dir));
 }

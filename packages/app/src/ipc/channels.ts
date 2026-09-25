@@ -12,7 +12,7 @@ import type { ScheduleStripData } from '../state/schedule-strip.js';
 import type { DaemonControlAvailability } from '../state/daemon-control-panel.js';
 import type { AutostartControlAvailability } from '../state/autostart-control-panel.js';
 import type { SettingsRow, ProjectPolicyLine } from '../state/settings-panel.js';
-import type { ProjectsPanelData } from '../state/projects-panel.js';
+import type { ProjectPanelOtherSessionRow, ProjectsPanelData } from '../state/projects-panel.js';
 
 export const CHANNELS = {
   /** Renderer → main: open a new tab. */
@@ -176,6 +176,11 @@ export const CHANNELS = {
   confirmAdoptionCommitRequest: 'seeya:confirm-adoption-commit-request',
   /** Renderer → main: the person's answer to one `confirmAdoptionCommitRequest`. */
   answerAdoptionCommitConfirm: 'seeya:answer-adoption-commit-confirm',
+  /** Renderer → main: V2-T55 item 4's own id-search field — "an id or the start of it, straight to
+   * the session, even outside the 12-hour window". Never wired into the ambient refresh cycle
+   * (`electron/session-search-ipc.ts`'s own docstring); only fires when the person submits the
+   * form. */
+  findSessionById: 'seeya:find-session-by-id',
 } as const;
 
 export interface CreateTabRequest {
@@ -579,3 +584,17 @@ export interface AnswerAdoptionCommitConfirmRequest {
   readonly requestId: string;
   readonly decision: 'commit' | 'decline';
 }
+
+/** `CHANNELS.findSessionById`'s payload (V2-T55 item 4). */
+export interface FindSessionByIdRequest {
+  readonly idOrPrefix: string;
+}
+
+/** `CHANNELS.findSessionById`'s response — the SAME row shape "Other sessions"'s own directory
+ * modal renders (`ProjectPanelOtherSessionRow`, `electron/session-row-view.ts`'s own reused
+ * markup), never a second, parallel row type for what's structurally the identical fact. D-025:
+ * `ambiguous`/`notFound` are their own cases, never flattened into `found: null`. */
+export type FindSessionByIdResponse =
+  | { readonly kind: 'found'; readonly session: ProjectPanelOtherSessionRow }
+  | { readonly kind: 'ambiguous'; readonly candidates: readonly ProjectPanelOtherSessionRow[] }
+  | { readonly kind: 'notFound' };

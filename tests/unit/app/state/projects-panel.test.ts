@@ -43,7 +43,9 @@ describe('buildProjectsPanelData (V2-T30 item 1)', () => {
     expect(data.projects).toHaveLength(1);
     expect(data.projects[0]?.lockText).toBe('unlocked');
     expect(data.projects[0]?.sessions.map((row) => row.sessionId)).toEqual([session.sessionId]);
-    expect(data.otherSessions).toEqual([]);
+    // V2-T55 item 5: the short id and formatted state label ride along on every session row.
+    expect(data.projects[0]?.sessions[0]?.displaySessionId).toBe('11111111');
+    expect(data.otherSessionsByDirectory).toEqual([]);
   });
 
   it('a held lock names the holder in plain English', () => {
@@ -101,7 +103,7 @@ describe('buildProjectsPanelData (V2-T30 item 1)', () => {
     expect(data.projects[0]?.lockText).toContain('reclaimable');
   });
 
-  it('a session matching no project lands in otherSessions, with its own adopt eligibility', () => {
+  it('a session matching no project lands in otherSessionsByDirectory, with its own adopt eligibility', () => {
     const session = createSessionWithoutPid({ cwd: '/code/unrelated' });
     const rows = buildSidebarRows(
       { sessions: [session], rejected: [] },
@@ -119,8 +121,15 @@ describe('buildProjectsPanelData (V2-T30 item 1)', () => {
     );
 
     expect(data.projects[0]?.sessions).toEqual([]);
-    expect(data.otherSessions).toHaveLength(1);
-    expect(data.otherSessions[0]?.adopt).toEqual({ kind: 'available' });
+    expect(data.otherSessionsByDirectory).toHaveLength(1);
+    expect(data.otherSessionsByDirectory[0]?.dir).toBe('/code/unrelated');
+    expect(data.otherSessionsByDirectory[0]?.sessionCount).toBe(1);
+    const row = data.otherSessionsByDirectory[0]?.sessions[0];
+    expect(row?.adopt).toEqual({ kind: 'available' });
+    // V2-T52: the enum stays 'unknown' (createSessionWithoutPid has no pid), the label reads a fact.
+    expect(row?.state).toBe('unknown');
+    expect(row?.stateLabel).toBe('no running process');
+    expect(row?.lastActivity).toEqual(session.lastActivity);
   });
 
   it('no projects at all still reports every session as "other" (D-025, no project to invent)', () => {
@@ -135,6 +144,58 @@ describe('buildProjectsPanelData (V2-T30 item 1)', () => {
     const data = buildProjectsPanelData(rows, [], [], new Map(), 'posix');
 
     expect(data.projects).toEqual([]);
-    expect(data.otherSessions).toHaveLength(1);
+    expect(data.otherSessionsByDirectory).toHaveLength(1);
+  });
+
+  /**
+   * V2-T55 item 2's own motivating case: many sessions, launched from the same handful of
+   * directories, become a confusing flat list. Two "other" sessions from the SAME directory
+   * collapse into one directory row with `sessionCount: 2` — never two separate rows.
+   */
+  it('other sessions sharing a directory collapse into one directory row with a count', () => {
+    const first = createSessionWithoutPid({
+      sessionId: '11111111-1111-4111-8111-111111111111',
+      cwd: '/code/unrelated',
+    });
+    const second = createSessionWithoutPid({
+      sessionId: '22222222-2222-4222-8222-222222222222',
+      cwd: '/code/unrelated',
+    });
+    const rows = buildSidebarRows(
+      { sessions: [first, second], rejected: [] },
+      createConfig(),
+      NOW,
+      emptyTabs(),
+    );
+
+    const data = buildProjectsPanelData(rows, [], [], new Map(), 'posix');
+
+    expect(data.otherSessionsByDirectory).toHaveLength(1);
+    expect(data.otherSessionsByDirectory[0]?.sessionCount).toBe(2);
+    expect(data.otherSessionsByDirectory[0]?.sessions.map((row) => row.sessionId).sort()).toEqual(
+      [first.sessionId, second.sessionId].sort(),
+    );
+  });
+
+  it('other sessions in different directories produce one row per directory', () => {
+    const a = createSessionWithoutPid({
+      sessionId: '11111111-1111-4111-8111-111111111111',
+      cwd: '/code/a',
+    });
+    const b = createSessionWithoutPid({
+      sessionId: '22222222-2222-4222-8222-222222222222',
+      cwd: '/code/b',
+    });
+    const rows = buildSidebarRows(
+      { sessions: [a, b], rejected: [] },
+      createConfig(),
+      NOW,
+      emptyTabs(),
+    );
+
+    const data = buildProjectsPanelData(rows, [], [], new Map(), 'posix');
+
+    expect(data.otherSessionsByDirectory).toHaveLength(2);
+    expect(data.otherSessionsByDirectory.map((group) => group.dir)).toEqual(['/code/a', '/code/b']);
   });
 });

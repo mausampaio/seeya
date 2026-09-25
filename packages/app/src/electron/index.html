@@ -17,6 +17,13 @@
           <p id="project-open-result-text"></p>
           <h2>Other sessions</h2>
           <ul id="other-sessions-list"></ul>
+          <form id="session-search-form">
+            <label id="session-search-label" for="session-search-input"></label>
+            <input id="session-search-input" type="text" />
+            <button type="submit" id="session-search-button"></button>
+          </form>
+          <p id="session-search-message"></p>
+          <ul id="session-search-result"></ul>
           <h2>Today</h2>
           <div id="today-panel"></div>
           <h2>Status</h2>
@@ -162,6 +169,13 @@
       <div class="project-dialog-actions">
         <button id="adopt-result-open-project" type="button" hidden></button>
         <button id="adopt-result-close" type="button"></button>
+      </div>
+    </dialog>
+    <dialog id="other-sessions-dir-dialog" class="project-dialog">
+      <h3 id="other-sessions-dir-dialog-title"></h3>
+      <ul id="other-sessions-dir-dialog-sessions"></ul>
+      <div class="project-dialog-actions">
+        <button id="other-sessions-dir-dialog-close" type="button"></button>
       </div>
     </dialog>
     <script type="module" src="renderer.js"></script>

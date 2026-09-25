@@ -145,20 +145,29 @@ export function wireAdoptFlow(): void {
 
   wireAdoptFlowLabels();
 
-  // "Adopt…" on an "Other sessions" row (event delegation — rows are rebuilt on every push).
-  document.getElementById('other-sessions-list')?.addEventListener('click', (event) => {
-    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('.adopt-button');
-    const sessionId = button?.dataset.sessionId;
-    const sessionName = button?.dataset.sessionName;
-    if (
-      button !== null &&
-      !button.disabled &&
-      sessionId !== undefined &&
-      sessionName !== undefined
-    ) {
-      apply(reduceAdoptPanel(state, { kind: 'pickerOpened', sessionId, sessionName }));
-    }
-  });
+  /**
+   * "Adopt…" on a session row (event delegation — rows are rebuilt on every push/render). V2-T55
+   * moved every "Adopt…" button out of the flat `#other-sessions-list` (now directory rows only,
+   * `electron/projects-list-view.ts`) into two other containers that share the identical row
+   * markup (`electron/session-row-view.ts#renderSessionActionRow`): the directory modal
+   * (`#other-sessions-dir-dialog-sessions`) and the id-search result
+   * (`#session-search-result`) — one delegated listener per container, same trigger logic.
+   */
+  for (const containerId of ['other-sessions-dir-dialog-sessions', 'session-search-result']) {
+    document.getElementById(containerId)?.addEventListener('click', (event) => {
+      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('.adopt-button');
+      const sessionId = button?.dataset.sessionId;
+      const sessionName = button?.dataset.sessionName;
+      if (
+        button !== null &&
+        !button.disabled &&
+        sessionId !== undefined &&
+        sessionName !== undefined
+      ) {
+        apply(reduceAdoptPanel(state, { kind: 'pickerOpened', sessionId, sessionName }));
+      }
+    });
+  }
 
   const pickDialog = document.getElementById('adopt-pick-dialog') as HTMLDialogElement;
   const existingRadio = document.getElementById('adopt-target-existing') as HTMLInputElement;

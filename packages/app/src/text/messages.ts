@@ -271,10 +271,30 @@ export const MESSAGES = {
   // Pulled out of electron/projects-list-view.ts's own row-building code (PO review, 2026-09-25):
   // "montagem de texto" belongs here, concentrated, like every other user-facing string in this
   // project — not inline template literals inside a DOM-building function.
-  projectSessionRowLabel: (name: string, state: string): string => `${name} (${state})`,
-  otherSessionRowLabel: (name: string, cwd: string, state: string): string =>
-    `${name} (${cwd}) — ${state}`,
+  // V2-T55 item 5: the short id rides alongside the name in every session row this project's
+  // window renders, aberta ou fechada — the same discipline `seeya sessions` already has.
+  projectSessionRowLabel: (name: string, displaySessionId: string, state: string): string =>
+    `${name} [${displaySessionId}] (${state})`,
   adoptButton: 'Adopt…',
+  // V2-T55 item 2 — "Other sessions" groups by directory instead of one row per session.
+  otherSessionsDirectoryRowLabel: (dir: string, sessionCount: number): string =>
+    `${dir} (${sessionCount} session${sessionCount === 1 ? '' : 's'})`,
+  // V2-T55 item 3 — the modal a directory row opens: name, short id (copyable), state, last
+  // activity, one line each. `stateLabel` is already the formatted V2-T52 word, never the raw enum.
+  otherSessionsDirDialogTitle: (dir: string): string => `Sessions in ${dir}`,
+  otherSessionsDirDialogClose: 'Close',
+  otherSessionsSessionCopyIdTitle: 'Copy id',
+  otherSessionsSessionCopyIdCopied: 'Copied!',
+  otherSessionsSessionLastActivityLabel: (lastActivityText: string): string =>
+    `last activity: ${lastActivityText}`,
+  sessionLastActivityUnknown: 'unknown',
+  // V2-T55 item 4 — the window's own id-search field, always available regardless of relevanceHours.
+  sessionSearchLabel: 'Find session by id',
+  sessionSearchPlaceholder: 'Session id or the start of it',
+  sessionSearchButton: 'Find',
+  sessionSearchNotFound: (query: string): string => `No session matches "${query}".`,
+  sessionSearchAmbiguous: (query: string, count: number): string =>
+    `"${query}" matches ${count} sessions — type a few more characters.`,
   newProjectButton: 'New project…',
   newProjectDialogTitle: 'New project',
   newProjectIdLabel: 'Project id',

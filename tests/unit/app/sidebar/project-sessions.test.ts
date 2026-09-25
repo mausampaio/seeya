@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  groupOtherSessionsByDirectory,
   groupSessionsByProject,
   resolveAdoptEligibility,
 } from '../../../../packages/app/src/sidebar/project-sessions.js';
@@ -170,5 +171,65 @@ describe('resolveAdoptEligibility (V2-T30 item 5)', () => {
     const [row] = rowsFor([ended]);
 
     expect(resolveAdoptEligibility(row!, [])).toEqual({ kind: 'available' });
+  });
+});
+
+describe('groupOtherSessionsByDirectory (V2-T55 item 2)', () => {
+  it('two sessions in the same directory collapse into one row with the right count', () => {
+    const rows = rowsFor([
+      createSessionWithoutPid({
+        sessionId: '11111111-1111-4111-8111-111111111111',
+        cwd: 'c:\\code\\shared',
+      }),
+      createSessionWithoutPid({
+        sessionId: '22222222-2222-4222-8222-222222222222',
+        cwd: 'c:\\code\\shared',
+      }),
+    ]);
+
+    const groups = groupOtherSessionsByDirectory(rows, 'win32');
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.sessionCount).toBe(2);
+    expect(groups[0]?.sessions).toHaveLength(2);
+  });
+
+  it('a different spelling of the same directory (trailing slash, separator, case) still merges', () => {
+    const rows = rowsFor([
+      createSessionWithoutPid({
+        sessionId: '11111111-1111-4111-8111-111111111111',
+        cwd: 'C:\\code\\Shared\\',
+      }),
+      createSessionWithoutPid({
+        sessionId: '22222222-2222-4222-8222-222222222222',
+        cwd: 'c:/code/shared',
+      }),
+    ]);
+
+    const groups = groupOtherSessionsByDirectory(rows, 'win32');
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.sessionCount).toBe(2);
+  });
+
+  it('sessions in different directories produce one row each, sorted by directory', () => {
+    const rows = rowsFor([
+      createSessionWithoutPid({
+        sessionId: '11111111-1111-4111-8111-111111111111',
+        cwd: 'c:\\code\\zzz',
+      }),
+      createSessionWithoutPid({
+        sessionId: '22222222-2222-4222-8222-222222222222',
+        cwd: 'c:\\code\\aaa',
+      }),
+    ]);
+
+    const groups = groupOtherSessionsByDirectory(rows, 'win32');
+
+    expect(groups.map((group) => group.dir)).toEqual(['c:\\code\\aaa', 'c:\\code\\zzz']);
+  });
+
+  it('no sessions produces no groups', () => {
+    expect(groupOtherSessionsByDirectory([], 'win32')).toEqual([]);
   });
 });

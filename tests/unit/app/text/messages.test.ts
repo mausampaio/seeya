@@ -34,15 +34,21 @@ describe('MESSAGES', () => {
 
   // V2-T30: the "Projects"/"Other sessions" row labels — pulled out of
   // electron/projects-list-view.ts's own DOM-building code so the text assembly has its own test.
-  it('projectSessionRowLabel names the session and its state', () => {
-    expect(MESSAGES.projectSessionRowLabel('demo-project-session', 'ended')).toBe(
-      'demo-project-session (ended)',
+  // V2-T55 item 5: the short id now rides along, next to the name, in every session row.
+  it('projectSessionRowLabel names the session, its short id, and its state', () => {
+    expect(MESSAGES.projectSessionRowLabel('demo-project-session', 'abcd1234', 'ended')).toBe(
+      'demo-project-session [abcd1234] (ended)',
     );
   });
 
-  it('otherSessionRowLabel names the session, its cwd, and its state', () => {
-    expect(MESSAGES.otherSessionRowLabel('unrelated-session', '/code/unrelated', 'ended')).toBe(
-      'unrelated-session (/code/unrelated) — ended',
+  // V2-T55 item 2: "Other sessions" groups by directory, one row with a count instead of one per
+  // session.
+  it('otherSessionsDirectoryRowLabel names the directory and how many sessions it holds', () => {
+    expect(MESSAGES.otherSessionsDirectoryRowLabel('/code/unrelated', 1)).toBe(
+      '/code/unrelated (1 session)',
+    );
+    expect(MESSAGES.otherSessionsDirectoryRowLabel('/code/unrelated', 3)).toBe(
+      '/code/unrelated (3 sessions)',
     );
   });
 
