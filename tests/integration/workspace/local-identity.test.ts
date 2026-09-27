@@ -72,6 +72,13 @@ async function headMessage(root: string): Promise<string> {
   return result.ran ? result.stdout : '';
 }
 
+/** The "empty" global config is not quite empty: `user.useConfigOnly = true` turns off git's own
+ * identity auto-detection. Without it, git on macOS guesses `<user>@<host>.local` from the machine
+ * and a commit with no configured identity succeeds anyway — the negative case below passed on
+ * Windows and Ubuntu and failed on the macOS CI runner (run 36314424566). With it, "no identity
+ * configured" means the same thing on all three systems. */
+const NO_IDENTITY_GLOBAL_CONFIG = '[user]\n\tuseConfigOnly = true\n';
+
 /** No global (and no system) git identity available anywhere, and no env-var override either —
  * the exact absence the maintainer's own Ubuntu machine had, minus the "has a name but no email"
  * detail: absence of email alone is already enough to make a plain `git commit` refuse. */
@@ -132,7 +139,7 @@ describe('the workspace-own local git identity — real execution (V2-T58, D-047
     );
 
     const emptyGlobalConfig = path.join(dir, 'empty-global-gitconfig');
-    await writeFile(emptyGlobalConfig, '');
+    await writeFile(emptyGlobalConfig, NO_IDENTITY_GLOBAL_CONFIG);
     const noIdentityEnv = envWithNoGitIdentityAnywhere(emptyGlobalConfig);
 
     // THE FIX under test: without it, this workspace has no identity anywhere — no global (the
@@ -178,7 +185,7 @@ describe('the workspace-own local git identity — real execution (V2-T58, D-047
     // reproduces exactly this failure).
 
     const emptyGlobalConfig = path.join(dir, 'empty-global-gitconfig');
-    await writeFile(emptyGlobalConfig, '');
+    await writeFile(emptyGlobalConfig, NO_IDENTITY_GLOBAL_CONFIG);
     const noIdentityEnv = envWithNoGitIdentityAnywhere(emptyGlobalConfig);
 
     await writeFile(path.join(dir, 'auth-hardening', 'status', 'current.md'), 'Working on X.\n');
