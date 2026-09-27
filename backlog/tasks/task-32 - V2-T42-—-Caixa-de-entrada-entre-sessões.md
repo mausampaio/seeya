@@ -4,6 +4,7 @@ title: V2-T42 — Caixa de entrada entre sessões
 status: To Do
 assignee: []
 created_date: '2026-09-24 00:17'
+updated_date: '2026-09-27 11:19'
 labels: []
 milestone: m-6
 dependencies: []
@@ -90,3 +91,13 @@ automática, o pior que uma mensagem faz é ocupar uma linha da caixa.
 outra o que hoje é copiado e colado, e a outra ler da própria caixa, sem intermediário humano
 carregando texto.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-27 11:19
+---
+2026-09-27: a V2-T60 (biblioteca de regras compartilhadas) usa esta caixa de entrada para propostas de melhoria de regra — o destinatário é o próprio seeya, não outra sessão; a especificação desta tarefa deve prever esse destinatário.
+---
+<!-- COMMENTS:END -->
