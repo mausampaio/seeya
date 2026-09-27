@@ -1,10 +1,10 @@
 ---
 id: TASK-8
 title: V2-T16 — A janela responde com a config da subida
-status: Review
+status: Done
 assignee: []
 created_date: '2026-09-22 11:10'
-updated_date: '2026-09-23 10:46'
+updated_date: '2026-09-27 11:38'
 labels: []
 milestone: m-2
 dependencies: []
@@ -99,3 +99,13 @@ ambiguidade; nenhuma premissa técnica se mostrou errada.
 passando, 4 pulados; cobertura 96,39%/92,61%/94,94%/96,76%). Revisão sem ajustes. Fica em
 `[~]` até o aceite do mantenedor.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-27 11:38
+---
+Aceite do mantenedor em 2026-09-27: fechada. Evidência já registrada na V2-T21 (Windows, instalado, 2026-09-24): depois de mudar o horário com a janela aberta e adiar, o status mostrou 'End-of-day time: 09:45 local (today: 10:45, after snoozing)' — a janela usou a config nova, não a da subida.
+---
+<!-- COMMENTS:END -->
