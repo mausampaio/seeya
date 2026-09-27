@@ -109,12 +109,27 @@ aprovada. É o único que altera os documentos de autoridade.
 > `seeya-dev` no registro do Windows (apontando para o Electron da worktree do agente) e gravou
 > `activeScheme: "seeya-dev"` em `~/.seeya/protocol-handler.json` — o que desviaria o clique dos
 > avisos do daemon do app instalado do mantenedor. O agente relatou "nenhuma escrita"; o PO conferiu
-> e não era verdade. **Nenhum agente roda `npm run app` nem `build.mjs --dev`.** Janela, só com
-> `SEEYA_APP_HOME_OVERRIDE` apontando para um home descartável — e mesmo assim o registro do
-> Windows (`HKCU\Software\Classes\seeya-dev`) continua sendo o real: essa parte não tem isolamento, e
-> quem precisar abrir a janela diz no relatório que a chave foi tocada. Depois de qualquer janela
-> aberta, confira `protocol-handler.json` e a chave, e diga o que encontrou — "não escrevi nada" só
-> vale conferido.
+> e não era verdade. Aconteceu de novo na V2-T55 (2026-09-25), com uma segunda verificação de
+> agente: mesma chave do registro reescrita, apontando para outra worktree que também já sumiu.
+> **Nenhum agente roda `npm run app` nem `build.mjs --dev`.**
+>
+> **Desde a V2-T57, há isolamento — e ele é determinístico, não convenção.**
+> `shouldRegisterProtocolScheme` (`packages/app/src/composition/protocol-registration-eligibility.ts`)
+> decide, só a partir de `SEEYA_APP_HOME_OVERRIDE` estar ou não presente, se a janela registra o
+> esquema de protocolo; `electron/main.ts` usa essa mesma decisão para pular **os dois** —
+> `registerProtocolHandler` (a chave do registro do Windows) e `saveActiveProtocolScheme` (o
+> marcador `protocol-handler.json`, único ponto de escrita no código, conferido por grep) — quando a
+> variável está definida. Uma janela de verificação com `SEEYA_APP_HOME_OVERRIDE` apontando para um
+> home descartável não toca mais nem a chave, nem o marcador.
+>
+> **Onde o isolamento termina:** `npm run app` **sem** a variável continua registrando `seeya-dev`
+> exatamente como antes — é o desenvolvimento de verdade do mantenedor, que precisa da janela
+> registrada para testar um clique de toast de ponta a ponta. A armadilha original (rodar
+> `build.mjs --dev`/`npm run app` para "só olhar a janela") continua valendo: o que a V2-T57 fechou
+> foi a escrita indevida quando a instrumentação de verificação (`SEEYA_APP_HOME_OVERRIDE`) já
+> estava em uso; não abriu uma forma nova de ver a janela sem registrar nada. Mesmo com o
+> isolamento, quem abrir uma janela de verificação confere `protocol-handler.json` e a chave antes e
+> depois (só leitura) e diz no relatório o que encontrou — "não escrevi nada" só vale conferido.
 
 ## Dev — Sonnet 5
 
