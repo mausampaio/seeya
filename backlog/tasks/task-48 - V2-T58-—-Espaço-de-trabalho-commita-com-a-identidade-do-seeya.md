@@ -4,7 +4,7 @@ title: V2-T58 — Espaço de trabalho commita com a identidade do seeya
 status: Review
 assignee: []
 created_date: '2026-09-25 21:24'
-updated_date: '2026-09-27 10:52'
+updated_date: '2026-09-27 11:01'
 labels: []
 milestone: m-0
 dependencies: []
@@ -95,3 +95,13 @@ cobertura 96.23% linhas geral, `engine/src/core` 99.46%). Separadamente,
 **Nada tocado fora do escopo:** nenhum `~/.seeya`/`~/.claude` real, nenhum espaço de trabalho
 real, nenhuma instalação, nenhum daemon/autostart real.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-27 11:01
+---
+Revisão do PO (2026-09-27): aprovada para publicar. Conferido que a adoção também reafirma a identidade (adoptSession chama createProject, que grava a identidade antes da checagem de projeto existente — o caso real do Ubuntu era adoção). Portão: 278 arquivos, 2849 testes; o mesmo sem identidade global do git (GIT_CONFIG_GLOBAL vazio, GIT_CONFIG_NOSYSTEM=1). Falta o aceite do mantenedor no Ubuntu, conforme a descrição.
+---
+<!-- COMMENTS:END -->
