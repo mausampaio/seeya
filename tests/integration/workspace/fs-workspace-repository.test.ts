@@ -486,6 +486,46 @@ describe('FsWorkspaceRepository', () => {
     await expect(workspace.removeProjectDirectory(root, 'ghost')).resolves.toBeUndefined();
   });
 
+  describe('configureIdentity (V2-T58, D-047 emendment)', () => {
+    async function readLocalConfig(dir: string, key: string): Promise<string> {
+      const result = await runGit(dir, ['config', '--local', '--get', key]);
+      return result.ran ? result.stdout.trim() : '';
+    }
+
+    it('sets user.name/user.email LOCAL to the workspace, never --global', async () => {
+      root = await makeTmpDir();
+      const workspace = new FsWorkspaceRepository();
+      await workspace.initialize(root);
+      await workspace.configureIdentity(root);
+      expect(await readLocalConfig(root, 'user.name')).toBe('seeya');
+      expect(await readLocalConfig(root, 'user.email')).toBe('seeya@localhost');
+    });
+
+    it('overwrites a local identity someone (or a session) already wrote (the permitted case)', async () => {
+      root = await makeTmpDir();
+      const workspace = new FsWorkspaceRepository();
+      await workspace.initialize(root);
+      await runGit(root, ['config', '--local', 'user.name', 'A Person']);
+      await runGit(root, ['config', '--local', 'user.email', 'person@example.com']);
+
+      await workspace.configureIdentity(root);
+
+      expect(await readLocalConfig(root, 'user.name')).toBe('seeya');
+      expect(await readLocalConfig(root, 'user.email')).toBe('seeya@localhost');
+    });
+
+    it('never touches any other key already in .git/config', async () => {
+      root = await makeTmpDir();
+      const workspace = new FsWorkspaceRepository();
+      await workspace.initialize(root);
+      await runGit(root, ['config', '--local', 'custom.marker', 'left-alone']);
+
+      await workspace.configureIdentity(root);
+
+      expect(await readLocalConfig(root, 'custom.marker')).toBe('left-alone');
+    });
+  });
+
   describe('findSessionCommits / findCommitsAfter / revertCommits (V2-T32, D-047 item 4)', () => {
     async function setUpProjectWithForkCommit(): Promise<{
       workspace: FsWorkspaceRepository;
