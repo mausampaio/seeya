@@ -1,10 +1,10 @@
 ---
 id: TASK-18
 title: 'V2-T26 — Spike: o que a adoção de sessão precisa'
-status: Review
+status: Done
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-23 10:46'
+updated_date: '2026-09-27 11:35'
 labels: []
 milestone: m-0
 dependencies: []
@@ -76,3 +76,13 @@ e `codex-cli` 0.154.0, com sessões descartáveis fora do repositório. As três
 Nenhuma mudança em `packages/`; portão rodado só com `format:check` e o guard de termos
 locais.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-27 11:35
+---
+Aceite fechado em 2026-09-27: a leitura do spike sustentou a V2-T29, implementada sobre ela e já em uso real pelo mantenedor. Fechada com o OK dele.
+---
+<!-- COMMENTS:END -->

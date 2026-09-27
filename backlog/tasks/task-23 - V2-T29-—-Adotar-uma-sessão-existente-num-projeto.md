@@ -1,10 +1,10 @@
 ---
 id: TASK-23
 title: V2-T29 — Adotar uma sessão existente num projeto
-status: Review
+status: Done
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-25 17:22'
+updated_date: '2026-09-27 11:35'
 labels:
   - adocao
   - d-047
@@ -255,5 +255,11 @@ author: PO
 created: 2026-09-25 17:22
 ---
 Evidência do mantenedor em 2026-09-25, Ubuntu, adoção de uma sessão REAL e longa de trabalho (build .deb com a instrução corrigida): commit único da adoção com o id da cópia no trailer Seeya-Session-Id; git status limpo; adoptions.json com a original e a cópia; forks.json vazio (promoção). Conteúdo escrito pela sessão: 18 arquivos, ~70 KB — context/know-how.md com 11,8 KB (o maior), 8 decisões numeradas, dois documentos de contexto por assunto, references (~10 KB), plans, status, journal, AGENTS.md e INDEX.md reescritos. Nomes e conteúdo ficam fora do repositório (dados de trabalho). Comparação: a adoção de teste com sessão curta gerou arquivos de centenas de bytes. Falta o último passo do aceite: sessão limpa aberta pelo projeto responder o que só a sessão antiga sabia.
+---
+
+author: PO
+created: 2026-09-27 11:35
+---
+Aceite do mantenedor em 2026-09-27: o projeto adotado funcionou muito bem no uso real, e uma sessão LIMPA aberta nele (no trabalho) se saiu muito bem com o que a adoção levou para o projeto — a pergunta à sessão limpa que faltava. Fechada.
 ---
 <!-- COMMENTS:END -->
