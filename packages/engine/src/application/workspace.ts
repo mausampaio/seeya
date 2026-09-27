@@ -20,6 +20,7 @@ import { buildProjectSkeleton } from '../core/project-skeleton.js';
 import { buildProjectCommitMessage } from '../core/project-commit.js';
 import { describeProjectLockStatus, type ProjectLockStatus } from './project-lock.js';
 import { ensureWorkspaceHooksInstalled } from './workspace-hooks.js';
+import { ensureWorkspaceIdentityConfigured } from './workspace-identity.js';
 
 export type { ProjectLockStatus };
 
@@ -108,6 +109,10 @@ export async function createProject(
     deps.cliEntryPath,
     deps.hookEnv ?? {},
   );
+  // V2-T58 (D-047 emendment): same "reasserted every time" reasoning as the hook right above —
+  // covers a workspace whose local identity was never set (created before this task shipped) or
+  // was overwritten by hand.
+  await ensureWorkspaceIdentityConfigured(deps.workspace, root);
   if (await deps.workspace.projectExists(root, projectId)) {
     return { kind: 'alreadyExists', projectId };
   }

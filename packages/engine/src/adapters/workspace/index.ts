@@ -45,12 +45,20 @@ export { FsCommitMessageFile } from './commit-message-file.js';
  * `tests/integration/git/_fixtures.ts#commitAt` uses for the identical reason). `.localhost` is an
  * RFC 6761 reserved suffix — deliberately not a real, ownable address (`scripts/
  * verificar-termos-locais.mjs`'s own reserved-domain exception documents why that matters for a
- * value that lives in versioned source, not just in a test fixture). */
+ * value that lives in versioned source, not just in a test fixture).
+ *
+ * `SEEYA_IDENTITY_NAME`/`SEEYA_IDENTITY_EMAIL` (V2-T58, D-047 emendment): the same two values,
+ * named separately so `configureIdentity` below can write them into the repository's own LOCAL
+ * git config too — "num lugar só" (the task's own words), rather than a second, independently
+ * spelled `'seeya'`/`'seeya@localhost'` pair. */
+const SEEYA_IDENTITY_NAME = 'seeya';
+const SEEYA_IDENTITY_EMAIL = 'seeya@localhost';
+
 const COMMIT_IDENTITY_ENV: NodeJS.ProcessEnv = {
-  GIT_AUTHOR_NAME: 'seeya',
-  GIT_AUTHOR_EMAIL: 'seeya@localhost',
-  GIT_COMMITTER_NAME: 'seeya',
-  GIT_COMMITTER_EMAIL: 'seeya@localhost',
+  GIT_AUTHOR_NAME: SEEYA_IDENTITY_NAME,
+  GIT_AUTHOR_EMAIL: SEEYA_IDENTITY_EMAIL,
+  GIT_COMMITTER_NAME: SEEYA_IDENTITY_NAME,
+  GIT_COMMITTER_EMAIL: SEEYA_IDENTITY_EMAIL,
 };
 
 function manifestPath(root: string, projectId: string): string {
@@ -205,6 +213,27 @@ export class FsWorkspaceRepository implements WorkspaceRepository {
       throw new Error(
         `git init failed for workspace at "${root}": ${result.ran ? `exit ${result.exitCode}` : result.reason}`,
       );
+    }
+  }
+
+  /** V2-T58 (D-047 emendment): `git config --local <key> <value>` for `user.name`/`user.email` —
+   * `--local` writes into `root/.git/config`, never the operator's own `~/.gitconfig`. `git
+   * config` replaces a single existing value in place, which is exactly the "sobrescreve
+   * identidade local existente" the task calls for; it never touches any other key already in that
+   * file. */
+  async configureIdentity(root: string): Promise<void> {
+    const entries: readonly [string, string][] = [
+      ['user.name', SEEYA_IDENTITY_NAME],
+      ['user.email', SEEYA_IDENTITY_EMAIL],
+    ];
+    for (const [key, value] of entries) {
+      const result = await runGit(root, ['config', '--local', key, value]);
+      if (!result.ran || result.exitCode !== 0) {
+        throw new Error(
+          `git config --local ${key} "${value}" failed in workspace at "${root}": ` +
+            `${result.ran ? `exit ${result.exitCode}: ${result.stderr.trim()}` : result.reason}`,
+        );
+      }
     }
   }
 

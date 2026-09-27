@@ -24,6 +24,7 @@ import { isValidProjectId } from '../core/project-id.js';
 import { findRepositoryMapEntry } from '../core/repository-map.js';
 import { resolveWorkspaceRoot } from './workspace.js';
 import { ensureWorkspaceHooksInstalled } from './workspace-hooks.js';
+import { ensureWorkspaceIdentityConfigured } from './workspace-identity.js';
 import { ensureHarnessHookInstalled } from './harness-hook.js';
 import { auditProject, type ProjectAuditReport } from './project-audit.js';
 import {
@@ -396,9 +397,11 @@ async function handleLeftoverChanges(
  * at all: no session launched, nothing to release (this attempt never held the lock).
  *
  * V2-T34 item 1: the workspace's own `commit-msg` hook is reasserted right at the top, before
- * anything else — "um gancho apagado volta sozinho." Item 2 (PO review): the project's own Claude
- * Code hook config is reasserted right after, same reasoning and same timing — both embed this
- * machine's current, absolute `seeya` path. Item 3: the project is audited next, still
+ * anything else — "um gancho apagado volta sozinho." V2-T58 (D-047 emendment): the workspace's own
+ * local git identity is reasserted right after the hook, same reasoning. Item 2 (PO review): the
+ * project's own Claude Code hook config is reasserted right after that, same reasoning and same
+ * timing — both embed this machine's current, absolute `seeya` path. Item 3: the project is
+ * audited next, still
  * BEFORE the lock is ever touched (`auditProject`'s own report reaches `callbacks.onBeforeLaunch`
  * alongside the missing-repository/lock info, same "print it before the harness takes the screen"
  * timing V2-T28 item 4 already established for the other two). Item 4: once this attempt actually
@@ -435,6 +438,10 @@ export async function openProject(
     deps.cliEntryPath,
     deps.hookEnv ?? {},
   );
+  // V2-T58 (D-047 emendment): reasserted at the same point as the git hook right above, for the
+  // same reason — a workspace opened before this task shipped, or whose local identity was
+  // overwritten by hand, needs it back before any session inside it ever runs a plain `git commit`.
+  await ensureWorkspaceIdentityConfigured(deps.workspace, root);
   // V2-T34 item 2 (PO review): the Claude Code project hook is regenerated here too, same timing
   // and same reasoning as the git hook right above — both embed this machine's current, absolute
   // `seeya` path, which only `open` can know is fresh.
