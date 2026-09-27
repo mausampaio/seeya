@@ -1,6 +1,7 @@
 /**
  * The working rules a session gets told about the project it just opened (D-047 item 5, V2-T34 item
- * 5). One text, in `core/` so both composition roots reach it without either importing the other
+ * 5; the git-configuration rule below added by V2-T58, D-047's own 2026-09-25 emendment). One
+ * text, in `core/` so both composition roots reach it without either importing the other
  * (D-043: `cli/` and `app/` never import each other) — `application/project-open.ts` folds this
  * into the SAME `--append-system-prompt` the lock warning already travels on (V2-T35 item 2), never
  * a second flag.
@@ -35,6 +36,9 @@ export function buildProjectWorkingRulesText(projectId: string): string {
     'not just what.\n' +
     `- Every commit here gets two trailers added automatically (${PROJECT_ID_TRAILER_KEY}, ` +
     `${SESSION_ID_TRAILER_KEY}) by a git hook. Do not write them yourself.\n` +
+    '- Do not change git configuration in this repository (user.name, user.email or anything ' +
+    'else) — the identity commits use here is already set up, and which session wrote what is ' +
+    'the trailers above, not git identity.\n' +
     '- One project per commit — never stage files from another seeya project in the same commit.\n' +
     '- Never commit the ".seeya-lock" file in this directory — it is operational state, not ' +
     'content, and a hook refuses it anyway.\n' +

@@ -493,6 +493,18 @@ describe('openProject', () => {
       );
     });
 
+    it('reasserts the workspace-own local git identity alongside the git hook (V2-T58, D-047 emendment)', async () => {
+      const before = workspace.configureIdentityCalls.length;
+      const result = await openProject(
+        buildOpenDeps(storage, workspace),
+        'auth-hardening',
+        'claude',
+      );
+      expect(result.kind).toBe('opened');
+      expect(workspace.configureIdentityCalls).toHaveLength(before + 1);
+      expect(workspace.configureIdentityCalls.at(-1)).toBe(WORKSPACE_ROOT);
+    });
+
     it('installs the harness hook (V2-T34 item 2, PO review) alongside the git hook', async () => {
       const result = await openProject(
         buildOpenDeps(storage, workspace),

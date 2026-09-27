@@ -86,6 +86,15 @@ describe('createProject', () => {
     expect(await workspace.projectExists(DEFAULT_WORKSPACE_ROOT, 'auth-hardening')).toBe(true);
   });
 
+  it('reasserts the workspace-own local git identity on every call (V2-T58, D-047 emendment)', async () => {
+    await createProject(buildDeps(storage, workspace), 'auth-hardening');
+    await createProject(buildDeps(storage, workspace), 'billing-v2');
+    expect(workspace.configureIdentityCalls).toEqual([
+      DEFAULT_WORKSPACE_ROOT,
+      DEFAULT_WORKSPACE_ROOT,
+    ]);
+  });
+
   it('writes the skeleton and commits exactly one message naming the project', async () => {
     const result = await createProject(buildDeps(storage, workspace), 'auth-hardening');
     expect(result).toEqual({

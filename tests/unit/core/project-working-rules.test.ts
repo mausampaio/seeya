@@ -20,6 +20,11 @@ describe('buildProjectWorkingRulesText', () => {
     expect(text).toContain('never its value');
   });
 
+  it('tells the session not to touch git configuration (V2-T58, D-047 emendment)', () => {
+    const text = buildProjectWorkingRulesText('auth-hardening');
+    expect(text).toContain('Do not change git configuration');
+  });
+
   it('names where the guard stops (item 7)', () => {
     const text = buildProjectWorkingRulesText('auth-hardening');
     expect(text.toLowerCase()).toContain('--no-verify');

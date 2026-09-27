@@ -1122,6 +1122,21 @@ export interface WorkspaceRepository {
    * "caller already knows" contract `ProcessControl.terminateGracefully`'s neighbors follow. */
   initialize(root: string): Promise<void>;
 
+  /**
+   * D-047 emendment (2026-09-25, V2-T58): sets `user.name`/`user.email` LOCAL to `root`'s own
+   * `.git/config` — never `--global` — to `seeya`'s own identity (the same values
+   * `commitAll`'s own env-var identity already forces into every commit it makes). Found on the
+   * maintainer's own machine: a global git identity with a name but no email made a session's own
+   * plain `git commit` (no env override, unlike `commitAll`) fail, and the session **fixed this
+   * itself** by writing a local `user.email` — exactly the kind of "session touches git
+   * configuration" this method now makes unnecessary. Always overwrites an existing local
+   * identity (the maintainer's own case) and never touches any other key. Called from
+   * `application/workspace.ts#createProject` (right after `initialize()`) and
+   * `application/project-open.ts#openProject` (at the start of every `open`, "reasserted every
+   * time" — same discipline `installCommitMsgHook` already has, in case someone edited it away).
+   */
+  configureIdentity(root: string): Promise<void>;
+
   /** True when `root/projectId` already holds a `seeya.json` — the same test `listProjects`
    * below uses to decide what counts as a project, so a directory a person created by hand for
    * some other reason is never mistaken for one (D-025: no `seeya.json`, no claim either way about

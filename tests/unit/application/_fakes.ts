@@ -526,6 +526,17 @@ export class FakeWorkspaceRepository implements WorkspaceRepository {
     return Promise.resolve();
   }
 
+  // V2-T58 (D-047 emendment): `workspace.test.ts`/`project-open.test.ts`'s own hook — records
+  // every `root` this was asserted for, same convention `installedCommitMsgHookCalls` below
+  // already sets, so a test can prove it's reasserted on every `createProject`/`openProject`
+  // call, not just remembered as a boolean.
+  readonly configureIdentityCalls: string[] = [];
+
+  configureIdentity(root: string): Promise<void> {
+    this.configureIdentityCalls.push(root);
+    return Promise.resolve();
+  }
+
   projectExists(root: string, projectId: string): Promise<boolean> {
     return Promise.resolve(this.projectsOf(root).has(projectId));
   }
