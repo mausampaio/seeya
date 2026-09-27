@@ -64,6 +64,7 @@ import type { Handoff } from '@seeya-ai/engine/core/types.js';
 import { buildAppContext, toEndDayDeps, type AppContext } from '../composition/index.js';
 import { shouldMarkLinuxProtocolRegistered } from '../composition/linux-protocol-marker.js';
 import { resolveProtocolScheme, type ProtocolScheme } from '../composition/protocol-scheme.js';
+import { shouldRegisterProtocolScheme } from '../composition/protocol-registration-eligibility.js';
 import { resolveWindowIconPath } from '../composition/window-icon.js';
 import { MESSAGES } from '../text/messages.js';
 import { buildEndDayCostCeiling } from '../state/end-day-preview.js';
@@ -1234,8 +1235,12 @@ if (!gotSingleInstanceLock) {
     // SEEYA_APP_HOME_OVERRIDE: same undocumented, internal, verification-only class as
     // SEEYA_APP_OFFSCREEN/SEEYA_APP_SCREENSHOT_PATH above — `buildAppContext` already accepts a home
     // directory as a parameter for exactly this (every test in tests/integration/app/composition.test.ts
-    // uses it against a tmpdir fixture, never the real home). Never set by `npm run app`.
-    const context = await buildAppContext(process.env.SEEYA_APP_HOME_OVERRIDE);
+    // uses it against a tmpdir fixture, never the real home). Never set by `npm run app`. Captured
+    // once here, and reused below by `shouldRegisterProtocolScheme` (V2-T57) — the OS-level
+    // registration and the marker file live outside whatever home this window is pointed at, so
+    // redirecting the home alone was never enough to isolate them (see that module's own docstring).
+    const homeOverride = process.env.SEEYA_APP_HOME_OVERRIDE;
+    const context = await buildAppContext(homeOverride);
 
     // V2-T10 item 1: the scheme THIS window registers — packaged installs still claim plain
     // `seeya`, a dev launch (`npm run app`) now claims `seeya-dev` instead, so the two worlds
@@ -1244,39 +1249,46 @@ if (!gotSingleInstanceLock) {
     // registration call below and (once item 2 lands) the marker write.
     const protocolScheme = resolveProtocolScheme(app.isPackaged);
 
-    // V2-T5b item 5: Windows — the `seeya://`-shaped handler on Linux comes from the package's own
-    // `.desktop` file and on macOS from its `Info.plist`, neither of which exists from a checkout
-    // (only the installer task can write them); attempting `setAsDefaultProtocolClient` there
-    // today would be a no-op at best (Electron's own docs: "this method is only implemented on
-    // macOS and Windows") and a false claim in the marker at worst. `process.platform` read
-    // directly here, not in `composition/index.ts`, matches this same file's own pre-existing
-    // `window-all-closed` handler below — an Electron-lifecycle branch, not a choice of which
-    // adapter to wire (composition/index.ts's own job).
-    //
-    // V2-T8 item 4: Linux — no equivalent API to call at all (`shouldMarkLinuxProtocolRegistered`'s
-    // own docstring: the `.desktop` file's `MimeType` was already written, at INSTALL time, by the
-    // `.deb`; this process can only infer that it was, never confirm it the way Windows' own
-    // boolean return does). macOS still gets no marker at all this task (`o que não entra`: no
-    // click mechanism exists there to gate). Linux never registers `seeya-dev` at all (V2-T10 item
-    // 1's own "o que entra": no `.desktop` file exists from a checkout there either), so
-    // `shouldMarkLinuxProtocolRegistered` only ever implies the packaged `seeya` scheme.
-    const markProtocolRegistered =
-      (process.platform === 'win32' && registerProtocolHandler(protocolScheme)) ||
-      shouldMarkLinuxProtocolRegistered({
-        platform: process.platform,
-        isPackaged: app.isPackaged,
-        appImageEnv: process.env.APPIMAGE,
-      });
-    if (markProtocolRegistered) {
-      // V2-T10 item 2: the marker now records WHICH scheme this window registered (never just a
-      // boolean "registered on this machine") — the toast/click backends read it back through
-      // `Storage.readActiveProtocolScheme()` to pick the right URI.
-      await context.storage.saveActiveProtocolScheme(protocolScheme).catch(() => {
-        // Best-effort: a failed write here just means the daemon's own toast/click keeps omitting
-        // `launch`/`--action` until a later run of the interface writes the marker successfully —
-        // the same "no marker, toast as before" fallback D-025 already gives a marker that was
-        // never written at all.
-      });
+    // V2-T57: a verification window (SEEYA_APP_HOME_OVERRIDE set) never registers the protocol
+    // scheme and never writes the marker, on any platform — neither `registerProtocolHandler`
+    // (the only thing that touches the Windows registry) nor `saveActiveProtocolScheme` (the only
+    // call site of the marker write in this codebase) run below when this is false. Without the
+    // variable, behavior is exactly what it was before this task.
+    if (shouldRegisterProtocolScheme(homeOverride)) {
+      // V2-T5b item 5: Windows — the `seeya://`-shaped handler on Linux comes from the package's
+      // own `.desktop` file and on macOS from its `Info.plist`, neither of which exists from a
+      // checkout (only the installer task can write them); attempting `setAsDefaultProtocolClient`
+      // there today would be a no-op at best (Electron's own docs: "this method is only
+      // implemented on macOS and Windows") and a false claim in the marker at worst.
+      // `process.platform` read directly here, not in `composition/index.ts`, matches this same
+      // file's own pre-existing `window-all-closed` handler below — an Electron-lifecycle branch,
+      // not a choice of which adapter to wire (composition/index.ts's own job).
+      //
+      // V2-T8 item 4: Linux — no equivalent API to call at all (`shouldMarkLinuxProtocolRegistered`'s
+      // own docstring: the `.desktop` file's `MimeType` was already written, at INSTALL time, by the
+      // `.deb`; this process can only infer that it was, never confirm it the way Windows' own
+      // boolean return does). macOS still gets no marker at all this task (`o que não entra`: no
+      // click mechanism exists there to gate). Linux never registers `seeya-dev` at all (V2-T10 item
+      // 1's own "o que entra": no `.desktop` file exists from a checkout there either), so
+      // `shouldMarkLinuxProtocolRegistered` only ever implies the packaged `seeya` scheme.
+      const markProtocolRegistered =
+        (process.platform === 'win32' && registerProtocolHandler(protocolScheme)) ||
+        shouldMarkLinuxProtocolRegistered({
+          platform: process.platform,
+          isPackaged: app.isPackaged,
+          appImageEnv: process.env.APPIMAGE,
+        });
+      if (markProtocolRegistered) {
+        // V2-T10 item 2: the marker now records WHICH scheme this window registered (never just a
+        // boolean "registered on this machine") — the toast/click backends read it back through
+        // `Storage.readActiveProtocolScheme()` to pick the right URI.
+        await context.storage.saveActiveProtocolScheme(protocolScheme).catch(() => {
+          // Best-effort: a failed write here just means the daemon's own toast/click keeps omitting
+          // `launch`/`--action` until a later run of the interface writes the marker successfully —
+          // the same "no marker, toast as before" fallback D-025 already gives a marker that was
+          // never written at all.
+        });
+      }
     }
 
     const window = createWindow(context.clock);
