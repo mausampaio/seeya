@@ -1,9 +1,10 @@
 ---
 id: TASK-48
 title: V2-T58 — Espaço de trabalho commita com a identidade do seeya
-status: To Do
+status: Review
 assignee: []
 created_date: '2026-09-25 21:24'
+updated_date: '2026-09-27 10:52'
 labels: []
 milestone: m-0
 dependencies: []
@@ -43,3 +44,54 @@ disco, é valor que já existe).
 ele passar sem ela mexer em configuração; `git -C ~/.seeya/workspace config --local --list` mostra a
 identidade do seeya.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+**Relatório do agente (branch `tarefa/V2-T58-identidade-do-espaco`, worktree isolada, a partir da
+`main` em `b0e50ea`).**
+
+1. **Porta e adaptador.** `WorkspaceRepository.configureIdentity(root)` (`core/ports.ts`) —
+   `git config --local user.name`/`user.email`, nunca `--global`. Implementada em
+   `adapters/workspace/index.ts#FsWorkspaceRepository`, reusando `SEEYA_IDENTITY_NAME`/
+   `SEEYA_IDENTITY_EMAIL` — extraídas de `COMMIT_IDENTITY_ENV` (o mesmo que `commitAll` já
+   injetava via env), num lugar só, como a tarefa pede. `git config --local <key> <value>`
+   sobrescreve um valor já existente (o caso do mantenedor no Ubuntu) e não toca em mais
+   nenhuma chave.
+2. **Orquestração.** `application/workspace-identity.ts#ensureWorkspaceIdentityConfigured` —
+   mesmo formato fininho de `ensureWorkspaceHooksInstalled` (o precedente citado na tarefa).
+   Chamada em `application/workspace.ts#createProject` (logo depois de
+   `ensureWorkspaceHooksInstalled`) e no início de `application/project-open.ts#openProject`
+   (mesmo ponto e mesma razão do gancho de git — reasserida a cada `open`).
+3. **Regras de trabalho.** `core/project-working-rules.ts` ganhou a linha "Do not change git
+   configuration... the identity commits use here is already set up, and which session wrote
+   what is the trailers above, not git identity." Texto continua em 1536 caracteres, bem abaixo
+   do teto de 4000.
+4. **Teste de regressão (item 3 da tarefa).** `tests/integration/workspace/local-identity.test.ts`
+   — espaço de trabalho descartável, gancho `commit-msg` real (CLI compilada), `GIT_CONFIG_GLOBAL`
+   apontando para um arquivo vazio e `GIT_CONFIG_NOSYSTEM=1`, e um `git commit` sem nenhuma
+   variável `GIT_AUTHOR_*`/`GIT_COMMITTER_*` (como uma sessão rodaria). Com `configureIdentity`
+   chamado, o commit passa com autor `seeya <seeya@localhost>` e os dois trailers; sem chamar
+   (segundo teste do arquivo, documentando o estado anterior a esta tarefa) o mesmo commit falha
+   com "Author identity unknown" — a reprodução exata do incidente do mantenedor.
+   Confirmei que a correção realmente muda o comportamento: comentei temporariamente as duas
+   chamadas de `ensureWorkspaceIdentityConfigured` (em `workspace.ts`/`project-open.ts`) e os
+   dois novos testes unitários que checam `configureIdentityCalls` falharam
+   (`expected [] to have a length of 1` / `expected [] to deeply equal [...]`); restaurei e os
+   38 testes dos dois arquivos voltaram a passar.
+5. **Cobertura adicional.** Caso permitido/sobrescrita e "não toca em outra chave" em
+   `tests/integration/workspace/fs-workspace-repository.test.ts` (`describe('configureIdentity
+   (V2-T58, D-047 emendment)')`); testes unitários da orquestração fininha em
+   `tests/unit/application/workspace-identity.test.ts`; asserções de reafirmação em
+   `tests/unit/application/workspace.test.ts`/`project-open.test.ts`; nova regra coberta em
+   `tests/unit/core/project-working-rules.test.ts`.
+6. **Glossário.** Nova linha em `AGENTS.md` — "identidade local do espaço de trabalho (V2-T58,
+   emenda de 2026-09-25 à D-047)", ao lado da entrada dos ganchos de git.
+
+**Verificação.** `npm run verificar`: verde (278 arquivos de teste, 2849 testes, 4 pulados;
+cobertura 96.23% linhas geral, `engine/src/core` 99.46%). Separadamente,
+`GIT_CONFIG_GLOBAL=<arquivo vazio> GIT_CONFIG_NOSYSTEM=1 npm test`: verde (mesmos 278/2849/4).
+
+**Nada tocado fora do escopo:** nenhum `~/.seeya`/`~/.claude` real, nenhum espaço de trabalho
+real, nenhuma instalação, nenhum daemon/autostart real.
+<!-- SECTION:NOTES:END -->
