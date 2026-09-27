@@ -4,7 +4,7 @@ title: 'V2-T15 — Instalador: daemon religado e macOS que abre aba'
 status: Review
 assignee: []
 created_date: '2026-09-22 11:10'
-updated_date: '2026-09-24 17:35'
+updated_date: '2026-09-27 11:56'
 labels: []
 milestone: m-3
 dependencies: []
@@ -330,5 +330,11 @@ author: PO
 created: 2026-09-24 17:35
 ---
 Aceite parcial em 2026-09-24 (Windows, por máquina): instalar por cima com o daemon de pé, sem matar processo à mão, e o daemon de volta ao fim — provado pelo installer.log da V2-T45. Faltam: desinstalar e a pasta ficar vazia (Windows), e a parte do Mac (sem máquina macOS disponível).
+---
+
+author: PO
+created: 2026-09-27 11:56
+---
+Desinstalação no Windows em 2026-09-27 (instalação por máquina), conferida pelo PO só lendo: pasta de instalação removida; nenhuma tarefa seeya no Agendador; HKCU\Software\Classes\seeya removida; nenhuma entrada de desinstalação em HKCU/HKLM/WOW6432Node; entrada do instalador no PATH removida (o seeya que sobra no PATH é o npm link do checkout de desenvolvimento, não do instalador); nenhum atalho; nenhum processo do seeya; installer.log mostra o desinstalador parando o daemon e removendo o autostart, sem religar. ~/.seeya preservado (dados da pessoa). Sobra HKCU\Software\Classes\seeya-dev, das janelas de verificação de agentes antes da V2-T57 — não é do instalador. Achado menor: a desinstalação de verdade é rotulada 'old-uninstaller' no installer.log, o mesmo rótulo da desinstalação que faz parte de uma atualização. Falta: a parte do macOS (sem máquina disponível).
 ---
 <!-- COMMENTS:END -->

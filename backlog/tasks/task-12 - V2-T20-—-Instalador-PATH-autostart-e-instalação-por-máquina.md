@@ -4,7 +4,7 @@ title: 'V2-T20 — Instalador: PATH, autostart e instalação por máquina'
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-24 17:48'
+updated_date: '2026-09-27 11:56'
 labels: []
 milestone: m-3
 dependencies: []
@@ -197,5 +197,11 @@ author: PO
 created: 2026-09-24 17:48
 ---
 Aceite parcial em 2026-09-24, Ubuntu do mantenedor (build de 1ba6dac, .deb em /opt): num terminal novo, 'seeya status' responde. Falta desinstalar e conferir que não sobra autostart (Linux e Windows), e o terminal novo no Windows.
+---
+
+author: PO
+created: 2026-09-27 11:56
+---
+Desinstalação no Windows em 2026-09-27 (instalação por máquina), conferida pelo PO só lendo: pasta de instalação removida; nenhuma tarefa seeya no Agendador; HKCU\Software\Classes\seeya removida; nenhuma entrada de desinstalação em HKCU/HKLM/WOW6432Node; entrada do instalador no PATH removida (o seeya que sobra no PATH é o npm link do checkout de desenvolvimento, não do instalador); nenhum atalho; nenhum processo do seeya; installer.log mostra o desinstalador parando o daemon e removendo o autostart, sem religar. ~/.seeya preservado (dados da pessoa). Sobra HKCU\Software\Classes\seeya-dev, das janelas de verificação de agentes antes da V2-T57 — não é do instalador. Achado menor: a desinstalação de verdade é rotulada 'old-uninstaller' no installer.log, o mesmo rótulo da desinstalação que faz parte de uma atualização. Falta: com o app reinstalado, um terminal novo no Windows responder a 'seeya status'.
 ---
 <!-- COMMENTS:END -->
