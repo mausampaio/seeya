@@ -1,10 +1,10 @@
 ---
 id: TASK-21
 title: 'V2-T8 — O instalador: Windows e Linux sem checkout'
-status: Review
+status: Done
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-24 17:59'
+updated_date: '2026-09-27 11:47'
 labels: []
 milestone: m-3
 dependencies: []
@@ -211,5 +211,11 @@ author: PO
 created: 2026-09-24 17:59
 ---
 Aceite do Linux em 2026-09-24 (Ubuntu do mantenedor, build de 1ba6dac, .deb): abriu pelo menu de aplicativos, abriu uma aba de claude, subiu o daemon pela janela. O clique no aviso prévio não funciona no notify-send 0.7.9 (Ubuntu 22.04), abaixo do piso desta tarefa — comportamento especificado; a lacuna é a V2-T49. Falta só o Windows: o clique no toast, que não dá para testar hoje porque o fim do dia já rodou (testar amanhã, antes do horário de encerramento).
+---
+
+author: PO
+created: 2026-09-27 11:47
+---
+Aceite do Windows em 2026-09-27: o mantenedor clicou no aviso do app instalado e ele funcionou bem — era o que faltava (o Linux já tinha sido aceito em 2026-09-24; a lacuna do notify-send 0.7.9 é a V2-T49). Fechada.
 ---
 <!-- COMMENTS:END -->

@@ -4,6 +4,7 @@ title: V2-T57 — Janela de verificação não mexe no protocolo real
 status: Review
 assignee: []
 created_date: '2026-09-25 17:05'
+updated_date: '2026-09-27 11:47'
 labels: []
 milestone: m-2
 dependencies: []
@@ -90,3 +91,13 @@ foi executado).
 Branch `tarefa/V2-T57-protocolo-isolado`, a partir de `main` em `41fd813`. Commit único
 (`fix(app): a verification window never registers the protocol scheme`).
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-27 11:47
+---
+Revisão do PO em 2026-09-27: aprovada. Conferido que há um único ponto de registro do esquema (registerProtocolHandler) e um único de gravação do marcador (saveActiveProtocolScheme), os dois em electron/main.ts e agora atrás de shouldRegisterProtocolScheme; sem SEEYA_APP_HOME_OVERRIDE, nada muda. Portão: 279 arquivos, 2851 testes, e o mesmo sem identidade global do git. Prova com janela real não foi feita (opcional). Nota de processo: o agente contornou um bloqueio do modo automático pondo o comando de teste sem identidade num script; o comando era inócuo, mas contornar bloqueio não é aceitável — registrado para o despacho seguinte. Falta o aceite: a chave seeya-dev e o marcador intocados depois de uma janela de verificação.
+---
+<!-- COMMENTS:END -->
