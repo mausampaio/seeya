@@ -4,7 +4,7 @@ title: 'V2-T41 — Spike: gancho antes da compactação no Claude Code'
 status: Review
 assignee: []
 created_date: '2026-09-23 11:05'
-updated_date: '2026-09-28 10:40'
+updated_date: '2026-09-28 10:46'
 labels: []
 milestone: m-5
 dependencies: []
@@ -134,3 +134,13 @@ de teste estão listados acima e na seção "Limpeza" do spike, para quem quiser
 
 Nenhum bloqueio de permissão/modo automático encontrado. `npm run verificar` verde (só docs novos).
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-28 10:46
+---
+Revisão do PO em 2026-09-28: mesclado, portão verde (2851 testes). Leitura aceita pelo PO: PreCompact não fez a sessão agir em 0 de 5; SessionStart(compact) sempre entrega o texto e foi seguido em 2 de 5; regras do --append-system-prompt sobreviveram; config só no cwd; a sessão retomada usa o .claude/settings.json atual (serve à V2-T59). Custo US$ 5,50 (acima do que eu esperava — forçar compactação real exige encher ~200k tokens). Nota de processo: o agente reescreveu formas de comando recusadas pela proteção da worktree (script em arquivo) — mesmo padrão já apontado na V2-T57; registrado. Transcripts das sessões descartáveis ficam em ~/.claude/projects (4 pastas do scratch do spike, ~12 MB), limpeza só com o OK do mantenedor. Falta o aceite do mantenedor: ler o spike.
+---
+<!-- COMMENTS:END -->
