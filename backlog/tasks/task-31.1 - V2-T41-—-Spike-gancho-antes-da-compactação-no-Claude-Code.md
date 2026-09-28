@@ -1,10 +1,10 @@
 ---
 id: TASK-31.1
 title: 'V2-T41 — Spike: gancho antes da compactação no Claude Code'
-status: To Do
+status: Review
 assignee: []
 created_date: '2026-09-23 11:05'
-updated_date: '2026-09-28 09:58'
+updated_date: '2026-09-28 10:40'
 labels: []
 milestone: m-5
 dependencies: []
@@ -73,3 +73,64 @@ entre agir antes e reorientar depois. Mais a primeira linha da matriz de capacid
 
 **Aceite do mantenedor:** ler o spike e concordar com a leitura, ou apontar o que ficou sem medir.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Medido com sessões descartáveis reais (`claude` 2.1.283, Windows 11), nunca sessão/config do
+mantenedor. Documento: `docs/spikes/O-gancho-antes-da-compactacao.md`. Matriz de capacidades da
+V2-T40 (não existia antes): `docs/CAPACIDADES-DE-HARNESS.md`, primeira linha (Claude Code).
+
+Achado colateral de método: `/compact` não funciona em `-p` headless (tratado como texto literal,
+nunca como comando) — só a compactação AUTOMÁTICA foi medida, forçada estourando a janela real de
+200k tokens do modelo em dois turnos (turno 1 sob o limite, turno 2 empurra o total além dele).
+Confirmado por um evento estruturado no transcript (`compact_boundary`, com `preTokens`/
+`postTokens`/`durationMs` exatos), não só por inferência de custo/cache.
+
+Resumo por pergunta (medido / só documentado / não medido):
+
+1. **`PreCompact` faz a sessão agir?** Medido. Não — 0 de 5 compactações reais produziram
+   qualquer ação (escrita, leitura) correlacionada com o gancho; a resposta final foi sempre a do
+   turno pendente, nunca a que o gancho pedia.
+2. **`SessionStart` é o caminho melhor?** Medido. Sim, mas não garantido — o texto sempre chega
+   como `<system-reminder>` real; em 2 de 5 compactações o modelo agiu (uma delas com chamadas de
+   ferramenta de verdade), em 3 de 5 foi ignorado.
+3. **O que cada gancho recebe?** Medido. Campos e nomes exatos no documento (`trigger` no
+   `PreCompact`, `source` no `SessionStart`; só este último recebe `model`).
+4. **As regras de `--append-system-prompt` sobrevivem à compactação?** Medido. Sim, no cenário
+   testado (flag só na primeira chamada, nunca repetida) — uma regra de recusa sobreviveu a uma
+   compactação automática real, idêntica antes e depois.
+5. **Máquina × projeto?** Medido (o que dá para medir). O `PreCompact` não força escrita nenhuma
+   (mesmo limite da pergunta 1); a categorização sobreviveu só na memória da própria conversa, sem
+   nada gravado em disco. Critério proposto na seção "o que isto decide": escrita continua exigindo
+   passo visível e confirmado por humano.
+6. **Configuração só vale no `cwd`?** Medido. Sim — um gancho num diretório só liberado por
+   `--add-dir` não disparou numa compactação automática real, mesma regra já medida na V2-T34 para
+   o gancho de `Bash`.
+7. **Quanto custa?** Medido. Seis compactações reais: 9,8–27,8s só para o passo de compactar,
+   tipicamente cortando a conversa para 45–55% do tamanho em tokens; uma chamada que compacta custa
+   uma ordem de grandeza a mais que uma equivalente que não compacta. Custo total do spike: US$ 5,50
+   em 18 chamadas `-p` reais (`haiku`).
+8. **Sessão retomada usa configuração atual?** Medido. Sim — reescrita do `.claude/settings.json`
+   entre duas chamadas, e só a versão nova disparou na compactação seguinte.
+
+Não medido (ver seção própria no documento): compactação MANUAL (`/compact` não funciona headless);
+bloquear compactação com código de saída 2; por que `--autocompact 100000` não disparou a ~140k
+tokens; Sonnet/Opus; Linux/macOS; sessão interativa de verdade com TTY; tipos de gancho além de
+`command`; a causa exata da variação de comportamento da pergunta 2; se o resultado da pergunta 4
+se sustenta num processo único de verdade (aqui simulado por `--resume` em processos separados).
+
+Recomendação: **reorientar depois (`SessionStart`), não agir antes (`PreCompact`)** — mas nenhum
+dos dois é confiável o bastante para substituir aceite humano explícito antes de gravar saber-fazer
+em arquivo versionado (detalhe na seção "o que isto decide" do spike).
+
+Custo total: **US$ 5,50**, 18 chamadas `claude -p --model haiku`, 8 `session_id` descartáveis (todos
+anonimizados no documento como `11111111-...` a `88888888-...`). Diretório temporário: quatro
+subpastas dentro do diretório de scratch deste agente
+(`.../scratchpad/spike-o/{hook-project,hook-project-q45,plain-cwd-q6+hooked-adddir-q6,resume-q8}`),
+todas fora do repositório, apagadas ao final. Transcripts em `~/.claude/projects/<hash>/` foram
+**deixados intactos** por instrução explícita da tarefa (não editar `~/.claude`) — os quatro `cwd`
+de teste estão listados acima e na seção "Limpeza" do spike, para quem quiser apagá-los.
+
+Nenhum bloqueio de permissão/modo automático encontrado. `npm run verificar` verde (só docs novos).
+<!-- SECTION:NOTES:END -->
