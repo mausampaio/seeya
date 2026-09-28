@@ -1,10 +1,10 @@
 ---
 id: TASK-6
 title: V2-T13 — O app é dono do daemon e do autostart
-status: Review
+status: Done
 assignee: []
 created_date: '2026-09-22 11:10'
-updated_date: '2026-09-23 10:46'
+updated_date: '2026-09-28 09:45'
 labels: []
 milestone: m-1
 dependencies: []
@@ -214,3 +214,13 @@ avisou, por conta própria, que "seeya" virou item de início de sessão — con
 de que o registro de autostart da V2-T13 chegou ao lugar certo. O item 2 está fechado na plataforma onde o defeito existia,
 e a versão de macOS deixou de sair quebrada.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-28 09:45
+---
+Aceite fechado em 2026-09-28 (Windows, instalação por máquina): o autostart ligado pela janela subiu o daemon sozinho depois de logout/login, sem ninguém abrir o app; a pergunta da transição foi respondida uma vez (2026-09-20) e não voltou; o lock registra launchedBy = seeya.exe instalado. O item 'seeya daemon recusa' ficou superado: desde a V2-T22 a recusa vale só para um binário separado do app, e desde a V2-T20 o seeya do PATH é o próprio seeya.exe instalado — com o daemon parado, 'seeya daemon' subiu o daemon do app (a janela mostrou running), como desenhado. A recusa continua coberta por teste para o caso que ela protege (CLI de outro binário, ex.: npm link do checkout). Fechada.
+---
+<!-- COMMENTS:END -->
