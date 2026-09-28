@@ -1,10 +1,10 @@
 ---
 id: TASK-17
 title: V2-T25 — A pergunta de transição não sabe de quem é o daemon
-status: Review
+status: Done
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-23 10:46'
+updated_date: '2026-09-28 09:40'
 labels: []
 milestone: m-1
 dependencies: []
@@ -135,3 +135,13 @@ mesclagem da V2-T22 tinham sido publicados dentro deste documento, porque a conf
 conflito foi encadeada junto do portão e a saída dela passou despercebida. Os dois lados
 foram preservados. Fica em `[~]` até o aceite do mantenedor.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-28 09:40
+---
+Aceite fechado em 2026-09-27 (Windows, instalação por máquina): autostart ligado pela janela, logout e login; o autostart subiu o daemon 14 s depois do logon, sem ninguém abrir a janela; daemon.lock com launchedBy apontando para o seeya.exe instalado; ao abrir o app, nenhuma pergunta. Ressalva registrada: a resposta da transição estava gravada desde 2026-09-20, então a ausência da pergunta sozinha não provaria — quem prova é o launchedBy do lock. Observação: no Windows o daemon não sobrevive ao logout (ao contrário do macOS medido); o autostart o repõe. Fechada.
+---
+<!-- COMMENTS:END -->
