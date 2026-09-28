@@ -1,10 +1,10 @@
 ---
 id: TASK-10
 title: V2-T18 — Caixa de seleção e painel Hoje parado
-status: Review
+status: Done
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-23 10:46'
+updated_date: '2026-09-28 09:54'
 labels: []
 milestone: m-2
 dependencies: []
@@ -163,3 +163,13 @@ passando, 4 pulados; cobertura 96,40%/92,62%/94,95%/96,76%). Revisão com um aju
 frases em português tinham ficado dentro de comentários de código, que por contrato são em
 inglês (D-028). Fica em `[~]` até o aceite do mantenedor.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-28 09:54
+---
+Aceite do mantenedor em 2026-09-28 (Windows, app instalado): retomou uma sessão do plano pelo painel Hoje, saiu com exit, e a caixa dela continuou disponível para retomar de novo. Fechada.
+---
+<!-- COMMENTS:END -->
