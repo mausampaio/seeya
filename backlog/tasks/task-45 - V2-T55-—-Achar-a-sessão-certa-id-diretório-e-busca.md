@@ -1,10 +1,10 @@
 ---
 id: TASK-45
 title: 'V2-T55 — Achar a sessão certa: id, diretório e busca'
-status: Review
+status: Done
 assignee: []
 created_date: '2026-09-25 13:35'
-updated_date: '2026-09-25 18:54'
+updated_date: '2026-09-28 09:49'
 labels: []
 milestone: m-2
 dependencies: []
@@ -244,5 +244,11 @@ author: PO
 created: 2026-09-25 18:54
 ---
 Revisão do PO em 2026-09-25, rodada de correção do aceite: mesclado no po-gate, portão verde (2793 testes) também sem identidade global do git. Conferido: o rótulo do diretório mostra o fim do caminho (função pura testada), a lateral não rola mais na horizontal (min-width:0 + overflow-x: hidden — a causa era o caminho sem espaço forçando a largura, a mesma classe da V2-T48), a lateral redimensiona com a largura lembrada (seeya.sidebarWidth, no glossário), e o foco volta à aba ativa por um mecanismo único para todos os diálogos (verificado: focusReturnedToTerminal true). A janela de verificação tocou de novo a chave seeya-dev (V2-T57 isola). Falta o aceite do mantenedor com um build novo.
+---
+
+author: PO
+created: 2026-09-28 09:49
+---
+Aceite do mantenedor em 2026-09-28 (Windows, app instalado): testou tudo na janela e está funcionando — botão de recolher no topo e o atalho Ctrl+B, rótulo de diretório encurtado, lateral redimensionável, foco de volta ao terminal ao fechar diálogo, rótulo 'no running process' e a busca por id. Fechada.
 ---
 <!-- COMMENTS:END -->
