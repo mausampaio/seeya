@@ -888,4 +888,161 @@ describe('FsWorkspaceRepository', () => {
       ).rejects.toThrow(/git log failed/);
     });
   });
+
+  // D-050/V2-T61.
+  describe('CLAUDE.md bridge', () => {
+    it('isClaudeMdVersioned is false for a brand-new project — nobody has committed one', async () => {
+      root = await makeTmpDir();
+      const workspace = new FsWorkspaceRepository();
+      await workspace.initialize(root);
+      await workspace.writeProjectSkeleton(
+        root,
+        'auth-hardening',
+        buildProjectSkeleton('auth-hardening'),
+      );
+      await workspace.commitAll(root, 'auth-hardening', 'Create project auth-hardening');
+      expect(await workspace.isClaudeMdVersioned(root, 'auth-hardening')).toBe(false);
+    });
+
+    it('isClaudeMdVersioned throws with the raw reason when root is not a git repository at all', async () => {
+      root = await makeTmpDir();
+      const workspace = new FsWorkspaceRepository();
+      await expect(workspace.isClaudeMdVersioned(root, 'auth-hardening')).rejects.toThrow(
+        /git ls-files failed/,
+      );
+    });
+
+    it('installGeneratedClaudeMd writes the file, and git reports it ignored (real git status --ignored)', async () => {
+      root = await makeTmpDir();
+      const workspace = new FsWorkspaceRepository();
+      await workspace.initialize(root);
+      await workspace.writeProjectSkeleton(
+        root,
+        'auth-hardening',
+        buildProjectSkeleton('auth-hardening'),
+      );
+      // Same as production: the .gitignore line only lands on the FIRST commit (`commitAll`'s own
+      // `ensureWorkspaceGitignoreIgnoresProjectLock` reassertion), which `openProject` always runs
+      // before ever writing the generated CLAUDE.md (`application/project-open.ts`'s own ordering).
+      await workspace.commitAll(root, 'auth-hardening', 'Create project auth-hardening');
+
+      await workspace.installGeneratedClaudeMd(root, 'auth-hardening', '@AGENTS.md\n');
+      expect(await readFile(path.join(root, 'auth-hardening', 'CLAUDE.md'), 'utf8')).toBe(
+        '@AGENTS.md\n',
+      );
+
+      // The permitted case (AGENTS.md § "Teste o caso permitido, não só o proibido"): an ordinary
+      // `git status --porcelain` never mentions it at all (ignored files are omitted by default,
+      // same assertion style the `.seeya-lock` test above already uses).
+      const status = await runGit(root, ['status', '--porcelain']);
+      expect(status.ran && status.stdout).not.toMatch(/CLAUDE\.md/);
+
+      // The task's own required proof: `git status --porcelain --ignored=matching` names it
+      // explicitly, `!!` (ignored), never `??` (untracked-but-not-ignored) — real git, real
+      // filesystem, no mock.
+      const ignored = await runGit(root, ['status', '--porcelain', '--ignored=matching']);
+      expect(ignored.ran && ignored.exitCode === 0).toBe(true);
+      const ignoredLine = ignored.ran
+        ? ignored.stdout.split('\n').find((line) => line.includes('CLAUDE.md'))
+        : undefined;
+      expect(ignoredLine).toBe('!! auth-hardening/CLAUDE.md');
+
+      expect(await workspace.isClaudeMdVersioned(root, 'auth-hardening')).toBe(false);
+    });
+
+    it('installGeneratedClaudeMd always overwrites — same "seeya-generated text" discipline as the harness hook', async () => {
+      root = await makeTmpDir();
+      const workspace = new FsWorkspaceRepository();
+      await workspace.initialize(root);
+      await workspace.writeProjectSkeleton(
+        root,
+        'auth-hardening',
+        buildProjectSkeleton('auth-hardening'),
+      );
+      await workspace.commitAll(root, 'auth-hardening', 'Create project auth-hardening');
+      await workspace.installGeneratedClaudeMd(root, 'auth-hardening', 'first version\n');
+      await workspace.installGeneratedClaudeMd(root, 'auth-hardening', 'second version\n');
+      expect(await readFile(path.join(root, 'auth-hardening', 'CLAUDE.md'), 'utf8')).toBe(
+        'second version\n',
+      );
+    });
+
+    it('isClaudeMdVersioned is true once a person commits their own CLAUDE.md (item 2: an old, pre-V2-T44 project)', async () => {
+      root = await makeTmpDir();
+      const workspace = new FsWorkspaceRepository();
+      await workspace.initialize(root);
+      await workspace.writeProjectSkeleton(
+        root,
+        'auth-hardening',
+        buildProjectSkeleton('auth-hardening'),
+      );
+      await workspace.commitAll(root, 'auth-hardening', 'Create project auth-hardening');
+
+      // Standing in for a project created before this task, whose CLAUDE.md a person wrote and
+      // committed by hand — never through `installGeneratedClaudeMd`. `-f`: the workspace's own
+      // `.gitignore` already carries this task's own `CLAUDE.md` pattern (added by `commitAll`
+      // above), and plain `git add` refuses an explicitly named, already-ignored path without it —
+      // exactly the override a person committing this file for real would have had to use too.
+      await writeFile(
+        path.join(root, 'auth-hardening', 'CLAUDE.md'),
+        '# Hand-written, do not touch\n',
+        'utf8',
+      );
+      await runGit(root, ['add', '-f', path.posix.join('auth-hardening', 'CLAUDE.md')]);
+      const commit = await runGit(root, ['commit', '-m', 'Add a hand-written CLAUDE.md'], {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'Seeya Test',
+        GIT_AUTHOR_EMAIL: 'seeya-test-fixture',
+        GIT_COMMITTER_NAME: 'Seeya Test',
+        GIT_COMMITTER_EMAIL: 'seeya-test-fixture',
+      });
+      expect(commit.ran && commit.exitCode === 0).toBe(true);
+
+      expect(await workspace.isClaudeMdVersioned(root, 'auth-hardening')).toBe(true);
+
+      // The `.gitignore` pattern this task adds never un-tracks a file git already knows about —
+      // the hand-written CLAUDE.md keeps showing up as ordinarily tracked, never `!!` (ignored).
+      const status = await runGit(root, ['status', '--porcelain', '--ignored=matching']);
+      expect(status.ran && status.stdout).not.toMatch(/CLAUDE\.md/);
+      const lsFiles = await runGit(root, ['ls-files', '--', 'auth-hardening/CLAUDE.md']);
+      expect(lsFiles.ran && lsFiles.stdout.trim()).toBe('auth-hardening/CLAUDE.md');
+    });
+
+    it('isClaudeMdVersioned checks per project — a versioned CLAUDE.md in one project never reports true for another', async () => {
+      root = await makeTmpDir();
+      const workspace = new FsWorkspaceRepository();
+      await workspace.initialize(root);
+      await workspace.writeProjectSkeleton(
+        root,
+        'auth-hardening',
+        buildProjectSkeleton('auth-hardening'),
+      );
+      await workspace.commitAll(root, 'auth-hardening', 'Create project auth-hardening');
+      await workspace.writeProjectSkeleton(root, 'billing-v2', buildProjectSkeleton('billing-v2'));
+      await workspace.commitAll(root, 'billing-v2', 'Create project billing-v2');
+
+      await writeFile(
+        path.join(root, 'billing-v2', 'CLAUDE.md'),
+        '# Hand-written for billing-v2\n',
+        'utf8',
+      );
+      // `-f`: same override as the test above, for the same `.gitignore` reason.
+      await runGit(root, ['add', '-f', path.posix.join('billing-v2', 'CLAUDE.md')]);
+      const commit = await runGit(
+        root,
+        ['commit', '-m', 'Add a hand-written CLAUDE.md to billing-v2'],
+        {
+          ...process.env,
+          GIT_AUTHOR_NAME: 'Seeya Test',
+          GIT_AUTHOR_EMAIL: 'seeya-test-fixture',
+          GIT_COMMITTER_NAME: 'Seeya Test',
+          GIT_COMMITTER_EMAIL: 'seeya-test-fixture',
+        },
+      );
+      expect(commit.ran && commit.exitCode === 0).toBe(true);
+
+      expect(await workspace.isClaudeMdVersioned(root, 'billing-v2')).toBe(true);
+      expect(await workspace.isClaudeMdVersioned(root, 'auth-hardening')).toBe(false);
+    });
+  });
 });

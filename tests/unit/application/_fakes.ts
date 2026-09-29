@@ -775,6 +775,34 @@ export class FakeWorkspaceRepository implements WorkspaceRepository {
     this.installedHarnessHookCalls.push({ root, projectId, settingsJsonContent });
     return Promise.resolve();
   }
+
+  // D-050/V2-T61: `claude-md-bridge.test.ts`/`project-open.test.ts`'s own hooks — unset (or a
+  // project id never configured) reads as "not versioned" (`false`), the same default a
+  // brand-new project (never touched by hand) would report for real.
+  private readonly claudeMdVersionedByProject = new Set<string>();
+  readonly installedGeneratedClaudeMdCalls: {
+    readonly root: string;
+    readonly projectId: string;
+    readonly content: string;
+  }[] = [];
+
+  setClaudeMdVersioned(projectId: string, versioned: boolean): void {
+    if (versioned) {
+      this.claudeMdVersionedByProject.add(projectId);
+    } else {
+      this.claudeMdVersionedByProject.delete(projectId);
+    }
+  }
+
+  isClaudeMdVersioned(root: string, projectId: string): Promise<boolean> {
+    void root;
+    return Promise.resolve(this.claudeMdVersionedByProject.has(projectId));
+  }
+
+  installGeneratedClaudeMd(root: string, projectId: string, content: string): Promise<void> {
+    this.installedGeneratedClaudeMdCalls.push({ root, projectId, content });
+    return Promise.resolve();
+  }
 }
 
 /** Named double for `SessionResumer` (S3-T3, docs/TESTES.md: "duplo de I/O é classe/objeto

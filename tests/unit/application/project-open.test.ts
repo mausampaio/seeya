@@ -16,6 +16,7 @@ import type {
 import type { ProjectLockInfo } from '@seeya-ai/engine/core/project-lock.js';
 import { buildProjectWorkingRulesText } from '@seeya-ai/engine/core/project-working-rules.js';
 import type { ProjectAuditReport } from '@seeya-ai/engine/application/project-audit.js';
+import type { ClaudeMdInstallOutcome } from '@seeya-ai/engine/application/claude-md-bridge.js';
 import {
   ControllableProcessControl,
   DEFAULT_TEST_CONFIG,
@@ -515,6 +516,48 @@ describe('openProject', () => {
       const call = workspace.installedHarnessHookCalls.at(-1);
       expect(call?.projectId).toBe('auth-hardening');
       expect(call?.settingsJsonContent).toContain('project verify-bash-command');
+    });
+
+    it('installs the generated CLAUDE.md bridge (D-050/V2-T61) alongside the harness hook', async () => {
+      const result = await openProject(
+        buildOpenDeps(storage, workspace),
+        'auth-hardening',
+        'claude',
+      );
+      expect(result.kind).toBe('opened');
+      const call = workspace.installedGeneratedClaudeMdCalls.at(-1);
+      expect(call?.projectId).toBe('auth-hardening');
+      expect(call?.content).toContain('@AGENTS.md');
+      expect(call?.content).toContain('Compact Instructions');
+    });
+
+    it('reports the CLAUDE.md outcome via onBeforeLaunch (D-050/V2-T61: written, the ordinary case)', async () => {
+      const captured: { claudeMd: ClaudeMdInstallOutcome | null } = { claudeMd: null };
+      await openProject(buildOpenDeps(storage, workspace), 'auth-hardening', 'claude', {
+        onBeforeLaunch: ({ claudeMd }) => {
+          captured.claudeMd = claudeMd;
+        },
+      });
+      expect(captured.claudeMd).toEqual({ kind: 'written' });
+    });
+
+    it('never overwrites an already-versioned CLAUDE.md, and reports skippedVersioned (item 2, D-025)', async () => {
+      workspace.setClaudeMdVersioned('auth-hardening', true);
+      const captured: { claudeMd: ClaudeMdInstallOutcome | null } = { claudeMd: null };
+      const before = workspace.installedGeneratedClaudeMdCalls.length;
+      const result = await openProject(
+        buildOpenDeps(storage, workspace),
+        'auth-hardening',
+        'claude',
+        {
+          onBeforeLaunch: ({ claudeMd }) => {
+            captured.claudeMd = claudeMd;
+          },
+        },
+      );
+      expect(result.kind).toBe('opened');
+      expect(captured.claudeMd).toEqual({ kind: 'skippedVersioned' });
+      expect(workspace.installedGeneratedClaudeMdCalls).toHaveLength(before);
     });
 
     it('reports what the audit found via onBeforeLaunch, before the lock is even checked', async () => {
