@@ -533,3 +533,26 @@ de um gancho.
 **Este arquivo não existia antes deste spike.** Criado aqui, enxuto, com a primeira linha (Claude
 Code) — a V2-T40 pede que a matriz viva em `docs/`; cresce quando um filho novo (Codex, Gemini...)
 medir o harness dele. Ver `docs/CAPACIDADES-DE-HARNESS.md`.
+
+## Complemento: leitura de documentação (PO, 2026-09-29)
+
+O mantenedor não se sentiu seguro para decidir só com as medições acima — em especial, se a regra
+entregue no `open` sobreviveu porque a janela era pequena. O PO completou com leitura de
+documentação oficial e código-fonte público, sem sessão nenhuma:
+
+- **Claude Code** (`code.claude.com/docs/en/memory`, `.../prompt-caching`, `.../hooks`): o
+  `CLAUDE.md` da raiz do projeto é relido do disco e reinjetado depois da compactação; o prompt de
+  sistema é remontado depois dela, não resumido; skills já invocadas voltam, cortadas em 5.000
+  tokens cada (25.000 no total); uma seção "Compact Instructions" no `CLAUDE.md` orienta o que o
+  resumo preserva. Nada sobre o tamanho da janela mudar o que é preservado — só quando dispara.
+  **Silêncio relevante:** nenhuma linha sobre o `AGENTS.md` ser reinjetado.
+- **Codex CLI** (`openai/codex`, `build_initial_context_with_world_state`): prompt de sistema e
+  `AGENTS.md` reconstruídos do zero depois de compactar. Ganchos `PreCompact`/`PostCompact`, que
+  podem abortar.
+- **Gemini CLI** (`google-gemini/gemini-cli`, `ChatCompressionService.compress`): `GEMINI.md` na
+  instrução de sistema, fora do histórico — a compressão não o toca. Só `PreCompress`, informativo.
+
+**Leitura:** nos três, o que sobrevive é estrutural, não sorte de tamanho — a pergunta 4 acima vale
+por construção. A lacuna é do seeya: o esqueleto gera só `AGENTS.md`, cuja reinjeção no Claude Code
+não está documentada. Virou a **D-050** e a **V2-T61** (`CLAUDE.md` gerado com `@AGENTS.md` e
+Compact Instructions), que confirma com uma compactação real.
