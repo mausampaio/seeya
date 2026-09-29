@@ -1356,6 +1356,29 @@ export interface WorkspaceRepository {
    * (`adapters/workspace/index.ts`'s own gitignore reassertion, extended to cover this).
    */
   installHarnessHook(root: string, projectId: string, settingsJsonContent: string): Promise<void>;
+
+  /**
+   * D-050/V2-T61: true when `<root>/<projectId>/CLAUDE.md` is already tracked by git (`git
+   * ls-files`) — a project created before this task shipped, whose `CLAUDE.md` a person may have
+   * written and committed by hand. `application/claude-md-bridge.ts#ensureGeneratedClaudeMdInstalled`
+   * is the one caller: true means "leave it alone" (item 2's own "não sobrescreve nem apaga"),
+   * false means "safe to (re)write the generated one" — covering both "never existed" and "exists
+   * on disk but was never committed" (e.g. a previous `open`'s own generated file), since either
+   * way nobody versioned it as their own content.
+   */
+  isClaudeMdVersioned(root: string, projectId: string): Promise<boolean>;
+
+  /**
+   * D-050/V2-T61: (over)writes `<root>/<projectId>/CLAUDE.md` — always overwrites, same "seeya's
+   * own generated text" discipline `installHarnessHook` above already has. Never committed — the
+   * workspace's own `.gitignore` excludes every project's own `CLAUDE.md`
+   * (`adapters/workspace/index.ts`'s own `IGNORED_WORKSPACE_PATTERNS`), so a fresh, ungenerated
+   * project's file never becomes part of the workspace's own history by accident. Only ever called
+   * after `isClaudeMdVersioned` reported false (`ensureGeneratedClaudeMdInstalled`'s own gate) —
+   * this method doesn't re-check on its own, the same "caller already knows" contract this
+   * interface's other methods already follow.
+   */
+  installGeneratedClaudeMd(root: string, projectId: string, content: string): Promise<void>;
 }
 
 /**

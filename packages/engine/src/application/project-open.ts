@@ -26,6 +26,10 @@ import { resolveWorkspaceRoot } from './workspace.js';
 import { ensureWorkspaceHooksInstalled } from './workspace-hooks.js';
 import { ensureWorkspaceIdentityConfigured } from './workspace-identity.js';
 import { ensureHarnessHookInstalled } from './harness-hook.js';
+import {
+  ensureGeneratedClaudeMdInstalled,
+  type ClaudeMdInstallOutcome,
+} from './claude-md-bridge.js';
 import { auditProject, type ProjectAuditReport } from './project-audit.js';
 import {
   acquireProjectLock,
@@ -143,6 +147,10 @@ export interface OpenProjectCallbacks {
      * itself couldn't run (never in production: `openProject` already validated `projectId` and
      * confirmed the project exists before this point). */
     readonly audit: ProjectAuditReport | null;
+    /** D-050/V2-T61: whether `open` (re)generated this project's own `CLAUDE.md`, or left an
+     * already-versioned one untouched — `cli/format-project.ts#formatClaudeMdLines` is the one
+     * consumer, printing a line only for `skippedVersioned` (item 2: "avisa numa linha"). */
+    readonly claudeMd: ClaudeMdInstallOutcome;
   }) => void;
   /** `undefined` behaves exactly like `'unavailable'` (D-025: never silently proceed without an
    * explicit yes) — every production caller (`cli/project-command.ts`) always supplies one; a test
@@ -404,7 +412,9 @@ async function handleLeftoverChanges(
  * audited next, still
  * BEFORE the lock is ever touched (`auditProject`'s own report reaches `callbacks.onBeforeLaunch`
  * alongside the missing-repository/lock info, same "print it before the harness takes the screen"
- * timing V2-T28 item 4 already established for the other two). Item 4: once this attempt actually
+ * timing V2-T28 item 4 already established for the other two). D-050/V2-T61: the project's own
+ * generated `CLAUDE.md` bridge is (re)installed right after the harness hook, same timing and same
+ * reasoning. Item 4: once this attempt actually
  * holds the lock (never for a `readOnly` open), `handleLeftoverChanges` asks what to do with
  * whatever a previous session left uncommitted, before the harness ever launches.
  */
@@ -453,12 +463,16 @@ export async function openProject(
     deps.cliEntryPath,
     deps.hookEnv ?? {},
   );
+  // D-050/V2-T61: same timing as the harness hook right above — both embed/derive content only
+  // `open` can know is current, and both are reinstalled on every run (except when the project
+  // already owns a versioned `CLAUDE.md`, `ensureGeneratedClaudeMdInstalled`'s own gate).
+  const claudeMd = await ensureGeneratedClaudeMdInstalled(deps.workspace, root, projectId);
   const auditOutcome = await auditProject(deps, projectId);
   const audit = auditOutcome.kind === 'audited' ? auditOutcome.report : null;
 
   const { addDirs, missing } = await resolveRepositoryDirs(deps, projectId, manifest.repositories);
   const lock = await acquireOpenLock(deps, root, projectId);
-  callbacks?.onBeforeLaunch?.({ missing, lock, audit });
+  callbacks?.onBeforeLaunch?.({ missing, lock, audit, claudeMd });
 
   // V2-T34 production defect (PO review, 2026-09-25): a `finally` around everything from here on,
   // on top of (not instead of) the explicit releases below — `handleLeftoverChanges`'s own

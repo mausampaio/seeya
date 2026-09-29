@@ -28,6 +28,7 @@ import type {
   MissingRepositoryRecord,
   OpenProjectResult,
 } from '@seeya-ai/engine/application/project-open.js';
+import type { ClaudeMdInstallOutcome } from '@seeya-ai/engine/application/claude-md-bridge.js';
 import type { AdoptSessionResult } from '@seeya-ai/engine/application/project-adopt.js';
 import type {
   AuditProjectOutcome,
@@ -201,6 +202,19 @@ export function formatMissingRepositoryLines(
   missing: readonly MissingRepositoryRecord[],
 ): string[] {
   return missing.map((entry) => formatMissingRepositoryLine(projectId, entry));
+}
+
+/** D-050/V2-T61: `open`'s own pre-launch `CLAUDE.md` note — `[]` when `open` just (re)generated it
+ * (the ordinary case, nothing worth a line), one line when the project already has its own
+ * versioned `CLAUDE.md` and `open` left it untouched (item 2: "avisa numa linha"). */
+export function formatClaudeMdLines(projectId: string, claudeMd: ClaudeMdInstallOutcome): string[] {
+  if (claudeMd.kind === 'written') {
+    return [];
+  }
+  return [
+    `seeya: project "${projectId}" already has its own CLAUDE.md (versioned) — leaving it as is, ` +
+      'not generating one.',
+  ];
 }
 
 /** V2-T34 item 3: one `core/project-audit.ts#CommitEscapeReason` in plain English — shared by the

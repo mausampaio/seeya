@@ -41,6 +41,7 @@ import {
   formatAdoptSessionReport,
   formatAuditCommandReport,
   formatAuditLines,
+  formatClaudeMdLines,
   formatCreateProjectReport,
   formatMissingRepositoryLines,
   formatOpenProjectReport,
@@ -184,9 +185,10 @@ export async function runProjectOpenCommand(
   let result;
   try {
     result = await openProject(deps, projectId, harness, {
-      onBeforeLaunch: ({ missing, lock, audit }) => {
+      onBeforeLaunch: ({ missing, lock, audit, claudeMd }) => {
         const lines = [
           ...formatAuditLines(audit),
+          ...formatClaudeMdLines(projectId, claudeMd),
           ...formatMissingRepositoryLines(projectId, missing),
           ...formatProjectLockWarningLines(projectId, lock),
         ];

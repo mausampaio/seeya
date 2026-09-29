@@ -30,6 +30,13 @@ describe('buildProjectWorkingRulesText', () => {
     expect(text.toLowerCase()).toContain('--no-verify');
   });
 
+  it('tells the session CLAUDE.md is generated and not to edit it (D-050/V2-T61)', () => {
+    const text = buildProjectWorkingRulesText('auth-hardening');
+    expect(text).toContain('CLAUDE.md');
+    expect(text).toContain('never hand-edited');
+    expect(text).toContain('AGENTS.md');
+  });
+
   it('stays well under the D-015 argument ceiling', () => {
     // The resume-prompt ceiling this project has actually measured is 16,384 characters
     // (docs/QUESTOES.md Q-069) — this text travels on a DIFFERENT flag (--append-system-prompt for

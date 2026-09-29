@@ -91,9 +91,19 @@ const IGNORED_OPERATIONAL_FILE_NAMES: readonly string[] = [
   PROJECT_LOCK_FILE_NAME,
   PROJECT_AUDIT_FILE_NAME,
 ];
+/** D-050/V2-T61: `CLAUDE.md` (bare, no slash — matches at any depth, the same rule
+ * `PROJECT_LOCK_FILE_NAME` already relies on above, unlike `**\/.claude/`'s own directory-pattern
+ * exception) — every project's own generated `CLAUDE.md` bridge is device/session bookkeeping the
+ * same way the lock and audit marker are, never workspace content. A project whose `CLAUDE.md`
+ * predates this task and is ALREADY tracked keeps being tracked regardless of this line — a
+ * `.gitignore` pattern only stops git from adding a NEW, untracked file; it never un-tracks one git
+ * already knows about (confirmed for real in `tests/integration/workspace/
+ * fs-workspace-repository.test.ts`, same `git status --porcelain --ignored=matching` technique the
+ * `.claude/` pattern above was confirmed with). */
 const IGNORED_WORKSPACE_PATTERNS: readonly string[] = [
   ...IGNORED_OPERATIONAL_FILE_NAMES,
   '**/.claude/',
+  'CLAUDE.md',
 ];
 
 async function ensureWorkspaceGitignoreIgnoresProjectLock(root: string): Promise<void> {
@@ -504,5 +514,30 @@ export class FsWorkspaceRepository implements WorkspaceRepository {
       path.join(root, projectId, '.claude', 'settings.json'),
       settingsJsonContent,
     );
+  }
+
+  /** D-050/V2-T61: `git ls-files -- <projectId>/CLAUDE.md` — empty output means untracked (never
+   * existed, or exists on disk from a previous `open`'s own generated write but was never
+   * committed); any output means a person versioned their own `CLAUDE.md` for this project before
+   * this task shipped. `projectId` never contains a path separator (`core/project-id.ts
+   * #isValidProjectId`), so a plain forward-slash join is a valid git pathspec on every platform
+   * this project supports, including Windows. */
+  async isClaudeMdVersioned(root: string, projectId: string): Promise<boolean> {
+    const result = await runGit(root, ['ls-files', '--', `${projectId}/CLAUDE.md`]);
+    if (!result.ran || result.exitCode !== 0) {
+      throw new Error(
+        `git ls-files failed in workspace at "${root}": ` +
+          `${result.ran ? `exit ${result.exitCode}` : result.reason}`,
+      );
+    }
+    return result.stdout.trim().length > 0;
+  }
+
+  /** D-050/V2-T61: always overwrites — `seeya`'s own generated text, `installHarnessHook`'s own
+   * "reinstalled by every open" discipline, applied here. Only ever called after
+   * `isClaudeMdVersioned` reported false (`application/claude-md-bridge.ts#
+   * ensureGeneratedClaudeMdInstalled`'s own gate). */
+  async installGeneratedClaudeMd(root: string, projectId: string, content: string): Promise<void> {
+    await writeFileAtomic(path.join(root, projectId, 'CLAUDE.md'), content);
   }
 }

@@ -6,6 +6,7 @@ import {
   formatAdoptSessionReport,
   formatAuditCommandReport,
   formatAuditLines,
+  formatClaudeMdLines,
   formatCreateProjectReport,
   formatMissingRepositoryLines,
   formatOpenProjectReport,
@@ -670,5 +671,18 @@ describe('renderLeftoverChangesConfirmation / parseLeftoverChangesAnswer (V2-T34
     expect(parseLeftoverChangesAnswer('')).toBeNull();
     expect(parseLeftoverChangesAnswer('y')).toBeNull();
     expect(parseLeftoverChangesAnswer('discard')).toBeNull();
+  });
+});
+
+describe('formatClaudeMdLines (D-050/V2-T61)', () => {
+  it('is empty when seeya (re)generated it — the ordinary case', () => {
+    expect(formatClaudeMdLines('auth-hardening', { kind: 'written' })).toEqual([]);
+  });
+
+  it('names the project and says its own CLAUDE.md was left untouched', () => {
+    const lines = formatClaudeMdLines('auth-hardening', { kind: 'skippedVersioned' });
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('auth-hardening');
+    expect(lines[0]).toContain('CLAUDE.md');
   });
 });
