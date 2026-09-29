@@ -556,3 +556,137 @@ documentação oficial e código-fonte público, sem sessão nenhuma:
 por construção. A lacuna é do seeya: o esqueleto gera só `AGENTS.md`, cuja reinjeção no Claude Code
 não está documentada. Virou a **D-050** e a **V2-T61** (`CLAUDE.md` gerado com `@AGENTS.md` e
 Compact Instructions), que confirma com uma compactação real.
+
+---
+
+## Apêndice: V2-T61 — duas medições contra o `CLAUDE.md` gerado (D-050)
+
+**Data:** 2026-09-29 · **Versão medida:** `claude` 2.1.284 (CLI) · **Modelo:** `haiku` em toda
+chamada · **Custo total das sete chamadas reais:** US$ 1,99 (dentro do teto de US$ 3 da tarefa).
+Mesmos controles de contaminação do corpo deste spike: variáveis de sessão herdadas removidas antes
+de cada `spawn` (D-017, `CLAUDE_CODE_CHILD_SESSION`/`CLAUDE_CODE_SESSION_ID`/
+`CLAUDE_CODE_ENTRYPOINT`/`CLAUDE_PID`/`CLAUDECODE`/`CLAUDE_AGENT_SDK_VERSION`, a mesma lista de
+`adapters/generation/env.ts#INHERITED_SESSION_VARS`); prompt de tamanho variável só por stdin,
+nunca por argumento (D-015); `session_id` real anonimizado (padrão de dígito repetido já usado
+neste documento, estendido); caminho de home real substituído por `<usuario>`/`<tmp>`. Os
+diretórios de projeto descartáveis (esqueleto de `core/project-skeleton.ts` + o `CLAUDE.md` de
+`core/project-claude-md.ts`, gerados pelo próprio código compilado desta tarefa,
+`packages/engine/dist/core/*.js`) ficaram fora do repositório, em `<tmp>`.
+
+### (a) Duplicação no início — o `AGENTS.md` entra uma vez ou duas?
+
+**Método.** Um projeto descartável com o `CLAUDE.md` gerado (`@AGENTS.md` + Compact Instructions)
+e um `AGENTS.md` com uma linha-sentinela sintética única (`SEEYA-SENTINEL-<hex>`) acrescentada ao
+fim. Três perguntas, cada uma numa sessão `-p` nova, `--model haiku`, sem ferramenta nenhuma
+liberada além do que o modo `-p` já dá por padrão:
+
+1. "Conte quantas vezes a string sentinela aparece no seu contexto atual, e diga de qual arquivo
+   veio." → **Resposta: "1" ("appears once... at the end of AGENTS.md")** — sem `tool_use`
+   registrado (`num_turns: 1`, uma única iteração `type: "message"`). Custo: US$ 0,022.
+2. "A mesma pergunta, mas peça para citar literalmente a linha de abertura/fechamento de cada
+   bloco distinto que contém o conteúdo do AGENTS.md, numerado." → **Resposta alegou DOIS blocos**
+   — um deles descrito como vindo de "an explicit Read tool call". **Achado colateral relevante:**
+   isto é auto-relato **inventado**, não observação real — o `usage.iterations` desta mesma chamada
+   tem uma única entrada `type: "message"` (nenhuma rodada de ferramenta aconteceu), e o texto do
+   "Bloco 2" citava literalmente o formato `"Contents of <caminho> (project instructions, checked
+   into the codebase):"` — a MESMA formatação que esta própria sessão de trabalho usa para
+   apresentar `AGENTS.md`/`CLAUDE.md`, não algo que pudesse existir na sessão descartável em
+   questão. Pedir citação literal induziu o modelo a confabular uma segunda fonte plausível em vez
+   de reportar o que via. Custo: US$ 0,021.
+3. Para não repetir o erro do item 2, uma terceira pergunta pediu reprodução literal e completa de
+   **tudo** que estava no contexto antes da mensagem, sem analisar nem resumir, blocos separados por
+   `==========`, proibindo qualquer chamada de ferramenta. A saída bruta (anonimizada) mostrou o
+   `CLAUDE.md` inteiro como um bloco, seguido IMEDIATAMENTE pelo conteúdo de `AGENTS.md` (título,
+   corpo, e a linha sentinela) como o bloco seguinte — **nenhum outro bloco no documento inteiro
+   repete esse conteúdo**. Custo: US$ 0,039.
+
+**Conclusão: sem duplicação.** Com o `CLAUDE.md` gerado (`@AGENTS.md`) e o `AGENTS.md` juntos na
+raiz, o conteúdo do `AGENTS.md` entra **uma vez** no contexto inicial — a pergunta 1 (simples
+contagem) e a pergunta 3 (reprodução literal, a mais confiável das três) concordam; a pergunta 2
+é descartada como falso positivo por confabulação, não por achado real, e registrada aqui só pelo
+valor metodológico ("pedir ao modelo para introspeccionar seu próprio mecanismo de recuperação
+pode inventar uma explicação plausível, mesmo quando os dados de uso da própria chamada
+(`usage.iterations`) já contradizem a alegação — vale conferir esse campo antes de aceitar um
+auto-relato sobre \"de onde isto veio\""). Como não houve duplicação, nada foi registrado em
+`docs/QUESTOES.md` (a tarefa só pedia isso no caso positivo).
+
+### (b) Uma compactação automática real — o `AGENTS.md` volta, e o resumo reflete o Compact Instructions?
+
+**Método.** Mesma técnica "estourar a janela real de contexto" já documentada no corpo deste
+spike: uma chamada base com um turno grande (~171 mil tokens efetivos, fatos + enchimento) abaixo
+de 200 mil, seguida de uma chamada `--resume` com um segundo turno (~50 mil tokens) grande o
+bastante para o total passar de 200 mil — a compactação automática dispara antes do modelo
+processar o segundo turno. O turno 1 estabeleceu quatro fatos, um para cada item do próprio texto
+do `CLAUDE.md` gerado (`core/project-claude-md.ts#buildGeneratedClaudeMd`): uma tarefa em
+andamento e o próximo passo; uma decisão ainda não escrita em `decisions/`; um arquivo mudado e
+não commitado; um aprendizado sobre ambiente ainda não em `context/know-how.md`. O `AGENTS.md`
+deste projeto também carregava sua própria linha-sentinela sintética.
+
+**Uma primeira tentativa (descartada, mas cobrada — por isso entra na soma de custo) mediu um
+enchimento mal dimensionado:** o segundo turno sozinho tinha ~220 mil tokens, acima do próprio
+teto de 200 mil da janela — a chamada tentou compactar (`compact_boundary` real disparou,
+`preTokens: 391778 → postTokens: 222995`) e ainda assim terminou em `"Prompt is too long"`
+(confirma, de novo, o achado já registrado no corpo deste spike: compactação só reduz o histórico
+ANTERIOR, nunca o turno pendente). Uma segunda chamada na MESMA sessão, com um enchimento correto,
+produziu uma SEGUNDA compactação em cima da primeira (já degradada por ter herdado o resultado da
+tentativa que falhou) — as quatro respostas sobre os fatos vieram todas "nenhum" (perdidas), mas a
+sentinela do `AGENTS.md` ainda voltou corretamente. Custo das duas chamadas desta tentativa: US$
+0,31 + US$ 0,50.
+
+**Medição limpa (sessão nova, um único enchimento de ~50 mil tokens no segundo turno — a mesma
+proporção do corpo deste spike):**
+
+```
+{"subtype":"compact_boundary","content":"Conversation compacted","level":"info",
+ "compactMetadata":{"trigger":"auto","preTokens":221761,"postTokens":53217,
+ "cumulativeDroppedTokens":168544,"durationMs":21150},"sessionId":"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"}
+```
+
+Perguntado em seguida (mesmo turno que segue a compactação, sem repetir nada do que foi dito
+antes), o modelo respondeu:
+
+```
+1. Implement invoice export feature; wire up the CSV writer.
+2. Use UTF-8 with BOM for CSV export.
+3. src/invoice-export.ts
+4. Staging deploy script requires STAGING_TOKEN environment variable that is undocumented.
+5. SEEYA-COMPACT-<hex>
+```
+
+Todas as cinco corretas — as quatro que o `CLAUDE.md`'s Compact Instructions pede para preservar
+E a linha-sentinela do `AGENTS.md`. O resumo real gerado pela compactação (lido direto do
+transcript, `type: "summary"`/mensagem de continuação, anonimizado) mostra explicitamente as
+quatro categorias do Compact Instructions refletidas em seções próprias:
+
+```
+7. Pending Tasks:
+   - Write UTF-8 with BOM CSV export decision into decisions/ directory
+   - Document STAGING_TOKEN requirement in context/know-how.md
+   - Commit src/invoice-export.ts changes with appropriate git trailers
+   - Wire up the CSV writer for invoice export functionality
+
+8. Current Work:
+   ...the invoice export feature is in progress with the CSV writer as the next component...
+   The file src/invoice-export.ts contains pending changes that have not yet been committed.
+
+9. Optional Next Step:
+   Based on the system context stating "TASK IN PROGRESS: implementing the 'invoice export'
+   feature. NEXT STEP: wire up the CSV writer," the logical next step would be...
+```
+
+**Ressalva honesta:** o formato de resumo do Claude Code já tem, por padrão, seções genéricas
+("Pending Tasks", "Current Work") que por si só tenderiam a capturar "tarefa em andamento" e
+"arquivo não commitado" mesmo sem nenhuma instrução extra — não dá para isolar quanto do resultado
+é o `Compact Instructions` e quanto é o comportamento padrão do resumidor. O que este spike PODE
+afirmar, com uma compactação automática real e limpa (uma só, sem a contaminação da tentativa
+anterior): **depois de compactar, tanto o conteúdo do `AGENTS.md` (via `@AGENTS.md`) quanto os
+quatro fatos que o Compact Instructions pede para preservar voltaram corretos**, sem que nada
+tivesse sido repetido no prompt.
+
+### Pastas de transcript criadas (não apagadas, por instrução da tarefa)
+
+Três diretórios de projeto, dentro de `<tmp>/claude-md-measure/`: `dup-check-project` (perguntas
+1–3 da medição a, três sessões), `compact-project-t61` (tentativa contaminada da medição b, uma
+sessão) e `compact-project-t61b` (medição limpa da medição b, uma sessão) — cada um com sua própria
+pasta em `~/.claude/projects/<hash-do-cwd>/`. Nenhuma escrita tocou `~/.seeya`, o espaço de
+trabalho real, ou qualquer sessão/configuração do mantenedor.
