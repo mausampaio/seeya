@@ -4,7 +4,7 @@ title: 'V2-T61 — O projeto ganha CLAUDE.md gerado, com Compact Instructions'
 status: Review
 assignee: []
 created_date: '2026-09-29 10:05'
-updated_date: '2026-09-29 11:13'
+updated_date: '2026-09-29 11:21'
 labels: []
 milestone: m-0
 dependencies: []
@@ -141,3 +141,13 @@ estender o formatProjectOpenOutcomeText do packages/app para citar skippedVersio
 que a janela ja segue para audit e missing-repository, que tambem nao aparecem la - consistencia,
 nao descoberta de problema).
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-29 11:21
+---
+Revisão do PO em 2026-09-29: mesclado, portão verde (2873 testes) e também sem identidade global do git (rodado pelo PO — a proteção da worktree recusou esse comando ao agente, que parou e reportou, sem contornar, como pedido). Conferido no transcript da medição limpa: uma compactação real (221.761 → 53.217 tokens) e o bloco CLAUDE.md + conteúdo do AGENTS.md presente de novo depois dela — a reinjeção via import está provada; sem duplicação no início. Custo das medições US$ 1,99. Ressalva do agente mantida: não dá para isolar quanto do resumo é efeito das Compact Instructions. Falta o aceite do mantenedor: abrir um projeto, ver o CLAUDE.md gerado e fora do git status.
+---
+<!-- COMMENTS:END -->
