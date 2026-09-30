@@ -18,9 +18,10 @@ html,
 body {
   margin: 0;
   height: 100%;
-  background: #1e1e1e;
-  color: #e0e0e0;
-  font-family: system-ui, sans-serif;
+  /* V2-T62 (D-051): tokens, both themes — `tokens.css`'s own `:root`/`[data-theme='dark']`. */
+  background: var(--seeya-background);
+  color: var(--seeya-text);
+  font-family: var(--seeya-font-sans);
   /* V2-T30/V2-T48 item 6: "a janela nunca deve ter barra de rolagem própria" — every region that
    * needs to scroll its own content already sets its own `overflow-y: auto` (#sidebar,
    * #end-day-dialog-report, #settings-rows); the DOCUMENT itself never should, even for the one
@@ -44,8 +45,12 @@ body {
   width: var(--sidebar-width, 260px);
   flex: none;
   display: flex;
-  border-right: 1px solid #333;
+  background: var(--seeya-surface);
+  border-right: 1px solid var(--seeya-border);
   box-sizing: border-box;
+  /* V2-T62 (D-051): respects `prefers-reduced-motion` for free — `tokens.css`'s own global
+   * override zeroes every transition-duration under that preference. */
+  transition: width var(--seeya-motion-panel) var(--seeya-motion-easing);
 }
 
 /* V2-T30 item 2: recolhida — the toggle button stays, everything else collapses to zero width so
@@ -68,22 +73,23 @@ body {
 
 #sidebar-resize-handle:hover,
 #sidebar-resize-handle.dragging {
-  background: #4a90d9;
+  background: var(--seeya-brand);
 }
 
 #sidebar.collapsed + #sidebar-resize-handle {
   display: none;
 }
 
+/* V2-T62 (D-051): colour/radius/weight now come from `.seeya-button--ghost`/`--icon`
+ * (`components.css`, `ui/button.tsx`) — this id rule keeps only the layout this exact spot in the
+ * sidebar strip needs (width, full-height stretch, the divider from the rest of the sidebar). */
 #sidebar-collapse-toggle {
   flex: none;
   width: 20px;
   align-self: stretch;
   border: none;
-  border-right: 1px solid #333;
-  background: #252525;
-  color: #aaa;
-  cursor: pointer;
+  border-right: 1px solid var(--seeya-border);
+  border-radius: 0;
 }
 
 #sidebar-content {
@@ -107,7 +113,7 @@ body {
 #sidebar h2 {
   font-size: 13px;
   text-transform: uppercase;
-  color: #888;
+  color: var(--seeya-text-tertiary);
   margin: 12px 0 4px;
 }
 
@@ -117,8 +123,8 @@ body {
 
 /* V2-T30 item 1: one block per project — name, lock line, "Open", its own sessions. */
 .project-block {
-  border: 1px solid #333;
-  border-radius: 4px;
+  border: 1px solid var(--seeya-border);
+  border-radius: var(--seeya-radius-sm);
   padding: 6px;
   margin-bottom: 6px;
   font-size: 12px;
@@ -142,7 +148,7 @@ body {
 
 .project-lock-text {
   font-size: 11px;
-  color: #a0a0a0;
+  color: var(--seeya-text-secondary);
   margin: 4px 0;
   overflow-wrap: anywhere;
 }
@@ -159,13 +165,13 @@ body {
 }
 
 .project-block li.matched {
-  color: #6bd06b;
+  color: var(--seeya-success-text);
 }
 
 #projects-panel-empty,
 #other-sessions-empty {
   font-size: 12px;
-  color: #a0a0a0;
+  color: var(--seeya-text-secondary);
 }
 
 #other-sessions-list {
@@ -181,7 +187,7 @@ body {
   justify-content: space-between;
   gap: 8px;
   padding: 4px 0;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid var(--seeya-border);
 }
 
 /* PO acceptance of V2-T55, correction 1 (2026-09-25): a long, unbroken path (no whitespace for
@@ -206,7 +212,7 @@ body {
 }
 
 .session-last-activity {
-  color: #a0a0a0;
+  color: var(--seeya-text-secondary);
 }
 
 .adopt-button {
@@ -216,7 +222,7 @@ body {
 
 #project-open-result-text {
   font-size: 11px;
-  color: #a0a0a0;
+  color: var(--seeya-text-secondary);
   margin: 4px 0;
   overflow-wrap: anywhere;
 }
@@ -233,7 +239,7 @@ body {
   align-items: center;
   gap: 4px;
   padding: 4px;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid var(--seeya-border);
 }
 
 #new-tab-button {
@@ -248,6 +254,11 @@ body {
   width: 28px;
   height: 28px;
   font-size: 14px;
+}
+
+#new-tab-button,
+#sidebar-toggle-button {
+  padding: 0;
 }
 
 #tab-strip {
@@ -268,8 +279,8 @@ body {
   align-items: center;
   gap: 8px;
   padding: 6px;
-  border-bottom: 1px solid #333;
-  background: #252525;
+  border-bottom: 1px solid var(--seeya-border);
+  background: var(--seeya-surface-subtle);
 }
 
 /* V2-T3 review: an ID selector (#command-bar above) is MORE specific than the browser's own
@@ -286,7 +297,7 @@ body {
   display: flex;
   flex-direction: column;
   font-size: 11px;
-  color: #aaa;
+  color: var(--seeya-text-secondary);
   gap: 2px;
 }
 
@@ -306,7 +317,7 @@ body {
  * "Resume selected" button and the progress/result lines below it. */
 #today-panel li {
   padding: 4px 0;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid var(--seeya-border);
 }
 
 #today-panel p {
@@ -320,11 +331,11 @@ body {
 
 #session-list li {
   padding: 4px 0;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid var(--seeya-border);
 }
 
 #session-list li.matched {
-  color: #6bd06b;
+  color: var(--seeya-success-text);
 }
 
 #status-panel {
@@ -398,18 +409,12 @@ body {
 
 /* V2-T4 item 3: the fallback confirmation dialog (S5-T9's "warn BEFORE, and ask", as a real
  * <dialog> instead of the CLI's readline question) — showModal() gives it the native backdrop and
- * Escape-to-cancel behavior renderer.ts's own "cancel" listener turns into a "skip" answer. */
+ * Escape-to-cancel behavior `fallback-dialog-view.ts`'s own "cancel" listener turns into a "skip"
+ * answer. V2-T62 (D-051): border/background/colour/padding/shadow/backdrop now come from
+ * `.seeya-dialog` (`components.css`, `ui/dialog.tsx`) — this id rule keeps only the size this
+ * dialog's own content needs, which `.seeya-dialog` deliberately leaves to each caller. */
 #fallback-dialog {
   max-width: 480px;
-  border: 1px solid #333;
-  border-radius: 6px;
-  background: #252525;
-  color: #e0e0e0;
-  padding: 16px;
-}
-
-#fallback-dialog::backdrop {
-  background: rgb(0 0 0 / 50%);
 }
 
 #fallback-dialog h3 {
@@ -430,19 +435,11 @@ body {
 
 /* V2-T5a items 1/4: the "End day..." preview-as-confirmation/progress/result dialog — same
  * shape as #fallback-dialog above (native <dialog>, showModal()), wider to fit
- * formatEndDayReport's own multi-line report text. */
+ * formatEndDayReport's own multi-line report text. V2-T62 (D-051): see #fallback-dialog's own
+ * comment above — base dialog styling now comes from `.seeya-dialog`. */
 #end-day-dialog {
   max-width: 640px;
   width: 90vw;
-  border: 1px solid #333;
-  border-radius: 6px;
-  background: #252525;
-  color: #e0e0e0;
-  padding: 16px;
-}
-
-#end-day-dialog::backdrop {
-  background: rgb(0 0 0 / 50%);
 }
 
 #end-day-dialog h3 {
@@ -454,9 +451,9 @@ body {
   overflow-y: auto;
   font-size: 12px;
   white-space: pre-wrap;
-  background: #1e1e1e;
-  border: 1px solid #333;
-  border-radius: 4px;
+  background: var(--seeya-surface-subtle);
+  border: 1px solid var(--seeya-border);
+  border-radius: var(--seeya-radius-sm);
   padding: 8px;
 }
 
@@ -474,20 +471,12 @@ body {
 }
 
 /* V2-T14: the Settings dialog — same shape as #end-day-dialog above (native <dialog>,
- * showModal()), scrollable for sixteen rows without growing past the window. */
+ * showModal()), scrollable for sixteen rows without growing past the window. V2-T62 (D-051): see
+ * #fallback-dialog's own comment above — base dialog styling now comes from `.seeya-dialog`. */
 #settings-dialog {
   max-width: 640px;
   width: 90vw;
   max-height: 85vh;
-  border: 1px solid #333;
-  border-radius: 6px;
-  background: #252525;
-  color: #e0e0e0;
-  padding: 16px;
-}
-
-#settings-dialog::backdrop {
-  background: rgb(0 0 0 / 50%);
 }
 
 #settings-dialog h3 {
@@ -496,7 +485,7 @@ body {
 
 #settings-dialog-daemon-note {
   font-size: 12px;
-  color: #a0a0a0;
+  color: var(--seeya-text-secondary);
   margin: 0 0 12px;
 }
 
@@ -506,7 +495,7 @@ body {
 }
 
 .settings-row {
-  border-top: 1px solid #333;
+  border-top: 1px solid var(--seeya-border);
   padding: 8px 0;
 }
 
@@ -517,7 +506,7 @@ body {
 .settings-row-name {
   display: block;
   font-size: 13px;
-  font-family: monospace;
+  font-family: var(--seeya-font-mono);
 }
 
 .settings-row-description {
@@ -527,7 +516,7 @@ body {
 
 .settings-row-origin {
   font-size: 11px;
-  color: #a0a0a0;
+  color: var(--seeya-text-secondary);
   margin-right: 8px;
 }
 
@@ -537,20 +526,20 @@ body {
 
 .settings-row-error {
   font-size: 12px;
-  color: #e06c6c;
+  color: var(--seeya-error-text);
   margin: 4px 0 0;
 }
 
 #settings-project-policy-heading {
   font-size: 12px;
   font-weight: normal;
-  color: #a0a0a0;
+  color: var(--seeya-text-secondary);
   margin: 12px 0 4px;
 }
 
 #settings-project-policy-lines p {
   font-size: 12px;
-  font-family: monospace;
+  font-family: var(--seeya-font-mono);
   margin: 0 0 2px;
 }
 
@@ -560,18 +549,11 @@ body {
 
 /* V2-T30: the five project dialogs (new project, project-lock confirmation, adopt picker, adopt
  * launch/commit confirmation, adopt result) all share the same shape as #fallback-dialog above —
- * one class instead of repeating the six declarations five more times. */
+ * one class instead of repeating the six declarations five more times. V2-T62 (D-051): base
+ * dialog styling now comes from `.seeya-dialog` (see #fallback-dialog's own comment above); this
+ * class keeps only the size these six dialogs share. */
 .project-dialog {
   max-width: 480px;
-  border: 1px solid #333;
-  border-radius: 6px;
-  background: #252525;
-  color: #e0e0e0;
-  padding: 16px;
-}
-
-.project-dialog::backdrop {
-  background: rgb(0 0 0 / 50%);
 }
 
 .project-dialog h3 {
@@ -593,7 +575,7 @@ body {
 
 .project-dialog-error {
   font-size: 12px;
-  color: #e06c6c;
+  color: var(--seeya-error-text);
   margin: 0 0 8px;
 }
 

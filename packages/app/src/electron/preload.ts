@@ -62,6 +62,7 @@ import type {
   AnswerAdoptionCommitConfirmRequest,
   FindSessionByIdRequest,
   FindSessionByIdResponse,
+  ThemeUpdateEvent,
 } from '../ipc/channels.js';
 
 export interface SeeyaApi {
@@ -161,6 +162,12 @@ export interface SeeyaApi {
   /** V2-T55 item 4: the id-search field — an id or the start of it, straight to the session, even
    * outside the 12-hour window. */
   findSessionById(request: FindSessionByIdRequest): Promise<FindSessionByIdResponse>;
+  /** V2-T62 (D-051): the window's effective theme, fetched once at startup — same "invoke, not
+   * send" round trip as `getTerminalFontConfig`. */
+  getEffectiveTheme(): Promise<ThemeUpdateEvent>;
+  /** V2-T62 (D-051): pushed whenever the OS's own light/dark preference changes (never on a
+   * fixed interval — `electron/main.ts`'s own `nativeTheme.on('updated', ...)` subscription). */
+  onThemeUpdate(listener: (event: ThemeUpdateEvent) => void): void;
 }
 
 const api: SeeyaApi = {
@@ -280,6 +287,10 @@ const api: SeeyaApi = {
   answerAdoptionCommitConfirm: (request) =>
     ipcRenderer.send(CHANNELS.answerAdoptionCommitConfirm, request),
   findSessionById: (request) => ipcRenderer.invoke(CHANNELS.findSessionById, request),
+  getEffectiveTheme: () => ipcRenderer.invoke(CHANNELS.getEffectiveTheme),
+  onThemeUpdate: (listener) => {
+    ipcRenderer.on(CHANNELS.themeUpdate, (_event, data: ThemeUpdateEvent) => listener(data));
+  },
 };
 
 contextBridge.exposeInMainWorld('seeya', api);

@@ -85,6 +85,10 @@ async function bundle() {
   // file from index.css so the two responsibilities (values vs. how they're applied) stay apart,
   // same split design/IDENTIDADE_VISUAL.md § 5.4 already documents as its own fenced block.
   cpSync(path.join(srcElectron, 'tokens.css'), path.join(outElectron, 'tokens.css'));
+  // V2-T62 (D-051): baseline styles for `src/ui/`'s own components — see that file's own comment
+  // for why it's separate from both `tokens.css` (values only) and `index.css` (the current
+  // screens' own layout, untouched by this task).
+  cpSync(path.join(srcElectron, 'components.css'), path.join(outElectron, 'components.css'));
   // V2-T3: the embedded Nerd Font (`assets/fonts/`, packaged alongside its own SIL OFL 1.1
   // license file) — index.css's own @font-face rule loads it by this same relative path,
   // `fonts/<file>`, next to index.html in dist/electron/.
