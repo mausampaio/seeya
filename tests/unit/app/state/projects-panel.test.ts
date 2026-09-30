@@ -198,4 +198,48 @@ describe('buildProjectsPanelData (V2-T30 item 1)', () => {
     expect(data.otherSessionsByDirectory).toHaveLength(2);
     expect(data.otherSessionsByDirectory.map((group) => group.dir)).toEqual(['/code/a', '/code/b']);
   });
+
+  describe('ignoredProjects (V2-T72 item 2)', () => {
+    it('is empty when nothing was rejected — the ordinary case', () => {
+      const data = buildProjectsPanelData([], [], [], new Map(), 'posix', []);
+      expect(data.ignoredProjects).toEqual([]);
+    });
+
+    it('derives the project id from the rejected seeya.json path (POSIX) and keeps the reason', () => {
+      const data = buildProjectsPanelData([], [], [], new Map(), 'posix', [
+        {
+          file: '/seeya/workspace/broken-project/seeya.json',
+          raw: undefined,
+          reason: 'repositories: expected array, received object',
+        },
+      ]);
+      expect(data.ignoredProjects).toEqual([
+        {
+          projectId: 'broken-project',
+          reason: 'repositories: expected array, received object',
+        },
+      ]);
+    });
+
+    it('derives the project id from a Windows-shaped path too — the same logic, no platform branch', () => {
+      const data = buildProjectsPanelData([], [], [], new Map(), 'win32', [
+        {
+          file: 'C:\\seeya\\workspace\\broken-project\\seeya.json',
+          raw: undefined,
+          reason: 'invalid JSON',
+        },
+      ]);
+      expect(data.ignoredProjects).toEqual([
+        { projectId: 'broken-project', reason: 'invalid JSON' },
+      ]);
+    });
+
+    it('reports every rejected entry, not just the first', () => {
+      const data = buildProjectsPanelData([], [], [], new Map(), 'posix', [
+        { file: '/seeya/workspace/a/seeya.json', raw: undefined, reason: 'bad a' },
+        { file: '/seeya/workspace/b/seeya.json', raw: undefined, reason: 'bad b' },
+      ]);
+      expect(data.ignoredProjects.map((row) => row.projectId)).toEqual(['a', 'b']);
+    });
+  });
 });

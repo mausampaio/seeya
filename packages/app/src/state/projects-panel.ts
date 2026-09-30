@@ -11,6 +11,7 @@ import { formatLockHolderDescription } from '@seeya-ai/engine/core/project-lock-
 import { formatSessionStateLabel } from '@seeya-ai/engine/core/session-state-label.js';
 import type { PathPlatformHint } from '@seeya-ai/engine/core/cwd-normalization.js';
 import type { AdoptionRecord, ProjectManifest, SessionState } from '@seeya-ai/engine/core/types.js';
+import type { RejectedDiscoveryRecord } from '@seeya-ai/engine/core/ports.js';
 import type { ProjectLockStatus } from '@seeya-ai/engine/application/project-lock.js';
 import {
   groupOtherSessionsByDirectory,
@@ -69,9 +70,39 @@ export interface OtherSessionDirectoryPanelRow {
   readonly sessions: readonly ProjectPanelOtherSessionRow[];
 }
 
+/** V2-T72 item 2 — a workspace subdirectory whose `seeya.json` didn't validate
+ * (`WorkspaceRepository.listProjects`'s own `rejected: RejectedDiscoveryRecord[]`, D-022's "both
+ * sides"). The CLI already shows this (`cli/format-project.ts`'s own "Ignored entries:"); before
+ * this task the window showed nothing at all for it — the maintainer's own "o projeto some" —
+ * because `computeProjectsPanelData` only ever read `manifests`, never `rejected`. */
+export interface IgnoredProjectPanelRow {
+  readonly projectId: string;
+  readonly reason: string;
+}
+
 export interface ProjectsPanelData {
   readonly projects: readonly ProjectPanelRow[];
   readonly otherSessionsByDirectory: readonly OtherSessionDirectoryPanelRow[];
+  readonly ignoredProjects: readonly IgnoredProjectPanelRow[];
+}
+
+/** `RejectedDiscoveryRecord.file` is always `<root>/<projectId>/seeya.json`
+ * (`adapters/workspace/index.ts#manifestPath`, the same path `readManifestOrRejection` builds) —
+ * the second-to-last path segment is the candidate project id, whatever the id validation this
+ * project id never got to run would have decided. Splits on both separators (never `node:path`,
+ * to stay a pure, host-independent computation like the rest of this module) so the same test
+ * exercises the same logic regardless of which OS runs it. Falls back to the raw path when it
+ * doesn't have the expected shape (D-025: never invents an id it can't actually read off) — the
+ * one case that can't happen from `listProjects`'s own real callers, but a test double could hand
+ * this a shape the real adapter never would. */
+function deriveIgnoredProjectId(manifestFilePath: string): string {
+  const segments = manifestFilePath.split(/[\\/]+/).filter((segment) => segment.length > 0);
+  const candidate = segments.at(-2);
+  return candidate ?? manifestFilePath;
+}
+
+function toIgnoredProjectRow(rejection: RejectedDiscoveryRecord): IgnoredProjectPanelRow {
+  return { projectId: deriveIgnoredProjectId(rejection.file), reason: rejection.reason };
 }
 
 function toSessionRow(row: SidebarRow): ProjectPanelSessionRow {
@@ -135,6 +166,7 @@ function lockSessionIdByProjectId(
  *   adoptions,
  *   new Map([['auth-hardening', { kind: 'unlocked' }]]),
  *   'posix',
+ *   [],
  * )
  */
 export function buildProjectsPanelData(
@@ -143,6 +175,9 @@ export function buildProjectsPanelData(
   adoptions: readonly AdoptionRecord[],
   lockStatusByProjectId: ReadonlyMap<string, ProjectLockStatus>,
   platform: PathPlatformHint,
+  /** V2-T72 item 2 — `WorkspaceRepository.listProjects`'s own `rejected`, the D-022 half of the
+   * result this module used to drop entirely. */
+  rejected: readonly RejectedDiscoveryRecord[] = [],
 ): ProjectsPanelData {
   const grouping = groupSessionsByProject(
     rows,
@@ -170,5 +205,9 @@ export function buildProjectsPanelData(
       adopt: resolveAdoptEligibility(row, adoptions),
     })),
   }));
-  return { projects: projectRows, otherSessionsByDirectory };
+  return {
+    projects: projectRows,
+    otherSessionsByDirectory,
+    ignoredProjects: rejected.map(toIgnoredProjectRow),
+  };
 }

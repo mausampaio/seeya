@@ -57,7 +57,11 @@ De cima para baixo:
    `locked` na cor de atenção). O projeto aberto nesta janela mostra, recuadas, as sessões dele
    com ponto de estado, nome e id curto.
 4. **Recent:** até 5 projetos pela última atividade, sem repetir favoritos. Derivado, não gravado.
-5. **All projects** com o total → abre a aba Projects.
+5. **All projects** com o total → abre a aba Projects. Um subdiretório do espaço de trabalho cujo
+   `seeya.json` não valida nunca some em silêncio (V2-T72 item 2): aparece como **Ignored
+   projects**, uma linha por entrada, com o id (derivado do nome do diretório) e o motivo — a
+   mesma informação que `seeya project list` já mostra em "Ignored entries", nunca uma segunda
+   redação.
 6. **Sessions** com o contador das que têm processo rodando (`3 running`, pílula de sucesso) →
    abre a aba Sessions. Nenhuma lista de sessões na lateral.
 7. **Rodapé**, fixo:
@@ -110,6 +114,12 @@ autostart (vai para Settings).
   `Locked by session <id>`), sessões, repositórios, última atividade (ordenação padrão).
 - Ação da linha segue o lock: `Go to tab` (aberto nesta janela), `Open` (livre), `Read only…`
   (travado por outra sessão — abre a confirmação da seção 9).
+- **Ignored projects** (V2-T72 item 2): seção própria, abaixo da tabela, só visível quando há pelo
+  menos uma entrada — um `seeya.json` que não valida, id (derivado do nome do diretório) e o
+  motivo, a mesma informação da lateral (seção 1) e de `seeya project list`'s "Ignored entries".
+  Sem ação de linha nesta tarefa — consertar é editar o arquivo fora do `seeya` (por enquanto: o
+  único jeito de tocar `seeya.json` continua sendo `seeya project add-repo`/comandos do `seeya`,
+  nunca um editor pela janela).
 
 ## 5. Aba Sessions
 

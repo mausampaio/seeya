@@ -27,6 +27,10 @@ export function AppShell() {
             <button id="new-project-button" type="button"></button>
             <div id="projects-list"></div>
             <p id="project-open-result-text"></p>
+            <h2 id="ignored-projects-heading" hidden>
+              Ignored projects
+            </h2>
+            <ul id="ignored-projects-list" hidden></ul>
             <h2>Other sessions</h2>
             <ul id="other-sessions-list"></ul>
             <form id="session-search-form">
