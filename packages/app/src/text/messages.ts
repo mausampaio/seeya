@@ -280,6 +280,11 @@ export const MESSAGES = {
   projectSessionRowLabel: (name: string, displaySessionId: string, state: string): string =>
     `${name} [${displaySessionId}] (${state})`,
   adoptButton: 'Adopt…',
+  // V2-T72 item 2 — a project whose `seeya.json` failed to parse/validate no longer just
+  // disappears from the window (the maintainer's own "o projeto some"): it shows here, with the
+  // same reason the CLI's own "Ignored entries:" already prints, so it's clear what to fix.
+  ignoredProjectsHeading: 'Ignored projects',
+  ignoredProjectRowLabel: (projectId: string, reason: string): string => `${projectId}: ${reason}`,
   // V2-T55 item 2 — "Other sessions" groups by directory instead of one row per session.
   otherSessionsDirectoryRowLabel: (dir: string, sessionCount: number): string =>
     `${dir} (${sessionCount} session${sessionCount === 1 ? '' : 's'})`,

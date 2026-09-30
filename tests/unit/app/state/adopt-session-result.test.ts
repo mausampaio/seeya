@@ -127,10 +127,41 @@ describe('formatAdoptSessionOutcomeText (V2-T30 item 5)', () => {
       projectId: 'auth-hardening',
       forkSessionId: '22222222-2222-4222-8222-222222222222',
       changedFiles: ['AGENTS.md'],
+      alreadyCommittedFiles: [],
+      pendingFiles: [],
     };
     const text = formatAdoptSessionOutcomeText(result);
     expect(text).toBe('Project "auth-hardening": adopted.');
     expect(text).not.toContain('AGENTS.md');
+  });
+
+  it('adopted names how many files the copy already committed on its own (V2-T72 item 1)', () => {
+    const result: AdoptSessionResult = {
+      kind: 'adopted',
+      projectId: 'auth-hardening',
+      forkSessionId: '22222222-2222-4222-8222-222222222222',
+      changedFiles: [],
+      alreadyCommittedFiles: ['AGENTS.md', 'status/README.md'],
+      pendingFiles: [],
+    };
+    const text = formatAdoptSessionOutcomeText(result);
+    expect(text).toContain('already committed 2 file(s) on its own');
+  });
+
+  it('adopted names how many files are still uncommitted, without withholding the adoption (V2-T72 item 1)', () => {
+    const result: AdoptSessionResult = {
+      kind: 'adopted',
+      projectId: 'auth-hardening',
+      forkSessionId: '22222222-2222-4222-8222-222222222222',
+      changedFiles: [],
+      alreadyCommittedFiles: ['AGENTS.md'],
+      pendingFiles: ['status/README.md'],
+    };
+    const text = formatAdoptSessionOutcomeText(result);
+    expect(text).toBe(
+      'Project "auth-hardening": adopted. The copy had already committed 1 file(s) on its own. ' +
+        '1 file(s) are still uncommitted — open the project to finish them.',
+    );
   });
 });
 
@@ -142,6 +173,8 @@ describe('isAdoptedResult', () => {
         projectId: 'x',
         forkSessionId: 'y',
         changedFiles: [],
+        alreadyCommittedFiles: [],
+        pendingFiles: [],
       }),
     ).toBe(true);
     expect(isAdoptedResult({ kind: 'noChanges', projectId: 'x', forkSessionId: 'y' })).toBe(false);

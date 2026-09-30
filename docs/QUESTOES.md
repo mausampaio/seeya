@@ -9213,3 +9213,27 @@ por falta de memória e não conta):
 
 As faixas se sobrepõem por inteiro: a fundação em Preact não custou memória mensurável. A
 diferença contra 2026-09-20 é do estado da máquina, o mesmo achado da Q-096.
+
+## Q-100 — V2-T72: `packages/cli/src/format-project.ts` já estava acima do teto de 500 linhas
+
+**Bloqueia:** não — registro, não pedido de decisão urgente.
+
+**Contexto.** O item 1 desta tarefa (adoção que registra o que a cópia já commitou sozinha)
+acrescentou três listas separadas ao caso `adopted` de `formatAdoptSessionReport` — o resultado da
+CLI precisa dizer o que já estava commitado, o que ela mesma commitou agora e o que ficou
+pendente. Antes desta tarefa `packages/cli/src/format-project.ts` já tinha 537 linhas (acima do
+teto de ~500 de `AGENTS.md` § "Funções e arquivos"); com a mudança, foram para 565.
+`packages/engine/src/application/project-adopt.ts` teve o mesmo risco (444 → 570 com a correção
+do item 1) e FOI dividido nesta tarefa (`project-adopt-outcome.ts`/`project-adopt-types.ts`,
+nenhum arquivo passa de ~260 linhas agora) — porque o crescimento ali veio inteiro desta tarefa.
+`format-project.ts` é diferente: já vinha crescendo por tarefas anteriores (V2-T29 a V2-T35), e
+dividir por responsabilidade (por comando: `create`/`list`/`show`, `open`/`add-repo`, `adopt`,
+`remove`/`remove-repo`/`revert-adoption`, `audit`) é uma decisão de como recortar um arquivo já
+grande, não uma consequência direta e mínima desta tarefa — por isso segui a "solução mínima" e
+não recortei.
+
+**Opções que enxergo:** A) deixar como está, registrado aqui, até uma tarefa que já mexa
+estruturalmente neste arquivo decidir o recorte. B) despachar uma tarefa pequena só para dividir
+`format-project.ts` por comando, sem mudar texto nenhum.
+
+**Resposta:** (preenchida pelo PO)

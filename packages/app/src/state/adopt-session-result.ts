@@ -55,8 +55,29 @@ export function formatAdoptSessionOutcomeText(result: AdoptSessionResult): strin
         `seeya: project "${result.projectId}" — the copy wrote changes, but there was no way to ` +
         'confirm the commit. Nothing was committed or discarded.'
       );
-    case 'adopted':
-      return `Project "${result.projectId}": adopted.`;
+    // V2-T72 item 1: `alreadyCommittedFiles` is non-empty exactly when the copy committed some or
+    // all of its own work itself, while it still held the project lock (D-047 item 4) — this
+    // outcome has to say what was already committed, not just what this call did.
+    // `pendingFiles` is non-empty only in the rarer case where something is still left
+    // uncommitted after this adoption (the person declined the follow-up question, there was no
+    // terminal to ask it through, or seeya's own attempt to commit it failed) — the adoption
+    // itself is never withheld for that; only reported.
+    case 'adopted': {
+      const parts = [`Project "${result.projectId}": adopted.`];
+      if (result.alreadyCommittedFiles.length > 0) {
+        parts.push(
+          `The copy had already committed ${result.alreadyCommittedFiles.length} file(s) on its ` +
+            'own.',
+        );
+      }
+      if (result.pendingFiles.length > 0) {
+        parts.push(
+          `${result.pendingFiles.length} file(s) are still uncommitted — open the project to ` +
+            'finish them.',
+        );
+      }
+      return parts.join(' ');
+    }
     // V2-T34 production defect (PO review, 2026-09-25): the workspace's own git hook (or any other
     // git failure) refused the commit — the copy's files stay on disk and the fork stays
     // registered as pending, so this is recoverable, never silently discarded. `result.reason`

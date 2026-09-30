@@ -497,6 +497,8 @@ describe('adoptSession', () => {
       projectId: 'auth-hardening',
       forkSessionId: FORK_SESSION_ID,
       changedFiles: ['auth-hardening/AGENTS.md', 'auth-hardening/context/know-how.md'],
+      alreadyCommittedFiles: [],
+      pendingFiles: [],
     });
     const lastCommit = workspace.commitMessages.at(-1);
     expect(lastCommit).toContain(`Seeya-Session-Id: ${FORK_SESSION_ID}`);
@@ -516,6 +518,246 @@ describe('adoptSession', () => {
         adoptedAt: NOW,
       },
     ]);
+  });
+
+  describe('the copy already committed on its own (V2-T72 item 1, maintainer production finding 2026-09-30)', () => {
+    // D-047 item 4: "quem segura o lock commita" — the copy is entitled to commit its own work
+    // while it holds the project's lock, exactly like `seeya project open`'s own session is. This
+    // whole `describe` is the regression suite for the bug that reasoning exposed: before the fix,
+    // `adoptSession` only ever looked at `listChangedFiles` (the UNCOMMITTED diff) to decide
+    // whether anything happened — a copy that committed everything itself and closed cleanly read
+    // as `changedFiles.length === 0`, which fell straight into the SAME branch as "the session did
+    // nothing at all": `discardFork` (deletes the transcript, unregisters the fork) plus
+    // `noChanges`. Real, already-committed work was thrown away. Every test below fails against
+    // the pre-fix code — asserting `forkCleanup.deletedSessionIds` stays empty is exactly the
+    // assertion that used to fail (it used to equal `[FORK_SESSION_ID]`).
+    it('committed everything and closed with nothing pending — registers the adoption, never discards the fork', async () => {
+      const storage = new InMemoryDeviceStorage(DEFAULT_TEST_CONFIG);
+      const workspace = new FakeWorkspaceRepository();
+      await adoptSession(
+        buildAdoptDeps(storage, workspace),
+        ORIGINAL_ENDED,
+        'auth-hardening',
+        buildCallbacks(),
+      );
+      // The copy committed its own work (trailer `Seeya-Session-Id: <FORK_SESSION_ID>`, exactly
+      // what the workspace's own commit-msg hook writes from the fork's own
+      // `CLAUDE_CODE_SESSION_ID`) and left NOTHING uncommitted afterward.
+      workspace.setSessionCommits('auth-hardening', FORK_SESSION_ID, [
+        { hash: 'c0ffee1', files: ['auth-hardening/AGENTS.md', 'auth-hardening/INDEX.md'] },
+      ]);
+      const commitsBefore = workspace.commitMessages.length;
+      const forkRegistration = new FakeForkRegistration();
+      const forkCleanup = new FakeForkCleanup();
+
+      const result = await adoptSession(
+        buildAdoptDeps(storage, workspace, { forkRegistration, forkCleanup }),
+        createSessionWithPid({
+          sessionId: '30303030-3030-4303-8303-303030303030',
+          processIsAlive: false,
+        }),
+        'auth-hardening',
+        // No `confirmCommit` given on purpose: with nothing pending, nothing should be asked.
+        buildCallbacks(),
+      );
+
+      expect(result).toEqual({
+        kind: 'adopted',
+        projectId: 'auth-hardening',
+        forkSessionId: FORK_SESSION_ID,
+        changedFiles: [],
+        alreadyCommittedFiles: ['auth-hardening/AGENTS.md', 'auth-hardening/INDEX.md'],
+        pendingFiles: [],
+      });
+      // The regression: the fork's transcript is never deleted once it left a commit behind.
+      expect(forkCleanup.deletedSessionIds).toEqual([]);
+      expect(forkRegistration.isRegistered(FORK_SESSION_ID)).toBe(false);
+      expect(await storage.readAdoptions()).toEqual([
+        {
+          originalSessionId: '30303030-3030-4303-8303-303030303030',
+          forkSessionId: FORK_SESSION_ID,
+          projectId: 'auth-hardening',
+          adoptedAt: NOW,
+        },
+      ]);
+      // seeya itself never had anything to commit — no new commit message from this call.
+      expect(workspace.commitMessages.length).toBe(commitsBefore);
+    });
+
+    it('committed part and left part pending — asks only about the pending part, registers regardless of the answer', async () => {
+      const storage = new InMemoryDeviceStorage(DEFAULT_TEST_CONFIG);
+      const workspace = new FakeWorkspaceRepository();
+      await adoptSession(
+        buildAdoptDeps(storage, workspace),
+        ORIGINAL_ENDED,
+        'auth-hardening',
+        buildCallbacks(),
+      );
+      workspace.setSessionCommits('auth-hardening', FORK_SESSION_ID, [
+        { hash: 'c0ffee2', files: ['auth-hardening/AGENTS.md'] },
+      ]);
+      workspace.setChangedFiles('auth-hardening', ['auth-hardening/status/README.md']);
+      const forkRegistration = new FakeForkRegistration();
+      const forkCleanup = new FakeForkCleanup();
+      const askedWith: (readonly string[])[] = [];
+
+      const result = await adoptSession(
+        buildAdoptDeps(storage, workspace, { forkRegistration, forkCleanup }),
+        createSessionWithPid({
+          sessionId: '40404040-4040-4404-8404-404040404040',
+          processIsAlive: false,
+        }),
+        'auth-hardening',
+        buildCallbacks({
+          confirmCommit: (files) => {
+            askedWith.push(files);
+            return Promise.resolve('decline');
+          },
+        }),
+      );
+
+      // "pergunta só pelo pendente" — never re-asks about what the copy already committed itself.
+      expect(askedWith).toEqual([['auth-hardening/status/README.md']]);
+      expect(result).toEqual({
+        kind: 'adopted',
+        projectId: 'auth-hardening',
+        forkSessionId: FORK_SESSION_ID,
+        changedFiles: [],
+        alreadyCommittedFiles: ['auth-hardening/AGENTS.md'],
+        pendingFiles: ['auth-hardening/status/README.md'],
+      });
+      // Declining the follow-up no longer discards the fork once it already left a commit behind.
+      expect(forkCleanup.deletedSessionIds).toEqual([]);
+      expect(forkRegistration.isRegistered(FORK_SESSION_ID)).toBe(false);
+      expect(await storage.readAdoptions()).toEqual([
+        {
+          originalSessionId: '40404040-4040-4404-8404-404040404040',
+          forkSessionId: FORK_SESSION_ID,
+          projectId: 'auth-hardening',
+          adoptedAt: NOW,
+        },
+      ]);
+    });
+
+    it('committed part, and the person agrees to commit the rest — both lists reported separately', async () => {
+      const storage = new InMemoryDeviceStorage(DEFAULT_TEST_CONFIG);
+      const workspace = new FakeWorkspaceRepository();
+      await adoptSession(
+        buildAdoptDeps(storage, workspace),
+        ORIGINAL_ENDED,
+        'auth-hardening',
+        buildCallbacks(),
+      );
+      workspace.setSessionCommits('auth-hardening', FORK_SESSION_ID, [
+        { hash: 'c0ffee3', files: ['auth-hardening/AGENTS.md'] },
+      ]);
+      workspace.setChangedFiles('auth-hardening', ['auth-hardening/status/README.md']);
+      const forkRegistration = new FakeForkRegistration();
+      const forkCleanup = new FakeForkCleanup();
+
+      const result = await adoptSession(
+        buildAdoptDeps(storage, workspace, { forkRegistration, forkCleanup }),
+        createSessionWithPid({
+          sessionId: '50505050-5050-4505-8505-505050505050',
+          processIsAlive: false,
+        }),
+        'auth-hardening',
+        buildCallbacks({ confirmCommit: () => Promise.resolve('commit') }),
+      );
+
+      expect(result).toEqual({
+        kind: 'adopted',
+        projectId: 'auth-hardening',
+        forkSessionId: FORK_SESSION_ID,
+        changedFiles: ['auth-hardening/status/README.md'],
+        alreadyCommittedFiles: ['auth-hardening/AGENTS.md'],
+        pendingFiles: [],
+      });
+      expect(forkCleanup.deletedSessionIds).toEqual([]);
+      const lastCommit = workspace.commitMessages.at(-1);
+      expect(lastCommit).toContain(`Seeya-Session-Id: ${FORK_SESSION_ID}`);
+    });
+
+    it('committed part, agreed to commit the rest, but that commit itself fails — still registers, names the failure', async () => {
+      const storage = new InMemoryDeviceStorage(DEFAULT_TEST_CONFIG);
+      const workspace = new FakeWorkspaceRepository();
+      await adoptSession(
+        buildAdoptDeps(storage, workspace),
+        ORIGINAL_ENDED,
+        'auth-hardening',
+        buildCallbacks(),
+      );
+      workspace.setSessionCommits('auth-hardening', FORK_SESSION_ID, [
+        { hash: 'c0ffee4', files: ['auth-hardening/AGENTS.md'] },
+      ]);
+      workspace.setChangedFiles('auth-hardening', ['auth-hardening/status/README.md']);
+      workspace.failNextCommitWith(
+        'git commit failed in workspace at "/x": exit 1: seeya: the workspace\'s own git hooks ' +
+          '(D-047) refused this commit.',
+      );
+      const forkRegistration = new FakeForkRegistration();
+      const forkCleanup = new FakeForkCleanup();
+
+      const result = await adoptSession(
+        buildAdoptDeps(storage, workspace, { forkRegistration, forkCleanup }),
+        createSessionWithPid({
+          sessionId: '60606060-6060-4606-8606-606060606060',
+          processIsAlive: false,
+        }),
+        'auth-hardening',
+        buildCallbacks({ confirmCommit: () => Promise.resolve('commit') }),
+      );
+
+      // Unlike the ordinary `commitFailed` case (no prior commits, below), a failed FOLLOW-UP
+      // commit never leaves the adoption unregistered — the copy already left real work behind.
+      expect(result).toMatchObject({
+        kind: 'adopted',
+        projectId: 'auth-hardening',
+        forkSessionId: FORK_SESSION_ID,
+        changedFiles: [],
+        alreadyCommittedFiles: ['auth-hardening/AGENTS.md'],
+        pendingFiles: ['auth-hardening/status/README.md'],
+      });
+      expect(result.kind === 'adopted' && result.pendingCommitFailedReason).toContain(
+        'refused this commit',
+      );
+      expect(forkCleanup.deletedSessionIds).toEqual([]);
+      expect(forkRegistration.isRegistered(FORK_SESSION_ID)).toBe(false);
+      expect(await storage.readAdoptions()).toEqual([
+        {
+          originalSessionId: '60606060-6060-4606-8606-606060606060',
+          forkSessionId: FORK_SESSION_ID,
+          projectId: 'auth-hardening',
+          adoptedAt: NOW,
+        },
+      ]);
+    });
+
+    it('the session really did nothing at all — still noChanges, the fork is still discarded (unchanged behavior)', async () => {
+      const storage = new InMemoryDeviceStorage(DEFAULT_TEST_CONFIG);
+      const workspace = new FakeWorkspaceRepository();
+      const forkRegistration = new FakeForkRegistration();
+      const forkCleanup = new FakeForkCleanup();
+
+      // Neither `setChangedFiles` nor `setSessionCommits` called: the fake's own default for
+      // both is "nothing here" — the session genuinely wrote nothing, distinct from the two
+      // cases above where it committed something.
+      const result = await adoptSession(
+        buildAdoptDeps(storage, workspace, { forkRegistration, forkCleanup }),
+        ORIGINAL_ENDED,
+        'auth-hardening',
+        buildCallbacks(),
+      );
+
+      expect(result).toEqual({
+        kind: 'noChanges',
+        projectId: 'auth-hardening',
+        forkSessionId: FORK_SESSION_ID,
+      });
+      expect(forkCleanup.deletedSessionIds).toEqual([FORK_SESSION_ID]);
+      expect(forkRegistration.isRegistered(FORK_SESSION_ID)).toBe(false);
+      expect(await storage.readAdoptions()).toEqual([]);
+    });
   });
 
   describe('commitFailed (V2-T34 production defect, PO review 2026-09-25)', () => {

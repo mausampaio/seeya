@@ -7,7 +7,11 @@
  */
 import { MESSAGES } from '../text/messages.js';
 import { shortenDirectoryPath } from '../sidebar/directory-label.js';
-import type { ProjectPanelRow, ProjectsPanelData } from '../state/projects-panel.js';
+import type {
+  IgnoredProjectPanelRow,
+  ProjectPanelRow,
+  ProjectsPanelData,
+} from '../state/projects-panel.js';
 import type { ProjectsUpdateEvent } from '../ipc/channels.js';
 
 // V2-T30 item 5: the last `ProjectsPanelData` this window received — `electron/adopt-flow-view.ts`'s
@@ -15,7 +19,11 @@ import type { ProjectsUpdateEvent } from '../ipc/channels.js';
 // projects again; the lateral already has the freshest copy from its own last refresh tick).
 // V2-T55 item 3: `electron/other-sessions-dir-dialog-view.ts` reads the same latest copy to
 // refresh an open directory modal in place, for the identical reason.
-let latestProjectsPanelData: ProjectsPanelData = { projects: [], otherSessionsByDirectory: [] };
+let latestProjectsPanelData: ProjectsPanelData = {
+  projects: [],
+  otherSessionsByDirectory: [],
+  ignoredProjects: [],
+};
 
 /** `electron/adopt-flow-view.ts`'s/`other-sessions-dir-dialog-view.ts`'s own read of the latest
  * push — kept as a function, not an export of the mutable binding itself, so nothing outside this
@@ -75,6 +83,15 @@ function renderProjectBlock(project: ProjectPanelRow): HTMLElement {
   return container;
 }
 
+/** V2-T72 item 2 — one row per ignored `seeya.json`, id plus the same reason the CLI's own
+ * "Ignored entries:" already prints (`RejectedDiscoveryRecord.reason`, unparsed — this is
+ * diagnostic text about the person's own disk, not something this project owns the wording of). */
+function renderIgnoredProjectRow(row: IgnoredProjectPanelRow): HTMLLIElement {
+  const item = document.createElement('li');
+  item.textContent = MESSAGES.ignoredProjectRowLabel(row.projectId, row.reason);
+  return item;
+}
+
 /** V2-T55 item 2 — one row per directory, never one per session: clicking it opens the modal
  * (`electron/other-sessions-dir-dialog-view.ts`, wired independently — this button only carries
  * `data-dir`, the key that modal looks the group back up by in `getLatestProjectsPanelData()`).
@@ -119,6 +136,18 @@ function renderProjectsPanel(data: ProjectsUpdateEvent): void {
     for (const project of data.projects) {
       projectsList.appendChild(renderProjectBlock(project));
     }
+  }
+
+  // V2-T72 item 2: hidden entirely in the ordinary case (no ignored project) — unlike "Other
+  // sessions" above, an empty state here would just be noise every time nothing is wrong.
+  const ignoredHeading = document.getElementById('ignored-projects-heading') as HTMLElement;
+  const ignoredList = document.getElementById('ignored-projects-list') as HTMLElement;
+  ignoredList.textContent = '';
+  const hasIgnored = data.ignoredProjects.length > 0;
+  ignoredHeading.hidden = !hasIgnored;
+  ignoredList.hidden = !hasIgnored;
+  for (const ignored of data.ignoredProjects) {
+    ignoredList.appendChild(renderIgnoredProjectRow(ignored));
   }
 
   const otherList = document.getElementById('other-sessions-list') as HTMLElement;

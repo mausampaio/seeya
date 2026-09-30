@@ -512,15 +512,43 @@ export function formatAdoptSessionReport(result: AdoptSessionResult): string {
         'discarded; run "seeya project adopt" again from a real terminal to decide. It had ' +
         `written:\n${formatAdoptedChangedFiles(result.changedFiles)}`
       );
-    case 'adopted':
-      // Item 9: repeats the same follow-up the launch confirmation already offered — the person
-      // saw it once before the harness took the terminal; this is the reminder for when they're
-      // looking at the terminal again, after the fact.
-      return (
+    // Item 9: repeats the same follow-up the launch confirmation already offered — the person saw
+    // it once before the harness took the terminal; this is the reminder for when they're looking
+    // at the terminal again, after the fact.
+    //
+    // V2-T72 item 1: three separate lists, never merged — `alreadyCommittedFiles` (what the copy
+    // committed itself, while it held the project lock, D-047 item 4), `changedFiles` (what THIS
+    // call committed, if anything was left pending and confirmed), and `pendingFiles` (what's
+    // still uncommitted, with the reason when seeya's own attempt at it failed). The report has to
+    // say what was already committed, not just what this call did — each list only prints when it
+    // has something to say, so the ordinary case (nothing already committed, nothing left pending)
+    // reads exactly like before this task.
+    case 'adopted': {
+      const sections = [
         `Project "${result.projectId}": adopted. The fork (${result.forkSessionId}) is now this ` +
-        `project's own session. Committed:\n${formatAdoptedChangedFiles(result.changedFiles)}\n` +
-        `Continue the work with: seeya project open ${result.projectId}`
-      );
+          "project's own session.",
+      ];
+      if (result.alreadyCommittedFiles.length > 0) {
+        sections.push(
+          `The session had already committed this itself:\n` +
+            formatAdoptedChangedFiles(result.alreadyCommittedFiles),
+        );
+      }
+      if (result.changedFiles.length > 0) {
+        sections.push(`Committed:\n${formatAdoptedChangedFiles(result.changedFiles)}`);
+      }
+      if (result.pendingFiles.length > 0) {
+        const failureNote =
+          result.pendingCommitFailedReason === undefined
+            ? ''
+            : ` (committing them failed: ${result.pendingCommitFailedReason})`;
+        sections.push(
+          `Still uncommitted${failureNote}:\n${formatAdoptedChangedFiles(result.pendingFiles)}`,
+        );
+      }
+      sections.push(`Continue the work with: seeya project open ${result.projectId}`);
+      return sections.join('\n');
+    }
     // V2-T34 production defect (PO review, 2026-09-25): the commit itself failed (most often the
     // workspace's own git hook refusing it) — `result.reason` carries git's own stderr
     // (`adapters/workspace/index.ts#commitAll`'s own fix, same PO review). Nothing was discarded:

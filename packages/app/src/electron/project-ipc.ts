@@ -31,6 +31,7 @@ import {
 } from '@seeya-ai/engine/application/project-lock.js';
 import { openProject, SUPPORTED_HARNESS } from '@seeya-ai/engine/application/project-open.js';
 import { adoptSession } from '@seeya-ai/engine/application/project-adopt.js';
+import type { RejectedDiscoveryRecord } from '@seeya-ai/engine/core/ports.js';
 import {
   renderLeftoverChangesLines,
   renderReadOnlyOpenQuestion,
@@ -93,14 +94,20 @@ export interface ProjectIpcHandle {
 
 /** Every project's manifest plus its own directory, and its lock status keyed by id — read once
  * per `pushProjectsUpdate` call, shared by the push itself and by `openProject`/`adoptSession`'s
- * own need to know a project's directory before launching into it. */
+ * own need to know a project's directory before launching into it.
+ *
+ * V2-T72 item 2: also returns `rejected` (`listProjects`'s own D-022 half this function used to
+ * drop) — a `seeya.json` that fails to parse/validate no longer just "disappears" from the window
+ * the way it used to; `computeProjectsPanelData` below folds it into `ProjectsPanelData
+ * .ignoredProjects`, the same fact the CLI's own "Ignored entries:" already shows. */
 async function readProjectsWithLockStatus(context: AppContext): Promise<{
   readonly root: string;
   readonly projects: readonly ProjectWithDirectory[];
   readonly lockStatusByProjectId: ReadonlyMap<string, ProjectLockStatus>;
+  readonly rejected: readonly RejectedDiscoveryRecord[];
 }> {
   const root = await resolveWorkspaceRoot(context.storage, context.home.seeyaHome);
-  const { manifests } = await listProjects(buildProjectWorkspaceDeps(context));
+  const { manifests, rejected } = await listProjects(buildProjectWorkspaceDeps(context));
   const projects = manifests.map((manifest) => ({ manifest, dir: path.join(root, manifest.id) }));
   const lockStatusByProjectId = new Map(
     await Promise.all(
@@ -117,7 +124,7 @@ async function readProjectsWithLockStatus(context: AppContext): Promise<{
       ),
     ),
   );
-  return { root, projects, lockStatusByProjectId };
+  return { root, projects, lockStatusByProjectId, rejected };
 }
 
 export function wireProjectIpc(
@@ -143,7 +150,7 @@ export function wireProjectIpc(
   const pendingCommitConfirmations = new PendingConfirmations<'commit' | 'decline'>('adopt-commit');
 
   async function computeProjectsPanelData(): Promise<ProjectsPanelData> {
-    const { projects, lockStatusByProjectId } = await readProjectsWithLockStatus(context);
+    const { projects, lockStatusByProjectId, rejected } = await readProjectsWithLockStatus(context);
     const adoptions = await context.storage.readAdoptions();
     return buildProjectsPanelData(
       getSidebarRows(),
@@ -151,6 +158,7 @@ export function wireProjectIpc(
       adoptions,
       lockStatusByProjectId,
       context.platformHint,
+      rejected,
     );
   }
 
