@@ -48,17 +48,37 @@ body {
   background: var(--seeya-surface);
   border-right: 1px solid var(--seeya-border);
   box-sizing: border-box;
+  overflow: hidden;
   /* V2-T62 (D-051): respects `prefers-reduced-motion` for free — `tokens.css`'s own global
    * override zeroes every transition-duration under that preference. */
   transition: width var(--seeya-motion-panel) var(--seeya-motion-easing);
 }
 
-/* V2-T30 item 2: recolhida — the toggle button stays, everything else collapses to zero width so
- * #main (the terminal) takes the freed space. The button itself never disappears (the task's own
- * "um botão sempre visível alterna entre aberta e recolhida"). Higher specificity than #sidebar
- * above (id + class beats id alone), so this always wins over --sidebar-width while collapsed. */
+/* V2-T63 correction: `#sidebar` itself is a flex ROW (so its collapse strip can sit beside the
+ * rest) — this wrapper is the single COLUMN that holds the header, the scrolling list and the
+ * footer, stacked. Without it, `#sidebar-content`/`#sidebar-footer` were themselves flex ROW
+ * items of `#sidebar`, landing SIDE BY SIDE (the two-column bug a real-window screenshot caught). */
+#sidebar-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+/* V2-T30 item 2 / V2-T63 correction: recolhida — collapsing now hides `#sidebar-main` entirely
+ * (header included: the collapse toggle that lived in it disappears too) and the sidebar itself
+ * shrinks to nothing, `overflow: hidden` on `#sidebar` above clipping the border cleanly. Nothing
+ * inside `#sidebar` stays visible while collapsed on purpose — reopening is the toolbar's own
+ * always-visible `#sidebar-toggle-button` or `Ctrl+B`, never a strip living inside `#sidebar`
+ * itself. Higher specificity than `#sidebar` above (id + class beats id alone), so this always
+ * wins over `--sidebar-width` while collapsed. */
 #sidebar.collapsed {
-  width: auto;
+  width: 0;
+  border-right: none;
+}
+
+#sidebar.collapsed #sidebar-main {
+  display: none;
 }
 
 /* PO acceptance of V2-T55, correction 2 — the draggable border between the sidebar and the tab
@@ -80,16 +100,18 @@ body {
   display: none;
 }
 
-/* V2-T62 (D-051): colour/radius/weight now come from `.seeya-button--ghost`/`--icon`
- * (`components.css`, `ui/button.tsx`) — this id rule keeps only the layout this exact spot in the
- * sidebar strip needs (width, full-height stretch, the divider from the rest of the sidebar). */
-#sidebar-collapse-toggle {
+/* V2-T63 correction: a small ghost icon button in the header now (`.seeya-button--ghost`/`--icon`
+ * from `components.css` already give it the right look — transparent, 32×32, no fixed colour) —
+ * the PREVIOUS rule here (`align-self: stretch`, no `variant`, so `Button` defaulted to
+ * `--primary`) is exactly what read as a "violet bar the full height of the sidebar" in the real
+ * window (the achado this correction fixes). No id-scoped size override needed: the component's
+ * own icon sizing is already right for a header button. */
+#sidebar-header {
   flex: none;
-  width: 20px;
-  align-self: stretch;
-  border: none;
-  border-right: 1px solid var(--seeya-border);
-  border-radius: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px;
 }
 
 #sidebar-content {
@@ -108,18 +130,11 @@ body {
   flex-direction: column;
 }
 
-#sidebar.collapsed #sidebar-content,
-#sidebar.collapsed #sidebar-footer {
-  display: none;
-}
-
 /* V2-T63 (`docs/INTERFACE.md` § 1 item 1): the logo, both theme variants always in the DOM
  * (`app-shell.tsx`) — only one is ever visible, toggled by the SAME `[data-theme='dark']`
- * selector `tokens.css` already keys the rest of the window's theming off, no JS swap needed. */
-#sidebar-logo {
-  margin: 4px 0 8px;
-}
-
+ * selector `tokens.css` already keys the rest of the window's theming off, no JS swap needed.
+ * Correction: lives in `#sidebar-header` now, next to the collapse toggle — no margin of its own
+ * needed, the header's own `padding`/`gap` place it. */
 #sidebar-logo img {
   height: 20px;
   display: block;
@@ -137,20 +152,52 @@ body {
   display: block;
 }
 
-/* V2-T63 item 2: the Today card — a full-width button so its own state (title + "N to resume")
- * reads as one clickable unit, opening the Today page tab. */
+/* V2-T63 item 2 (correction, real-window review): the Today card — a full-width button, TWO
+ * lines (`.today-card-row`/`.today-card-subtitle`, built by `sidebar-favorites-view.ts`) instead
+ * of one collapsed string — icon + "Today" + the "N to resume" pill on the first line, "Plan for
+ * <day>"/"Nothing to resume" on the second. */
 #today-card {
   display: block;
   width: 100%;
+  box-sizing: border-box;
   text-align: left;
   border: 1px solid var(--seeya-border);
   border-radius: var(--seeya-radius-sm);
   background: var(--seeya-surface-subtle);
   color: var(--seeya-text);
-  font-size: 12px;
   padding: 8px;
   margin-bottom: 8px;
   cursor: pointer;
+}
+
+#today-card[aria-current='true'] {
+  border-color: var(--seeya-brand);
+  background: var(--seeya-brand-soft);
+}
+
+.today-card-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.today-card-icon {
+  flex: none;
+}
+
+.today-card-title {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.today-card-row .seeya-status-pill {
+  margin-left: auto;
+}
+
+.today-card-subtitle {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--seeya-text-secondary);
 }
 
 .sidebar-section-header {
@@ -163,15 +210,25 @@ body {
   margin: 0;
 }
 
-/* V2-T63 item 3: "+" (New project…) lives in the Favorites section header now. */
+/* V2-T63 item 3 (correction, real-window review): icon-only "+" — the previous version set its
+ * `textContent` to the full "New project…" phrase (`new-project-dialog-view.ts`), which read as a
+ * large text button next to the section heading instead of a small icon; `aria-label` now carries
+ * the name instead (identity § 8). */
 #new-project-button {
   flex: none;
-  font-size: 16px;
+  width: 20px;
+  height: 20px;
   line-height: 1;
   border: none;
+  border-radius: var(--seeya-radius-sm);
   background: transparent;
   color: var(--seeya-text-secondary);
   cursor: pointer;
+}
+
+#new-project-button:hover {
+  background: var(--seeya-surface-hover);
+  color: var(--seeya-text);
 }
 
 #favorites-list,
@@ -182,9 +239,12 @@ body {
   font-size: 12px;
 }
 
+/* V2-T63 item 8 (correction, real-window review): small, tertiary text — never the same weight as
+ * a real row. */
 #favorites-empty,
 #recent-empty {
-  color: var(--seeya-text-secondary);
+  color: var(--seeya-text-tertiary);
+  font-size: 11px;
 }
 
 .sidebar-favorite-row {
@@ -247,19 +307,50 @@ body {
   padding: 1px 0;
 }
 
-/* V2-T63 items 5/6: "All projects (N)"/"Sessions (N running)" — full-width text links, each
- * opening its own page tab. */
-#all-projects-link,
-#sessions-link {
-  display: block;
+/* V2-T63 items 5/6 (correction, real-window review): "All projects"/"Sessions" as real nav rows —
+ * icon, label, and a right-aligned count (plain number for All projects, the green dotted pill
+ * for Sessions, both built by `sidebar-favorites-view.ts`) — never a loose line of text. Active
+ * (the matching page tab is currently open, `electron/tabs-view.ts#onActiveTabChanged`) highlights
+ * the row the same way `#today-card[aria-current='true']` does above. */
+.sidebar-nav-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   text-align: left;
   border: none;
+  border-radius: var(--seeya-radius-sm);
   background: transparent;
   color: var(--seeya-text);
   font-size: 13px;
-  padding: 6px 0;
+  padding: 6px 4px;
   cursor: pointer;
+  box-sizing: border-box;
+}
+
+.sidebar-nav-row:hover {
+  background: var(--seeya-surface-hover);
+}
+
+.sidebar-nav-row[aria-current='true'] {
+  background: var(--seeya-brand-soft);
+  color: var(--seeya-brand-text);
+  font-weight: 500;
+}
+
+.sidebar-nav-icon {
+  flex: none;
+}
+
+.sidebar-nav-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar-nav-count {
+  flex: none;
+  font-size: 12px;
+  color: var(--seeya-text-secondary);
 }
 
 #sidebar-footer {
@@ -268,9 +359,10 @@ body {
   border-top: 1px solid var(--seeya-border);
 }
 
+/* V2-T63 item 4 (correction, real-window review): no uppercase — 12px, weight 500, tertiary. */
 #sidebar h2 {
-  font-size: 13px;
-  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--seeya-text-tertiary);
   margin: 12px 0 4px;
 }
@@ -538,10 +630,43 @@ body {
   width: 100%;
 }
 
-/* V2-T5b item 3 / V2-T63: "Daemon running"/"Daemon stopped" — the pill (`components.css`'s own
- * `.seeya-status-pill-button`, applied by `daemon-control-view.ts#setPillTone`). */
-#daemon-control-button {
+/* V2-T5b item 3 / V2-T63 (correction, real-window review): the daemon pill — a dot + a label on
+ * the left (`#daemon-pill-dot`/`#daemon-pill-label`, `daemon-control-view.ts#setDotTone`) and a
+ * small icon button on the right (▶ to start / ■ to stop, `Button`'s own `--ghost`/`--icon`
+ * sizing) — never one giant button whose own text doubled as both the state and the click target,
+ * which is what the earlier version's "sem botão de parar visível" read as. */
+#daemon-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
   margin-top: 6px;
+  border: 1px solid var(--seeya-border);
+  border-radius: var(--seeya-radius-full);
+  box-sizing: border-box;
+}
+
+#daemon-pill-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+#daemon-pill-dot.sidebar-pill-dot--neutral {
+  background: var(--seeya-text-tertiary);
+}
+
+#daemon-pill-dot.sidebar-pill-dot--success {
+  background: var(--seeya-success-base);
+}
+
+#daemon-pill-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
 }
 
 #daemon-control-result {
@@ -550,11 +675,11 @@ body {
   white-space: pre-wrap;
 }
 
-/* V2-T13 item 4: the autostart button — stays in the footer until V2-T65 moves it into Settings
- * (this task's own explicit instruction: "fica onde está"). */
+/* V2-T13 item 4 (correction, real-window review): "fica onde está" in this task's own wording —
+ * but a SMALL secondary button, not a full-width one, until V2-T65 moves it into Settings. */
 #autostart-control-button {
   margin-top: 6px;
-  width: 100%;
+  font-size: 12px;
 }
 
 #terminal-host {

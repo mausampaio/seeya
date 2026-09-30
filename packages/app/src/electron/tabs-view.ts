@@ -35,6 +35,18 @@ let nextTabId = 0;
  */
 const paneContainers = new Map<string, HTMLElement>();
 
+/** V2-T63 correction (real-window screenshot review, item 6): who wants to know which tab is
+ * active — the lateral's own nav rows/Today card highlight themselves when their page tab is the
+ * one showing (`sidebar-favorites-view.ts`'s own listener below). `showTab` is the single place
+ * visibility changes, so this is the single place that announces it — never a second poll of
+ * `aria-current` elsewhere. */
+type ActiveTabListener = (id: string) => void;
+const activeTabListeners: ActiveTabListener[] = [];
+
+export function onActiveTabChanged(listener: ActiveTabListener): void {
+  activeTabListeners.push(listener);
+}
+
 /** `electron/page-tab-strip.ts`'s own registration/removal — kept as functions, not an export of
  * the map itself, so only this module ever iterates or clears it directly. */
 export function registerPane(id: string, container: HTMLElement): void {
@@ -110,6 +122,9 @@ export function showTab(id: string): void {
   // without a second click on it. A page tab (no `Terminal` of its own) simply has nothing to
   // focus here — the browser's own default tab order into its content still works.
   shown?.terminal.focus();
+  for (const listener of activeTabListeners) {
+    listener(id);
+  }
 }
 
 /** PO acceptance of V2-T55, correction 3 (2026-09-25) — the one place that knows which tab is
