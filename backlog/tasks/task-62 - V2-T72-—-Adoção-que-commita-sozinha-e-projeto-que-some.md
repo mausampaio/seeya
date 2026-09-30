@@ -4,7 +4,7 @@ title: V2-T72 — Adoção que commita sozinha e projeto que some
 status: Review
 assignee: []
 created_date: '2026-09-30 13:13'
-updated_date: '2026-09-30 14:41'
+updated_date: '2026-09-30 14:49'
 labels: []
 milestone: m-0
 dependencies: []
@@ -153,3 +153,13 @@ novas no caso `adopted`). Registrei em vez de recortar sozinho: ao contrário de
 `format-project.ts` vem se acumulando desde a V2-T29 — como recortá-lo por comando é uma decisão
 de escopo maior que esta correção.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-30 14:49
+---
+Revisão do PO em 2026-09-30: mesclado, portão verde (2934 testes) e também sem identidade global do git (rodado pelo PO — recusado ao agente, que parou e reportou). Conferido: a adoção identifica os commits da cópia pelo trailer Seeya-Session-Id (restrito de propósito; o limite é o --no-verify, coberto pela V2-T73); commitou tudo → registra sem perguntar; parte pendente → pergunta só pelo resto e registra de qualquer jeito; nada feito → continua noChanges. Teste de regressão falhava antes (confirmado pelo agente revertendo o arquivo). Projeto com seeya.json inválido aparece na lateral com o motivo. Q-100 (format-project.ts acima de 500 linhas) fica aberta para uma tarefa de divisão por comando. Nota de processo: o agente ficou sem commitar nada até a interrupção — retomado com ordem de commitar primeiro. Falta o aceite do mantenedor no Ubuntu.
+---
+<!-- COMMENTS:END -->
