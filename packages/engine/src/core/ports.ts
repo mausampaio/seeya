@@ -502,6 +502,20 @@ export interface Storage {
   /** Replaces `adoptions.json`'s entire contents with `records` — same append-by-read-then-write
    * contract `saveRepositoryMap` already has above; this method itself doesn't merge. */
   saveAdoptions(records: readonly AdoptionRecord[]): Promise<void>;
+
+  /**
+   * V2-T63: `~/.seeya/favorite-projects.json` — the projects starred in this window's own
+   * lateral (`docs/INTERFACE.md` § 1 item 3). A favorite is a per-machine viewing preference, not
+   * a fact about the project (never written to `seeya.json`). Empty when nothing has been starred
+   * on this device yet (D-025), never an error.
+   */
+  readFavoriteProjectIds(): Promise<readonly string[]>;
+
+  /** Replaces `favorite-projects.json`'s entire contents with `projectIds` — same
+   * read-then-write-the-whole-list contract `saveAdoptions` above already has;
+   * `core/favorite-projects.ts#toggleFavoriteProjectId` is what computes the new list before this
+   * is called. */
+  saveFavoriteProjectIds(projectIds: readonly string[]): Promise<void>;
 }
 
 /**

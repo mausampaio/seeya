@@ -445,6 +445,23 @@ export class FakeStorage implements Storage {
     void records;
     return Promise.reject(new Error('FakeStorage.saveAdoptions is not exercised by endDay'));
   }
+
+  // V2-T63: `favorite-projects.json` — never touched by `endDay`/`startDay`/the daemon, same
+  // "reject loudly" convention this fake uses above for every other method outside its own scope.
+  readFavoriteProjectIds(): ReturnType<Storage['readFavoriteProjectIds']> {
+    return Promise.reject(
+      new Error('FakeStorage.readFavoriteProjectIds is not exercised by endDay'),
+    );
+  }
+
+  saveFavoriteProjectIds(
+    projectIds: readonly string[],
+  ): ReturnType<Storage['saveFavoriteProjectIds']> {
+    void projectIds;
+    return Promise.reject(
+      new Error('FakeStorage.saveFavoriteProjectIds is not exercised by endDay'),
+    );
+  }
 }
 
 /**
