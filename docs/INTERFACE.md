@@ -6,7 +6,8 @@ tarefa que muda o que a pessoa vê atualiza este arquivo antes do código (regra
 
 - **Visual:** `design/IDENTIDADE_VISUAL.md` — tokens, temas, tipografia, espaçamento, raios,
   movimento, tom de voz e acessibilidade. Este arquivo não repete valores de lá; cita os nomes.
-- **Camada:** D-051 — Preact, componentes próprios, tokens como variáveis CSS, fontes empacotadas.
+- **Camada:** D-051 — Preact, componentes próprios, tokens como variáveis CSS, fontes empacotadas;
+  D-052 — a estrutura dos componentes (pastas, primitivas de disposição, CSS modules, testes).
 - **Protótipo:** a proposta visual vive fora do repositório, numa página privada do mantenedor.
   Tudo que ela decidiu está escrito aqui; nenhuma tarefa depende de abri-la.
 - **Idioma:** o texto da tela é inglês (D-028), com os nomes do produto (`end day`, `snooze`,
