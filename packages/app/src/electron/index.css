@@ -135,20 +135,32 @@ body {
  * selector `tokens.css` already keys the rest of the window's theming off, no JS swap needed.
  * Correction: lives in `#sidebar-header` now, next to the collapse toggle — no margin of its own
  * needed, the header's own `padding`/`gap` place it. */
-#sidebar-logo img {
-  height: 20px;
-  display: block;
-}
-
+/* V2-T63 correction (real-window screenshot review): the light theme showed BOTH logos stacked
+ * (two "S" symbols above the wordmark) — `#sidebar-logo img` (id + type selector, specificity
+ * 1,0,1) was MORE specific than the plain `#sidebar-logo-dark { display: none }` rule below it
+ * (specificity 1,0,0) and won regardless of source order, so `display: block` from this rule kept
+ * the dark logo visible too, stacked under the light one. Fixed by giving the two images their
+ * OWN id selectors here (no descendant/type combinator) and the hide/show overrides below a
+ * STRICTLY higher specificity (two ids) than this base rule (one id) — never a specificity tie a
+ * browser has to break by source order again. `width: auto` alongside the fixed `height` keeps
+ * each SVG's own aspect ratio (both master files share one viewBox, `design/seeya-logo.svg`/
+ * `-on-dark.svg`, so this was never about the files themselves). */
+#sidebar-logo-light,
 #sidebar-logo-dark {
+  display: block;
+  height: 20px;
+  width: auto;
+}
+
+#sidebar-logo #sidebar-logo-dark {
   display: none;
 }
 
-[data-theme='dark'] #sidebar-logo-light {
+[data-theme='dark'] #sidebar-logo #sidebar-logo-light {
   display: none;
 }
 
-[data-theme='dark'] #sidebar-logo-dark {
+[data-theme='dark'] #sidebar-logo #sidebar-logo-dark {
   display: block;
 }
 
@@ -183,6 +195,8 @@ body {
 
 .today-card-icon {
   flex: none;
+  display: flex;
+  align-items: center;
 }
 
 .today-card-title {
@@ -255,14 +269,37 @@ body {
   padding: 2px 0;
 }
 
+/* V2-T63 correction (real-window review, second round): the icon itself (`<StarIcon/>`,
+ * `ui/icons.tsx`) already carries its own colour — outline inherits `currentColor` (this button's
+ * own `color`, left at the default text colour on purpose: an UNfavorited star in the Projects
+ * tab shouldn't compete for attention), filled sets the brand colour directly. No `color`/
+ * `font-size` override belongs here anymore — those were the ★/☆ GLYPH's own styling. */
 .project-favorite-star {
+  display: flex;
+  align-items: center;
   flex: none;
   border: none;
   background: transparent;
   cursor: pointer;
-  color: var(--seeya-warning-text);
-  font-size: 13px;
   padding: 0;
+}
+
+/* V2-T63 correction (real-window review, third round, item 3): Recent rows get the same
+ * icon-then-name layout Favorites rows already have (`.sidebar-favorite-row`), so the two lists'
+ * rows line up — a folder icon (outline, tertiary colour: a Recent row isn't a favorite, never
+ * the brand/warning colour) in the same slot the star occupies above it. */
+.sidebar-recent-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+}
+
+.sidebar-recent-icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  color: var(--seeya-text-tertiary);
 }
 
 .sidebar-favorite-name,
@@ -340,6 +377,8 @@ body {
 
 .sidebar-nav-icon {
   flex: none;
+  display: flex;
+  align-items: center;
 }
 
 .sidebar-nav-label {
@@ -635,16 +674,29 @@ body {
  * small icon button on the right (▶ to start / ■ to stop, `Button`'s own `--ghost`/`--icon`
  * sizing) — never one giant button whose own text doubled as both the state and the click target,
  * which is what the earlier version's "sem botão de parar visível" read as. */
+/* V2-T63 correction (real-window review, third round): a SOLID tone background instead of an
+ * outline — item 4's own "fundo sólido do estado em vez de contorno". `color` is set on the pill
+ * itself (never repeated on the label) so `#daemon-pill-label`'s own text inherits it via normal
+ * cascade — `daemon-control-view.ts#setPillTone` is the one place that toggles which of the two
+ * classes below applies. `radius-md` (10px, a card/button radius — identity § 6.2), not
+ * `radius-full`: this reads as a status row now, not a chip. */
 #daemon-pill {
   display: flex;
   align-items: center;
   gap: 6px;
   width: 100%;
+  min-height: 32px;
   padding: 6px 8px;
   margin-top: 6px;
-  border: 1px solid var(--seeya-border);
-  border-radius: var(--seeya-radius-full);
+  border-radius: var(--seeya-radius-md);
   box-sizing: border-box;
+  color: var(--seeya-text);
+  background: var(--seeya-surface-hover);
+}
+
+#daemon-pill.daemon-pill--success {
+  background: var(--seeya-success-bg);
+  color: var(--seeya-success-text);
 }
 
 #daemon-pill-dot {
@@ -652,14 +704,7 @@ body {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-}
-
-#daemon-pill-dot.sidebar-pill-dot--neutral {
-  background: var(--seeya-text-tertiary);
-}
-
-#daemon-pill-dot.sidebar-pill-dot--success {
-  background: var(--seeya-success-base);
+  background: currentColor;
 }
 
 #daemon-pill-label {
