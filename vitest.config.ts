@@ -371,13 +371,16 @@ const ENGINE_ALIAS_DEPS_INLINE = { server: { deps: { inline: ['@seeya-ai/engine'
 
 export default defineConfig({
   ...ENGINE_ALIAS,
-  // V2-T62 (D-051): explicit, not relying on Vite's own tsconfig auto-discovery for `.tsx`
-  // (`tsconfig.base.json`'s own comment on `"types": ["node"]` already burned this project once on
-  // implicit config discovery depending on which file happens to be in the program) — every `.tsx`
-  // in this repo compiles through `preact/jsx-runtime`, never `preact/compat` (D-051's own "sem a
-  // camada de compatibilidade com React"), matching `packages/app/tsconfig.json` and
-  // `tsconfig.app-ui.json`'s identical two settings for `tsc`.
-  esbuild: { jsx: 'automatic', jsxImportSource: 'preact' },
+  // V2-T62 (D-051): NO `esbuild: { jsx, jsxImportSource }` here — measured, not assumed. This
+  // Vite version (8) transforms `.ts`/`.tsx` through `oxc` by default, not `esbuild`; setting
+  // `esbuild.jsx*` here is silently ignored (`oxc options will be used and esbuild options will
+  // be ignored`, printed at test-run time) and `oxc`'s own options type explicitly excludes a
+  // `tsconfig` override — it resolves each file's OWN nearest `tsconfig.json` for JSX settings
+  // instead, the same walk-up `tsc`/typescript-eslint's `projectService` already do. Every `.tsx`
+  // in this repo already sits under a tsconfig that sets `"jsx": "react-jsx"` and
+  // `"jsxImportSource": "preact"` (`packages/app/tsconfig.json` for `src/ui/**`,
+  // `tsconfig.app-ui.json` for the same directory's own tests) — confirmed by running a component
+  // test with NO vitest-level JSX config at all and reading the correct Preact vnode back.
   test: {
     ...ENGINE_ALIAS_DEPS_INLINE,
     passWithNoTests: true,

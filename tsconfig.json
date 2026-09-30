@@ -43,9 +43,13 @@
   // globs — it does NOT stop a file from being pulled in anyway once something else in the program
   // imports it. A test under `tests/` (which stays in `include` below) importing a `.tsx` from
   // `ui/` would still drag that DOM-typed file straight back into this DOM-less program. Both
-  // `ui/**` and its own tests move to `tsconfig.app-ui.json` instead (a second, narrow flat
-  // program, DOM + jsx enabled, run as its own step in `npm run verificar` — see that file's own
-  // comment) — unlike electron/**, `ui/**` has no Electron/display dependency at all and stays IN
+  // `ui/**` and its own tests each get their OWN leaf `tsconfig.json` instead
+  // (`packages/app/src/ui/tsconfig.json`, `tests/unit/app/ui/tsconfig.json` — literally named
+  // "tsconfig.json", not some other name, because that is the one filename typescript-eslint's
+  // `projectService` walks up looking for; a differently-named file at the repo root was invisible
+  // to it, measured directly). Each is also its own explicit `tsc --noEmit` step in
+  // `npm run verificar`. Unlike electron/**, `ui/**` has no Electron/display dependency at all and
+  // stays IN
   // vitest's coverage floor (its tests call each component function directly and inspect the
   // vnode it returns, no DOM needed to run); it just needs a DIFFERENT type-checking program, not
   // none at all.
