@@ -203,28 +203,60 @@ export interface TodayPanelInputs {
  * if (data !== null) window.webContents.send(CHANNELS.todayUpdate, data);
  */
 /**
- * V2-T63 — the lateral's own Today card (`docs/INTERFACE.md` § 1 item 2): `Plan for <day>` plus
- * "N to resume" when there's a pending briefing, or "Nothing to resume" with no count otherwise.
- * `resumableCount` is the SAME `hasResumableSession`/`offersResumeCheckbox` rule the panel itself
- * already uses to decide whether a row offers a checkbox (`runningNow` never counts) — never a
- * second interpretation of "left to resume" (D-041).
+ * V2-T63 — the lateral's own Today card (`docs/INTERFACE.md` § 1 item 2): a readable day
+ * ("today"/"yesterday"/a weekday-and-date string), never the raw `(N days ago)` suffix
+ * `MESSAGES.todayPlanTitle` gives the full Today PAGE (that one mirrors the CLI's own
+ * "yesterday is the unremarkable case" wording, Q-026 — a DIFFERENT convention from the card's
+ * own "always name the day plainly", so it gets its own formatter rather than reusing that one).
+ *
+ * Correction (real-window screenshot review, 2026-09-30): the earlier version reused
+ * `todayPlanTitle`'s own `daysAgo === 1 ? '' : ' (N days ago)'` rule, which reads as the literal
+ * "(0 days ago)" for a same-day plan — the achado this fixes. `new Date(value)` WITH an argument
+ * is a deterministic transform, not a read of "now" (D-019 allows it outside `adapters/clock/`);
+ * `day` itself already came from a real `Clock` read upstream (`findPendingBriefing`).
+ *
+ * @example
+ * formatTodayCardDayLabel('2026-09-30', 0); // 'today'
+ * formatTodayCardDayLabel('2026-09-29', 1); // 'yesterday'
+ * formatTodayCardDayLabel('2026-09-20', 10); // 'Sun, Sep 20'
+ */
+export function formatTodayCardDayLabel(day: Day, daysAgo: number): string {
+  if (daysAgo === 0) {
+    return 'today';
+  }
+  if (daysAgo === 1) {
+    return 'yesterday';
+  }
+  // No 'Z' suffix: parsed in LOCAL time, matching the local calendar day `day` already names
+  // (`core/day.ts#localDayString`'s own convention) — a 'Z'/UTC parse could roll the date back a
+  // day in a negative-UTC-offset timezone once formatted back through `toLocaleDateString`.
+  const date = new Date(`${day}T00:00:00`);
+  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+/**
+ * The lateral's own Today card: icon + "Today" + the "N to resume" pill on one line
+ * (`sidebar-favorites-view.ts` builds that line from `dayLabel`/`resumableCount`), "Plan for
+ * `<dayLabel>`"/"Nothing to resume" on the next. `resumableCount` is the SAME
+ * `hasResumableSession`/`offersResumeCheckbox` rule the panel itself already uses to decide
+ * whether a row offers a checkbox (`runningNow` never counts) — never a second interpretation of
+ * "left to resume" (D-041).
  */
 export type TodayCardSummary =
-  | { readonly kind: 'pending'; readonly titleText: string; readonly resumableCount: number }
-  | { readonly kind: 'noBriefing'; readonly titleText: string };
+  | { readonly kind: 'pending'; readonly dayLabel: string; readonly resumableCount: number }
+  | { readonly kind: 'noBriefing' };
 
 /**
  * @example
- * buildTodayCardSummary({ kind: 'noBriefing', message: '...' });
- * // { kind: 'noBriefing', titleText: 'Nothing to resume' }
+ * buildTodayCardSummary({ kind: 'noBriefing', message: '...' }); // { kind: 'noBriefing' }
  */
 export function buildTodayCardSummary(data: TodayPanelData): TodayCardSummary {
   if (data.kind === 'noBriefing') {
-    return { kind: 'noBriefing', titleText: MESSAGES.todayCardNothingToResume };
+    return { kind: 'noBriefing' };
   }
   return {
     kind: 'pending',
-    titleText: MESSAGES.todayPlanTitle(data.day, data.daysAgo),
+    dayLabel: formatTodayCardDayLabel(data.day, data.daysAgo),
     resumableCount: data.rows.filter((row) => offersResumeCheckbox(row.resumeStatus)).length,
   };
 }

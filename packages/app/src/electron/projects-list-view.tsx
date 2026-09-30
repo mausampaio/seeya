@@ -7,6 +7,7 @@
  */
 import { MESSAGES } from '../text/messages.js';
 import { shortenDirectoryPath } from '../sidebar/directory-label.js';
+import { StarIcon, mountIcon } from '../ui/icons.js';
 import type {
   IgnoredProjectPanelRow,
   ProjectPanelRow,
@@ -55,7 +56,11 @@ function renderProjectSessionRow(session: {
 /** V2-T63 item 3: the star — shared by this row and the lateral's own Favorites section
  * (`electron/sidebar-favorites-view.ts`, which stars/unstars the SAME project by the SAME
  * channel). `aria-pressed` carries the state for assistive tech; the glyph itself is never the
- * only signal (identity § 8) — `aria-label` names the action in words. */
+ * only signal (identity § 8) — `aria-label` names the action in words.
+ *
+ * Correction (real-window screenshot review, second round): `<StarIcon filled={favorite}/>` —
+ * outline when not favorited, filled with the brand colour (never yellow/orange, identity § 6.4)
+ * when it is — replaces the ★/☆ glyphs, which the CSS coloured with `--seeya-warning-text`. */
 function renderFavoriteStarButton(projectId: string, name: string, favorite: boolean): HTMLElement {
   const button = document.createElement('button');
   button.type = 'button';
@@ -64,7 +69,7 @@ function renderFavoriteStarButton(projectId: string, name: string, favorite: boo
   button.dataset.favorite = String(favorite);
   button.setAttribute('aria-pressed', String(favorite));
   button.setAttribute('aria-label', MESSAGES.sidebarFavoriteStarLabel(favorite, name));
-  button.textContent = favorite ? '★' : '☆';
+  mountIcon(button, <StarIcon filled={favorite} />);
   return button;
 }
 

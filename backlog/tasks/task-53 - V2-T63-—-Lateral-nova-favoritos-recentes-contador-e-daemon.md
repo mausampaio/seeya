@@ -4,7 +4,7 @@ title: 'V2-T63 — Lateral nova: favoritos, recentes, contador e daemon'
 status: Review
 assignee: []
 created_date: '2026-09-30 10:33'
-updated_date: '2026-09-30 18:06'
+updated_date: '2026-09-30 19:22'
 labels: []
 milestone: m-2
 dependencies:
@@ -133,5 +133,17 @@ author: PO
 created: 2026-09-30 18:06
 ---
 Revisão do PO em 2026-09-30: mesclado, portão verde (2999 testes) e também sem identidade global do git (rodado pelo PO). Conferido: lateral da seção 1 com Today, Favorites (favorite-projects.json por máquina, glossário antes do código), Recent derivado da última atividade das sessões do projeto (sem evidência, fora — D-025), All projects/Sessions abrindo abas de página com o conteúdo atual (redesenho na V2-T67/V2-T68), rodapé com agenda, Snooze, Skip today, End day e pílula do daemon; autostart continua no rodapé até a V2-T65. Desempenho medido em A/B na mesma sessão, sem custo. Resto pequeno anotado: main.ts ainda calcula statusUpdate sem ouvinte (entra na V2-T51). Falta o aceite do mantenedor com o instalador.
+---
+
+author: agente
+created: 2026-09-30 19:00
+---
+Correção do aceite (2026-09-30), branch tarefa/V2-T63-lateral-correcao a partir de main a192fe0, commits f307495 e 8ec4754. Capturas da janela real (SEEYA_APP_HOME_OVERRIDE + SEEYA_APP_OFFSCREEN, tema claro e escuro, 2 projetos/1 favorito/sessoes com atividade) confirmaram e corrigiram os 8 itens do aceite: (1) lateral virou uma coluna so (sidebar-main envolve header/content/footer, antes eram 3 itens de um flex row); (2) faixa violeta de altura inteira removida, recolher agora e um botao ghost pequeno no cabecalho + Ctrl+B, reabrir e sempre pelo botao da barra de abas (capturado tambem o estado recolhido, sem nenhum resto visivel); (3) New project virou icone + so com aria-label; (4) FAVORITES/RECENT sem uppercase, 12px peso 500; (5) cartao Today: icone + Today + pilula N to resume na primeira linha, Plan for <dia legivel> na segunda -- a causa raiz era a funcao de formatacao do card reusando a formula (0 days ago) da pagina Today cheia; state/today-panel.ts#formatTodayCardDayLabel e nova, so para o card, com teste cobrindo today/yesterday/weekday; (6) All projects/Sessions viraram linhas com icone + rotulo + contador/pilula a direita, com destaque quando a aba correspondente esta aberta (electron/tabs-view.ts#onActiveTabChanged); (7) pilula do daemon: ponto + rotulo a esquerda, botao de icone start/stop a direita; (8) estados vazios de Favorites/Recent em texto terciario 11px. npm run verificar verde (302 arquivos, 3002 passando, 4 puladas pre-existentes). Registro do Windows (HKCU\Software\Classes\seeya-dev) e hash de protocol-handler.json reais conferidos identicos antes/depois de toda a sessao de captura. Capturas salvas no scratchpad da sessao do agente (caminho passado ao mantenedor fora deste arquivo, por ser especifico da maquina): v2t63-correction-dark.png, ...-light.png e ...-collapsed.png (estado recolhido, sem faixa).
+---
+
+author: agente
+created: 2026-09-30 19:22
+---
+Segunda correcao do aceite (2026-09-30), mesma branch tarefa/V2-T63-lateral-correcao, commits 84a4004 e c9b9373. Layout de uma coluna confirmado certo pelo PO na primeira correcao; esta trata os 2 defeitos visiveis + 2 ajustes restantes: (1) logo duplicado no tema claro -- causa raiz era especificidade CSS (#sidebar-logo img, id+tipo, vencia #sidebar-logo-dark { display:none }, so id, mesmo fora de ordem), corrigido dando aos dois seletores de escolha dois ids (sempre mais especifico); os SVGs mestres de design/ nunca precisaram de mudanca, os dois sempre tiveram o mesmo viewBox. (2) Nenhum emoji mais -- packages/app/src/ui/icons.tsx, modulo novo e reusavel (calendario, pasta, balao, estrela, mais, recolher, play, stop, relogio, ajustes, terminal, fechar), tracado 1.75px, grade 24, nunca preenchido+contorno misturados no mesmo icone; a estrela e a unica com estado (contorno por padrao, preenchida com --seeya-brand-text so quando favorita, nunca amarelo/laranja). (3) Recent ganhou o icone de pasta (contorno, cor terciaria) alinhado com a posicao da estrela em Favorites. (4) Pilula do daemon: fundo solido por estado (--seeya-success-bg/text rodando, --seeya-surface-hover parado), radius-md (10px, nao mais pilula 9999px), altura ~32px -- o estado rodando (fundo verde) foi conferido por leitura do CSS, nao capturado (nenhum daemon real rodando na fixture desta verificacao; o estado parado, capturado, prova a mesma regra de fundo/raio/altura). npm run verificar verde (303 arquivos, 3007 passando, 4 puladas pre-existentes) rodado duas vezes. Capturas novas (claro, escuro, recolhido) salvas no scratchpad da sessao do agente, caminho passado ao mantenedor fora deste arquivo. Registro do Windows e hash de protocol-handler.json reais conferidos identicos antes e depois desta rodada tambem.
 ---
 <!-- COMMENTS:END -->

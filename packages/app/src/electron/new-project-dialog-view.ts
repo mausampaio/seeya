@@ -22,9 +22,11 @@ export function wireNewProjectDialog(): void {
   const input = document.getElementById('new-project-id-input') as HTMLInputElement;
   const errorLine = document.getElementById('new-project-error') as HTMLElement;
 
-  (document.getElementById('new-project-button') as HTMLButtonElement).textContent =
-    MESSAGES.newProjectButton;
-  document.getElementById('new-project-button')?.addEventListener('click', () => {
+  // Correction (real-window screenshot review, second round): the "+" is a static
+  // `<PlusIcon/>`/`aria-label` now (`app-shell.tsx`) — this button's own appearance never
+  // changes, so nothing here sets its content anymore, only its click handler.
+  const newProjectButton = document.getElementById('new-project-button') as HTMLButtonElement;
+  newProjectButton.addEventListener('click', () => {
     input.value = '';
     errorLine.textContent = '';
     dialog.showModal();
