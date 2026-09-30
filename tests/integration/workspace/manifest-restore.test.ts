@@ -167,4 +167,29 @@ describe('restoreProjectManifestIfChanged', () => {
 
     expect(outcome).toEqual({ kind: 'unchanged' });
   });
+
+  it('throws a real error when root is not a git repository at all (never mistaken for "noCommittedVersion")', async () => {
+    root = await makeTmpDir();
+    const workspace = new FsWorkspaceRepository();
+    // Deliberately never `initialize`d — real `git rev-parse` here fails with "not a git
+    // repository" (a genuine non-0/1 exit code), a different failure from "this repo just has no
+    // commits yet" (exit 1) — the two must never collapse into the same `noCommittedVersion`.
+    await expect(workspace.restoreProjectManifestIfChanged(root, 'auth-hardening')).rejects.toThrow(
+      /git rev-parse failed/,
+    );
+  });
+
+  it('throws a real error when git diff itself fails unexpectedly (a corrupted .git/index — real git reports exit 128, never 0 or 1)', async () => {
+    const setup = await setUpCommittedProject();
+    root = setup.root;
+    // `git rev-parse HEAD` never reads the index (it only resolves refs), so this corruption is
+    // reached specifically by the `git diff` call below, not by `headResolves` — a real,
+    // reproducible failure (measured: "fatal: .git/index: index file smaller than expected"),
+    // never a contrived one.
+    await writeFile(path.join(root, '.git', 'index'), 'not a real git index');
+
+    await expect(
+      setup.workspace.restoreProjectManifestIfChanged(root, 'auth-hardening'),
+    ).rejects.toThrow(/git diff failed/);
+  });
 });
