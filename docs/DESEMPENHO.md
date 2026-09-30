@@ -130,6 +130,34 @@ de uma máquina que às vezes está apertada.
 **Linux e macOS:** fora do escopo desta tarefa (sem máquina disponível para medir). A tabela acima
 está pronta para ganhar uma coluna por sistema operacional quando houver onde medir.
 
+## V2-T62 — antes/depois (Preact, D-051)
+
+**Data:** 2026-09-30, mesma máquina da linha de base acima (não repetida aqui por regra do
+projeto). Memória livre no momento da medição: ~3,3 GB de ~15,9 GB totais — semelhante à condição
+"pouca memória livre" que a linha de base de 2026-09-20 já registra. Medido com
+`measure-startup.mjs` e `measure-idle.mjs`, exatamente como o método acima descreve; (d) não foi
+medido — ver nota abaixo.
+
+| Medida | Linha de base (2026-09-20) | V2-T62 (2026-09-30, depois de Preact + tokens + esqueleto) |
+|---|---|---|
+| (a) Tempo até a lista de sessões | 5782–5801 ms | 5742–5824 ms |
+| (b) Memória em repouso (árvore inteira) | 335,6–338,0 MiB | 364,5–397,6 MiB |
+| (c) CPU ocioso (janela de 60 s) | 0,39%–0,57% de um núcleo lógico | 0,29%–0,47% de um núcleo lógico |
+| (d) Instalador / instalado | ~112,1 MiB / ~390,6 MiB | não medido — `npm run dist:windows` foi recusado pelo classificador automático do harness ("Production Deploy") nesta sessão de agente; precisa ser medido por quem tem permissão para rodá-lo |
+
+**(a) e (c) ficam dentro da faixa já registrada** (ou melhores) — sem indício de custo novo na
+subida ou no processador parado.
+
+**(b) saiu acima da faixa registrada em 2026-09-20 (30–60 MiB a mais) — registrado, não resolvido
+sozinho, por decisão de processo.** `docs/QUESTOES.md` Q-096 já deixou a lição escrita depois de um
+caso quase idêntico: "piora só se afirma com A/B na mesma sessão" — comparar contra uma linha de
+base de outro dia não isola a mudança de código do estado da máquina naquele momento. Esta tarefa
+não tinha como reconstruir o `main` de antes da migração para medir os dois lados na mesma sessão
+(exigiria uma segunda worktree/checkout, fora do que esta tarefa foi autorizada a fazer sozinha) —
+o número está registrado tal como medido, e `docs/QUESTOES.md` Q-099 pede o A/B de verdade antes de
+decidir se isto é custo real do Preact/das fontes ou ruído da máquina.
+
+
 ## A régua
 
 **Toda tarefa de interface que acrescente trabalho em repouso, na subida ou no tamanho em disco
