@@ -6,6 +6,10 @@
  *
  * @example
  * <TextField id="new-project-id-input" label="Project id" value={id} onInput={setId} />
+ *
+ * Relocated from `ui/` by D-052 (V2-T75) — still no production caller (confirmed by grep before
+ * moving it) and still styled by `renderer/legacy/components.css`'s own `.seeya-field*` global
+ * classes, not a CSS module yet; left for the region task that first puts it on screen.
  */
 import type { JSX } from 'preact';
 

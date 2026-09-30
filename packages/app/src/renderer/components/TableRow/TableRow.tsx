@@ -6,6 +6,11 @@
  *
  * @example
  * <TableRow cells={[name, lock, sessions]} onClick={() => goToTab(id)} />
+ *
+ * Relocated from `ui/` by D-052 (V2-T75) — still no production caller (confirmed by grep before
+ * moving it) and still styled by `renderer/legacy/components.css`'s own `.seeya-table-row*` global
+ * classes, not a CSS module yet; left for the Projects/Sessions region tasks that first put it on
+ * screen.
  */
 import type { ComponentChildren, JSX } from 'preact';
 

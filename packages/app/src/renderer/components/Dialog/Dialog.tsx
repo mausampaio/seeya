@@ -14,6 +14,12 @@
  * <Dialog id="fallback-dialog" title="Resume without a plan?">
  *   <p>...</p>
  * </Dialog>
+ *
+ * Relocated from `ui/` by D-052 (V2-T75) into this folder — still styled by
+ * `renderer/legacy/components.css`'s own `.seeya-dialog*` global classes, not a CSS module yet
+ * (every dialog that uses this component today is `renderer/legacy/dialogs-shell.tsx`, a screen
+ * this task doesn't redesign); that conversion is left for the task that redesigns confirmations
+ * and dialogs (`docs/INTERFACE.md` § 9).
  */
 import type { ComponentChildren, JSX } from 'preact';
 

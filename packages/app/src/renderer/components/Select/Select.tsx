@@ -6,6 +6,11 @@
  * @example
  * <Select id="theme-select" label="Theme" value={theme} onChange={setTheme}
  *   options={[{ value: 'system', label: 'System' }, { value: 'light', label: 'Light' }]} />
+ *
+ * Relocated from `ui/` by D-052 (V2-T75) — still no production caller (confirmed by grep before
+ * moving it) and still styled by `renderer/legacy/components.css`'s own `.seeya-field*` global
+ * classes, not a CSS module yet; left for the region task that first puts it on screen (Settings'
+ * own Theme control, `docs/INTERFACE.md` § 8).
  */
 import type { JSX } from 'preact';
 

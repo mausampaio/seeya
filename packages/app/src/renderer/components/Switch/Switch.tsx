@@ -8,6 +8,11 @@
  *
  * @example
  * <Switch id="autostart" label="Start with the system" checked={enabled} onChange={setEnabled} />
+ *
+ * Relocated from `ui/` by D-052 (V2-T75) — still no production caller (confirmed by grep before
+ * moving it) and still styled by `renderer/legacy/components.css`'s own `.seeya-switch*` global
+ * classes, not a CSS module yet; left for the region task that first puts it on screen (Settings,
+ * `docs/INTERFACE.md` § 8).
  */
 import type { ComponentChildren, JSX } from 'preact';
 

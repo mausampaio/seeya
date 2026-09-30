@@ -11,6 +11,11 @@
  * <SegmentedControl ariaLabel="Filter" value="all"
  *   options={[{ value: 'all', label: 'All' }, { value: 'running', label: 'Running' }]}
  *   onChange={setFilter} />
+ *
+ * Relocated from `ui/` by D-052 (V2-T75) — still no production caller (confirmed by grep before
+ * moving it) and still styled by `renderer/legacy/components.css`'s own
+ * `.seeya-segmented-control*` global classes, not a CSS module yet; left for the region task that
+ * first puts it on screen (Sessions' own filters, `docs/INTERFACE.md` § 5).
  */
 import type { JSX } from 'preact';
 

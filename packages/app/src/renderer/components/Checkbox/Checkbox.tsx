@@ -8,6 +8,11 @@
  *
  * @example
  * <Checkbox id="session-1" label="my-project" checked={false} value="session-1" onChange={toggle} />
+ *
+ * Relocated from `ui/` by D-052 (V2-T75) into this folder — still no production caller (confirmed
+ * by grep before moving it) and still styled by `renderer/legacy/components.css`'s own
+ * `.seeya-checkbox` global class, not a CSS module yet: that conversion, and the upgrade to a
+ * real-rendered test, is left for the region task that first puts this component on screen.
  */
 import type { ComponentChildren, JSX } from 'preact';
 
