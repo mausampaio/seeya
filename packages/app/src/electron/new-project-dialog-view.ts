@@ -22,9 +22,13 @@ export function wireNewProjectDialog(): void {
   const input = document.getElementById('new-project-id-input') as HTMLInputElement;
   const errorLine = document.getElementById('new-project-error') as HTMLElement;
 
-  (document.getElementById('new-project-button') as HTMLButtonElement).textContent =
-    MESSAGES.newProjectButton;
-  document.getElementById('new-project-button')?.addEventListener('click', () => {
+  // Correction (real-window screenshot review): icon-only "+" — the earlier version set this
+  // button's own `textContent` to the full "New project…" phrase, which read as a second large
+  // text button crowding the "Favorites" heading instead of a small icon next to it.
+  const newProjectButton = document.getElementById('new-project-button') as HTMLButtonElement;
+  newProjectButton.textContent = '+';
+  newProjectButton.setAttribute('aria-label', MESSAGES.newProjectButton);
+  newProjectButton.addEventListener('click', () => {
     input.value = '';
     errorLine.textContent = '';
     dialog.showModal();

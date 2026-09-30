@@ -30,6 +30,12 @@ export const MESSAGES = {
   todayPlanTitle: (day: string, daysAgo: number): string =>
     daysAgo === 1 ? `Plan for ${day}` : `Plan for ${day} (${daysAgo} days ago)`,
   // V2-T63 — the lateral's own Today card (state/today-panel.ts#buildTodayCardSummary).
+  // Correction (real-window screenshot review): two lines now — "Today" + the pill is the first
+  // (`todayCardHeading`), "Plan for <day>"/"Nothing to resume" is the second. `dayLabel` already
+  // reads "today"/"yesterday"/a weekday-and-date string (`state/today-panel.ts
+  // #formatTodayCardDayLabel`) — this function only ever wraps it, never re-derives it.
+  todayCardHeading: 'Today',
+  todayCardPlanFor: (dayLabel: string): string => `Plan for ${dayLabel}`,
   todayCardNothingToResume: 'Nothing to resume',
   todayCardResumeCount: (count: number): string => `${count} to resume`,
   // V2-T9 item 4: replaces the old todayAlreadyResumed — the checkbox rule now depends on
@@ -170,6 +176,11 @@ export const MESSAGES = {
   daemonPillStopped: 'Daemon stopped',
   daemonControlUnknown: 'Daemon: cannot verify.',
   daemonControlRunning: 'Working…',
+  // Correction (real-window screenshot review): the pill's own icon button needs its own
+  // aria-label naming the ACTION it performs (▶/■) — distinct from `daemonPillRunning`/
+  // `daemonPillStopped` above, which are the pill's own label text (the fact, not the action).
+  daemonControlStartAction: 'Start daemon',
+  daemonControlStopAction: 'Stop daemon',
 
   // V2-T13 item 4 — the autostart control button (state/autostart-control-panel.ts). Only shown
   // when the app owns autostart (D-045 item 3); `resultText` is whatever
@@ -314,7 +325,10 @@ export const MESSAGES = {
   sessionSearchNotFound: (query: string): string => `No session matches "${query}".`,
   sessionSearchAmbiguous: (query: string, count: number): string =>
     `"${query}" matches ${count} sessions — type a few more characters.`,
-  newProjectButton: 'New project…',
+  // Correction (real-window screenshot review): this button is icon-only now (the "+" glyph
+  // lives in the JSX/JS directly, `new-project-dialog-view.ts`) — this string is its
+  // `aria-label`, so it stays without the ellipsis a text button would carry.
+  newProjectButton: 'New project',
   newProjectDialogTitle: 'New project',
   newProjectIdLabel: 'Project id',
   newProjectSubmit: 'Create',
@@ -351,8 +365,12 @@ export const MESSAGES = {
   sidebarFavoritesEmpty: 'No favorites yet — star a project to pin it here.',
   sidebarRecentHeading: 'Recent',
   sidebarRecentEmpty: 'Nothing recent yet.',
-  sidebarAllProjectsLink: (total: number): string => `All projects (${total})`,
-  sidebarSessionsLink: (runningCount: number): string => `Sessions (${runningCount} running)`,
+  // Correction (real-window screenshot review): "All projects"/"Sessions" are nav rows now —
+  // icon + label + a right-aligned count, built as separate DOM pieces
+  // (`electron/sidebar-favorites-view.ts`), never one combined string like "All projects (2)".
+  sidebarAllProjectsLabel: 'All projects',
+  sidebarSessionsLabel: 'Sessions',
+  sidebarSessionsCount: (runningCount: number): string => `${runningCount} running`,
   pageTabLabelToday: 'Today',
   pageTabLabelProjects: 'Projects',
   pageTabLabelSessions: 'Sessions',

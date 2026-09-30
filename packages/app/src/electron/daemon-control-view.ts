@@ -13,24 +13,27 @@ import { reduceDaemonControl, type DaemonControlState } from '../state/daemon-co
  */
 let daemonControlState: DaemonControlState = { kind: 'idle', availability: { kind: 'unknown' } };
 
-/** V2-T63: the button IS the pill (`docs/INTERFACE.md` § 1's own "rodapé... pílula do daemon,
- * largura total") — `seeya-status-pill-button`/`seeya-status-pill--<tone>` (`components.css`) give
- * it the same rounded, toned look `StatusPill` gives a plain `<span>` elsewhere, sized to a full
- * native `<button>` since this one has to stay clickable. One call, so a re-render never leaves a
- * stale tone class from a previous state sitting alongside the new one. */
-function setPillTone(button: HTMLButtonElement, tone: 'success' | 'neutral'): void {
-  button.classList.remove('seeya-status-pill--success', 'seeya-status-pill--neutral');
-  button.classList.add('seeya-status-pill-button', `seeya-status-pill--${tone}`);
+/** V2-T63 correction (real-window screenshot review): the pill is a dot + a label
+ * (`#daemon-pill-dot`/`#daemon-pill-label`) reporting the FACT, plus a separate small icon button
+ * (`#daemon-control-button`, ▶/■) that performs the action — replaces the earlier version, where
+ * the whole pill was one button and had no visible stop affordance at all. `setDotTone` mirrors
+ * `sidebar-favorites-view.ts`'s own single-call-clears-stale-class shape. */
+function setDotTone(dot: HTMLElement, tone: 'success' | 'neutral'): void {
+  dot.classList.remove('sidebar-pill-dot--success', 'sidebar-pill-dot--neutral');
+  dot.classList.add(`sidebar-pill-dot--${tone}`);
 }
 
 function renderDaemonControl(): void {
+  const dot = document.getElementById('daemon-pill-dot') as HTMLElement;
+  const label = document.getElementById('daemon-pill-label') as HTMLElement;
   const button = document.getElementById('daemon-control-button') as HTMLButtonElement;
   const result = document.getElementById('daemon-control-result') as HTMLElement;
 
   if (daemonControlState.kind === 'running') {
-    button.textContent = MESSAGES.daemonControlRunning;
+    label.textContent = MESSAGES.daemonControlRunning;
+    setDotTone(dot, 'neutral');
     button.disabled = true;
-    setPillTone(button, 'neutral');
+    button.textContent = '';
     return;
   }
   if (daemonControlState.kind === 'result') {
@@ -38,18 +41,26 @@ function renderDaemonControl(): void {
   }
   const availability = daemonControlState.availability;
   if (availability.kind === 'unknown') {
-    button.textContent = MESSAGES.daemonControlUnknown;
+    label.textContent = MESSAGES.daemonControlUnknown;
+    setDotTone(dot, 'neutral');
     button.disabled = true;
-    setPillTone(button, 'neutral');
+    button.textContent = '';
+    button.setAttribute('aria-label', MESSAGES.daemonControlUnknown);
     return;
   }
   // `availability.kind === 'start'` means the daemon is currently STOPPED (starting is the
-  // action offered) — the pill's own text says the fact, not the action (this file's own
-  // `daemonControlState` docstring), so it reads "Daemon stopped"/"Daemon running" here.
-  button.textContent =
-    availability.kind === 'start' ? MESSAGES.daemonPillStopped : MESSAGES.daemonPillRunning;
+  // action offered) — the LABEL says the fact, not the action (this file's own
+  // `daemonControlState` docstring), so it reads "Daemon stopped"/"Daemon running" here; the
+  // BUTTON is the action, glyph and `aria-label` both naming what clicking it does.
+  const running = availability.kind === 'stop';
+  label.textContent = running ? MESSAGES.daemonPillRunning : MESSAGES.daemonPillStopped;
+  setDotTone(dot, running ? 'success' : 'neutral');
   button.disabled = false;
-  setPillTone(button, availability.kind === 'start' ? 'neutral' : 'success');
+  button.textContent = running ? '■' : '▶';
+  button.setAttribute(
+    'aria-label',
+    running ? MESSAGES.daemonControlStopAction : MESSAGES.daemonControlStartAction,
+  );
 }
 
 async function handleDaemonControlClicked(): Promise<void> {

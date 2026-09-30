@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildTodayCardSummary,
   buildTodayPanelData,
+  formatTodayCardDayLabel,
   hasResumableSession,
   offersResumeCheckbox,
   refreshTodayPanelLiveness,
@@ -369,10 +370,25 @@ describe('refreshTodayPanelLiveness — V2-T18 defect 2: the panel tracks the am
   });
 });
 
+describe('formatTodayCardDayLabel (V2-T63 correction — the "(0 days ago)" fix)', () => {
+  it('0 days ago reads "today", never "(0 days ago)"', () => {
+    expect(formatTodayCardDayLabel('2026-09-30', 0)).toBe('today');
+  });
+
+  it('1 day ago reads "yesterday"', () => {
+    expect(formatTodayCardDayLabel('2026-09-29', 1)).toBe('yesterday');
+  });
+
+  it('anything older reads as a weekday-and-date string', () => {
+    // 2026-09-20 is a Sunday.
+    expect(formatTodayCardDayLabel('2026-09-20', 10)).toBe('Sun, Sep 20');
+  });
+});
+
 describe('buildTodayCardSummary (V2-T63)', () => {
-  it('"noBriefing" becomes "Nothing to resume", with no count', () => {
+  it('"noBriefing" carries no dayLabel/count to show', () => {
     const summary = buildTodayCardSummary({ kind: 'noBriefing', message: 'irrelevant' });
-    expect(summary).toEqual({ kind: 'noBriefing', titleText: 'Nothing to resume' });
+    expect(summary).toEqual({ kind: 'noBriefing' });
   });
 
   it('counts only rows that still offer the checkbox — runningNow never counts', () => {
@@ -401,7 +417,7 @@ describe('buildTodayCardSummary (V2-T63)', () => {
     });
     expect(summary).toEqual({
       kind: 'pending',
-      titleText: 'Plan for 2026-08-16',
+      dayLabel: 'yesterday',
       resumableCount: 1,
     });
   });

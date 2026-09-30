@@ -17,6 +17,8 @@ import {
   type FavoriteProjectRow,
 } from '../state/sidebar-summary.js';
 import type { ProjectsPanelData } from '../state/projects-panel.js';
+import { pageTabId, type PageTabKind } from '../tabs/page-tab.js';
+import { onActiveTabChanged } from './tabs-view.js';
 import { openOrFocusPageTab } from './page-tab-strip.js';
 import { triggerFavoriteToggle } from './projects-list-view.js';
 
@@ -27,13 +29,40 @@ function todayCardButton(): HTMLButtonElement {
   return document.getElementById('today-card') as HTMLButtonElement;
 }
 
+/** Correction (real-window screenshot review, item 5): two lines, built as real DOM instead of a
+ * single collapsed string — icon + "Today" + the "N to resume" pill (only when there IS
+ * something to resume) on the first, "Plan for `<day>`"/"Nothing to resume" on the second. */
 function renderTodayCard(data: TodayPanelData): void {
   const button = todayCardButton();
   const summary = buildTodayCardSummary(data);
-  button.textContent =
-    summary.kind === 'pending' && summary.resumableCount > 0
-      ? `${summary.titleText} — ${MESSAGES.todayCardResumeCount(summary.resumableCount)}`
-      : summary.titleText;
+  button.textContent = '';
+
+  const row = document.createElement('div');
+  row.className = 'today-card-row';
+  const icon = document.createElement('span');
+  icon.className = 'today-card-icon';
+  icon.setAttribute('aria-hidden', 'true');
+  icon.textContent = '📅';
+  row.appendChild(icon);
+  const title = document.createElement('span');
+  title.className = 'today-card-title';
+  title.textContent = MESSAGES.todayCardHeading;
+  row.appendChild(title);
+  if (summary.kind === 'pending' && summary.resumableCount > 0) {
+    const pill = document.createElement('span');
+    pill.className = 'seeya-status-pill seeya-status-pill--info';
+    pill.textContent = MESSAGES.todayCardResumeCount(summary.resumableCount);
+    row.appendChild(pill);
+  }
+  button.appendChild(row);
+
+  const subtitle = document.createElement('div');
+  subtitle.className = 'today-card-subtitle';
+  subtitle.textContent =
+    summary.kind === 'pending'
+      ? MESSAGES.todayCardPlanFor(summary.dayLabel)
+      : MESSAGES.todayCardNothingToResume;
+  button.appendChild(subtitle);
 }
 
 function renderFavoriteSessionRow(session: FavoriteProjectRow['sessions'][number]): HTMLLIElement {
@@ -140,14 +169,51 @@ function render(): void {
     }
   }
 
-  (document.getElementById('all-projects-link') as HTMLButtonElement).textContent =
-    MESSAGES.sidebarAllProjectsLink(latestProjects.projects.length);
-  const runningCount = countRunningSessions(
-    latestProjects.projects,
-    latestProjects.otherSessionsByDirectory,
+  renderAllProjectsRow(latestProjects.projects.length);
+  renderSessionsRow(
+    countRunningSessions(latestProjects.projects, latestProjects.otherSessionsByDirectory),
   );
-  (document.getElementById('sessions-link') as HTMLButtonElement).textContent =
-    MESSAGES.sidebarSessionsLink(runningCount);
+}
+
+/** Correction (real-window screenshot review, item 6): icon + label + a plain right-aligned
+ * total — never the combined "All projects (N)" string the earlier version rendered. */
+function renderAllProjectsRow(total: number): void {
+  const row = document.getElementById('all-projects-link') as HTMLElement;
+  (row.querySelector('.sidebar-nav-icon') as HTMLElement).textContent = '📁';
+  (row.querySelector('.sidebar-nav-label') as HTMLElement).textContent =
+    MESSAGES.sidebarAllProjectsLabel;
+  (row.querySelector('.sidebar-nav-count') as HTMLElement).textContent = String(total);
+}
+
+/** Correction (real-window screenshot review, item 6): icon + label + the green dotted "N
+ * running" pill — same `.seeya-status-pill` classes the Today card's own pill uses, tone `success`
+ * when something IS running, `neutral` otherwise (never hidden: "how many are running" is the
+ * fact this row exists to show, even when the answer is zero). */
+function renderSessionsRow(runningCount: number): void {
+  const row = document.getElementById('sessions-link') as HTMLElement;
+  (row.querySelector('.sidebar-nav-icon') as HTMLElement).textContent = '💬';
+  (row.querySelector('.sidebar-nav-label') as HTMLElement).textContent =
+    MESSAGES.sidebarSessionsLabel;
+  const count = row.querySelector('.sidebar-nav-count') as HTMLElement;
+  count.textContent = '';
+  const pill = document.createElement('span');
+  pill.className = `seeya-status-pill seeya-status-pill--${runningCount > 0 ? 'success' : 'neutral'}`;
+  pill.textContent = MESSAGES.sidebarSessionsCount(runningCount);
+  count.appendChild(pill);
+}
+
+/** Correction (real-window screenshot review, item 6): highlights the Today card/nav row whose
+ * page tab is the one currently showing — `electron/tabs-view.ts#onActiveTabChanged` is the
+ * single place tab visibility changes, so this is the only listener that needs to exist. */
+function updateActiveNavState(activeTabId: string): void {
+  const rowByKind: Record<PageTabKind, HTMLElement> = {
+    today: todayCardButton(),
+    projects: document.getElementById('all-projects-link') as HTMLElement,
+    sessions: document.getElementById('sessions-link') as HTMLElement,
+  };
+  for (const [kind, element] of Object.entries(rowByKind) as [PageTabKind, HTMLElement][]) {
+    element.setAttribute('aria-current', String(pageTabId(kind) === activeTabId));
+  }
 }
 
 /** Favorites/Recent rows share one delegated listener (same "one listener per list, not one per
@@ -178,6 +244,7 @@ function wireFavoritesAndRecentClicks(): void {
  * fetches its own first-paint copies regardless, so the order only matters for nothing racing it;
  * it's kept this way to match the established idiom every other region here follows. */
 export function wireSidebarFavorites(): void {
+  onActiveTabChanged(updateActiveNavState);
   todayCardButton().addEventListener('click', () => openOrFocusPageTab('today'));
   document
     .getElementById('all-projects-link')
