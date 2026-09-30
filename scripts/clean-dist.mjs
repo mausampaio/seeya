@@ -67,13 +67,49 @@ for (const target of packagePathsToClean) {
 // program, failed with rootDir errors, and even emitted `.js`/`.d.ts` next to the CLI's sources.
 // `npm run app` was broken until someone deleted the residue by hand. This sweep runs before every
 // build (same trigger as the dist cleanup above), so a killed test run can never leave the tree in
-// a state that fails the next build. Nothing legitimate ever lives under a `_guard-*` directory or
-// as a `.js`/`.d.ts` inside a package's `src` — every source is TypeScript. The test suite's own
-// guards run AFTER `npm run build` inside `npm run verificar`, so this sweep never races them.
+// a state that fails the next build. The test suite's own guards run AFTER `npm run build` inside
+// `npm run verificar`, so this sweep never races them.
+//
+// Defect found by V2-T75 (D-052) — the comment above used to end "as a `.js`/`.d.ts` inside a
+// package's `src` — every source is TypeScript", and the sweep deleted every `.d.ts`/`.js` file
+// under `src` on that premise. That premise held only because no package's `src` had ever
+// contained a hand-written `.d.ts`: V2-T75 added one (`packages/app/src/renderer/css-modules.d.ts`,
+// the ambient module declaration `*.module.css` imports need), and this sweep silently deleted it
+// from disk (uncommitted, so `git status` was the only sign) on every single `npm run build` —
+// which then failed type-checking the very files that file exists for. A `.js`/`.d.ts` is only
+// ever emitted NEXT TO the `.ts`/`.tsx` it was compiled from, sharing its exact basename, so
+// `hasEmittedSibling` below is the honest test for "this is residue", not just "this extension
+// looks like tsc output".
 const packageSrcRoots = ['packages/engine', 'packages/cli', 'packages/app'].map((pkg) =>
   path.join(repoRoot, pkg, 'src'),
 );
-const EMITTED_INTO_SRC = /\.(js|js\.map|d\.ts|d\.ts\.map)$/;
+const EMITTED_SUFFIXES = ['.d.ts.map', '.d.ts', '.js.map', '.js'];
+
+/**
+ * The basename a `.js`/`.d.ts` file would share with the `.ts`/`.tsx` it was emitted from, or
+ * `null` when `name` doesn't end in one of tsc's own emitted-output suffixes at all.
+ * @param {string} name
+ * @returns {string | null}
+ */
+function emittedSourceBaseName(name) {
+  for (const suffix of EMITTED_SUFFIXES) {
+    if (name.endsWith(suffix)) {
+      return name.slice(0, -suffix.length);
+    }
+  }
+  return null;
+}
+
+/**
+ * @param {import('node:fs').Dirent[]} siblings
+ * @param {string} baseName
+ */
+function hasEmittedSibling(siblings, baseName) {
+  return siblings.some(
+    (sibling) =>
+      sibling.isFile() && (sibling.name === `${baseName}.ts` || sibling.name === `${baseName}.tsx`),
+  );
+}
 
 /** @param {string} directory */
 function sweepResidue(directory) {
@@ -92,7 +128,10 @@ function sweepResidue(directory) {
       } else {
         sweepResidue(full);
       }
-    } else if (EMITTED_INTO_SRC.test(entry.name)) {
+      continue;
+    }
+    const baseName = emittedSourceBaseName(entry.name);
+    if (baseName !== null && hasEmittedSibling(entries, baseName)) {
       rmSync(full, { force: true });
     }
   }
