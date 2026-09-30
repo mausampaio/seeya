@@ -30,6 +30,8 @@ Conflito entre este arquivo e um doc acima: o doc vence, e você registra a inco
 - **Uma tarefa por vez**, na ordem do backlog e respeitando as dependências declaradas em cada
   tarefa. Não agrupe, não adiante, não pule.
 - Antes de começar: releia a tarefa e o trecho da spec que ela implementa.
+- **Tarefa que muda o que a pessoa vê segue `docs/INTERFACE.md`** (D-051): o desenho da tela está
+  lá, e a tela que não está lá não foi decidida — vira questão, não improviso.
 - **Título de tarefa e de decisão é nome, não frase: no máximo 72 caracteres** (D-048). O nome do
   arquivo sai do título, e um título longo demais já impediu um `git worktree add` de rodar no
   Windows (`Filename too long`, 2026-09-23). A frase inteira vai na descrição. Trocar o título

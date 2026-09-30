@@ -4,6 +4,7 @@ title: V2-T51 — Dividir renderer.ts e main.ts abaixo de 500 linhas
 status: To Do
 assignee: []
 created_date: '2026-09-25 03:41'
+updated_date: '2026-09-30 10:34'
 labels: []
 milestone: m-2
 dependencies: []
@@ -38,3 +39,13 @@ que explicam. Nenhum arquivo acima de 500 linhas no fim.
 **Aceite:** do PO — portão verde, nenhum arquivo acima de 500 linhas, A/B sem piora; do mantenedor —
 usar a janela normalmente um dia e não notar diferença nenhuma.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-30 10:34
+---
+2026-09-30: absorvida pela V2-T62 (fundação da interface em Preact, D-051) — dividir renderer.ts acontece na troca de camada. Fechar junto com a V2-T62.
+---
+<!-- COMMENTS:END -->

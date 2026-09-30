@@ -68,3 +68,4 @@ dizendo o que mudou e por qual decisão — "emendada" não é status.
 | D-048 — As tarefas saem do plano único e vão para o Backlog.md | `backlog/decisions/decision-48 - D-048-—-As-tarefas-saem-do-plano-único-e-vão-para-o-Backlog.md.md` |
 | D-049 — Gancho antes do push agora, pull request quando fechar | `backlog/decisions/decision-49 - D-049-—-Gancho-antes-do-push-agora-pull-request-quando-fechar.md` |
 | D-050 — O projeto ganha CLAUDE.md gerado, com Compact Instructions | `backlog/decisions/decision-50 - D-050-—-O-projeto-ganha-CLAUDE.md-gerado-com-Compact-Instructions.md` |
+| D-051 — A interface usa Preact com componentes próprios | `backlog/decisions/decision-51 - D-051-—-A-interface-usa-Preact-com-componentes-próprios.md` |
