@@ -41,7 +41,13 @@ e na leitura do código pelo mantenedor em 2026-09-30: "não existe separação 
    `radius`, `elevation`, `variant`). As props aceitam só a escala de tokens (`gap="md"`,
    `padding="lg"`, `span={6}`), nunca pixel solto — o tipo recusa o que a identidade não prevê
    (D-024). CSS próprio numa região fica para o que as primitivas não expressam.
-6. **Testes de componente renderizados**, com `@testing-library/preact` e `happy-dom` como
+6. **O que varia e se repete vira prop tipada** (acréscimo do mantenedor, 2026-09-30): tom
+   (`tone`: os papéis da identidade — neutral, brand, success, warning, danger), tamanho (`size`:
+   sm, md, lg), variante quando há mais de uma (`variant`), estado (`active`, `disabled`), largura
+   (`fullWidth`). Uniões literais no tipo, padrão explícito, e o CSS module traduz cada valor em
+   tokens — nunca uma classe ou um estilo avulso no lugar de usar o componente. Os nomes das props
+   compartilhadas e seus valores ficam no glossário do `AGENTS.md`.
+7. **Testes de componente renderizados**, com `@testing-library/preact` e `happy-dom` como
    dependências de desenvolvimento (aprovadas pelo mantenedor em 2026-09-30): o componente é
    montado e testado pelo que a pessoa vê e faz, não pelo objeto que a função devolve.
 
