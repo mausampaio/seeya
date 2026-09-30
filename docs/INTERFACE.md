@@ -41,6 +41,11 @@ tarefa que muda o que a pessoa vê atualiza este arquivo antes do código (regra
 └──────────────┴──────────────────────────────────────────────────────┘
 ```
 
+**Moldura da janela:** a janela usa a barra de título do próprio sistema (minimizar, maximizar e
+fechar do SO), **sem a barra de menu** do Electron ("File Edit View Window"), que o app não usa.
+No macOS fica só o menu mínimo do app, com o menu Edit (sem ele, copiar e colar não funcionam
+nos campos de texto).
+
 Continuam valendo: recolher a lateral (botão e `Ctrl+B`), redimensionar (180–480 px, padrão
 280, lembrado por máquina), foco devolvido ao terminal ao fechar um diálogo.
 
@@ -164,6 +169,8 @@ a frase de que o daemon relê a configuração a cada ciclo, e `Done`.
 
 - **General:** `Theme` (System · Light · Dark) e `Start with the system` (o autostart, como
   interruptor; indisponível com o motivo quando o app não é dono do autostart).
+  No fim da seção, a versão instalada (`seeya 0.1.0`), em texto terciário, selecionável para
+  copiar.
 - **Schedule:** horário de fim do dia, avisos antes, intervalo entre avisos, limiar de atraso.
 - **Capture, Discovery, Terminal:** as demais chaves de hoje, com rótulos legíveis no lugar do
   nome da chave (o nome da chave fica como dica, em mono).
