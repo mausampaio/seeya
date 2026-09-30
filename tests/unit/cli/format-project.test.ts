@@ -560,6 +560,8 @@ describe('formatAdoptSessionReport', () => {
       projectId: 'auth-hardening',
       forkSessionId: '22222222-2222-4222-8222-222222222222',
       changedFiles: ['auth-hardening/AGENTS.md', 'auth-hardening/context/know-how.md'],
+      alreadyCommittedFiles: [],
+      pendingFiles: [],
     });
     expect(text).toContain('adopted');
     expect(text).toContain("project's own session");
@@ -567,6 +569,35 @@ describe('formatAdoptSessionReport', () => {
     expect(text).toContain('auth-hardening/context/know-how.md');
     // Item 9: the follow-up repeated after the fact.
     expect(text).toContain('seeya project open auth-hardening');
+  });
+
+  it('adopted lists what the copy already committed itself, separately from what seeya committed now (V2-T72 item 1)', () => {
+    const text = formatAdoptSessionReport({
+      kind: 'adopted',
+      projectId: 'auth-hardening',
+      forkSessionId: '22222222-2222-4222-8222-222222222222',
+      changedFiles: [],
+      alreadyCommittedFiles: ['auth-hardening/AGENTS.md'],
+      pendingFiles: [],
+    });
+    expect(text).toContain('already committed this itself');
+    expect(text).toContain('auth-hardening/AGENTS.md');
+    expect(text).not.toContain('Committed:\n');
+  });
+
+  it('adopted names the still-uncommitted files and the failure reason, without withholding the adoption (V2-T72 item 1)', () => {
+    const text = formatAdoptSessionReport({
+      kind: 'adopted',
+      projectId: 'auth-hardening',
+      forkSessionId: '22222222-2222-4222-8222-222222222222',
+      changedFiles: [],
+      alreadyCommittedFiles: ['auth-hardening/AGENTS.md'],
+      pendingFiles: ['auth-hardening/status/README.md'],
+      pendingCommitFailedReason: 'git commit failed in workspace at "/x": exit 1: hook refused',
+    });
+    expect(text).toContain('adopted');
+    expect(text).toContain('Still uncommitted (committing them failed: git commit failed');
+    expect(text).toContain('auth-hardening/status/README.md');
   });
 
   it('commitFailed names the reason, says nothing was discarded, and lists what was written (V2-T34 production defect, PO review 2026-09-25)', () => {
