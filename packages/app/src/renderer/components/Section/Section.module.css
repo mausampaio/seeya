@@ -1,0 +1,25 @@
+/* D-052 (V2-T75). identity § 4.4's `caption` size (12/16px, weight 500) for the heading — the
+ * V2-T63 aceite's own item 4 ("FAVORITES/RECENT sem uppercase, 12px peso 500"). */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--seeya-space-1);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--seeya-space-2);
+}
+
+.title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--seeya-text-tertiary);
+}
+
+.body {
+  min-width: 0;
+}

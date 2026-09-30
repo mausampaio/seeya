@@ -1010,10 +1010,19 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
       const today = localDayString(now);
       const dayState = (await context.storage.readState()) ?? emptyDayState(today);
       const { decision } = decideSchedule(updated, dayState, now);
+      const scheduleEvent: ScheduleUpdateEvent = buildScheduleStripData(decision, now);
+      // D-052 (V2-T75): pushed too, not just returned in the response — the lateral's own
+      // schedule strip (`renderer/features/sidebar/SidebarFooter`) is a reactive component now,
+      // driven ONLY by `onScheduleUpdate` pushes (the same channel the ambient tick above already
+      // uses); without this push it would show the STALE schedule until the next tick (up to
+      // `REFRESH_INTERVAL_MS`), the exact regression `settings-dialog-view.ts`'s own comment on
+      // this response field was written to prevent in the FIRST place, before the Settings dialog
+      // moved to `renderer/legacy/`.
+      window.webContents.send(CHANNELS.scheduleUpdate, scheduleEvent);
       return {
         ok: true,
         rows: buildSettingsRows(updated),
-        schedule: buildScheduleStripData(decision, now),
+        schedule: scheduleEvent,
       };
     },
   );

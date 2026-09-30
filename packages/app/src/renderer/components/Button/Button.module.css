@@ -1,0 +1,76 @@
+/* D-052 (V2-T75): replaces the old global `.seeya-button*` classes (`components.css`, still kept
+ * there for `renderer/legacy/**`, which nothing in THIS module depends on any more) — the same
+ * visual result, token-driven, scoped to this component alone. */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--seeya-space-2);
+  border: 1px solid transparent;
+  border-radius: var(--seeya-radius-md);
+  font-family: var(--seeya-font-sans);
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color var(--seeya-motion-micro) var(--seeya-motion-easing),
+    border-color var(--seeya-motion-micro) var(--seeya-motion-easing);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.fullWidth {
+  display: flex;
+  width: 100%;
+}
+
+/* Sizes (identity § 4.4's own type scale: body-sm/body-md, plus the padding that keeps each
+ * size's own tap target readable). */
+.sm {
+  padding: var(--seeya-space-1) var(--seeya-space-3);
+  font-size: 13px;
+}
+
+.md {
+  padding: var(--seeya-space-2) var(--seeya-space-4);
+  font-size: 14px;
+}
+
+.lg {
+  padding: var(--seeya-space-3) var(--seeya-space-6);
+  font-size: 16px;
+}
+
+/* Variants. */
+.primary {
+  background: var(--seeya-brand);
+  color: var(--seeya-on-brand);
+}
+
+.primary:not(:disabled):hover {
+  background: var(--seeya-brand-hover);
+}
+
+.secondary {
+  background: var(--seeya-surface);
+  color: var(--seeya-text);
+  border-color: var(--seeya-border-strong);
+}
+
+.secondary:not(:disabled):hover {
+  background: var(--seeya-surface-hover);
+}
+
+.ghost {
+  background: transparent;
+  color: var(--seeya-text-secondary);
+}
+
+.ghost:not(:disabled):hover {
+  background: var(--seeya-surface-hover);
+  color: var(--seeya-text);
+}

@@ -1,0 +1,92 @@
+/* D-052 (V2-T75): replaces the sidebar-only rules that lived in `renderer/legacy/legacy.css`
+ * (formerly `electron/index.css`) — those are REMOVED from that file by this same task, this
+ * module is now the only place that styles `#sidebar`/`#sidebar-resize-handle`. */
+.sidebar {
+  width: var(--sidebar-width, 260px);
+  flex: none;
+  display: flex;
+  background: var(--seeya-surface);
+  border-right: 1px solid var(--seeya-border);
+  box-sizing: border-box;
+  overflow: hidden;
+  /* Respects `prefers-reduced-motion` for free — `tokens.css`'s own global override zeroes every
+   * transition-duration under that preference. */
+  transition: width var(--seeya-motion-panel) var(--seeya-motion-easing);
+}
+
+.collapsed {
+  width: 0;
+  border-right: none;
+}
+
+/* V2-T30 item 2 / V2-T63 correction, preserved by this rewrite: collapsing hides `.main` entirely
+ * (header included) and the sidebar shrinks to nothing — reopening is the toolbar's own always-
+ * visible button or `Ctrl+B`, never a strip living inside the sidebar itself. */
+.collapsed .main {
+  display: none;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--seeya-space-2);
+}
+
+.logoLight,
+.logoDark {
+  display: block;
+  height: 20px;
+  width: auto;
+}
+
+.logo .logoDark {
+  display: none;
+}
+
+:global([data-theme='dark']) .logo .logoLight {
+  display: none;
+}
+
+:global([data-theme='dark']) .logo .logoDark {
+  display: block;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  /* PO acceptance of V2-T55, preserved by this rewrite: "a lateral nunca rola na horizontal" —
+   * without an explicit `overflow-x`, `overflow-y: auto` alone makes the UA compute `overflow-x`
+   * as `auto` too (a CSS overflow-spec quirk). */
+  overflow-x: hidden;
+  padding: var(--seeya-space-2);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--seeya-space-4);
+}
+
+.resizeHandle {
+  flex: none;
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+}
+
+.resizeHandle:hover,
+.resizeHandleDragging {
+  background: var(--seeya-brand);
+}
+
+.collapsed + .resizeHandle {
+  display: none;
+}

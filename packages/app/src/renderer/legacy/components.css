@@ -1,70 +1,16 @@
 /*
- * V2-T62 (D-051): baseline, token-driven styles for `packages/app/src/ui/`'s own base components.
- * No region of the window is redesigned by this file — it only gives the component LIBRARY itself
- * a coherent look before any screen actually adopts it wholesale (that is `docs/INTERFACE.md`
- * items 2 onward). `index.css` keeps styling the CURRENT screens by id/class exactly as before;
- * where this task's `app-shell.tsx` already uses a component (the toolbar buttons, the sidebar's
- * own action buttons), the id-scoped rule in `index.css` and this file's class-scoped rule both
- * apply — harmless, since neither one redeclares a property the other already sets for those
- * elements (position/size stays in `index.css`, colour/radius/weight moves here).
+ * V2-T62 (D-051): baseline, token-driven styles for the LEGACY `renderer/legacy/**` screens' own
+ * base components — `seeya-field*`/`seeya-checkbox`/`seeya-switch`/`seeya-segmented-control`/
+ * `seeya-dialog`/`seeya-table-row`/`seeya-info-box`/`seeya-empty-state` (still unused by any
+ * region so far — the button/status-pill equivalents are gone from here, see the note below).
+ * `legacy.css` keeps styling the current LEGACY screens by id/class exactly as before.
+ *
+ * D-052 (V2-T75): `.seeya-button*`/`.seeya-status-pill*` are REMOVED from this file — `Button`/
+ * `IconButton`/`Chip` (`renderer/components/`) have their own CSS modules now, and nothing under
+ * `renderer/legacy/` ever used the button/status-pill global classes directly (confirmed by grep
+ * before deleting them): the design system's redesigned components never depended on this file's
+ * class names, they just hadn't been given a real CSS module yet.
  */
-
-.seeya-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--seeya-space-2);
-  border: 1px solid transparent;
-  border-radius: var(--seeya-radius-md);
-  padding: var(--seeya-space-2) var(--seeya-space-4);
-  font-family: var(--seeya-font-sans);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition:
-    background-color var(--seeya-motion-micro) var(--seeya-motion-easing),
-    border-color var(--seeya-motion-micro) var(--seeya-motion-easing);
-}
-
-.seeya-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.seeya-button--primary {
-  background: var(--seeya-brand);
-  color: var(--seeya-on-brand);
-}
-
-.seeya-button--primary:not(:disabled):hover {
-  background: var(--seeya-brand-hover);
-}
-
-.seeya-button--secondary {
-  background: var(--seeya-surface);
-  color: var(--seeya-text);
-  border-color: var(--seeya-border-strong);
-}
-
-.seeya-button--secondary:not(:disabled):hover {
-  background: var(--seeya-surface-hover);
-}
-
-.seeya-button--ghost {
-  background: transparent;
-  color: var(--seeya-text-secondary);
-}
-
-.seeya-button--ghost:not(:disabled):hover {
-  background: var(--seeya-surface-hover);
-  color: var(--seeya-text);
-}
-
-.seeya-button--icon {
-  padding: var(--seeya-space-2);
-  min-width: 32px;
-  min-height: 32px;
-}
 
 .seeya-field {
   display: flex;

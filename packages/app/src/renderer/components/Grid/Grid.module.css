@@ -1,0 +1,14 @@
+/* D-052 (V2-T75). `--seeya-grid-columns` is set inline per `Grid` instance (`Grid.tsx`); the
+ * column count itself is the one layout number this primitive expresses as a plain prop rather
+ * than a token — "12 colunas" is the grid's own unit, not a spacing/radius/elevation value. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(var(--seeya-grid-columns), minmax(0, 1fr));
+  min-width: 0;
+}
+
+.item {
+  /* `grid-column` itself is set inline (`GridItem`'s own `span` prop) — same reasoning as
+   * `--seeya-grid-columns` above: span count is the primitive's own unit, not a token. */
+  min-width: 0;
+}

@@ -1,0 +1,23 @@
+/* D-052 (V2-T75): the card/panel primitive — colour and border only; `padding`/`radius`/
+ * `elevation` all come in as inline styles from the typed token scale (`Surface.tsx`), never a
+ * pixel picked at the call site. */
+.surface {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.bordered {
+  border: 1px solid var(--seeya-border);
+}
+
+.default {
+  background: var(--seeya-surface);
+}
+
+.subtle {
+  background: var(--seeya-surface-subtle);
+}
+
+.elevated {
+  background: var(--seeya-surface-elevated);
+}

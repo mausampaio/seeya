@@ -5,7 +5,6 @@
  */
 import { MESSAGES } from '../../text/messages.js';
 import type { SettingsRow, ProjectPolicyLine } from '../../state/settings-panel.js';
-import { renderScheduleStrip } from './schedule-strip-view.js';
 
 /**
  * V2-T14 — one row per `SettingsRow` (`state/settings-panel.ts`), each with its own text input
@@ -27,9 +26,12 @@ function settingsRowsContainer(): HTMLElement {
  * (the person's typed text stays there to fix, D-039's own "never surprise" spirit) and shows the
  * refusal `main.ts` returned verbatim (AGENTS.md § "Mensagens de erro" — the raw value and the
  * expected shape, no second wording here); a saved value re-renders every row (another field's
- * `origin` line never goes stale next to the one that just changed) and repaints the faixa de
- * horário immediately, the same "don't wait for the next ambient tick" shape
- * `schedule-strip-view.ts#handleScheduleAdjustment` already has for Snooze/Skip. */
+ * `origin` line never goes stale next to the one that just changed). D-052 (V2-T75): the faixa de
+ * horário is no longer repainted from `response.schedule` directly here — `main.ts`'s own
+ * `saveSetting` handler now ALSO pushes the freshly recomputed schedule over `onScheduleUpdate`
+ * (the same channel the ambient tick and Snooze/Skip already use), which the lateral's own
+ * `SidebarFooter` subscribes to — still "don't wait for the next ambient tick", just through one
+ * channel instead of two. */
 async function handleSettingsSaveClicked(
   key: string,
   input: HTMLInputElement,
@@ -42,7 +44,6 @@ async function handleSettingsSaveClicked(
     return;
   }
   renderSettingsRows(response.rows);
-  renderScheduleStrip(response.schedule);
 }
 
 function renderSettingsRow(row: SettingsRow): HTMLElement {

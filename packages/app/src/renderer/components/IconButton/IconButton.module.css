@@ -1,0 +1,67 @@
+/* D-052 (V2-T75). The icon is centered by this component's own layout, never by the icon's own
+ * markup — the "+ fora do centro" defect (V2-T63 aceite) was exactly a button with no centering
+ * rule of its own around a bare inline SVG. */
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  border: 1px solid transparent;
+  border-radius: var(--seeya-radius-sm);
+  cursor: pointer;
+  transition:
+    background-color var(--seeya-motion-micro) var(--seeya-motion-easing),
+    color var(--seeya-motion-micro) var(--seeya-motion-easing);
+}
+
+.iconButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Square tap targets — identity § 8's own "áreas interativas devem possuir pelo menos 44×44 px
+ * quando usadas por toque"; `sm` stays smaller on purpose for a dense inline row (a nav section's
+ * own "+"), never the ONLY way to reach that action from a touch surface in this app (desktop). */
+.sm {
+  width: 24px;
+  height: 24px;
+}
+
+.md {
+  width: 32px;
+  height: 32px;
+}
+
+.lg {
+  width: 40px;
+  height: 40px;
+}
+
+.primary {
+  background: var(--seeya-brand);
+  color: var(--seeya-on-brand);
+}
+
+.primary:not(:disabled):hover {
+  background: var(--seeya-brand-hover);
+}
+
+.secondary {
+  background: var(--seeya-surface);
+  color: var(--seeya-text);
+  border-color: var(--seeya-border-strong);
+}
+
+.secondary:not(:disabled):hover {
+  background: var(--seeya-surface-hover);
+}
+
+.ghost {
+  background: transparent;
+  color: var(--seeya-text-secondary);
+}
+
+.ghost:not(:disabled):hover {
+  background: var(--seeya-surface-hover);
+  color: var(--seeya-text);
+}

@@ -7,6 +7,7 @@
  * renderer with `contextIsolation` on — this is the fix, not a workaround inside the renderer).
  */
 import { contextBridge, ipcRenderer } from 'electron';
+import type { IpcRendererEvent } from 'electron';
 import { CHANNELS } from '../ipc/channels.js';
 import type {
   CreateTabRequest,
@@ -89,8 +90,9 @@ export interface SeeyaApi {
   /** V2-T4 item 1: the "Today" panel's own data. */
   getTodayPanel(): Promise<TodayPanelResponse>;
   /** V2-T18 item 2: the panel's own data, pushed on the same refresh tick as `onSessionsUpdate` —
-   * the panel tracks liveness without a page reload. */
-  onTodayUpdate(listener: (event: TodayUpdateEvent) => void): void;
+   * the panel tracks liveness without a page reload. D-052 (V2-T75): unsubscribe function, same
+   * reasoning as `onProjectsUpdate` above. */
+  onTodayUpdate(listener: (event: TodayUpdateEvent) => void): () => void;
   /** V2-T4 items 1/2/3: "Resume selected". */
   resumeSelected(request: ResumeSelectedRequest): Promise<ResumeSummaryResponse>;
   onResumeProgress(listener: (event: ResumeProgressUpdateEvent) => void): void;
@@ -104,14 +106,16 @@ export interface SeeyaApi {
   endDayRun(): Promise<EndDayRunResponse>;
   onEndDayProgress(listener: (event: EndDayProgressUpdateEvent) => void): void;
   /** V2-T5b item 1: the faixa de horário's own data, pushed on the same refresh tick as
-   * `onStatusUpdate`. */
-  onScheduleUpdate(listener: (event: ScheduleUpdateEvent) => void): void;
+   * `onStatusUpdate`. D-052 (V2-T75): unsubscribe function, same reasoning as `onProjectsUpdate`
+   * above. */
+  onScheduleUpdate(listener: (event: ScheduleUpdateEvent) => void): () => void;
   /** V2-T5b item 1: one of "Snooze +15m/+30m/+1h" — resolves with the freshly recomputed strip. */
   snoozeToday(request: SnoozeTodayRequest): Promise<ScheduleUpdateEvent>;
   /** V2-T5b item 1: "Skip today" — resolves with the freshly recomputed strip. */
   skipToday(): Promise<ScheduleUpdateEvent>;
-  /** V2-T5b item 3: the daemon's own liveness, pushed on the same refresh tick. */
-  onDaemonAvailabilityUpdate(listener: (event: DaemonAvailabilityUpdateEvent) => void): void;
+  /** V2-T5b item 3: the daemon's own liveness, pushed on the same refresh tick. D-052 (V2-T75):
+   * unsubscribe function, same reasoning as `onProjectsUpdate` above. */
+  onDaemonAvailabilityUpdate(listener: (event: DaemonAvailabilityUpdateEvent) => void): () => void;
   /** V2-T5b item 3: "Start daemon"/"Stop daemon". */
   daemonControl(request: DaemonControlRequest): Promise<DaemonControlResponse>;
   /** V2-T14 item 1: the Settings dialog's own rows, re-fetched every time it opens. */
@@ -120,8 +124,11 @@ export interface SeeyaApi {
    * recomputed faixa de horário on success, or the refusal message on failure. */
   saveSetting(request: SaveSettingRequest): Promise<SaveSettingResponse>;
   /** V2-T13 item 4: the autostart button's own liveness, pushed on the same refresh tick as
-   * `onDaemonAvailabilityUpdate`. */
-  onAutostartAvailabilityUpdate(listener: (event: AutostartAvailabilityUpdateEvent) => void): void;
+   * `onDaemonAvailabilityUpdate`. D-052 (V2-T75): unsubscribe function, same reasoning as
+   * `onProjectsUpdate` above. */
+  onAutostartAvailabilityUpdate(
+    listener: (event: AutostartAvailabilityUpdateEvent) => void,
+  ): () => void;
   /** V2-T13 item 4: "Enable autostart"/"Disable autostart". */
   autostartControl(request: AutostartControlRequest): Promise<AutostartControlResponse>;
   /** V2-T13 item 5: the ownership-transition dialog's own data, fetched once at startup. */
@@ -129,8 +136,14 @@ export interface SeeyaApi {
   /** V2-T13 item 5: the person's answer to the ownership-transition dialog. */
   answerDaemonOwnershipTransition(request: AnswerDaemonOwnershipTransitionRequest): Promise<void>;
   /** V2-T30 item 1: the "Projects" section's own data, pushed on the same refresh tick as
-   * `onSessionsUpdate` and again right after "New project…"/"Open"/"Adopt…" finish. */
-  onProjectsUpdate(listener: (event: ProjectsUpdateEvent) => void): void;
+   * `onSessionsUpdate` and again right after "New project…"/"Open"/"Adopt…" finish.
+   * D-052 (V2-T75): returns an unsubscribe function — `renderer/hooks/useIpcSubscription.ts`'s
+   * own contract ("com limpeza no desmonte") needs one; every OTHER `onXUpdate` below still
+   * returns `void` (unchanged, still no way to remove that listener) because nothing outside the
+   * new Sidebar feature needs to unsubscribe yet — widening this return type is backward
+   * compatible (every existing caller already ignores the return value), so only the six
+   * channels the Sidebar actually subscribes to changed. */
+  onProjectsUpdate(listener: (event: ProjectsUpdateEvent) => void): () => void;
   /** V2-T30 item 1: fetched once, at startup — see `CHANNELS.getProjectsPanel`'s own docstring. */
   getProjectsPanel(): Promise<ProjectsPanelResponse>;
   /** V2-T30 item 4: "New project…". */
@@ -167,11 +180,25 @@ export interface SeeyaApi {
    * send" round trip as `getTerminalFontConfig`. */
   getEffectiveTheme(): Promise<ThemeUpdateEvent>;
   /** V2-T62 (D-051): pushed whenever the OS's own light/dark preference changes (never on a
-   * fixed interval — `electron/main.ts`'s own `nativeTheme.on('updated', ...)` subscription). */
-  onThemeUpdate(listener: (event: ThemeUpdateEvent) => void): void;
+   * fixed interval — `main/main.ts`'s own `nativeTheme.on('updated', ...)` subscription). D-052
+   * (V2-T75): unsubscribe function, same reasoning as `onProjectsUpdate` above. */
+  onThemeUpdate(listener: (event: ThemeUpdateEvent) => void): () => void;
   /** V2-T63: the star, from either the lateral or the Projects tab — resolves once saved and
    * pushed. */
   toggleFavoriteProject(request: ToggleFavoriteProjectRequest): Promise<void>;
+}
+
+/**
+ * D-052 (V2-T75): the one place that both registers an `ipcRenderer.on` listener and hands back a
+ * real remover for it — `ipcRenderer.removeListener` needs the SAME wrapper function reference
+ * `.on` was given, so this closes over it instead of every call site re-deriving its own. Used
+ * only by the six `onXUpdate` methods `renderer/hooks/useIpcSubscription.ts` subscribes through;
+ * every other `on*` method below keeps its own inline `ipcRenderer.on` call, unchanged.
+ */
+function subscribe<T>(channel: string, listener: (event: T) => void): () => void {
+  const handler = (_event: IpcRendererEvent, data: T): void => listener(data);
+  ipcRenderer.on(channel, handler);
+  return () => ipcRenderer.removeListener(channel, handler);
 }
 
 const api: SeeyaApi = {
@@ -205,9 +232,7 @@ const api: SeeyaApi = {
   },
   answerFallbackConfirm: (request) => ipcRenderer.send(CHANNELS.confirmFallbackAnswer, request),
   getTodayPanel: () => ipcRenderer.invoke(CHANNELS.getTodayPanel),
-  onTodayUpdate: (listener) => {
-    ipcRenderer.on(CHANNELS.todayUpdate, (_event, data: TodayUpdateEvent) => listener(data));
-  },
+  onTodayUpdate: (listener) => subscribe(CHANNELS.todayUpdate, listener),
   resumeSelected: (request) => ipcRenderer.invoke(CHANNELS.resumeSelected, request),
   onResumeProgress: (listener) => {
     ipcRenderer.on(CHANNELS.resumeProgress, (_event, data: ResumeProgressUpdateEvent) =>
@@ -226,34 +251,21 @@ const api: SeeyaApi = {
       listener(data),
     );
   },
-  onScheduleUpdate: (listener) => {
-    ipcRenderer.on(CHANNELS.scheduleUpdate, (_event, data: ScheduleUpdateEvent) => listener(data));
-  },
+  onScheduleUpdate: (listener) => subscribe(CHANNELS.scheduleUpdate, listener),
   snoozeToday: (request) => ipcRenderer.invoke(CHANNELS.snoozeToday, request),
   skipToday: () => ipcRenderer.invoke(CHANNELS.skipToday),
-  onDaemonAvailabilityUpdate: (listener) => {
-    ipcRenderer.on(
-      CHANNELS.daemonAvailabilityUpdate,
-      (_event, data: DaemonAvailabilityUpdateEvent) => listener(data),
-    );
-  },
+  onDaemonAvailabilityUpdate: (listener) => subscribe(CHANNELS.daemonAvailabilityUpdate, listener),
   daemonControl: (request) => ipcRenderer.invoke(CHANNELS.daemonControl, request),
   getSettingsPanel: () => ipcRenderer.invoke(CHANNELS.getSettingsPanel),
   saveSetting: (request) => ipcRenderer.invoke(CHANNELS.saveSetting, request),
-  onAutostartAvailabilityUpdate: (listener) => {
-    ipcRenderer.on(
-      CHANNELS.autostartAvailabilityUpdate,
-      (_event, data: AutostartAvailabilityUpdateEvent) => listener(data),
-    );
-  },
+  onAutostartAvailabilityUpdate: (listener) =>
+    subscribe(CHANNELS.autostartAvailabilityUpdate, listener),
   autostartControl: (request) => ipcRenderer.invoke(CHANNELS.autostartControl, request),
   getDaemonOwnershipTransitionOffer: () =>
     ipcRenderer.invoke(CHANNELS.getDaemonOwnershipTransitionOffer),
   answerDaemonOwnershipTransition: (request) =>
     ipcRenderer.invoke(CHANNELS.answerDaemonOwnershipTransition, request),
-  onProjectsUpdate: (listener) => {
-    ipcRenderer.on(CHANNELS.projectsUpdate, (_event, data: ProjectsUpdateEvent) => listener(data));
-  },
+  onProjectsUpdate: (listener) => subscribe(CHANNELS.projectsUpdate, listener),
   getProjectsPanel: () => ipcRenderer.invoke(CHANNELS.getProjectsPanel),
   createProject: (request) => ipcRenderer.invoke(CHANNELS.createProject, request),
   openProject: (request) => ipcRenderer.invoke(CHANNELS.openProject, request),
@@ -292,9 +304,7 @@ const api: SeeyaApi = {
     ipcRenderer.send(CHANNELS.answerAdoptionCommitConfirm, request),
   findSessionById: (request) => ipcRenderer.invoke(CHANNELS.findSessionById, request),
   getEffectiveTheme: () => ipcRenderer.invoke(CHANNELS.getEffectiveTheme),
-  onThemeUpdate: (listener) => {
-    ipcRenderer.on(CHANNELS.themeUpdate, (_event, data: ThemeUpdateEvent) => listener(data));
-  },
+  onThemeUpdate: (listener) => subscribe(CHANNELS.themeUpdate, listener),
   toggleFavoriteProject: (request) => ipcRenderer.invoke(CHANNELS.toggleFavoriteProject, request),
 };
 

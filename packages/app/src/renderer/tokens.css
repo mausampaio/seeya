@@ -28,6 +28,11 @@
   --seeya-surface: #ffffff;
   --seeya-surface-subtle: #f7f7f8;
   --seeya-surface-hover: #efeff1;
+  /* D-052 (V2-T75): `identidade` § 3.3 names `neutral-0` (`#ffffff`) as "Superfície elevada
+   * clara" — the same value `--seeya-surface` already uses in this theme, since white IS the
+   * lightest/most elevated surface here. Added so `Surface`'s own `elevation`-adjacent `variant`
+   * prop has a real value on BOTH themes (the dark theme already defines this token, V2-T62). */
+  --seeya-surface-elevated: #ffffff;
 
   --seeya-text: #121214;
   --seeya-text-secondary: #565661;
