@@ -9,14 +9,17 @@
  *
  * **What this refuses, precisely — and what it doesn't (item 7's own "onde o guarda-corpo
  * termina").** Refuses: a commit that stages files inside more than one project directory; a
- * commit that stages the project's own `.seeya-lock`; a commit into a project whose lock is held by
- * a DIFFERENT, live session; a commit message whose trailer already contradicts what this guard
- * independently knows. Passes, unchanged: a commit that touches no project directory at all (e.g.
- * only the workspace's own top-level `.gitignore`) — D-047 has nothing to say about that. A commit
- * made by hand, with no `CLAUDE_CODE_SESSION_ID` in the environment and the project's lock free (or
- * stale), always passes too — attributed to session `unknown` (D-025,
- * `core/project-commit.ts#UNKNOWN_SESSION_TRAILER_VALUE`), never refused for lacking an identity
- * nobody claimed.
+ * commit that stages the project's own `.seeya-lock`; a commit that stages the project's own
+ * `seeya.json` without being one of `seeya`'s own four intentional writes to it (V2-T73 item 1,
+ * `manifestWriteAuthorized` below — refused even for a session that otherwise legitimately holds
+ * the project's lock, since holding the lock never authorizes THIS specific path); a commit into a
+ * project whose lock is held by a DIFFERENT, live session; a commit message whose trailer already
+ * contradicts what this guard independently knows. Passes, unchanged: a commit that touches no
+ * project directory at all (e.g. only the workspace's own top-level `.gitignore`) — D-047 has
+ * nothing to say about that. A commit made by hand, with no `CLAUDE_CODE_SESSION_ID` in the
+ * environment and the project's lock free (or stale), always passes too — attributed to session
+ * `unknown` (D-025, `core/project-commit.ts#UNKNOWN_SESSION_TRAILER_VALUE`), never refused for
+ * lacking an identity nobody claimed.
  *
  * **Where it can't reach at all, documented rather than silently absent.** This can't detect a
  * forged `CLAUDE_CODE_SESSION_ID` (the hook trusts the environment it's handed, the same way every
@@ -26,6 +29,20 @@
  * its own `cwd` (V2-T34 item 2's own docstring on where THAT layer stops, too). Neither one covers
  * history rewritten after the fact outside any hook at all — `seeya project audit` is what looks at
  * what already landed and reports what escaped, later (`core/project-audit.ts`).
+ *
+ * **V2-T73 item 3: the manifest guard's own extra boundary.** `--no-verify` still skips this
+ * function entirely, same as any other commit — but the adoption's own fork (`application/
+ * project-adopt.ts`) runs in the ORIGINAL session's `cwd`, never the project's own, so the harness
+ * hook above never even installs there to block `--no-verify` in the first place (`core/
+ * harness-hook-config.ts`'s own docstring on why that layer "NÃO protege seeya project adopt"); an
+ * `open`-launched session doesn't have that gap, since it runs IN the project directory. A
+ * deliberate `--no-verify` commit that gets `seeya.json` through becomes the new committed
+ * baseline — `restoreProjectManifestIfChanged` (`core/ports.ts`) can only ever restore the WORKING
+ * TREE back to whatever's already committed, so it cannot undo that specific commit; what surfaces
+ * it is `seeya project audit`'s own generic missing/wrong-trailer detection (`--no-verify` skips
+ * this hook's trailer completion too, `core/project-audit.ts`), at the next `open`. What item 2
+ * still protects, regardless: whatever the SAME session leaves genuinely uncommitted, however many
+ * unrelated commits it separately pushed through with `--no-verify`.
  *
  * **V2-T34 hotfix (PO review, 2026-09-25): a same-process authorization, alongside the session
  * one.** The maintainer found, on real use, that EVERY commit `seeya` itself makes while holding a
@@ -51,6 +68,10 @@ import {
   UNKNOWN_SESSION_TRAILER_VALUE,
   extractCommitTrailer,
 } from './project-commit.js';
+import {
+  MANIFEST_OWNERSHIP_NOTE,
+  PROJECT_MANIFEST_FILE_NAME,
+} from './project-manifest-ownership.js';
 import { distinctProjectDirs } from './workspace-paths.js';
 
 /** What the guard needs to know about a project's lock — a subset of `ProjectLockInfo`
@@ -82,6 +103,13 @@ export interface CommitGuardInput {
    * `currentSessionId` already is. `undefined` for an ordinary commit `seeya` isn't making while
    * holding the touched project's own lock (a person's own `git commit`, most commonly). */
   readonly currentProcess: LockHolderProcess | undefined;
+  /** V2-T73 item 1: `SEEYA_MANIFEST_WRITE_AUTHORIZED`, read by `application/verify-commit.ts`'s own
+   * caller the same composition-root-adjacent way `currentSessionId`/`currentProcess` already are —
+   * `true` only for `seeya`'s own four intentional writes to the touched project's `seeya.json`
+   * (`adapters/workspace/manifest-write-env.ts`'s own docstring names all four). `false` for every
+   * other commit, session-authored or seeya's own (the leftover-changes commit, an adoption's
+   * commit) — none of those ever legitimately changes this path. */
+  readonly manifestWriteAuthorized: boolean;
   /** `null` when the touched project has never had a lock taken (D-025) — never confused with a
    * lock that WAS taken but died, which is `{ ..., isAlive: false }` instead. */
   readonly lock: CommitGuardLockFact | null;
@@ -252,6 +280,19 @@ export function decideCommitGuard(input: CommitGuardInput): CommitGuardDecision 
       reason:
         `this commit stages the project lock (${lockFilePath}) — it is never committed ` +
         `(D-047 item 2). Unstage it: git restore --staged ${lockFilePath}`,
+    };
+  }
+  // V2-T73 item 1: refuses ANY commit that stages the manifest unless `seeya` itself marked this
+  // exact `git commit` as one of its own four intentional writes to it — independent of who holds
+  // the project's lock (a session that legitimately holds it is still refused here; only the
+  // commit's own `manifestWriteAuthorized` flag matters). `MANIFEST_OWNERSHIP_NOTE` is the SAME
+  // sentence `adapters/harness/adopt-instruction.ts`/`core/project-working-rules.ts` already tell a
+  // session before it ever gets this far (V2-T72 item 3) — one module, one wording.
+  const manifestPath = `${projectId}/${PROJECT_MANIFEST_FILE_NAME}`;
+  if (input.stagedFiles.includes(manifestPath) && !input.manifestWriteAuthorized) {
+    return {
+      kind: 'refuse',
+      reason: `this commit changes "${manifestPath}" — ${MANIFEST_OWNERSHIP_NOTE}`,
     };
   }
   const conflict = decideSessionConflict(

@@ -30,6 +30,7 @@ describe('decideCommitGuard — the permitted case', () => {
       currentProcess: undefined,
       lock: null,
       lockFileName: LOCK_FILE_NAME,
+      manifestWriteAuthorized: false,
     });
     expect(decision).toEqual({
       kind: 'allow',
@@ -46,6 +47,7 @@ describe('decideCommitGuard — the permitted case', () => {
       currentProcess: undefined,
       lock: null,
       lockFileName: LOCK_FILE_NAME,
+      manifestWriteAuthorized: false,
     });
     expect(decision.kind).toBe('allow');
     expect(decision.kind === 'allow' && decision.message).toContain('Seeya-Session-Id: unknown');
@@ -59,6 +61,7 @@ describe('decideCommitGuard — the permitted case', () => {
       currentProcess: undefined,
       lock: liveLock({ isAlive: false }),
       lockFileName: LOCK_FILE_NAME,
+      manifestWriteAuthorized: false,
     });
     expect(decision.kind).toBe('allow');
   });
@@ -71,6 +74,7 @@ describe('decideCommitGuard — the permitted case', () => {
       currentProcess: undefined,
       lock: liveLock({ sessionId: 'session-a' }),
       lockFileName: LOCK_FILE_NAME,
+      manifestWriteAuthorized: false,
     });
     expect(decision.kind).toBe('allow');
   });
@@ -85,6 +89,7 @@ describe('decideCommitGuard — the permitted case', () => {
       currentProcess: undefined,
       lock: null,
       lockFileName: LOCK_FILE_NAME,
+      manifestWriteAuthorized: false,
     });
     expect(decision).toEqual({ kind: 'allow', message });
   });
@@ -97,6 +102,7 @@ describe('decideCommitGuard — the permitted case', () => {
       currentProcess: undefined,
       lock: null,
       lockFileName: LOCK_FILE_NAME,
+      manifestWriteAuthorized: false,
     });
     expect(decision.kind).toBe('allow');
     const message = decision.kind === 'allow' ? decision.message : '';
@@ -112,8 +118,24 @@ describe('decideCommitGuard — the permitted case', () => {
       currentProcess: undefined,
       lock: null,
       lockFileName: LOCK_FILE_NAME,
+      manifestWriteAuthorized: false,
     });
     expect(decision).toEqual({ kind: 'allow', message: 'Update gitignore' });
+  });
+
+  // V2-T73 item 1: seeya's own four legitimate manifest writes (create/add-repo/remove-repo/
+  // remove) mark themselves via `manifestWriteAuthorized` — this proves the marked case passes.
+  it("allows a commit that stages seeya.json when marked as one of seeya's own manifest writes", () => {
+    const decision = decideCommitGuard({
+      stagedFiles: ['auth-hardening/seeya.json'],
+      rawMessage: 'Add repository app-api to project auth-hardening',
+      currentSessionId: undefined,
+      currentProcess: undefined,
+      lock: null,
+      lockFileName: LOCK_FILE_NAME,
+      manifestWriteAuthorized: true,
+    });
+    expect(decision.kind).toBe('allow');
   });
 });
 
@@ -126,6 +148,7 @@ describe('decideCommitGuard — refusals', () => {
       currentProcess: undefined,
       lock: null,
       lockFileName: LOCK_FILE_NAME,
+      manifestWriteAuthorized: false,
     });
     expect(decision.kind).toBe('refuse');
     expect(decision.kind === 'refuse' && decision.reason).toContain('auth-hardening');
@@ -140,6 +163,7 @@ describe('decideCommitGuard — refusals', () => {
       currentProcess: undefined,
       lock: null,
       lockFileName: LOCK_FILE_NAME,
+      manifestWriteAuthorized: false,
     });
     expect(decision.kind).toBe('refuse');
     expect(decision.kind === 'refuse' && decision.reason).toContain('.seeya-lock');
@@ -153,6 +177,7 @@ describe('decideCommitGuard — refusals', () => {
       currentProcess: undefined,
       lock: liveLock({ sessionId: 'session-a' }),
       lockFileName: LOCK_FILE_NAME,
+      manifestWriteAuthorized: false,
     });
     expect(decision.kind).toBe('refuse');
     expect(decision.kind === 'refuse' && decision.reason).toContain('session-a');
@@ -166,6 +191,7 @@ describe('decideCommitGuard — refusals', () => {
       currentProcess: undefined,
       lock: liveLock({ sessionId: undefined }),
       lockFileName: LOCK_FILE_NAME,
+      manifestWriteAuthorized: false,
     });
     expect(decision.kind).toBe('refuse');
     expect(decision.kind === 'refuse' && decision.reason).toContain('unidentified session');
@@ -179,6 +205,7 @@ describe('decideCommitGuard — refusals', () => {
       currentProcess: undefined,
       lock: null,
       lockFileName: LOCK_FILE_NAME,
+      manifestWriteAuthorized: false,
     });
     expect(decision.kind).toBe('refuse');
     expect(decision.kind === 'refuse' && decision.reason).toContain('wrong-project');
@@ -192,9 +219,46 @@ describe('decideCommitGuard — refusals', () => {
       currentProcess: undefined,
       lock: null,
       lockFileName: LOCK_FILE_NAME,
+      manifestWriteAuthorized: false,
     });
     expect(decision.kind).toBe('refuse');
     expect(decision.kind === 'refuse' && decision.reason).toContain('someone-else');
+  });
+
+  // V2-T73 item 1: the forbidden case — a session (or anything else not marked
+  // `manifestWriteAuthorized`) staging seeya.json is refused, naming the exact path and reusing
+  // `MANIFEST_OWNERSHIP_NOTE` (the same sentence the adoption instruction/working rules already
+  // tell a session, V2-T72 item 3 — "num lugar só").
+  it("refuses a commit that stages seeya.json when not marked as one of seeya's own manifest writes", () => {
+    const decision = decideCommitGuard({
+      stagedFiles: ['auth-hardening/seeya.json'],
+      rawMessage: 'Fix the broken repositories field',
+      currentSessionId: 'session-a',
+      currentProcess: undefined,
+      lock: null,
+      lockFileName: LOCK_FILE_NAME,
+      manifestWriteAuthorized: false,
+    });
+    expect(decision.kind).toBe('refuse');
+    expect(decision.kind === 'refuse' && decision.reason).toContain('auth-hardening/seeya.json');
+    expect(decision.kind === 'refuse' && decision.reason).toContain('maintained by seeya itself');
+  });
+
+  // V2-T73 item 1's own headline case: a session holding the project's OWN lock (so the session
+  // check above would otherwise pass) is still refused for touching seeya.json — holding the lock
+  // never authorizes THIS specific path.
+  it('refuses a commit staging seeya.json even from the session that legitimately holds the project lock', () => {
+    const decision = decideCommitGuard({
+      stagedFiles: ['auth-hardening/seeya.json'],
+      rawMessage: 'Adoption fork edits the manifest by hand',
+      currentSessionId: 'session-a',
+      currentProcess: undefined,
+      lock: liveLock({ sessionId: 'session-a' }),
+      lockFileName: LOCK_FILE_NAME,
+      manifestWriteAuthorized: false,
+    });
+    expect(decision.kind).toBe('refuse');
+    expect(decision.kind === 'refuse' && decision.reason).toContain('auth-hardening/seeya.json');
   });
 });
 
@@ -211,6 +275,7 @@ describe('decideCommitGuard — same-process authorization (V2-T34 hotfix)', () 
       currentProcess: { pid: 1234, procStart: '11111' },
       lock: liveLock({ sessionId: undefined, pid: 1234, procStart: '11111' }),
       lockFileName: LOCK_FILE_NAME,
+      manifestWriteAuthorized: false,
     });
     expect(decision.kind).toBe('allow');
     expect(decision.kind === 'allow' && decision.message).toContain('Seeya-Session-Id: unknown');
@@ -224,6 +289,7 @@ describe('decideCommitGuard — same-process authorization (V2-T34 hotfix)', () 
       currentProcess: { pid: 1234, procStart: '11111' },
       lock: liveLock({ sessionId: 'fork-session-uuid', pid: 1234, procStart: '11111' }),
       lockFileName: LOCK_FILE_NAME,
+      manifestWriteAuthorized: false,
     });
     expect(decision.kind).toBe('allow');
   });
@@ -243,6 +309,7 @@ describe('decideCommitGuard — same-process authorization (V2-T34 hotfix)', () 
       currentProcess: { pid: 1234, procStart: '11111' },
       lock: liveLock({ sessionId: 'launched-session-uuid', pid: 1234, procStart: '11111' }),
       lockFileName: LOCK_FILE_NAME,
+      manifestWriteAuthorized: false,
     });
     expect(decision.kind).toBe('allow');
     expect(decision.kind === 'allow' && decision.message).toContain('Seeya-Session-Id: unknown');
@@ -257,6 +324,7 @@ describe('decideCommitGuard — same-process authorization (V2-T34 hotfix)', () 
       currentProcess: { pid: 1234, procStart: '11111' },
       lock: liveLock({ sessionId: 'launched-session-uuid', pid: 1234, procStart: '11111' }),
       lockFileName: LOCK_FILE_NAME,
+      manifestWriteAuthorized: false,
     });
     expect(decision.kind).toBe('allow');
     expect(decision.kind === 'allow' && decision.message).toContain('Seeya-Session-Id: unknown');
@@ -271,6 +339,7 @@ describe('decideCommitGuard — same-process authorization (V2-T34 hotfix)', () 
       currentProcess: { pid: 1234, procStart: '99999' },
       lock: liveLock({ sessionId: undefined, pid: 1234, procStart: '11111' }),
       lockFileName: LOCK_FILE_NAME,
+      manifestWriteAuthorized: false,
     });
     expect(decision.kind).toBe('refuse');
   });
@@ -283,7 +352,25 @@ describe('decideCommitGuard — same-process authorization (V2-T34 hotfix)', () 
       currentProcess: { pid: 9999, procStart: '11111' },
       lock: liveLock({ sessionId: undefined, pid: 1234, procStart: '11111' }),
       lockFileName: LOCK_FILE_NAME,
+      manifestWriteAuthorized: false,
     });
     expect(decision.kind).toBe('refuse');
+  });
+
+  // V2-T73 item 1: the same-process authorization (`open`'s leftover-changes commit, an adoption's
+  // own commit — both spawned by seeya itself, while holding the project's own lock) STILL never
+  // authorizes touching seeya.json — only `manifestWriteAuthorized` does.
+  it('refuses a commit staging seeya.json even when authorized by the same process holding the lock', () => {
+    const decision = decideCommitGuard({
+      stagedFiles: ['auth-hardening/seeya.json'],
+      rawMessage: 'Commit changes left uncommitted before opening auth-hardening',
+      currentSessionId: undefined,
+      currentProcess: { pid: 1234, procStart: '11111' },
+      lock: liveLock({ sessionId: undefined, pid: 1234, procStart: '11111' }),
+      lockFileName: LOCK_FILE_NAME,
+      manifestWriteAuthorized: false,
+    });
+    expect(decision.kind).toBe('refuse');
+    expect(decision.kind === 'refuse' && decision.reason).toContain('auth-hardening/seeya.json');
   });
 });

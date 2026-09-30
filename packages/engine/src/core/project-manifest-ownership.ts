@@ -17,3 +17,11 @@ export const MANIFEST_OWNERSHIP_NOTE =
   '"seeya.json" in this project is maintained by seeya itself — never write to it by hand, ' +
   'even to fix it. To add a repository, tell the person to run "seeya project add-repo" from a ' +
   'real terminal.';
+
+/**
+ * The manifest's own file name, relative to a project's own directory — fixed here (V2-T73) so
+ * `core/workspace-commit-guard.ts` (deciding which staged path IS the manifest) and
+ * `adapters/workspace/index.ts` (writing/reading it) never spell the literal `'seeya.json'`
+ * independently, which would risk the two drifting apart (AGENTS.md: "nada de duplicação").
+ */
+export const PROJECT_MANIFEST_FILE_NAME = 'seeya.json';

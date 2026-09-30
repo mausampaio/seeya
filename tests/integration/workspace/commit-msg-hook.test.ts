@@ -112,6 +112,33 @@ async function setUpWorkspaceWithProject(): Promise<{
   return { root: dir, workspace };
 }
 
+/** Module-level (V2-T73 item 1: shared by the manifest-ownership describe block below AND the
+ * same-process-authorization one, which is where this originated). Mutates THIS test process's own
+ * `CLAUDE_CODE_SESSION_ID` for the duration of `fn` — `commitAll`/`revertCommits` spread
+ * `process.env` directly (the same environment the workspace's own commit-msg hook, and thus `seeya
+ * project verify-commit`, actually inherits from a real `seeya` process), so this is the faithful
+ * way to prove a scenario without inventing a second `runGit`-adjacent parameter no real caller has.
+ * Always restored, even on throw — needed even for a value this whole test suite already runs
+ * under a REAL Claude Code session (this process's own ambient `CLAUDE_CODE_SESSION_ID`), which a
+ * naive test would otherwise silently inherit instead of the value it means to prove. */
+async function withSessionIdEnv<T>(value: string | undefined, fn: () => Promise<T>): Promise<T> {
+  const original = process.env['CLAUDE_CODE_SESSION_ID'];
+  if (value === undefined) {
+    delete process.env['CLAUDE_CODE_SESSION_ID'];
+  } else {
+    process.env['CLAUDE_CODE_SESSION_ID'] = value;
+  }
+  try {
+    return await fn();
+  } finally {
+    if (original === undefined) {
+      delete process.env['CLAUDE_CODE_SESSION_ID'];
+    } else {
+      process.env['CLAUDE_CODE_SESSION_ID'] = original;
+    }
+  }
+}
+
 describe('the workspace commit-msg hook — real execution', () => {
   let root: string | undefined;
 
@@ -340,6 +367,110 @@ describe('the workspace commit-msg hook — real execution', () => {
 });
 
 /**
+ * V2-T73 item 1 (D-047's own extension, task-63): the maintainer found, in production, that a
+ * session adopted into a project had edited `seeya.json` by hand — an invalid shape that made the
+ * whole project disappear from discovery (V2-T72). These prove the manifest-ownership guard for
+ * real: the permitted case (a commit marked as one of seeya's own manifest writes) and the
+ * forbidden one (a session's own commit staging the manifest), including while that same session
+ * legitimately holds the project's own lock — holding the lock authorizes everything else in the
+ * project, never this one path.
+ */
+describe("the workspace's own manifest-ownership guard — real execution (V2-T73 item 1)", () => {
+  let root: string | undefined;
+  const projectLock = new FsProjectLock();
+
+  afterEach(async () => {
+    if (root !== undefined) {
+      await rm(root, { recursive: true, force: true });
+      root = undefined;
+    }
+  });
+
+  it("allows a real commit staging seeya.json when marked as one of seeya's own manifest writes (add-repo shape)", async () => {
+    const { root: dir, workspace } = await setUpWorkspaceWithProject();
+    root = dir;
+    await writeFile(
+      path.join(dir, 'auth-hardening', 'seeya.json'),
+      JSON.stringify({
+        schemaVersion: 1,
+        id: 'auth-hardening',
+        name: 'auth-hardening',
+        defaultHarness: null,
+        repositories: [{ hasRemote: false, name: 'app-api' }],
+        trackers: [],
+      }) + '\n',
+    );
+    await runGit(dir, ['add', 'auth-hardening']);
+    const message = buildProjectCommitMessage(
+      'Add repository app-api to project auth-hardening',
+      'auth-hardening',
+      undefined,
+    );
+
+    // `withSessionIdEnv(undefined, ...)`: this whole suite already runs under a real Claude Code
+    // session — without this, `commitAll`'s own `{...process.env}` would inherit THIS session's
+    // real `CLAUDE_CODE_SESSION_ID` and contradict the "unknown" trailer `buildProjectCommitMessage`
+    // wrote above (D-025: nobody present can say whose `add-repo` this was).
+    await withSessionIdEnv(undefined, () =>
+      workspace.commitAll(dir, 'auth-hardening', message, undefined, true),
+    );
+
+    expect(await headMessage(dir)).toContain('Seeya-Session-Id: unknown');
+  }, 30_000);
+
+  it('refuses a real commit staging seeya.json from a session, with no lock at all', async () => {
+    const { root: dir } = await setUpWorkspaceWithProject();
+    root = dir;
+    const beforeHash = await headHash(dir);
+    await writeFile(
+      path.join(dir, 'auth-hardening', 'seeya.json'),
+      '{"repositories": "not even an array"}\n',
+    );
+    await runGit(dir, ['add', 'auth-hardening']);
+    const sessionEnv = { ...process.env, CLAUDE_CODE_SESSION_ID: 'session-real-123' };
+
+    const attempt = await realCommit(dir, 'Fix the broken repositories field myself', sessionEnv);
+
+    expect(attempt.exitCode).not.toBe(0);
+    expect(attempt.stderr).toContain('auth-hardening/seeya.json');
+    expect(attempt.stderr).toContain('maintained by seeya itself');
+    expect(await headHash(dir)).toBe(beforeHash);
+  }, 30_000);
+
+  it('refuses a real commit staging seeya.json even from the session that legitimately holds the project lock (real child process)', async () => {
+    const { root: dir } = await setUpWorkspaceWithProject();
+    root = dir;
+    const beforeHash = await headHash(dir);
+    // A real, live process this test controls, holding the project's OWN lock under the SAME
+    // session id the commit's own environment carries — `decideSessionConflict` alone would allow
+    // this commit through; the manifest guard has to refuse it anyway.
+    const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
+      stdio: 'ignore',
+    });
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      await projectLock.write(dir, 'auth-hardening', {
+        sessionId: 'holder-session',
+        pid: child.pid as number,
+        procStart: undefined,
+        acquiredAt: new Date(),
+      });
+      await writeFile(path.join(dir, 'auth-hardening', 'seeya.json'), '{"repositories": []}\n');
+      await runGit(dir, ['add', 'auth-hardening']);
+      const holderEnv = { ...process.env, CLAUDE_CODE_SESSION_ID: 'holder-session' };
+
+      const attempt = await realCommit(dir, 'Edit the manifest while holding the lock', holderEnv);
+
+      expect(attempt.exitCode).not.toBe(0);
+      expect(attempt.stderr).toContain('auth-hardening/seeya.json');
+      expect(await headHash(dir)).toBe(beforeHash);
+    } finally {
+      child.kill();
+    }
+  }, 30_000);
+});
+
+/**
  * V2-T34 hotfix (PO review, 2026-09-25): the maintainer found, on real use right after the asar
  * fix above landed, that EVERY commit `seeya` itself makes while holding a project's own lock was
  * refused by this same hook — the reason finally SHOWED (the asar fix's own point), and it was
@@ -361,29 +492,6 @@ describe('same-process lock-holder authorization — real execution (V2-T34 hotf
       root = undefined;
     }
   });
-
-  /** Mutates THIS test process's own `CLAUDE_CODE_SESSION_ID` for the duration of `fn` —
-   * `commitAll`/`revertCommits` spread `process.env` directly (the same environment the workspace's
-   * own commit-msg hook, and thus `seeya project verify-commit`, actually inherits from a real
-   * `seeya` process), so this is the faithful way to prove both scenarios without inventing a
-   * second `runGit`-adjacent parameter no real caller has. Always restored, even on throw. */
-  async function withSessionIdEnv<T>(value: string | undefined, fn: () => Promise<T>): Promise<T> {
-    const original = process.env['CLAUDE_CODE_SESSION_ID'];
-    if (value === undefined) {
-      delete process.env['CLAUDE_CODE_SESSION_ID'];
-    } else {
-      process.env['CLAUDE_CODE_SESSION_ID'] = value;
-    }
-    try {
-      return await fn();
-    } finally {
-      if (original === undefined) {
-        delete process.env['CLAUDE_CODE_SESSION_ID'];
-      } else {
-        process.env['CLAUDE_CODE_SESSION_ID'] = original;
-      }
-    }
-  }
 
   const ENV_SCENARIOS: readonly [string, string | undefined][] = [
     ['no CLAUDE_CODE_SESSION_ID at all (the app, or a plain terminal)', undefined],
@@ -482,8 +590,10 @@ describe('same-process lock-holder authorization — real execution (V2-T34 hotf
         envSessionId,
       );
 
+      // V2-T73 item 1: `removeProjectDirectory` deletes `seeya.json` along with the rest of the
+      // project — one of seeya's own four legitimate manifest writes.
       await withSessionIdEnv(envSessionId, () =>
-        workspace.commitAll(dir, 'auth-hardening', message),
+        workspace.commitAll(dir, 'auth-hardening', message, undefined, true),
       );
 
       expect(await headMessage(dir)).toContain(`Seeya-Session-Id: ${envSessionId ?? 'unknown'}`);
@@ -510,11 +620,16 @@ describe('same-process lock-holder authorization — real execution (V2-T34 hotf
         undefined,
       );
 
+      // V2-T73 item 1: this commit's own write to `seeya.json` (just above) is one of seeya's own
+      // four legitimate manifest writes.
       await withSessionIdEnv(envSessionId, () =>
-        workspace.commitAll(dir, 'auth-hardening', message, {
-          pid: process.pid,
-          procStart: undefined,
-        }),
+        workspace.commitAll(
+          dir,
+          'auth-hardening',
+          message,
+          { pid: process.pid, procStart: undefined },
+          true,
+        ),
       );
 
       expect(await headMessage(dir)).toContain('Seeya-Session-Id: unknown');
@@ -597,11 +712,15 @@ describe('same-process lock-holder authorization — real execution (V2-T34 hotf
       // `addRepository` never take one (this suite's own module docstring). The trailer mirrors
       // `envSessionId`, same as real code: `deps.sessionId` (read once from the same env var)
       // feeds both the message and `currentSessionId`.
+      // V2-T73 item 1: this commit's own write to `seeya.json` (`writeProjectSkeleton` above) is
+      // one of seeya's own four legitimate manifest writes.
       await withSessionIdEnv(envSessionId, () =>
         workspace.commitAll(
           dir,
           'billing-v2',
           buildProjectCommitMessage('Create project billing-v2', 'billing-v2', envSessionId),
+          undefined,
+          true,
         ),
       );
 

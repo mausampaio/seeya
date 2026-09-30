@@ -80,6 +80,7 @@ describe('formatAdoptSessionOutcomeText (V2-T30 item 5)', () => {
       projectId: 'auth-hardening',
       forkSessionId: '22222222-2222-4222-8222-222222222222',
       changedFiles: ['AGENTS.md'],
+      manifestRestore: { kind: 'unchanged' },
     };
     expect(formatAdoptSessionOutcomeText(result)).toBe(
       'Project "auth-hardening": adoption declined — the copy was discarded.',
@@ -92,6 +93,7 @@ describe('formatAdoptSessionOutcomeText (V2-T30 item 5)', () => {
       projectId: 'auth-hardening',
       forkSessionId: '22222222-2222-4222-8222-222222222222',
       changedFiles: ['AGENTS.md'],
+      manifestRestore: { kind: 'unchanged' },
     };
     const text = formatAdoptSessionOutcomeText(result);
     expect(text).toContain('no way to');
@@ -103,6 +105,7 @@ describe('formatAdoptSessionOutcomeText (V2-T30 item 5)', () => {
       kind: 'noChanges',
       projectId: 'auth-hardening',
       forkSessionId: '22222222-2222-4222-8222-222222222222',
+      manifestRestore: { kind: 'unchanged' },
     };
     expect(formatAdoptSessionOutcomeText(result)).toContain('nothing to commit');
   });
@@ -114,6 +117,7 @@ describe('formatAdoptSessionOutcomeText (V2-T30 item 5)', () => {
       forkSessionId: '22222222-2222-4222-8222-222222222222',
       changedFiles: ['AGENTS.md'],
       reason: 'git commit failed in workspace at "/x": exit 1: hook refused',
+      manifestRestore: { kind: 'unchanged' },
     };
     const text = formatAdoptSessionOutcomeText(result);
     expect(text).toContain('committing them failed');
@@ -129,6 +133,7 @@ describe('formatAdoptSessionOutcomeText (V2-T30 item 5)', () => {
       changedFiles: ['AGENTS.md'],
       alreadyCommittedFiles: [],
       pendingFiles: [],
+      manifestRestore: { kind: 'unchanged' },
     };
     const text = formatAdoptSessionOutcomeText(result);
     expect(text).toBe('Project "auth-hardening": adopted.');
@@ -143,6 +148,7 @@ describe('formatAdoptSessionOutcomeText (V2-T30 item 5)', () => {
       changedFiles: [],
       alreadyCommittedFiles: ['AGENTS.md', 'status/README.md'],
       pendingFiles: [],
+      manifestRestore: { kind: 'unchanged' },
     };
     const text = formatAdoptSessionOutcomeText(result);
     expect(text).toContain('already committed 2 file(s) on its own');
@@ -156,6 +162,7 @@ describe('formatAdoptSessionOutcomeText (V2-T30 item 5)', () => {
       changedFiles: [],
       alreadyCommittedFiles: ['AGENTS.md'],
       pendingFiles: ['status/README.md'],
+      manifestRestore: { kind: 'unchanged' },
     };
     const text = formatAdoptSessionOutcomeText(result);
     expect(text).toBe(
@@ -175,9 +182,17 @@ describe('isAdoptedResult', () => {
         changedFiles: [],
         alreadyCommittedFiles: [],
         pendingFiles: [],
+        manifestRestore: { kind: 'unchanged' },
       }),
     ).toBe(true);
-    expect(isAdoptedResult({ kind: 'noChanges', projectId: 'x', forkSessionId: 'y' })).toBe(false);
+    expect(
+      isAdoptedResult({
+        kind: 'noChanges',
+        projectId: 'x',
+        forkSessionId: 'y',
+        manifestRestore: { kind: 'unchanged' },
+      }),
+    ).toBe(false);
   });
 });
 

@@ -147,10 +147,16 @@ async function finishRemoval(
   // (`undefined` from a plain terminal — never matching `currentSessionId`'s own `undefined` by
   // the guard's session check alone, D-025's "don't guess" cutting the wrong way there);
   // `lockHolder` is how the hook recognizes this exact process instead.
-  await deps.workspace.commitAll(root, projectId, message, {
-    pid: deps.pid,
-    procStart: deps.procStart,
-  });
+  // V2-T73 item 1: `removeProjectDirectory` (just above) deletes `seeya.json` along with the rest
+  // of the project — one of seeya's own four legitimate manifest writes (this one a deletion),
+  // `WorkspaceRepository.commitAll`'s own docstring names all four.
+  await deps.workspace.commitAll(
+    root,
+    projectId,
+    message,
+    { pid: deps.pid, procStart: deps.procStart },
+    true,
+  );
   const removedAdoptions = await dropProjectAdoptions(deps.storage, projectId);
   await releaseProjectLock(deps, root, projectId, deps.pid);
   return { kind: 'removed', projectId, fileCount, previousCommit, removedAdoptions };

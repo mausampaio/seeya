@@ -45,6 +45,7 @@ import {
 } from '@seeya-ai/engine/adapters/workspace/index.js';
 import { PROJECT_LOCK_FILE_NAME } from '@seeya-ai/engine/adapters/workspace/project-lock.js';
 import { readLockHolderProcess } from '@seeya-ai/engine/adapters/workspace/lock-holder-env.js';
+import { readManifestWriteAuthorized } from '@seeya-ai/engine/adapters/workspace/manifest-write-env.js';
 import { buildAppInstallation } from '@seeya-ai/engine/adapters/installation/index.js';
 import { resolveDaemonOwner } from '@seeya-ai/engine/application/daemon-ownership.js';
 import {
@@ -555,6 +556,10 @@ export function buildVerifyCommitDeps(): VerifyCommitDeps {
     // `git commit` this hook is running inside of, only when `seeya` itself made that commit while
     // holding the touched project's own lock.
     currentProcess: readLockHolderProcess(process.env),
+    // V2-T73 item 1: `SEEYA_MANIFEST_WRITE_AUTHORIZED` — set by `adapters/workspace/index.ts
+    // #commitAll` only on the `git commit` this hook is running inside of, when `seeya` itself made
+    // that commit as one of its own four intentional writes to the project's `seeya.json`.
+    manifestWriteAuthorized: readManifestWriteAuthorized(process.env),
   };
 }
 

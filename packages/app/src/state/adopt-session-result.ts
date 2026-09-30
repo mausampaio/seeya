@@ -7,6 +7,7 @@
  */
 import { formatLockHolderDescription } from '@seeya-ai/engine/core/project-lock-message.js';
 import type { AdoptSessionResult } from '@seeya-ai/engine/application/project-adopt.js';
+import { formatManifestRestoreSuffix } from './manifest-restore-suffix.js';
 
 /** Whether `result` is the one case the "Open project" button follows — kept here so
  * `electron/adopt-flow-view.ts` never re-derives the discriminant check on its own (D-041). */
@@ -46,14 +47,18 @@ export function formatAdoptSessionOutcomeText(result: AdoptSessionResult): strin
     case 'noChanges':
       return (
         `Project "${result.projectId}": the session didn't write anything inside the project — ` +
-        'nothing to commit.'
+        `nothing to commit.${formatManifestRestoreSuffix(result.manifestRestore)}`
       );
     case 'declined':
-      return `Project "${result.projectId}": adoption declined — the copy was discarded.`;
+      return (
+        `Project "${result.projectId}": adoption declined — the copy was discarded.` +
+        formatManifestRestoreSuffix(result.manifestRestore)
+      );
     case 'confirmationUnavailable':
       return (
         `seeya: project "${result.projectId}" — the copy wrote changes, but there was no way to ` +
-        'confirm the commit. Nothing was committed or discarded.'
+        'confirm the commit. Nothing was committed or discarded.' +
+        formatManifestRestoreSuffix(result.manifestRestore)
       );
     // V2-T72 item 1: `alreadyCommittedFiles` is non-empty exactly when the copy committed some or
     // all of its own work itself, while it still held the project lock (D-047 item 4) — this
@@ -76,7 +81,7 @@ export function formatAdoptSessionOutcomeText(result: AdoptSessionResult): strin
             'finish them.',
         );
       }
-      return parts.join(' ');
+      return parts.join(' ') + formatManifestRestoreSuffix(result.manifestRestore);
     }
     // V2-T34 production defect (PO review, 2026-09-25): the workspace's own git hook (or any other
     // git failure) refused the commit — the copy's files stay on disk and the fork stays
@@ -87,7 +92,8 @@ export function formatAdoptSessionOutcomeText(result: AdoptSessionResult): strin
       return (
         `seeya: project "${result.projectId}" — the copy wrote changes, but committing them ` +
         `failed (${result.reason}). The files are still on disk; the fork stays registered so a ` +
-        'later attempt to adopt this session again finds it exactly as it was left.'
+        'later attempt to adopt this session again finds it exactly as it was left.' +
+        formatManifestRestoreSuffix(result.manifestRestore)
       );
   }
 }

@@ -24,6 +24,7 @@ function buildDeps(overrides: Partial<VerifyCommitDeps> = {}): VerifyCommitDeps 
     lockFileName: '.seeya-lock',
     currentSessionId: undefined,
     currentProcess: undefined,
+    manifestWriteAuthorized: false,
     ...overrides,
   };
 }
@@ -137,6 +138,39 @@ describe('verifyCommit', () => {
     const commitMessageFile = new FakeCommitMessageFile();
     commitMessageFile.setContent(MESSAGE_FILE, 'Update gitignore');
     const deps = buildDeps({ workspace, projectLock, commitMessageFile });
+
+    const result = await verifyCommit(deps, ROOT, MESSAGE_FILE);
+
+    expect(result).toEqual({ kind: 'allowed' });
+  });
+
+  // V2-T73 item 1: `manifestWriteAuthorized` threaded from `VerifyCommitDeps` all the way to
+  // `decideCommitGuard` — the forbidden case (a session staging seeya.json) and the permitted one
+  // (marked as one of seeya's own manifest writes), at this layer.
+  it('refuses a commit that stages seeya.json when this VerifyCommitDeps is not manifest-write-authorized', async () => {
+    const workspace = new FakeWorkspaceRepository();
+    workspace.setStagedFiles(['auth-hardening/seeya.json']);
+    const commitMessageFile = new FakeCommitMessageFile();
+    commitMessageFile.setContent(MESSAGE_FILE, 'Fix the broken repositories field');
+    const deps = buildDeps({ workspace, commitMessageFile, currentSessionId: 'session-a' });
+
+    const result = await verifyCommit(deps, ROOT, MESSAGE_FILE);
+
+    expect(result.kind).toBe('refused');
+    expect(result.kind === 'refused' && result.reason).toContain('auth-hardening/seeya.json');
+  });
+
+  it('allows a commit that stages seeya.json when this VerifyCommitDeps IS manifest-write-authorized', async () => {
+    const workspace = new FakeWorkspaceRepository();
+    workspace.setStagedFiles(['auth-hardening/seeya.json']);
+    const commitMessageFile = new FakeCommitMessageFile();
+    commitMessageFile.setContent(MESSAGE_FILE, 'Add repository app-api to project auth-hardening');
+    const deps = buildDeps({
+      workspace,
+      commitMessageFile,
+      currentSessionId: undefined,
+      manifestWriteAuthorized: true,
+    });
 
     const result = await verifyCommit(deps, ROOT, MESSAGE_FILE);
 

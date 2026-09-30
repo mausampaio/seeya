@@ -546,6 +546,13 @@ já os tinha fixado e tem precedência.
 Variável de ambiente interna: `SEEYA_DAEMON_CHILD` (S4-T3) distingue o lançador do worker do
 daemon. Atravessa um `spawn`, nunca vai para disco, e ninguém digita.
 
+Variável de ambiente interna: `SEEYA_MANIFEST_WRITE_AUTHORIZED` (V2-T73 item 1, mesmo padrão de
+`SEEYA_LOCK_HOLDER_PID`) marca, no `git commit` que o próprio seeya lança, que ESTE commit é uma
+das escritas intencionais do seeya no `seeya.json` do projeto (`create`, `add-repo`, `remove-repo`,
+`remove`) — nunca presente num commit que só passa a segurar o lock do projeto por outro motivo
+(a sobra do `open`, o commit da adoção), já que nenhum desses dois jamais deveria tocar o
+manifesto. Atravessa um `spawn`, nunca vai para disco, e ninguém digita.
+
 Variáveis de ambiente só de instrumentação de verificação (`packages/app/src/electron/main.ts`,
 V2-T2, V2-T4, V2-T5a, V2-T5b, V2-T14, V2-T17): `SEEYA_APP_OFFSCREEN`, `SEEYA_APP_SCREENSHOT_PATH`, `SEEYA_APP_QUIT_AFTER_MS`,
 `SEEYA_APP_AUTO_OPEN_SHELL_TAB`, `SEEYA_APP_HOME_OVERRIDE`, `SEEYA_APP_AUTO_RESUME_ALL` (V2-T4:

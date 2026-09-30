@@ -9,6 +9,7 @@ import type {
   Clock,
   DirectoryExistence,
   HarnessLauncher,
+  ManifestRestoreOutcome,
   ProcessControl,
   ProjectAuditMarker,
   ProjectLock,
@@ -151,6 +152,12 @@ export interface OpenProjectCallbacks {
      * already-versioned one untouched — `cli/format-project.ts#formatClaudeMdLines` is the one
      * consumer, printing a line only for `skippedVersioned` (item 2: "avisa numa linha"). */
     readonly claudeMd: ClaudeMdInstallOutcome;
+    /** V2-T73 item 2: what `restoreProjectManifestIfChanged` found and did to `seeya.json` BEFORE
+     * this `open` ever read the manifest — computed even earlier than every other field here (right
+     * after `root` is resolved, before `readProjectManifest`, so an invalid on-disk file is fixed
+     * before that call would otherwise throw), reported here alongside the rest of the pre-launch
+     * warnings. */
+    readonly manifestRestore: ManifestRestoreOutcome;
   }) => void;
   /** `undefined` behaves exactly like `'unavailable'` (D-025: never silently proceed without an
    * explicit yes) — every production caller (`cli/project-command.ts`) always supplies one; a test
@@ -428,6 +435,12 @@ export async function openProject(
     return { kind: 'invalidId', projectId };
   }
   const root = await resolveWorkspaceRoot(deps.storage, deps.seeyaHome);
+  // V2-T73 item 2: restored BEFORE the manifest is ever read — a `seeya.json` a session left
+  // invalid on disk (item 1 guarantees it was never committed that way) would otherwise make
+  // `readProjectManifest` throw right below, well before `openProject` has any chance to report
+  // anything. Cheap and harmless for a `projectId` that doesn't correspond to a real project at
+  // all: nothing tracked at that path in `HEAD` means nothing to restore.
+  const manifestRestore = await deps.workspace.restoreProjectManifestIfChanged(root, projectId);
   const manifest = await deps.workspace.readProjectManifest(root, projectId);
   if (manifest === null) {
     return { kind: 'notFound', projectId };
@@ -472,7 +485,7 @@ export async function openProject(
 
   const { addDirs, missing } = await resolveRepositoryDirs(deps, projectId, manifest.repositories);
   const lock = await acquireOpenLock(deps, root, projectId);
-  callbacks?.onBeforeLaunch?.({ missing, lock, audit, claudeMd });
+  callbacks?.onBeforeLaunch?.({ missing, lock, audit, claudeMd, manifestRestore });
 
   // V2-T34 production defect (PO review, 2026-09-25): a `finally` around everything from here on,
   // on top of (not instead of) the explicit releases below — `handleLeftoverChanges`'s own

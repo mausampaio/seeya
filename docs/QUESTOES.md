@@ -9237,3 +9237,25 @@ estruturalmente neste arquivo decidir o recorte. B) despachar uma tarefa pequena
 `format-project.ts` por comando, sem mudar texto nenhum.
 
 **Resposta:** (preenchida pelo PO)
+
+## Q-101 — V2-T73: `packages/engine/src/adapters/workspace/index.ts` já estava acima do teto de 500 linhas
+
+**Bloqueia:** não — registro, não pedido de decisão urgente.
+
+**Contexto.** Mesmo precedente da Q-100. Antes desta tarefa `adapters/workspace/index.ts` já tinha
+543 linhas (acima do teto de ~500 de `AGENTS.md` § "Funções e arquivos"). O item 1 (a variável de
+ambiente/parâmetro `manifestWriteAuthorized` em `commitAll`) e o item 2 (o método
+`restoreProjectManifestIfChanged`) tocam este arquivo — segui o mesmo recorte que `revert.ts`/
+`audit.ts` já estabelecem para este arquivo (mecânica de git pesada num módulo à parte,
+`adapters/workspace/manifest-restore.ts`, com o método de `FsWorkspaceRepository` reduzido a um
+delegate de uma linha, igual `findSessionCommits`/`listCommitsForAudit`), o que manteve o
+crescimento mínimo — mesmo assim foram 543 → 562 linhas (o parâmetro novo de `commitAll`, a troca
+do literal `'seeya.json'` pela constante `PROJECT_MANIFEST_FILE_NAME` e o delegate em si). Não
+recortei o arquivo inteiro por responsabilidade (fora do escopo desta tarefa, como a Q-100 já
+argumenta para `format-project.ts`).
+
+**Opções que enxergo:** as mesmas da Q-100 — A) deixar como está, registrado aqui. B) despachar uma
+tarefa pequena para recortar `adapters/workspace/index.ts` por responsabilidade (manifesto/commit/
+hooks/lock), sem mudar comportamento.
+
+**Resposta:** (preenchida pelo PO)
