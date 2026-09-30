@@ -9259,3 +9259,34 @@ tarefa pequena para recortar `adapters/workspace/index.ts` por responsabilidade 
 hooks/lock), sem mudar comportamento.
 
 **Resposta:** (preenchida pelo PO)
+
+## Q-102 — V2-T75: nove componentes de `ui/` migraram de lugar sem CSS module/teste renderizado
+
+**Bloqueia:** não — registro, não pedido de decisão urgente.
+
+**Contexto.** A tarefa pede "cada um com CSS module, teste e `index.ts`" para o design system
+inicial. Os nove componentes da V2-T62 sem chamador de produção ainda (`Checkbox`, `Dialog`,
+`EmptyState`, `InfoBox`, `SegmentedControl`, `Select`, `Switch`, `TableRow`, `TextField` —
+confirmado por grep: nenhum é importado fora da própria suíte de teste da V2-T62) migraram para
+`renderer/components/<Nome>/` (pasta própria, `index.ts` novo), mas mantiveram a implementação e o
+teste antigos (classes globais de `renderer/legacy/components.css`, teste por inspeção de vnode em
+vez de renderização real) — só `Icon`, `Button` e `Dialog` (este último só pela migração de pasta,
+sem reescrita) tinham chamador real (`app-shell.tsx`/futuro `dialogs-shell.tsx`) e por isso
+receberam tratamento completo onde precisavam.
+
+**Por que não converti os nove agora.** D-052 lista explicitamente as primitivas/componentes que
+ESTA tarefa entrega (`Stack`, `Grid`, `Surface`, `Button`, `IconButton`, `Chip`, `NavItem`,
+`Section`, `Icon`) — os outros nove pertencem a telas futuras (Settings, Today, Projects, Sessions,
+V2-T64 em diante) que ainda vão decidir a forma exata de cada um contra a tela real; reescrever a
+CSS/teste de um componente sem chamador agora arrisca refazer o trabalho quando a tela chegar, e
+alargaria esta tarefa além do que a lateral precisa. Deixei `renderer/legacy/components.css`
+(as classes `seeya-field*`/`seeya-checkbox`/`seeya-switch`/`seeya-segmented-control`/
+`seeya-dialog`/`seeya-table-row`/`seeya-info-box`/`seeya-empty-state`) intocado para esses nove,
+removendo só `.seeya-button*`/`.seeya-status-pill*` (confirmado sem uso algum, nem legado).
+
+**Opções que enxergo:** A) aceitar como está — cada região futura converte seu próprio componente
+para CSS module + teste renderizado quando chegar a vez dela (a leitura que segui). B) abrir uma
+tarefa pequena, só de conversão mecânica (CSS module + teste renderizado, sem mudar a API), antes
+das tarefas de região começarem.
+
+**Resposta:** (preenchida pelo PO)
