@@ -4,7 +4,7 @@ title: 'V2-T63 — Lateral nova: favoritos, recentes, contador e daemon'
 status: Review
 assignee: []
 created_date: '2026-09-30 10:33'
-updated_date: '2026-09-30 17:58'
+updated_date: '2026-09-30 18:06'
 labels: []
 milestone: m-2
 dependencies:
@@ -127,5 +127,11 @@ author: PO
 created: 2026-09-30 17:02
 ---
 Refinamento do PO em 2026-09-30, antes do despacho: as abas Projects e Sessions (V2-T67/V2-T68) ainda não existem. Nesta tarefa, 'All projects' e 'Sessions' já abrem ABAS de página (o mecanismo de aba de página entra aqui, reusável pelo Today na V2-T66), e o conteúdo delas é o que a lateral mostra hoje (lista de projetos com Open; Other sessions por diretório + busca por id), sem redesenho — o redesenho em tabela é da V2-T67/V2-T68. Assim nada some da janela. O painel de status em texto sai; o que ele mostrava de útil já está no rodapé (agenda, daemon) — o resto, se faltar, vira questão. Inclui o achado da V2-T62: anel de foco visível no botão de recolher ao abrir a janela. 'Recent' é derivado de evidência (D-025) — o agente justifica a fonte da última atividade de cada projeto.
+---
+
+author: PO
+created: 2026-09-30 18:06
+---
+Revisão do PO em 2026-09-30: mesclado, portão verde (2999 testes) e também sem identidade global do git (rodado pelo PO). Conferido: lateral da seção 1 com Today, Favorites (favorite-projects.json por máquina, glossário antes do código), Recent derivado da última atividade das sessões do projeto (sem evidência, fora — D-025), All projects/Sessions abrindo abas de página com o conteúdo atual (redesenho na V2-T67/V2-T68), rodapé com agenda, Snooze, Skip today, End day e pílula do daemon; autostart continua no rodapé até a V2-T65. Desempenho medido em A/B na mesma sessão, sem custo. Resto pequeno anotado: main.ts ainda calcula statusUpdate sem ouvinte (entra na V2-T51). Falta o aceite do mantenedor com o instalador.
 ---
 <!-- COMMENTS:END -->
