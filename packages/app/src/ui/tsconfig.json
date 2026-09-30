@@ -1,0 +1,22 @@
+{
+  // V2-T62 (D-051): a leaf `tsconfig.json` (the name typescript-eslint's `projectService` walks
+  // up looking for — a file named anything else is invisible to it, measured directly: naming
+  // this `tsconfig.app-ui.json` at the repo root produced "was not found by the project service"
+  // for every file under `ui/**`) — DOM lib plus the JSX compiler options this directory's `.tsx`
+  // components need, which the root `tsconfig.json` deliberately does not carry (that file's own
+  // comment: DOM leaking into every engine/cli file for no reason any of them needs). Also the
+  // explicit `tsc -p packages/app/src/ui/tsconfig.json --noEmit` step `npm run verificar` runs.
+  //
+  // `packages/app/tsconfig.json` (the package-level program `tsc -b` already uses for the whole
+  // package, including this directory) ALSO carries these two settings — this file exists for the
+  // tools that walk up from a file to its NEAREST `tsconfig.json` (ESLint) or that need a narrow,
+  // explicit `-p` target (this file's own `tsc --noEmit` step), not to replace the package build.
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact"
+  },
+  "include": ["**/*.ts", "**/*.tsx"]
+}

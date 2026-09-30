@@ -248,6 +248,10 @@ export const MESSAGES = {
       "The embedded terminal's CSS font-family stack — a change here needs seeya relaunched to show.",
     terminalFontSize:
       "The embedded terminal's font size, in pixels — a change here needs seeya relaunched to show.",
+    // V2-T62 (D-051): unlike the two font fields above, this one takes effect live — "system"
+    // follows the OS's own light/dark switch without a relaunch (electron/main.ts's own
+    // `nativeTheme` subscription).
+    theme: 'Colour theme: "system" follows the OS, or pin "light"/"dark". Applies immediately.',
   } as Record<string, string>,
 
   // V2-T30 — the "Projects" section, its dialogs, and the sidebar's collapse toggle.

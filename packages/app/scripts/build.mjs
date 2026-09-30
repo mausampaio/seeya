@@ -63,7 +63,11 @@ async function bundle() {
   });
 
   // renderer: the browser context (loaded by index.html as `<script type="module">`) — bundled
-  // for the browser, nothing external, so @xterm/xterm and @xterm/addon-fit ship inline.
+  // for the browser, nothing external, so @xterm/xterm, @xterm/addon-fit and preact ship inline.
+  // V2-T62 (D-051): `jsx: 'automatic'`/`jsxImportSource: 'preact'` compiles `.tsx` through
+  // `preact/jsx-runtime`, never `preact/compat` (D-051's own "sem a camada de compatibilidade com
+  // React") — the same setting `tsconfig.json` and the root `vitest.config.ts` repeat for `tsc -b`
+  // and the unit tests, so all three tools agree on what a bare `<div/>` compiles to.
   await esbuild.build({
     entryPoints: [path.join(srcElectron, 'renderer.ts')],
     outfile: path.join(outElectron, 'renderer.js'),
@@ -71,10 +75,20 @@ async function bundle() {
     platform: 'browser',
     format: 'esm',
     target: 'chrome120',
+    jsx: 'automatic',
+    jsxImportSource: 'preact',
   });
 
   cpSync(path.join(srcElectron, 'index.html'), path.join(outElectron, 'index.html'));
   cpSync(path.join(srcElectron, 'index.css'), path.join(outElectron, 'index.css'));
+  // V2-T62 (D-051): the design tokens (both themes, spacing, radius, shadow, motion) — a separate
+  // file from index.css so the two responsibilities (values vs. how they're applied) stay apart,
+  // same split design/IDENTIDADE_VISUAL.md § 5.4 already documents as its own fenced block.
+  cpSync(path.join(srcElectron, 'tokens.css'), path.join(outElectron, 'tokens.css'));
+  // V2-T62 (D-051): baseline styles for `src/ui/`'s own components — see that file's own comment
+  // for why it's separate from both `tokens.css` (values only) and `index.css` (the current
+  // screens' own layout, untouched by this task).
+  cpSync(path.join(srcElectron, 'components.css'), path.join(outElectron, 'components.css'));
   // V2-T3: the embedded Nerd Font (`assets/fonts/`, packaged alongside its own SIL OFL 1.1
   // license file) — index.css's own @font-face rule loads it by this same relative path,
   // `fonts/<file>`, next to index.html in dist/electron/.

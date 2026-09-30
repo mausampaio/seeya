@@ -36,6 +36,7 @@ function config(overrides: Partial<Config> = {}): Config {
     leadTimeHysteresisMinutes: 3,
     terminalFontFamily: "'FiraCode Nerd Font Mono', 'FiraCode Nerd Font', 'Fira Code', monospace",
     terminalFontSize: 14,
+    theme: 'system',
     ...overrides,
   };
 }
@@ -101,6 +102,12 @@ describe('runConfigGetCommand', () => {
       "terminalFontFamily: 'Cascadia Code', monospace",
     );
     expect(await runConfigGetCommand({ storage }, 'terminalFontSize')).toBe('terminalFontSize: 16');
+  });
+
+  // V2-T62 (D-051): "theme" reads like any other scalar key too.
+  it('"theme" reads like any other scalar key', async () => {
+    const storage = new InMemoryScheduleStorage(config({ theme: 'dark' }));
+    expect(await runConfigGetCommand({ storage }, 'theme')).toBe('theme: dark');
   });
 });
 
@@ -234,6 +241,21 @@ describe('runConfigSetCommand', () => {
     const storage = new InMemoryScheduleStorage(config());
     const message = await runConfigSetCommand({ storage }, 'terminalFontSize', '0');
     expect(message).toContain('terminalFontSize');
+    expect(storage.savedConfigs).toHaveLength(0);
+  });
+
+  // V2-T62 (D-051): "theme" sets like any other scalar field.
+  it('sets theme to a valid value', async () => {
+    const storage = new InMemoryScheduleStorage(config());
+    const message = await runConfigSetCommand({ storage }, 'theme', 'light');
+    expect(message).toBe('theme set to light.');
+    expect(storage.savedConfigs[0]?.theme).toBe('light');
+  });
+
+  it('refuses a made-up theme name', async () => {
+    const storage = new InMemoryScheduleStorage(config());
+    const message = await runConfigSetCommand({ storage }, 'theme', 'solarized');
+    expect(message).toContain('theme');
     expect(storage.savedConfigs).toHaveLength(0);
   });
 });

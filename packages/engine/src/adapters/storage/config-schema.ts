@@ -14,7 +14,7 @@
  * silent default).
  */
 import { z } from 'zod';
-import type { Config, ProjectPolicy } from '../../core/types.js';
+import type { Config, ProjectPolicy, ThemePreference } from '../../core/types.js';
 import { normalizeCwdForComparison, type PathPlatformHint } from '../../core/cwd-normalization.js';
 
 /** Read once, same pattern `adapters/git/git-adapter.ts`/`application/eligibility-assembly.ts`
@@ -132,6 +132,10 @@ const configFileSchema = z.object({
   // fractional fontSize, and refusing one here would be a constraint this project invented, not one
   // xterm.js or CSS actually has).
   terminalFontSize: z.number().positive().optional(),
+  // V2-T62 (D-051): exactly the three values `core/types.ts#ThemePreference` allows — a fourth
+  // spelling in a hand-edited config.json is corruption, not absence (this module's own docstring),
+  // so it fails validation for the whole file rather than silently falling back to a default.
+  theme: z.enum(['system', 'light', 'dark']).optional(),
 });
 
 /**
@@ -186,6 +190,9 @@ const CONFIG_DEFAULTS: Config = {
   // terminal default) — not a measurement, there is no "correct" size to derive from anything the
   // machine reports (this field's own docstring in `core/types.ts`).
   terminalFontSize: 14,
+  // V2-T62 (D-051): `docs/INTERFACE.md`'s own "Dados novos em disco" fixes `'system'` as the
+  // default before this field existed in code.
+  theme: 'system',
 };
 
 /** `parseConfigDocument({})` — every field at its default. Exported so callers (the adapter, on a
@@ -251,6 +258,7 @@ export const EDITABLE_CONFIG_KEYS = [
   'leadTimeHysteresisMinutes',
   'terminalFontFamily',
   'terminalFontSize',
+  'theme',
 ] as const;
 
 export type EditableConfigKey = (typeof EDITABLE_CONFIG_KEYS)[number];
@@ -351,6 +359,7 @@ function coerceRawConfigValue(key: EditableConfigKey, raw: string): unknown {
       return splitCommaList(raw);
     case 'captureModel':
     case 'terminalFontFamily':
+    case 'theme':
       return raw;
     // Every remaining editable key is a bare number (int or float, `configFileSchema`'s own
     // per-field constraint decides which) — relevanceHours, idleMinutes, budgetPerSessionUsd,
@@ -443,6 +452,8 @@ export function applyConfigFieldUpdate(
       return { ...current, terminalFontFamily: value as string };
     case 'terminalFontSize':
       return { ...current, terminalFontSize: value as number };
+    case 'theme':
+      return { ...current, theme: value as ThemePreference };
   }
 }
 
@@ -558,6 +569,7 @@ export function serializeConfigDocument(config: Config): Record<string, unknown>
     leadTimeHysteresisMinutes: config.leadTimeHysteresisMinutes,
     terminalFontFamily: config.terminalFontFamily,
     terminalFontSize: config.terminalFontSize,
+    theme: config.theme,
   };
 }
 
@@ -589,5 +601,6 @@ export function parseConfigDocument(raw: unknown): Config {
       fields.leadTimeHysteresisMinutes ?? CONFIG_DEFAULTS.leadTimeHysteresisMinutes,
     terminalFontFamily: fields.terminalFontFamily ?? CONFIG_DEFAULTS.terminalFontFamily,
     terminalFontSize: fields.terminalFontSize ?? CONFIG_DEFAULTS.terminalFontSize,
+    theme: fields.theme ?? CONFIG_DEFAULTS.theme,
   };
 }

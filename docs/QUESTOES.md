@@ -9170,3 +9170,33 @@ id quando tem só hexadecimal e hífen, com pelo menos dois caracteres — e a p
 quando a resolução por nome não achou nada. O erro possível é gastar uma busca a mais num nome que
 por acaso parece hexadecimal (`cafe`), nunca escolher a sessão errada: prefixo ambíguo continua
 listando as candidatas.
+
+## Q-099 — V2-T62: memória em repouso subiu 30–60 MiB contra a linha de base de outro dia
+
+**O que foi medido (2026-09-30, mesma máquina de `docs/DESEMPENHO.md`).** Depois da fundação da
+interface em Preact (tokens, fontes Geist empacotadas, esqueleto da janela, D-051):
+`measure-idle.mjs` leu 364,5–397,6 MiB de memória em repouso, contra 335,6–338,0 MiB na linha de
+base de 2026-09-20 — 30 a 60 MiB a mais. (a) tempo até a lista e (c) CPU parado ficaram dentro da
+faixa já registrada, ou melhores; só (b) subiu.
+
+**Por que não decidi sozinho se é regressão.** `docs/QUESTOES.md` Q-096 (V2-T30, praticamente o
+mesmo formato de pergunta) já tem a lição escrita: "piora só se afirma com A/B na mesma sessão" —
+comparar contra uma linha de base de outro dia mistura a mudança de código com o estado da máquina
+naquele dia (a própria linha de base de 2026-09-20 registra a máquina com pouca memória livre por
+outros motivos). Esta tarefa não tinha como reconstruir o `main` de antes da migração e medir os
+dois lados na mesma sessão sem uma segunda worktree/checkout — decisão fora do que a tarefa
+autorizava sozinha (D-051 fala em medir antes/depois, não em como construir o "antes" quando a
+tarefa já está feita). A memória livre da máquina no momento desta medição (~3,3 GB de ~15,9 GB)
+é parecida com a da linha de base (2–3 GB), o que pesa contra "só falta de memória livre" como
+explicação única, mas não prova regressão nenhuma sozinho.
+
+**O que descartei como causa provável, sem medir a fundo:** os arquivos novos são pequenos (cinco
+fontes .woff2 de ~45–50 KiB cada, um runtime Preact de poucos KB no bundle, quatorze `<dialog>`
+que já existiam antes como HTML estático e agora são os mesmos elementos gerados por Preact) — nada
+ali parece grande o bastante para render 30–60 MiB sozinho, mas isto é uma impressão, não uma
+medição.
+
+**Pedido:** um A/B de verdade — `main` (antes) contra esta branch (depois), medidos na mesma sessão,
+mesma máquina, mesmo `measure-idle.mjs` — antes de decidir se isto é custo real (e, se for, o que
+custou) ou ruído. `docs/DESEMPENHO.md` já tem os dois números lado a lado, sem reescrever a linha
+de base de 2026-09-20.

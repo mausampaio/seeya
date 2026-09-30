@@ -371,6 +371,16 @@ const ENGINE_ALIAS_DEPS_INLINE = { server: { deps: { inline: ['@seeya-ai/engine'
 
 export default defineConfig({
   ...ENGINE_ALIAS,
+  // V2-T62 (D-051): NO `esbuild: { jsx, jsxImportSource }` here — measured, not assumed. This
+  // Vite version (8) transforms `.ts`/`.tsx` through `oxc` by default, not `esbuild`; setting
+  // `esbuild.jsx*` here is silently ignored (`oxc options will be used and esbuild options will
+  // be ignored`, printed at test-run time) and `oxc`'s own options type explicitly excludes a
+  // `tsconfig` override — it resolves each file's OWN nearest `tsconfig.json` for JSX settings
+  // instead, the same walk-up `tsc`/typescript-eslint's `projectService` already do. Every `.tsx`
+  // in this repo already sits under a tsconfig that sets `"jsx": "react-jsx"` and
+  // `"jsxImportSource": "preact"` (`packages/app/tsconfig.json` for `src/ui/**`,
+  // `tsconfig.app-ui.json` for the same directory's own tests) — confirmed by running a component
+  // test with NO vitest-level JSX config at all and reading the correct Preact vnode back.
   test: {
     ...ENGINE_ALIAS_DEPS_INLINE,
     passWithNoTests: true,
@@ -387,6 +397,10 @@ export default defineConfig({
         'packages/engine/src/**/*.ts',
         'packages/cli/src/**/*.ts',
         'packages/app/src/**/*.ts',
+        // V2-T62 (D-051): the Preact base components (`src/ui/**`) and the window skeleton
+        // (`src/electron/app-shell.tsx` and its sub-components) — the `.ts` glob above never
+        // matches `.tsx`.
+        'packages/app/src/**/*.tsx',
       ],
       exclude:
         process.platform === 'win32'

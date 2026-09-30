@@ -26,7 +26,7 @@
     "audit-report": "node scripts/audit-report.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "verificar": "npm run format:check && tsc -p tsconfig.json --noEmit && npm run lint && npm run build && npm run dependencias && npm run cobertura",
+    "verificar": "npm run format:check && tsc -p tsconfig.json --noEmit && tsc -p packages/app/src/ui/tsconfig.json --noEmit && tsc -p tests/unit/app/ui/tsconfig.json --noEmit && npm run lint && npm run build && npm run dependencias && npm run cobertura",
     "verificar:linux": "node scripts/verificar-linux.mjs",
     "prepare": "husky"
   },

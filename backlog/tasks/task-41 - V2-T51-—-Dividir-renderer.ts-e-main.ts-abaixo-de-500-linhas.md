@@ -4,7 +4,7 @@ title: V2-T51 — Dividir renderer.ts e main.ts abaixo de 500 linhas
 status: To Do
 assignee: []
 created_date: '2026-09-25 03:41'
-updated_date: '2026-09-30 10:34'
+updated_date: '2026-09-30 12:13'
 labels: []
 milestone: m-2
 dependencies: []
@@ -47,5 +47,11 @@ author: PO
 created: 2026-09-30 10:34
 ---
 2026-09-30: absorvida pela V2-T62 (fundação da interface em Preact, D-051) — dividir renderer.ts acontece na troca de camada. Fechar junto com a V2-T62.
+---
+
+author: Dev (V2-T62)
+created: 2026-09-30 12:13
+---
+V2-T62 dividiu electron/renderer.ts (1407 -> 74 linhas, 10 modulos por regiao). electron/main.ts NAO foi dividido -- fora do escopo explicito do despacho da V2-T62, que so absorveu renderer.ts. Falta decidir se abre tarefa nova so para main.ts (1346 linhas).
 ---
 <!-- COMMENTS:END -->

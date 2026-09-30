@@ -181,6 +181,37 @@ describe('parseConfigDocument — terminalFontFamily/terminalFontSize (V2-T3, D-
   });
 });
 
+describe('parseConfigDocument — theme (V2-T62, D-051)', () => {
+  it('defaults to "system" when the document says nothing about it', () => {
+    expect(parseConfigDocument({}).theme).toBe('system');
+    expect(DEFAULT_CONFIG.theme).toBe('system');
+  });
+
+  it('honors each of the three explicit values', () => {
+    expect(parseConfigDocument({ theme: 'light' }).theme).toBe('light');
+    expect(parseConfigDocument({ theme: 'dark' }).theme).toBe('dark');
+    expect(parseConfigDocument({ theme: 'system' }).theme).toBe('system');
+  });
+
+  it('rejects a made-up theme name (AGENTS.md: corruption, not absence, fails the whole file)', () => {
+    expect(() => parseConfigDocument({ theme: 'solarized' })).toThrow();
+  });
+
+  // A pre-V2-T62 config.json never mentions "theme" at all — the same "old document, new
+  // optional field" shape every other additive field in this schema already tolerates (no
+  // schemaVersion bump needed, this module's own docstring).
+  it('a document missing "theme" entirely (pre-V2-T62 config.json) still resolves the rest', () => {
+    const result = parseConfigDocument({ relevanceHours: 6 });
+    expect(result.theme).toBe('system');
+    expect(result.relevanceHours).toBe(6);
+  });
+
+  it('serializeConfigDocument round-trips theme like every other scalar field', () => {
+    const config = parseConfigDocument({ theme: 'dark' });
+    expect(serializeConfigDocument(config).theme).toBe('dark');
+  });
+});
+
 describe('isEditableConfigKey / unknownConfigKeyMessage (S4-T4)', () => {
   it('accepts every key in EDITABLE_CONFIG_KEYS and rejects projectPolicy plus a made-up key', () => {
     for (const key of EDITABLE_CONFIG_KEYS) {

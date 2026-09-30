@@ -13,6 +13,7 @@ import type { DaemonControlAvailability } from '../state/daemon-control-panel.js
 import type { AutostartControlAvailability } from '../state/autostart-control-panel.js';
 import type { SettingsRow, ProjectPolicyLine } from '../state/settings-panel.js';
 import type { ProjectPanelOtherSessionRow, ProjectsPanelData } from '../state/projects-panel.js';
+import type { EffectiveTheme } from '../theme/resolve-theme.js';
 
 export const CHANNELS = {
   /** Renderer → main: open a new tab. */
@@ -190,6 +191,20 @@ export const CHANNELS = {
    * (`electron/session-search-ipc.ts`'s own docstring); only fires when the person submits the
    * form. */
   findSessionById: 'seeya:find-session-by-id',
+  /** Renderer → main: the window's effective theme, fetched once at startup, before the first
+   * `new Terminal({...})` is constructed (same "invoke, not send" round trip as
+   * `getTerminalFontConfig`, for the identical reason: the renderer needs a value back before it
+   * can build anything). Unlike `getTerminalFontConfig`, this one DOES have a live counterpart —
+   * `themeUpdate` below — because "system" (V2-T62, D-051) has to react to the OS changing, not
+   * just to a relaunch. */
+  getEffectiveTheme: 'seeya:get-effective-theme',
+  /** Main → renderer, pushed whenever the resolved theme changes (V2-T62, D-051) —
+   * `electron/main.ts`'s own `nativeTheme.on('updated', ...)` subscription, re-resolved against
+   * `Config.theme` (read fresh each time, never cached — the same "storage.readConfig() at the
+   * moment it's needed" precedent `getSettingsPanel` already set) and sent only when the EFFECTIVE
+   * theme actually changed, so a pinned `'light'`/`'dark'` preference never triggers a needless
+   * repaint just because the OS itself changed. */
+  themeUpdate: 'seeya:theme-update',
 } as const;
 
 export interface CreateTabRequest {
@@ -246,6 +261,13 @@ export interface StatusUpdateEvent {
 
 /** `getTerminalFontConfig`'s response — the exact shape `state/terminal-font.ts` produces. */
 export type TerminalFontConfigResponse = TerminalFontOptions;
+
+/** `CHANNELS.getEffectiveTheme`'s response AND `CHANNELS.themeUpdate`'s payload (V2-T62, D-051) —
+ * the same shape either way, so the renderer applies the two through one function
+ * (`electron/theme-view.ts#applyEffectiveTheme`) regardless of which one delivered it. */
+export interface ThemeUpdateEvent {
+  readonly effectiveTheme: EffectiveTheme;
+}
 
 /** `CHANNELS.confirmFallbackRequest`'s payload — the exact shape
  * `resume/fallback-confirmer.ts#FallbackConfirmRequestPayload` produces (re-declared here rather
