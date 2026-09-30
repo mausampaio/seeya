@@ -307,7 +307,25 @@ export interface Config {
    * measurement — there is no "correct" size to derive from anything the machine reports).
    */
   readonly terminalFontSize: number;
+  /**
+   * The interface's colour theme (V2-T62, D-051; `docs/INTERFACE.md` § "Dados novos em disco").
+   * `'system'` follows the operating system's own light/dark preference live (Electron's
+   * `nativeTheme`, `packages/app/src/electron/main.ts`) — the interface never needs a relaunch to
+   * pick up an OS-level change. `'light'`/`'dark'` pin the theme regardless of what the OS reports.
+   * The embedded terminal (xterm) follows the SAME resolved theme (`state/terminal-theme.ts`), so
+   * there is no independent "dark terminal on a light theme" combination to configure separately.
+   * The on-screen control (a `Theme` field in Settings) is a later tarefa (`docs/INTERFACE.md`
+   * item 4) — this field is the mechanism the CLI (`seeya config set theme ...`) and the app share.
+   */
+  readonly theme: ThemePreference;
 }
+
+/**
+ * `Config.theme`'s three values (V2-T62, D-051). A union of exactly these three, never a bare
+ * `string` (D-024): an invalid theme name is a config error caught by zod at the boundary
+ * (`adapters/storage/config-schema.ts`), not a value this type could ever carry past that point.
+ */
+export type ThemePreference = 'system' | 'light' | 'dark';
 
 /**
  * "Already warned" bookkeeping for S1-T7's early-warning detection (`core/early-warnings.ts`) —

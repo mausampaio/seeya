@@ -44,6 +44,7 @@ function config(overrides: Partial<Config> = {}): Config {
     leadTimeHysteresisMinutes: 3,
     terminalFontFamily: "'FiraCode Nerd Font Mono', 'FiraCode Nerd Font', 'Fira Code', monospace",
     terminalFontSize: 14,
+    theme: 'system',
     ...overrides,
   };
 }
