@@ -4,7 +4,7 @@ title: V2-T73 — O seeya.json só muda pelo seeya
 status: Review
 assignee: []
 created_date: '2026-09-30 13:34'
-updated_date: '2026-09-30 16:08'
+updated_date: '2026-09-30 16:17'
 labels: []
 milestone: m-0
 dependencies:
@@ -170,3 +170,13 @@ processo filho real (não precisam de harness); o aceite do mantenedor
 ("pedir a uma sessão aberta num projeto que edite o seeya.json e commite" /
 "editar à mão sem commitar e reabrir o projeto") ainda precisa ser confirmado por ele.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-30 16:17
+---
+Revisão do PO em 2026-09-30: mesclado, portão verde (2969 testes) e também sem identidade global do git (rodado pelo PO; recusado ao agente, que reportou sem contornar). Conferido: os quatro fluxos que gravam o seeya.json (create, add-repo, remove-repo, remove) passam a marca SEEYA_MANIFEST_WRITE_AUTHORIZED; a sobra do open e o commit da adoção nunca passam — recusados como qualquer sessão; recusa vale mesmo para quem segura o lock (gancho real, processo filho vivo). Restauração no início do open (antes da leitura que lançaria num arquivo inválido) e no fim da adoção, com aviso na CLI e na janela; casos alterado/inválido/apagado/staged testados com git real. Limite registrado: --no-verify na adoção vira a nova linha de base; a auditoria acusa. Q-101 (adapters/workspace/index.ts acima de 500 linhas) junta-se à Q-100 para uma tarefa de divisão. Falta o aceite do mantenedor.
+---
+<!-- COMMENTS:END -->
