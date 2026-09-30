@@ -74,7 +74,9 @@ async function persistNewRepository(
     projectId,
     deps.sessionId,
   );
-  await deps.workspace.commitAll(root, projectId, message);
+  // V2-T73 item 1: this commit's OWN write to `seeya.json` (just above) is one of seeya's own four
+  // legitimate manifest writes — `WorkspaceRepository.commitAll`'s own docstring names all four.
+  await deps.workspace.commitAll(root, projectId, message, undefined, true);
 
   const map = await deps.storage.readRepositoryMap();
   const mapEntry =

@@ -72,6 +72,7 @@ import {
   type ProjectWithDirectory,
 } from '../state/projects-panel.js';
 import { formatProjectOpenOutcomeText } from '../state/project-open-result.js';
+import { formatManifestRestoreSuffix } from '../state/manifest-restore-suffix.js';
 import {
   formatAdoptSessionOutcomeText,
   formatSessionNotDiscoverableText,
@@ -198,7 +199,14 @@ export function wireProjectIpc(
         label: request.projectId,
       });
       const deps = buildProjectOpenDeps(context, processIdentity, launcher, randomUUID());
+      // V2-T73 item 2: `openProject` only ever reports `manifestRestore` through this callback
+      // (the same pre-launch channel the CLI already prints through) — captured here so the
+      // window's own single "how it ended" text can mention it too, never silently.
+      let manifestRestoreSuffix = '';
       const result = await openProject(deps, request.projectId, SUPPORTED_HARNESS, {
+        onBeforeLaunch: ({ manifestRestore }) => {
+          manifestRestoreSuffix = formatManifestRestoreSuffix(manifestRestore);
+        },
         confirmReadOnlyOpen: async (heldBy) => {
           const { requestId, answer } = pendingLockConfirmations.create();
           const event: ConfirmProjectLockOpenRequestEvent = {
@@ -221,7 +229,7 @@ export function wireProjectIpc(
         },
       });
       await pushProjectsUpdate();
-      return { outcomeText: formatProjectOpenOutcomeText(result) };
+      return { outcomeText: formatProjectOpenOutcomeText(result) + manifestRestoreSuffix };
     },
   );
 

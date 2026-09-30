@@ -1196,12 +1196,24 @@ export interface WorkspaceRepository {
    * hook can authorize it without a matching `CLAUDE_CODE_SESSION_ID` — `core/
    * workspace-commit-guard.ts`'s own docstring has the full reasoning for why session id alone
    * can't. `undefined` for `createProject`/`addRepository`, which never take a lock at all.
+   *
+   * `manifestWriteAuthorized` (V2-T73 item 1): `true` for `seeya`'s own four legitimate writes to
+   * the touched project's `seeya.json` (`createProject`, `addRepository`, `removeRepository`,
+   * `removeProject` — the last one via the whole project directory's own deletion) — folded into
+   * the spawned `git commit`'s own environment (`adapters/workspace/manifest-write-env.ts
+   * #buildManifestWriteEnv`) so the workspace's own commit-msg hook can tell those apart from every
+   * OTHER commit that happens to touch a project while holding its lock (`open`'s own
+   * leftover-changes commit, an adoption's commit) — `core/workspace-commit-guard.ts`'s own new
+   * check refuses any of THOSE that stages `seeya.json`, session-authored edit or not. Omitted (or
+   * `false`) behaves exactly like `undefined` — every caller that never intentionally rewrites the
+   * manifest leaves this out.
    */
   commitAll(
     root: string,
     projectId: string,
     message: string,
     lockHolder?: LockHolderProcess,
+    manifestWriteAuthorized?: boolean,
   ): Promise<void>;
 
   /**
@@ -1379,7 +1391,35 @@ export interface WorkspaceRepository {
    * interface's other methods already follow.
    */
   installGeneratedClaudeMd(root: string, projectId: string, content: string): Promise<void>;
+
+  /**
+   * V2-T73 item 2: restores `<projectId>/seeya.json` to its own last committed content whenever the
+   * working tree disagrees with it, and reports which of the three outcomes happened
+   * (`ManifestRestoreOutcome`, below) — the mechanism behind "restauração do que ficou sem commit"
+   * (item 1 already guarantees nothing a session writes to this path can ever land in a commit, so
+   * the only way it can differ from `HEAD` is exactly that: an uncommitted edit, deletion, or an
+   * invalid rewrite left behind). Called at the START of every `application/project-open.ts
+   * #openProject` (before `readProjectManifest`, so an invalid on-disk file is fixed before that
+   * call would otherwise throw) and at the END of every `application/project-adopt.ts#adoptSession`
+   * (after the fork's own harness closes, before `finishAdoption` reads what changed — so a
+   * dirtied-but-never-committed manifest never shows up as something to ask the person about).
+   */
+  restoreProjectManifestIfChanged(root: string, projectId: string): Promise<ManifestRestoreOutcome>;
 }
+
+/**
+ * `WorkspaceRepository.restoreProjectManifestIfChanged`'s own outcome (V2-T73 item 2) — a
+ * discriminated union, not a boolean (D-024): `restored` carries `diffSummary` (`git diff --stat`'s
+ * own short text against `HEAD`) so a caller can report exactly what was discarded, never silently
+ * ("sem silêncio," the task's own words). `noCommittedVersion` is D-025's "least specific true
+ * statement" for a workspace whose `HEAD` doesn't resolve at all yet — unreachable for an EXISTING
+ * project in practice (`createProject` always commits the manifest before returning), but never
+ * collapsed into `unchanged` just because that's the more common case.
+ */
+export type ManifestRestoreOutcome =
+  | { readonly kind: 'unchanged' }
+  | { readonly kind: 'restored'; readonly diffSummary: string }
+  | { readonly kind: 'noCommittedVersion' };
 
 /**
  * `WorkspaceRepository.findSessionCommits`/`findCommitsAfter`'s own return shape (V2-T32) — one

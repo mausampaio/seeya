@@ -141,10 +141,15 @@ async function writeManifestWithoutRepository(
   );
   // V2-T34 hotfix (PO review, 2026-09-25): same lock-holder authorization `project-remove.ts
   // #finishRemoval` already needs, for the identical reason.
-  await deps.workspace.commitAll(root, projectId, message, {
-    pid: deps.pid,
-    procStart: deps.procStart,
-  });
+  // V2-T73 item 1: this commit's OWN write to `seeya.json` (just above) is one of seeya's own four
+  // legitimate manifest writes — `WorkspaceRepository.commitAll`'s own docstring names all four.
+  await deps.workspace.commitAll(
+    root,
+    projectId,
+    message,
+    { pid: deps.pid, procStart: deps.procStart },
+    true,
+  );
 }
 
 /**

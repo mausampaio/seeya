@@ -712,6 +712,7 @@ describe('runProjectVerifyCommitCommand (V2-T34 item 1)', () => {
       lockFileName: '.seeya-lock',
       currentSessionId: undefined,
       currentProcess: undefined,
+      manifestWriteAuthorized: false,
       ...overrides,
     };
   }

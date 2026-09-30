@@ -35,6 +35,7 @@ import type {
   ProjectAuditReport,
 } from '@seeya-ai/engine/application/project-audit.js';
 import type { CommitEscapeReason } from '@seeya-ai/engine/core/project-audit.js';
+import { formatManifestRestoreLines } from './format-manifest-restore.js';
 
 export { formatProjectLockWarningLines };
 
@@ -468,6 +469,18 @@ function formatAdoptedChangedFiles(changedFiles: readonly string[]): string {
   return changedFiles.map((file) => `  ${file}`).join('\n');
 }
 
+/** V2-T73 item 2: appended to every `AdoptSessionResult` case that reaches
+ * `application/project-adopt-outcome.ts#finishAdoption` (the only ones carrying
+ * `manifestRestore`) — `''` when nothing was restored, so the ordinary case reads exactly like
+ * before this task. */
+function appendManifestRestoreLines(
+  text: string,
+  manifestRestore: Extract<AdoptSessionResult, { readonly kind: 'noChanges' }>['manifestRestore'],
+): string {
+  const lines = formatManifestRestoreLines(manifestRestore);
+  return lines.length === 0 ? text : `${text}\n${lines.join('\n')}`;
+}
+
 export function formatAdoptSessionReport(result: AdoptSessionResult): string {
   switch (result.kind) {
     case 'invalidId':
@@ -495,22 +508,25 @@ export function formatAdoptSessionReport(result: AdoptSessionResult): string {
     case 'failedToStart':
       return `seeya: could not start claude to adopt session into project "${result.projectId}".`;
     case 'noChanges':
-      return (
+      return appendManifestRestoreLines(
         `Project "${result.projectId}": the session (fork ${result.forkSessionId}) didn't write ` +
-        'anything inside the project — nothing to commit, nothing kept.'
+          'anything inside the project — nothing to commit, nothing kept.',
+        result.manifestRestore,
       );
     case 'declined':
-      return (
+      return appendManifestRestoreLines(
         `Project "${result.projectId}": adoption declined — the fork (${result.forkSessionId}) ` +
-        `was discarded and nothing was committed. It had written:\n` +
-        formatAdoptedChangedFiles(result.changedFiles)
+          `was discarded and nothing was committed. It had written:\n` +
+          formatAdoptedChangedFiles(result.changedFiles),
+        result.manifestRestore,
       );
     case 'confirmationUnavailable':
-      return (
+      return appendManifestRestoreLines(
         `seeya: project "${result.projectId}" — the fork (${result.forkSessionId}) wrote changes, ` +
-        'but there was no interactive terminal to confirm the commit. Nothing was committed or ' +
-        'discarded; run "seeya project adopt" again from a real terminal to decide. It had ' +
-        `written:\n${formatAdoptedChangedFiles(result.changedFiles)}`
+          'but there was no interactive terminal to confirm the commit. Nothing was committed or ' +
+          'discarded; run "seeya project adopt" again from a real terminal to decide. It had ' +
+          `written:\n${formatAdoptedChangedFiles(result.changedFiles)}`,
+        result.manifestRestore,
       );
     // Item 9: repeats the same follow-up the launch confirmation already offered — the person saw
     // it once before the harness took the terminal; this is the reminder for when they're looking
@@ -547,7 +563,7 @@ export function formatAdoptSessionReport(result: AdoptSessionResult): string {
         );
       }
       sections.push(`Continue the work with: seeya project open ${result.projectId}`);
-      return sections.join('\n');
+      return appendManifestRestoreLines(sections.join('\n'), result.manifestRestore);
     }
     // V2-T34 production defect (PO review, 2026-09-25): the commit itself failed (most often the
     // workspace's own git hook refusing it) — `result.reason` carries git's own stderr
@@ -556,10 +572,11 @@ export function formatAdoptSessionReport(result: AdoptSessionResult): string {
     // on disk, exactly like `confirmationUnavailable` above — a later "seeya project adopt" on the
     // same original session finds the fork exactly as it was left.
     case 'commitFailed':
-      return (
+      return appendManifestRestoreLines(
         `seeya: project "${result.projectId}" — the fork (${result.forkSessionId}) wrote changes, ` +
-        `but committing them failed: ${result.reason}\nNothing was discarded — the fork is still ` +
-        `registered, and it had written:\n${formatAdoptedChangedFiles(result.changedFiles)}`
+          `but committing them failed: ${result.reason}\nNothing was discarded — the fork is ` +
+          `still registered, and it had written:\n${formatAdoptedChangedFiles(result.changedFiles)}`,
+        result.manifestRestore,
       );
   }
 }

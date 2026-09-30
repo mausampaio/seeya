@@ -14,6 +14,7 @@ import type {
   HandoffGenerator,
   HarnessLauncher,
   HarnessOpenResult,
+  ManifestRestoreOutcome,
   ProcessControl,
   ProjectAuditMarker,
   ProjectLock,
@@ -567,16 +568,21 @@ export class FakeWorkspaceRepository implements WorkspaceRepository {
   // actually thread their own `deps.pid`/`deps.procStart` through, not just that SOME commit
   // happened.
   readonly commitAllLockHolders: (LockHolderProcess | undefined)[] = [];
+  // V2-T73 item 1: records each call's `manifestWriteAuthorized` so a test can assert exactly
+  // which callers mark themselves as one of seeya's own four legitimate manifest writes.
+  readonly commitAllManifestWriteAuthorized: (boolean | undefined)[] = [];
 
   commitAll(
     root: string,
     projectId: string,
     message: string,
     lockHolder?: LockHolderProcess,
+    manifestWriteAuthorized?: boolean,
   ): Promise<void> {
     void root;
     void projectId;
     this.commitAllLockHolders.push(lockHolder);
+    this.commitAllManifestWriteAuthorized.push(manifestWriteAuthorized);
     if (this.commitFailureMessage !== null) {
       const reason = this.commitFailureMessage;
       this.commitFailureMessage = null;
@@ -584,6 +590,25 @@ export class FakeWorkspaceRepository implements WorkspaceRepository {
     }
     this.commitMessages.push(message);
     return Promise.resolve();
+  }
+
+  // V2-T73 item 2: a test sets this to simulate `restoreProjectManifestIfChanged`'s own three
+  // outcomes — `'unchanged'` (the default, matching a manifest a session never touched) unless a
+  // test calls `setManifestRestoreOutcome` first.
+  private manifestRestoreOutcome: ManifestRestoreOutcome = { kind: 'unchanged' };
+  readonly restoreProjectManifestCalls: { readonly root: string; readonly projectId: string }[] =
+    [];
+
+  setManifestRestoreOutcome(outcome: ManifestRestoreOutcome): void {
+    this.manifestRestoreOutcome = outcome;
+  }
+
+  restoreProjectManifestIfChanged(
+    root: string,
+    projectId: string,
+  ): Promise<ManifestRestoreOutcome> {
+    this.restoreProjectManifestCalls.push({ root, projectId });
+    return Promise.resolve(this.manifestRestoreOutcome);
   }
 
   listProjects(

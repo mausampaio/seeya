@@ -33,6 +33,7 @@ import { decideBashCommandGuard } from '@seeya-ai/engine/core/harness-hook-confi
 import { parseBashCommandFromHookPayload } from '@seeya-ai/engine/adapters/harness/bash-command-hook-payload-schema.js';
 import type { SessionIdLookup } from '@seeya-ai/engine/core/ports.js';
 import { resolveSessionReferenceForAdoption } from './session-reference.js';
+import { formatManifestRestoreLines } from './format-manifest-restore.js';
 import type { ProjectContext } from './composition.js';
 import {
   formatAddRepoReport,
@@ -185,8 +186,9 @@ export async function runProjectOpenCommand(
   let result;
   try {
     result = await openProject(deps, projectId, harness, {
-      onBeforeLaunch: ({ missing, lock, audit, claudeMd }) => {
+      onBeforeLaunch: ({ missing, lock, audit, claudeMd, manifestRestore }) => {
         const lines = [
+          ...formatManifestRestoreLines(manifestRestore),
           ...formatAuditLines(audit),
           ...formatClaudeMdLines(projectId, claudeMd),
           ...formatMissingRepositoryLines(projectId, missing),

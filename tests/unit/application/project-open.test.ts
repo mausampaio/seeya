@@ -17,6 +17,7 @@ import type { ProjectLockInfo } from '@seeya-ai/engine/core/project-lock.js';
 import { buildProjectWorkingRulesText } from '@seeya-ai/engine/core/project-working-rules.js';
 import type { ProjectAuditReport } from '@seeya-ai/engine/application/project-audit.js';
 import type { ClaudeMdInstallOutcome } from '@seeya-ai/engine/application/claude-md-bridge.js';
+import type { ManifestRestoreOutcome } from '@seeya-ai/engine/core/ports.js';
 import {
   ControllableProcessControl,
   DEFAULT_TEST_CONFIG,
@@ -588,6 +589,57 @@ describe('openProject', () => {
         },
       });
       expect(captured.audit?.escaped).toEqual([]);
+    });
+  });
+
+  describe('V2-T73 item 2: seeya.json restored before the manifest is ever read', () => {
+    it('reports "unchanged" via onBeforeLaunch when nothing had to be restored (the ordinary case)', async () => {
+      const captured: { manifestRestore: ManifestRestoreOutcome | null } = {
+        manifestRestore: null,
+      };
+      const result = await openProject(
+        buildOpenDeps(storage, workspace),
+        'auth-hardening',
+        'claude',
+        {
+          onBeforeLaunch: ({ manifestRestore }) => {
+            captured.manifestRestore = manifestRestore;
+          },
+        },
+      );
+      expect(result.kind).toBe('opened');
+      expect(captured.manifestRestore).toEqual({ kind: 'unchanged' });
+    });
+
+    it('reports a real restore via onBeforeLaunch, and reads the manifest AFTER the restore already ran', async () => {
+      workspace.setManifestRestoreOutcome({
+        kind: 'restored',
+        diffSummary: 'auth-hardening/seeya.json | 2 +-',
+      });
+      const captured: { manifestRestore: ManifestRestoreOutcome | null } = {
+        manifestRestore: null,
+      };
+      const result = await openProject(
+        buildOpenDeps(storage, workspace),
+        'auth-hardening',
+        'claude',
+        {
+          onBeforeLaunch: ({ manifestRestore }) => {
+            captured.manifestRestore = manifestRestore;
+          },
+        },
+      );
+      expect(result.kind).toBe('opened');
+      expect(captured.manifestRestore).toEqual({
+        kind: 'restored',
+        diffSummary: 'auth-hardening/seeya.json | 2 +-',
+      });
+      // The restore ran for the SAME project this `open` targets, and it ran (`restoreProjectManifestCalls`
+      // is non-empty) BEFORE `readProjectManifest` would otherwise have thrown on an invalid file —
+      // `result.kind === 'opened'` above already proves the manifest was readable afterward.
+      expect(workspace.restoreProjectManifestCalls).toEqual([
+        { root: WORKSPACE_ROOT, projectId: 'auth-hardening' },
+      ]);
     });
   });
 

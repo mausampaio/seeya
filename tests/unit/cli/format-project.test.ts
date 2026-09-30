@@ -524,6 +524,7 @@ describe('formatAdoptSessionReport', () => {
       kind: 'noChanges',
       projectId: 'auth-hardening',
       forkSessionId: '22222222-2222-4222-8222-222222222222',
+      manifestRestore: { kind: 'unchanged' },
     });
     expect(text).toContain('"auth-hardening"');
     expect(text).toContain('22222222-2222-4222-8222-222222222222');
@@ -536,6 +537,7 @@ describe('formatAdoptSessionReport', () => {
       projectId: 'auth-hardening',
       forkSessionId: '22222222-2222-4222-8222-222222222222',
       changedFiles: ['auth-hardening/AGENTS.md'],
+      manifestRestore: { kind: 'unchanged' },
     });
     expect(text).toContain('declined');
     expect(text).toContain('discarded');
@@ -548,6 +550,7 @@ describe('formatAdoptSessionReport', () => {
       projectId: 'auth-hardening',
       forkSessionId: '22222222-2222-4222-8222-222222222222',
       changedFiles: ['auth-hardening/status/README.md'],
+      manifestRestore: { kind: 'unchanged' },
     });
     expect(text).toContain('no interactive terminal');
     expect(text).toContain('Nothing was committed or discarded');
@@ -562,6 +565,7 @@ describe('formatAdoptSessionReport', () => {
       changedFiles: ['auth-hardening/AGENTS.md', 'auth-hardening/context/know-how.md'],
       alreadyCommittedFiles: [],
       pendingFiles: [],
+      manifestRestore: { kind: 'unchanged' },
     });
     expect(text).toContain('adopted');
     expect(text).toContain("project's own session");
@@ -579,6 +583,7 @@ describe('formatAdoptSessionReport', () => {
       changedFiles: [],
       alreadyCommittedFiles: ['auth-hardening/AGENTS.md'],
       pendingFiles: [],
+      manifestRestore: { kind: 'unchanged' },
     });
     expect(text).toContain('already committed this itself');
     expect(text).toContain('auth-hardening/AGENTS.md');
@@ -594,6 +599,7 @@ describe('formatAdoptSessionReport', () => {
       alreadyCommittedFiles: ['auth-hardening/AGENTS.md'],
       pendingFiles: ['auth-hardening/status/README.md'],
       pendingCommitFailedReason: 'git commit failed in workspace at "/x": exit 1: hook refused',
+      manifestRestore: { kind: 'unchanged' },
     });
     expect(text).toContain('adopted');
     expect(text).toContain('Still uncommitted (committing them failed: git commit failed');
@@ -607,6 +613,7 @@ describe('formatAdoptSessionReport', () => {
       forkSessionId: '22222222-2222-4222-8222-222222222222',
       changedFiles: ['auth-hardening/AGENTS.md'],
       reason: 'git commit failed in workspace at "/x": exit 1: hook refused',
+      manifestRestore: { kind: 'unchanged' },
     });
     expect(text).toContain('committing them failed');
     expect(text).toContain('hook refused');

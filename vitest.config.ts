@@ -172,6 +172,9 @@ const REAL_CHILD_PROCESS_GIT_AND_STORAGE_FILES = [
   // V2-T27: same real-`git` shape, through `createProject` end to end (item 4's own boundary
   // test) rather than through `FsWorkspaceRepository` directly.
   'tests/integration/application/workspace-boundary.test.ts',
+  // V2-T73: same real-`git`-per-test shape as `fs-workspace-repository.test.ts` above (`diff`,
+  // `checkout`, `status` per case) — added here preemptively, same reasoning.
+  'tests/integration/workspace/manifest-restore.test.ts',
 ];
 
 /**

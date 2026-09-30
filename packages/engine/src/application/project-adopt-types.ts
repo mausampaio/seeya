@@ -12,6 +12,7 @@ import type {
   Clock,
   ForkCleanup,
   ForkRegistration,
+  ManifestRestoreOutcome,
   ProcessControl,
   ProjectLock,
   SessionAdoptionLauncher,
@@ -119,12 +120,18 @@ export type AdoptSessionResult =
   /** Nothing was written inside the project — nothing to show, nothing to confirm. Same cleanup as
    * an explicit decline (the fork is discarded, nothing stays registered), reported distinctly so
    * the person can tell "you said no" apart from "there was nothing to say yes to". */
-  | { readonly kind: 'noChanges'; readonly projectId: string; readonly forkSessionId: string }
+  | {
+      readonly kind: 'noChanges';
+      readonly projectId: string;
+      readonly forkSessionId: string;
+      readonly manifestRestore: ManifestRestoreOutcome;
+    }
   | {
       readonly kind: 'declined';
       readonly projectId: string;
       readonly forkSessionId: string;
       readonly changedFiles: readonly string[];
+      readonly manifestRestore: ManifestRestoreOutcome;
     }
   /** No way to ask (no interactive terminal) — unlike `declined`, nothing is deleted and nothing is
    * committed: the fork stays registered (hidden, as any capture fork would be) and the written
@@ -136,11 +143,17 @@ export type AdoptSessionResult =
       readonly projectId: string;
       readonly forkSessionId: string;
       readonly changedFiles: readonly string[];
+      readonly manifestRestore: ManifestRestoreOutcome;
     }
   | {
       readonly kind: 'adopted';
       readonly projectId: string;
       readonly forkSessionId: string;
+      /** V2-T73 item 2: what `restoreProjectManifestIfChanged` found and did to `seeya.json`,
+       * computed right after the fork's own harness closed — BEFORE this call ever read what
+       * changed, so a manifest the fork left dirty (item 1 guarantees it was never committed that
+       * way) never shows up in `changedFiles`/`alreadyCommittedFiles` below. */
+      readonly manifestRestore: ManifestRestoreOutcome;
       /** Files committed by THIS call's own `commitAdoption` — empty when there was nothing left
        * for seeya to commit itself (V2-T72 item 1: either the copy left nothing pending, or what
        * it left pending stayed uncommitted, see `pendingFiles` below). */
@@ -184,4 +197,5 @@ export type AdoptSessionResult =
       readonly forkSessionId: string;
       readonly changedFiles: readonly string[];
       readonly reason: string;
+      readonly manifestRestore: ManifestRestoreOutcome;
     };

@@ -6,7 +6,7 @@
  * `adoptSession` itself (still in `project-adopt.ts`) only calls `finishAdoption` — everything in
  * here is a private implementation detail of that one call.
  */
-import type { RevertCommitInfo } from '../core/ports.js';
+import type { ManifestRestoreOutcome, RevertCommitInfo } from '../core/ports.js';
 import { buildProjectCommitMessage } from '../core/project-commit.js';
 import type {
   AdoptSessionCallbacks,
@@ -50,6 +50,7 @@ async function registerAdoption(
   changedFiles: readonly string[],
   alreadyCommittedFiles: readonly string[],
   pendingFiles: readonly string[],
+  manifestRestore: ManifestRestoreOutcome,
   now: Date,
   pendingCommitFailedReason?: string,
 ): Promise<AdoptSessionResult> {
@@ -68,6 +69,7 @@ async function registerAdoption(
     changedFiles,
     alreadyCommittedFiles,
     pendingFiles,
+    manifestRestore,
     ...(pendingCommitFailedReason === undefined ? {} : { pendingCommitFailedReason }),
   };
 }
@@ -91,6 +93,7 @@ async function commitAdoption(
   originalSessionId: string,
   changedFiles: readonly string[],
   alreadyCommittedFiles: readonly string[],
+  manifestRestore: ManifestRestoreOutcome,
   now: Date,
 ): Promise<AdoptSessionResult> {
   const message = buildProjectCommitMessage(
@@ -123,6 +126,7 @@ async function commitAdoption(
         [],
         alreadyCommittedFiles,
         changedFiles,
+        manifestRestore,
         now,
         reason,
       );
@@ -133,6 +137,7 @@ async function commitAdoption(
       forkSessionId: deps.forkSessionId,
       changedFiles,
       reason,
+      manifestRestore,
     };
   }
   return registerAdoption(
@@ -142,6 +147,7 @@ async function commitAdoption(
     changedFiles,
     alreadyCommittedFiles,
     [],
+    manifestRestore,
     now,
   );
 }
@@ -180,6 +186,7 @@ async function decideAdoptionOutcome(
   originalSessionId: string,
   changedFiles: readonly string[],
   alreadyCommittedFiles: readonly string[],
+  manifestRestore: ManifestRestoreOutcome,
   callbacks: AdoptSessionCallbacks | undefined,
 ): Promise<AdoptSessionResult> {
   const hasPriorCommits = alreadyCommittedFiles.length > 0;
@@ -187,9 +194,18 @@ async function decideAdoptionOutcome(
   if (changedFiles.length === 0) {
     if (!hasPriorCommits) {
       await discardFork(deps);
-      return { kind: 'noChanges', projectId, forkSessionId: deps.forkSessionId };
+      return { kind: 'noChanges', projectId, forkSessionId: deps.forkSessionId, manifestRestore };
     }
-    return registerAdoption(deps, projectId, originalSessionId, [], alreadyCommittedFiles, [], now);
+    return registerAdoption(
+      deps,
+      projectId,
+      originalSessionId,
+      [],
+      alreadyCommittedFiles,
+      [],
+      manifestRestore,
+      now,
+    );
   }
   const answer = await confirmCommit(callbacks, changedFiles);
   if (answer === 'commit') {
@@ -200,19 +216,27 @@ async function decideAdoptionOutcome(
       originalSessionId,
       changedFiles,
       alreadyCommittedFiles,
+      manifestRestore,
       now,
     );
   }
   if (!hasPriorCommits) {
     if (answer === 'decline') {
       await discardFork(deps);
-      return { kind: 'declined', projectId, forkSessionId: deps.forkSessionId, changedFiles };
+      return {
+        kind: 'declined',
+        projectId,
+        forkSessionId: deps.forkSessionId,
+        changedFiles,
+        manifestRestore,
+      };
     }
     return {
       kind: 'confirmationUnavailable',
       projectId,
       forkSessionId: deps.forkSessionId,
       changedFiles,
+      manifestRestore,
     };
   }
   // The copy already left commits behind — declining (or having no terminal to ask through)
@@ -224,16 +248,19 @@ async function decideAdoptionOutcome(
     [],
     alreadyCommittedFiles,
     changedFiles,
+    manifestRestore,
     now,
   );
 }
 
-/** The tail of `adoptSession`, after the fork's interactive harness has already closed: reads what
- * changed inside the project (`listChangedFiles`) AND what the copy already committed on its own
- * while it held the lock (`findSessionCommits` against its own `forkSessionId`, V2-T72 item 1),
- * then decides the outcome (item 4). Lock release is no longer done here — `adoptSession`'s own
- * `finally` is the single place that happens now, so it also covers a throw from THIS function's
- * own calls, not just their normal return. */
+/** The tail of `adoptSession`, after the fork's interactive harness has already closed: restores
+ * `seeya.json` first (V2-T73 item 2 — before anything below ever reads what changed, so a manifest
+ * the fork left dirty, but item 1 guaranteed was never committed, never shows up as something to
+ * ask the person about), then reads what changed inside the project (`listChangedFiles`) AND what
+ * the copy already committed on its own while it held the lock (`findSessionCommits` against its
+ * own `forkSessionId`, V2-T72 item 1), then decides the outcome (item 4). Lock release is no longer
+ * done here — `adoptSession`'s own `finally` is the single place that happens now, so it also
+ * covers a throw from THIS function's own calls, not just their normal return. */
 export async function finishAdoption(
   deps: AdoptSessionDeps,
   root: string,
@@ -241,6 +268,7 @@ export async function finishAdoption(
   originalSessionId: string,
   callbacks: AdoptSessionCallbacks | undefined,
 ): Promise<AdoptSessionResult> {
+  const manifestRestore = await deps.workspace.restoreProjectManifestIfChanged(root, projectId);
   const changedFiles = await deps.workspace.listChangedFiles(root, projectId);
   const priorCommits = await deps.workspace.findSessionCommits(root, projectId, deps.forkSessionId);
   const alreadyCommittedFiles = uniqueCommittedFiles(priorCommits);
@@ -251,6 +279,7 @@ export async function finishAdoption(
     originalSessionId,
     changedFiles,
     alreadyCommittedFiles,
+    manifestRestore,
     callbacks,
   );
 }

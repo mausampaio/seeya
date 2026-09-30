@@ -381,6 +381,7 @@ describe('adoptSession', () => {
       kind: 'noChanges',
       projectId: 'auth-hardening',
       forkSessionId: FORK_SESSION_ID,
+      manifestRestore: { kind: 'unchanged' },
     });
     expect(forkCleanup.deletedSessionIds).toEqual([FORK_SESSION_ID]);
     expect(forkRegistration.isRegistered(FORK_SESSION_ID)).toBe(false);
@@ -417,6 +418,7 @@ describe('adoptSession', () => {
       projectId: 'auth-hardening',
       forkSessionId: FORK_SESSION_ID,
       changedFiles: ['auth-hardening/context/know-how.md'],
+      manifestRestore: { kind: 'unchanged' },
     });
     expect(forkCleanup.deletedSessionIds).toEqual([FORK_SESSION_ID]);
     expect(forkRegistration.isRegistered(FORK_SESSION_ID)).toBe(false);
@@ -456,6 +458,7 @@ describe('adoptSession', () => {
       projectId: 'auth-hardening',
       forkSessionId: FORK_SESSION_ID,
       changedFiles: ['auth-hardening/status/README.md'],
+      manifestRestore: { kind: 'unchanged' },
     });
     expect(forkCleanup.deletedSessionIds).toEqual([]);
     expect(forkRegistration.isRegistered(FORK_SESSION_ID)).toBe(true);
@@ -499,6 +502,7 @@ describe('adoptSession', () => {
       changedFiles: ['auth-hardening/AGENTS.md', 'auth-hardening/context/know-how.md'],
       alreadyCommittedFiles: [],
       pendingFiles: [],
+      manifestRestore: { kind: 'unchanged' },
     });
     const lastCommit = workspace.commitMessages.at(-1);
     expect(lastCommit).toContain(`Seeya-Session-Id: ${FORK_SESSION_ID}`);
@@ -568,6 +572,7 @@ describe('adoptSession', () => {
         changedFiles: [],
         alreadyCommittedFiles: ['auth-hardening/AGENTS.md', 'auth-hardening/INDEX.md'],
         pendingFiles: [],
+        manifestRestore: { kind: 'unchanged' },
       });
       // The regression: the fork's transcript is never deleted once it left a commit behind.
       expect(forkCleanup.deletedSessionIds).toEqual([]);
@@ -625,6 +630,7 @@ describe('adoptSession', () => {
         changedFiles: [],
         alreadyCommittedFiles: ['auth-hardening/AGENTS.md'],
         pendingFiles: ['auth-hardening/status/README.md'],
+        manifestRestore: { kind: 'unchanged' },
       });
       // Declining the follow-up no longer discards the fork once it already left a commit behind.
       expect(forkCleanup.deletedSessionIds).toEqual([]);
@@ -672,6 +678,7 @@ describe('adoptSession', () => {
         changedFiles: ['auth-hardening/status/README.md'],
         alreadyCommittedFiles: ['auth-hardening/AGENTS.md'],
         pendingFiles: [],
+        manifestRestore: { kind: 'unchanged' },
       });
       expect(forkCleanup.deletedSessionIds).toEqual([]);
       const lastCommit = workspace.commitMessages.at(-1);
@@ -753,6 +760,7 @@ describe('adoptSession', () => {
         kind: 'noChanges',
         projectId: 'auth-hardening',
         forkSessionId: FORK_SESSION_ID,
+        manifestRestore: { kind: 'unchanged' },
       });
       expect(forkCleanup.deletedSessionIds).toEqual([FORK_SESSION_ID]);
       expect(forkRegistration.isRegistered(FORK_SESSION_ID)).toBe(false);
@@ -807,6 +815,47 @@ describe('adoptSession', () => {
       expect(await storage.readAdoptions()).toEqual([]);
       // The lock this attempt took is released even though commitAll threw.
       expect(await projectLock.read(WORKSPACE_ROOT, 'auth-hardening')).toBeNull();
+    });
+  });
+
+  describe('V2-T73 item 2: seeya.json restored right after the fork closes, before anything is read', () => {
+    it('reports "unchanged" on the adopted result when nothing had to be restored (the ordinary case)', async () => {
+      const storage = new InMemoryDeviceStorage(DEFAULT_TEST_CONFIG);
+      const workspace = new FakeWorkspaceRepository();
+      workspace.setChangedFiles('auth-hardening', ['auth-hardening/AGENTS.md']);
+
+      const result = await adoptSession(
+        buildAdoptDeps(storage, workspace),
+        ORIGINAL_ENDED,
+        'auth-hardening',
+        buildCallbacks({ confirmCommit: () => Promise.resolve('commit') }),
+      );
+
+      expect(result).toMatchObject({ kind: 'adopted', manifestRestore: { kind: 'unchanged' } });
+    });
+
+    it('reports a real restore on the adopted result, and restores for the RIGHT project', async () => {
+      const storage = new InMemoryDeviceStorage(DEFAULT_TEST_CONFIG);
+      const workspace = new FakeWorkspaceRepository();
+      workspace.setManifestRestoreOutcome({
+        kind: 'restored',
+        diffSummary: 'auth-hardening/seeya.json | 4 +++-',
+      });
+
+      const result = await adoptSession(
+        buildAdoptDeps(storage, workspace),
+        ORIGINAL_ENDED,
+        'auth-hardening',
+        buildCallbacks(),
+      );
+
+      expect(result).toMatchObject({
+        kind: 'noChanges',
+        manifestRestore: { kind: 'restored', diffSummary: 'auth-hardening/seeya.json | 4 +++-' },
+      });
+      expect(workspace.restoreProjectManifestCalls).toEqual([
+        { root: WORKSPACE_ROOT, projectId: 'auth-hardening' },
+      ]);
     });
   });
 });

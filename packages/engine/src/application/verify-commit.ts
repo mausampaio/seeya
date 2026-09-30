@@ -34,6 +34,10 @@ export interface VerifyCommitDeps {
    * docstring on why session id alone can never authorize a commit `seeya` makes while holding the
    * touched project's own lock. */
   readonly currentProcess: LockHolderProcess | undefined;
+  /** V2-T73 item 1: `SEEYA_MANIFEST_WRITE_AUTHORIZED`
+   * (`adapters/workspace/manifest-write-env.ts#readManifestWriteAuthorized`), read once at the
+   * composition root the same way `currentProcess` above already is. */
+  readonly manifestWriteAuthorized: boolean;
 }
 
 export type VerifyCommitResult =
@@ -89,6 +93,7 @@ export async function verifyCommit(
     rawMessage,
     currentSessionId: deps.currentSessionId,
     currentProcess: deps.currentProcess,
+    manifestWriteAuthorized: deps.manifestWriteAuthorized,
     lock,
     lockFileName: deps.lockFileName,
   });

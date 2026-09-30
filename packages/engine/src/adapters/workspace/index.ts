@@ -12,6 +12,7 @@
 import { chmod, mkdir, readdir, readFile, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import type {
+  ManifestRestoreOutcome,
   RejectedDiscoveryRecord,
   RevertCommitInfo,
   RevertExecutionOutcome,
@@ -20,8 +21,10 @@ import type {
 import type { AuditableCommit } from '../../core/project-audit.js';
 import type { ProjectManifest, ProjectSkeleton } from '../../core/types.js';
 import type { LockHolderProcess } from '../../core/lock-holder-process.js';
+import { PROJECT_MANIFEST_FILE_NAME } from '../../core/project-manifest-ownership.js';
 import { runGit } from '../git/run-git.js';
 import { buildLockHolderEnv } from './lock-holder-env.js';
+import { buildManifestWriteEnv } from './manifest-write-env.js';
 import { writeFileAtomic } from '../storage/atomic-write.js';
 import { resolveSchemaVersion } from '../storage/schema-version.js';
 import { isEnoent } from './fs-errors.js';
@@ -35,6 +38,7 @@ import { PROJECT_AUDIT_FILE_NAME } from './project-audit-marker.js';
 import { COMMIT_MSG_HOOK_FILE_NAME } from '../../core/workspace-hooks.js';
 import { findCommitsAfter, findSessionCommits, revertCommitSequence } from './revert.js';
 import { listCommitsForAudit as listCommitsForAuditImpl } from './audit.js';
+import { restoreProjectManifestIfChanged as restoreProjectManifestIfChangedImpl } from './manifest-restore.js';
 
 export { FsProjectLock } from './project-lock.js';
 export { FsProjectAuditMarker } from './project-audit-marker.js';
@@ -62,7 +66,7 @@ const COMMIT_IDENTITY_ENV: NodeJS.ProcessEnv = {
 };
 
 function manifestPath(root: string, projectId: string): string {
-  return path.join(root, projectId, 'seeya.json');
+  return path.join(root, projectId, PROJECT_MANIFEST_FILE_NAME);
 }
 
 const GITIGNORE_FILE_NAME = '.gitignore';
@@ -289,6 +293,7 @@ export class FsWorkspaceRepository implements WorkspaceRepository {
     projectId: string,
     message: string,
     lockHolder?: LockHolderProcess,
+    manifestWriteAuthorized?: boolean,
   ): Promise<void> {
     // D-047 item 3's own bug fix: `git add <projectId> .gitignore`, never `-A` — a second
     // project's own pending change must never ride along on this commit (see this method's own
@@ -314,10 +319,15 @@ export class FsWorkspaceRepository implements WorkspaceRepository {
     // commit's own env when `lockHolder` is given, so the workspace's own commit-msg hook can
     // authorize a commit `seeya` makes while holding this project's lock even though it never runs
     // inside a Claude Code session whose CLAUDE_CODE_SESSION_ID matches the lock's own sessionId.
+    // V2-T73 item 1: folds SEEYA_MANIFEST_WRITE_AUTHORIZED into the commit's own env when this
+    // call is one of seeya's own four legitimate writes to the project's `seeya.json` — the
+    // workspace's own commit-msg hook refuses any OTHER commit that touches that path
+    // (`core/workspace-commit-guard.ts`'s own new check), a session's edit riding along included.
     const commit = await runGit(root, ['commit', '-m', message], {
       ...process.env,
       ...COMMIT_IDENTITY_ENV,
       ...buildLockHolderEnv(lockHolder),
+      ...buildManifestWriteEnv(manifestWriteAuthorized ?? false),
     });
     if (!commit.ran || commit.exitCode !== 0) {
       // V2-T34 production defect (PO review, 2026-09-25): the commit-msg hook's own refusal
@@ -539,5 +549,14 @@ export class FsWorkspaceRepository implements WorkspaceRepository {
    * ensureGeneratedClaudeMdInstalled`'s own gate). */
   async installGeneratedClaudeMd(root: string, projectId: string, content: string): Promise<void> {
     await writeFileAtomic(path.join(root, projectId, 'CLAUDE.md'), content);
+  }
+
+  /** V2-T73 item 2 — mechanics in `adapters/workspace/manifest-restore.ts`, same delegate shape as
+   * `findSessionCommits`/`revertCommits`/`listCommitsForAudit` above. */
+  restoreProjectManifestIfChanged(
+    root: string,
+    projectId: string,
+  ): Promise<ManifestRestoreOutcome> {
+    return restoreProjectManifestIfChangedImpl(root, projectId);
   }
 }
