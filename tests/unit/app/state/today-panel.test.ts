@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildTodayCardSummary,
   buildTodayPanelData,
   hasResumableSession,
   offersResumeCheckbox,
@@ -365,5 +366,43 @@ describe('refreshTodayPanelLiveness — V2-T18 defect 2: the panel tracks the am
     const data = refreshTodayPanelLiveness(inputs, new Map());
 
     expect(data?.kind).toBe('noBriefing');
+  });
+});
+
+describe('buildTodayCardSummary (V2-T63)', () => {
+  it('"noBriefing" becomes "Nothing to resume", with no count', () => {
+    const summary = buildTodayCardSummary({ kind: 'noBriefing', message: 'irrelevant' });
+    expect(summary).toEqual({ kind: 'noBriefing', titleText: 'Nothing to resume' });
+  });
+
+  it('counts only rows that still offer the checkbox — runningNow never counts', () => {
+    const summary = buildTodayCardSummary({
+      kind: 'pending',
+      day: '2026-08-16',
+      daysAgo: 1,
+      rows: [
+        {
+          sessionId: 'a',
+          name: 'alpha',
+          cwd: '/a',
+          firstPlanLine: null,
+          resumeStatus: { kind: 'neverResumed' },
+          cwdHistory: [],
+        },
+        {
+          sessionId: 'b',
+          name: 'beta',
+          cwd: '/b',
+          firstPlanLine: null,
+          resumeStatus: { kind: 'runningNow', matchedTabId: null },
+          cwdHistory: [],
+        },
+      ],
+    });
+    expect(summary).toEqual({
+      kind: 'pending',
+      titleText: 'Plan for 2026-08-16',
+      resumableCount: 1,
+    });
   });
 });

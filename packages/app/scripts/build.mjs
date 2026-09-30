@@ -95,6 +95,14 @@ async function bundle() {
   cpSync(path.join(packageRoot, 'assets', 'fonts'), path.join(outElectron, 'fonts'), {
     recursive: true,
   });
+  // V2-T63 (`docs/INTERFACE.md` § 1 item 2): the lateral's own logo, both pre-baked theme
+  // variants (`design/seeya-logo.svg`/`-on-dark.svg`, identity § 2.1) — copied verbatim, never
+  // loaded from the network, same "packaged, not fetched" discipline as the fonts above. Both are
+  // always in the DOM (`app-shell.tsx`); `index.css`'s own `[data-theme='dark']` rule toggles
+  // which one is visible, so no JS swap is needed.
+  cpSync(path.join(packageRoot, 'assets', 'logo'), path.join(outElectron, 'logo'), {
+    recursive: true,
+  });
   // Resolved via import.meta.resolve, not a hardcoded node_modules path: npm workspaces hoist
   // @xterm/xterm to the REPO ROOT's node_modules, not packages/app/node_modules — the same
   // resolution Node's own module loader uses, so this never drifts from wherever npm actually

@@ -104,10 +104,168 @@ body {
   overflow-x: hidden;
   padding: 8px;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 
-#sidebar.collapsed #sidebar-content {
+#sidebar.collapsed #sidebar-content,
+#sidebar.collapsed #sidebar-footer {
   display: none;
+}
+
+/* V2-T63 (`docs/INTERFACE.md` § 1 item 1): the logo, both theme variants always in the DOM
+ * (`app-shell.tsx`) — only one is ever visible, toggled by the SAME `[data-theme='dark']`
+ * selector `tokens.css` already keys the rest of the window's theming off, no JS swap needed. */
+#sidebar-logo {
+  margin: 4px 0 8px;
+}
+
+#sidebar-logo img {
+  height: 20px;
+  display: block;
+}
+
+#sidebar-logo-dark {
+  display: none;
+}
+
+[data-theme='dark'] #sidebar-logo-light {
+  display: none;
+}
+
+[data-theme='dark'] #sidebar-logo-dark {
+  display: block;
+}
+
+/* V2-T63 item 2: the Today card — a full-width button so its own state (title + "N to resume")
+ * reads as one clickable unit, opening the Today page tab. */
+#today-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--seeya-border);
+  border-radius: var(--seeya-radius-sm);
+  background: var(--seeya-surface-subtle);
+  color: var(--seeya-text);
+  font-size: 12px;
+  padding: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+
+.sidebar-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sidebar-section-header h2 {
+  margin: 0;
+}
+
+/* V2-T63 item 3: "+" (New project…) lives in the Favorites section header now. */
+#new-project-button {
+  flex: none;
+  font-size: 16px;
+  line-height: 1;
+  border: none;
+  background: transparent;
+  color: var(--seeya-text-secondary);
+  cursor: pointer;
+}
+
+#favorites-list,
+#recent-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  font-size: 12px;
+}
+
+#favorites-empty,
+#recent-empty {
+  color: var(--seeya-text-secondary);
+}
+
+.sidebar-favorite-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 2px 0;
+}
+
+.project-favorite-star {
+  flex: none;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--seeya-warning-text);
+  font-size: 13px;
+  padding: 0;
+}
+
+.sidebar-favorite-name,
+.sidebar-recent-name {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--seeya-text);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  padding: 0;
+}
+
+.sidebar-favorite-badge {
+  flex: none;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: var(--seeya-radius-full);
+}
+
+.sidebar-favorite-badge--openHere {
+  background: var(--seeya-success-bg);
+  color: var(--seeya-success-text);
+}
+
+.sidebar-favorite-badge--locked {
+  background: var(--seeya-warning-bg);
+  color: var(--seeya-warning-text);
+}
+
+.sidebar-favorite-sessions {
+  list-style: none;
+  margin: 2px 0 0 20px;
+  padding: 0;
+  width: 100%;
+}
+
+.sidebar-favorite-session-row {
+  color: var(--seeya-text-secondary);
+  padding: 1px 0;
+}
+
+/* V2-T63 items 5/6: "All projects (N)"/"Sessions (N running)" — full-width text links, each
+ * opening its own page tab. */
+#all-projects-link,
+#sessions-link {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--seeya-text);
+  font-size: 13px;
+  padding: 6px 0;
+  cursor: pointer;
+}
+
+#sidebar-footer {
+  flex: none;
+  padding: 8px;
+  border-top: 1px solid var(--seeya-border);
 }
 
 #sidebar h2 {
@@ -264,6 +422,18 @@ body {
 #tab-strip {
   display: flex;
   gap: 4px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+/* V2-T63 (`docs/INTERFACE.md` § 2): "Settings fica no canto direito da barra" — `#tab-strip` above
+ * takes all the room between the left-side buttons and this one (`flex: 1`), so this always sits
+ * at the far right regardless of how many tabs are open. */
+#settings-button {
+  flex: none;
+  margin-left: auto;
+  font-size: 13px;
 }
 
 .tab-button[aria-current='true'] {
@@ -338,24 +508,10 @@ body {
   color: var(--seeya-success-text);
 }
 
-#status-panel {
-  font-size: 11px;
-  white-space: pre-wrap;
-  /* V2-T48 item 2: `white-space: pre-wrap` alone wraps at whitespace, but the autostart line's own
-   * parenthesized path (`...\resources\app.asar\node_modules\@seeya-ai\cli\dist\index.js`) has none
-   * — one long unbroken "word" that overflowed the 260px sidebar and forced a horizontal scrollbar
-   * underneath it. `overflow-wrap: anywhere` lets a break land inside that word (a path's own
-   * backslashes are still natural break points visually) instead of never breaking at all — the
-   * task's own "quebrar linha longa, inclusive dentro de caminho", never a shortened/elided text
-   * (the CLI's own `seeya status` wording is unchanged). */
-  overflow-wrap: anywhere;
-}
-
-/* V2-T5b item 1: the faixa de horário, below the status panel it's computed alongside
- * (docs/PLANO-DE-ENTREGA.md V2-T5b: "na região de estado"). Buttons are hidden by default in the
- * HTML — `renderer.ts#renderScheduleStrip` only un-hides the ones `canSnooze`/`canSkip` allow. */
+/* V2-T63 item 1: the faixa de horário lives in `#sidebar-footer` now — the status panel it used
+ * to sit below is gone from the lateral entirely (this file's own `app-shell.tsx` docstring). */
 #schedule-strip {
-  margin-top: 6px;
+  margin-bottom: 6px;
 }
 
 #schedule-strip-text {
@@ -363,22 +519,29 @@ body {
   margin: 0 0 4px;
 }
 
-#schedule-strip button {
-  font-size: 11px;
-  margin: 0 4px 4px 0;
+/* V2-T63 item 1: "Snooze ▾"/"Skip today" side by side, same width (`docs/INTERFACE.md` § 1's own
+ * "lado a lado, com a mesma largura"). */
+#schedule-strip-actions {
+  display: flex;
+  gap: 4px;
 }
 
-/* V2-T5a item 1: the "End day..." button, in the status region below the panel it reports
- * against (docs/PLANO-DE-ENTREGA.md V2-T5a: "na região de estado"). */
+#schedule-strip-actions > * {
+  flex: 1;
+  font-size: 11px;
+}
+
+/* V2-T5a item 1: the "End day..." button, in the footer below the faixa de horário
+ * (docs/PLANO-DE-ENTREGA.md V2-T5a: "na região de estado"). */
 #end-day-button {
   margin-top: 6px;
   width: 100%;
 }
 
-/* V2-T5b item 3: "Start daemon"/"Stop daemon", same region. */
+/* V2-T5b item 3 / V2-T63: "Daemon running"/"Daemon stopped" — the pill (`components.css`'s own
+ * `.seeya-status-pill-button`, applied by `daemon-control-view.ts#setPillTone`). */
 #daemon-control-button {
   margin-top: 6px;
-  width: 100%;
 }
 
 #daemon-control-result {
@@ -387,8 +550,9 @@ body {
   white-space: pre-wrap;
 }
 
-/* V2-T14: "Settings…", same region as end-day/daemon-control above. */
-#settings-button {
+/* V2-T13 item 4: the autostart button — stays in the footer until V2-T65 moves it into Settings
+ * (this task's own explicit instruction: "fica onde está"). */
+#autostart-control-button {
   margin-top: 6px;
   width: 100%;
 }
@@ -398,13 +562,23 @@ body {
   position: relative;
 }
 
-.terminal-pane {
+.terminal-pane,
+.page-pane {
   position: absolute;
   inset: 0;
 }
 
-.terminal-pane[hidden] {
+.terminal-pane[hidden],
+.page-pane[hidden] {
   display: none;
+}
+
+/* V2-T63: a page tab's own content (Today/Projects/Sessions) — unlike a terminal pane (xterm
+ * paints its own scrollback), this is ordinary DOM content, so it needs its own scroll/padding. */
+.page-pane {
+  overflow-y: auto;
+  padding: var(--seeya-space-4);
+  box-sizing: border-box;
 }
 
 /* V2-T4 item 3: the fallback confirmation dialog (S5-T9's "warn BEFORE, and ask", as a real

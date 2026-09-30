@@ -56,7 +56,9 @@ import type {
   CreateProjectResponse,
   OpenProjectRequest,
   OpenProjectResponse,
+  ToggleFavoriteProjectRequest,
 } from '../ipc/channels.js';
+import { toggleFavoriteProjectId } from '@seeya-ai/engine/core/favorite-projects.js';
 import {
   buildProjectAdoptDeps,
   buildProjectOpenDeps,
@@ -153,6 +155,11 @@ export function wireProjectIpc(
   async function computeProjectsPanelData(): Promise<ProjectsPanelData> {
     const { projects, lockStatusByProjectId, rejected } = await readProjectsWithLockStatus(context);
     const adoptions = await context.storage.readAdoptions();
+    // V2-T63: read fresh every push (never cached on `AppContext`) — same "storage.readConfig() at
+    // the moment it's needed" precedent every other live-reread value in this window follows,
+    // since a star click from this same window (or, in principle, another `seeya` process) can
+    // change the file between ticks.
+    const favoriteProjectIds = new Set(await context.storage.readFavoriteProjectIds());
     return buildProjectsPanelData(
       getSidebarRows(),
       projects,
@@ -160,6 +167,7 @@ export function wireProjectIpc(
       lockStatusByProjectId,
       context.platformHint,
       rejected,
+      favoriteProjectIds,
     );
   }
 
@@ -178,6 +186,22 @@ export function wireProjectIpc(
   // `computeProjectsPanelData` call in one real run on this machine).
   ipcMain.handle(CHANNELS.getProjectsPanel, async (): Promise<ProjectsPanelData> =>
     computeProjectsPanelData(),
+  );
+
+  // V2-T63: the star, clicked either from the lateral's own Favorites section or from a row in
+  // the Projects tab (`docs/INTERFACE.md` § 1 item 3) — both call this one channel with the
+  // project's own current `favorite` flag flipped, never re-derive it here (D-041: the renderer
+  // already knows what it's toggling FROM). Read-modify-write, like every other `~/.seeya/`
+  // document this window mutates; the push right after is what lets BOTH places (lateral and the
+  // Projects tab) reflect the change without a second round trip of their own.
+  ipcMain.handle(
+    CHANNELS.toggleFavoriteProject,
+    async (_event, request: ToggleFavoriteProjectRequest): Promise<void> => {
+      const current = await context.storage.readFavoriteProjectIds();
+      const next = toggleFavoriteProjectId(current, request.projectId, request.favorite);
+      await context.storage.saveFavoriteProjectIds(next);
+      await pushProjectsUpdate();
+    },
   );
 
   ipcMain.handle(

@@ -199,6 +199,45 @@ describe('buildProjectsPanelData (V2-T30 item 1)', () => {
     expect(data.otherSessionsByDirectory.map((group) => group.dir)).toEqual(['/code/a', '/code/b']);
   });
 
+  describe('favorite (V2-T63)', () => {
+    it('defaults to false when no favoriteProjectIds is given', () => {
+      const data = buildProjectsPanelData(
+        [],
+        [{ manifest: manifest(), dir: '/seeya/workspace/auth-hardening' }],
+        [],
+        new Map(),
+        'posix',
+      );
+      expect(data.projects[0]?.favorite).toBe(false);
+    });
+
+    it('marks a project favorite when its id is in favoriteProjectIds', () => {
+      const data = buildProjectsPanelData(
+        [],
+        [{ manifest: manifest(), dir: '/seeya/workspace/auth-hardening' }],
+        [],
+        new Map(),
+        'posix',
+        [],
+        new Set(['auth-hardening']),
+      );
+      expect(data.projects[0]?.favorite).toBe(true);
+    });
+
+    it('never marks a project not in favoriteProjectIds', () => {
+      const data = buildProjectsPanelData(
+        [],
+        [{ manifest: manifest(), dir: '/seeya/workspace/auth-hardening' }],
+        [],
+        new Map(),
+        'posix',
+        [],
+        new Set(['billing']),
+      );
+      expect(data.projects[0]?.favorite).toBe(false);
+    });
+  });
+
   describe('ignoredProjects (V2-T72 item 2)', () => {
     it('is empty when nothing was rejected — the ordinary case', () => {
       const data = buildProjectsPanelData([], [], [], new Map(), 'posix', []);
