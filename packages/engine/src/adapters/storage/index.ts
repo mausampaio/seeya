@@ -77,6 +77,11 @@ import {
   parseAdoptionRegistryDocument,
   serializeAdoptionRegistryDocument,
 } from './adoption-registry-schema.js';
+import {
+  FAVORITE_PROJECTS_SCHEMA_VERSION,
+  parseFavoriteProjectsDocument,
+  serializeFavoriteProjectsDocument,
+} from './favorite-projects-schema.js';
 import { resolveSchemaVersion, type SchemaMigration } from './schema-version.js';
 import { writeFileAtomic } from './atomic-write.js';
 
@@ -508,6 +513,30 @@ export class StorageAdapter implements Storage {
     await writeFileAtomic(
       this.adoptionsPath(),
       JSON.stringify(serializeAdoptionRegistryDocument(records), null, 2) + '\n',
+    );
+  }
+
+  /** `~/.seeya/favorite-projects.json` (V2-T63). */
+  private favoriteProjectsPath(): string {
+    return path.join(this.seeyaHome, 'favorite-projects.json');
+  }
+
+  async readFavoriteProjectIds(): Promise<readonly string[]> {
+    const resolved = await readVersionedDocument(
+      this.favoriteProjectsPath(),
+      FAVORITE_PROJECTS_SCHEMA_VERSION,
+    );
+    if (resolved === null) {
+      // Nothing starred on this device yet (D-025), not an error.
+      return [];
+    }
+    return parseFavoriteProjectsDocument(resolved);
+  }
+
+  async saveFavoriteProjectIds(projectIds: readonly string[]): Promise<void> {
+    await writeFileAtomic(
+      this.favoriteProjectsPath(),
+      JSON.stringify(serializeFavoriteProjectsDocument(projectIds), null, 2) + '\n',
     );
   }
 }

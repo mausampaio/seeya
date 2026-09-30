@@ -52,12 +52,29 @@ function renderProjectSessionRow(session: {
   return item;
 }
 
+/** V2-T63 item 3: the star — shared by this row and the lateral's own Favorites section
+ * (`electron/sidebar-favorites-view.ts`, which stars/unstars the SAME project by the SAME
+ * channel). `aria-pressed` carries the state for assistive tech; the glyph itself is never the
+ * only signal (identity § 8) — `aria-label` names the action in words. */
+function renderFavoriteStarButton(projectId: string, name: string, favorite: boolean): HTMLElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'project-favorite-star';
+  button.dataset.projectId = projectId;
+  button.dataset.favorite = String(favorite);
+  button.setAttribute('aria-pressed', String(favorite));
+  button.setAttribute('aria-label', MESSAGES.sidebarFavoriteStarLabel(favorite, name));
+  button.textContent = favorite ? '★' : '☆';
+  return button;
+}
+
 function renderProjectBlock(project: ProjectPanelRow): HTMLElement {
   const container = document.createElement('div');
   container.className = 'project-block';
 
   const header = document.createElement('div');
   header.className = 'project-block-header';
+  header.appendChild(renderFavoriteStarButton(project.projectId, project.name, project.favorite));
   const name = document.createElement('strong');
   name.textContent = project.name;
   header.appendChild(name);
@@ -187,12 +204,26 @@ export function triggerProjectOpen(projectId: string): void {
     });
 }
 
+/** The star toggles straight from its own current `dataset.favorite` (set by the last render,
+ * `renderFavoriteStarButton` above) — never re-derived from a separate lookup, and the next
+ * `projectsUpdate` push (`electron/project-ipc.ts#toggleFavoriteProject`'s own handler fires one
+ * right after saving) is what redraws every star with the new state, in both places that show one
+ * (`electron/sidebar-favorites-view.ts` shares this exact channel). */
+export function triggerFavoriteToggle(projectId: string, currentlyFavorite: boolean): void {
+  void window.seeya.toggleFavoriteProject({ projectId, favorite: !currentlyFavorite });
+}
+
 function wireProjectOpenButtons(): void {
   document.getElementById('projects-list')?.addEventListener('click', (event) => {
-    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('.project-open-button');
-    const projectId = button?.dataset.projectId;
-    if (projectId !== undefined) {
-      triggerProjectOpen(projectId);
+    const target = event.target as HTMLElement;
+    const openButton = target.closest<HTMLButtonElement>('.project-open-button');
+    if (openButton?.dataset.projectId !== undefined) {
+      triggerProjectOpen(openButton.dataset.projectId);
+      return;
+    }
+    const starButton = target.closest<HTMLButtonElement>('.project-favorite-star');
+    if (starButton?.dataset.projectId !== undefined) {
+      triggerFavoriteToggle(starButton.dataset.projectId, starButton.dataset.favorite === 'true');
     }
   });
 }

@@ -13,6 +13,16 @@ import { reduceDaemonControl, type DaemonControlState } from '../state/daemon-co
  */
 let daemonControlState: DaemonControlState = { kind: 'idle', availability: { kind: 'unknown' } };
 
+/** V2-T63: the button IS the pill (`docs/INTERFACE.md` § 1's own "rodapé... pílula do daemon,
+ * largura total") — `seeya-status-pill-button`/`seeya-status-pill--<tone>` (`components.css`) give
+ * it the same rounded, toned look `StatusPill` gives a plain `<span>` elsewhere, sized to a full
+ * native `<button>` since this one has to stay clickable. One call, so a re-render never leaves a
+ * stale tone class from a previous state sitting alongside the new one. */
+function setPillTone(button: HTMLButtonElement, tone: 'success' | 'neutral'): void {
+  button.classList.remove('seeya-status-pill--success', 'seeya-status-pill--neutral');
+  button.classList.add('seeya-status-pill-button', `seeya-status-pill--${tone}`);
+}
+
 function renderDaemonControl(): void {
   const button = document.getElementById('daemon-control-button') as HTMLButtonElement;
   const result = document.getElementById('daemon-control-result') as HTMLElement;
@@ -20,6 +30,7 @@ function renderDaemonControl(): void {
   if (daemonControlState.kind === 'running') {
     button.textContent = MESSAGES.daemonControlRunning;
     button.disabled = true;
+    setPillTone(button, 'neutral');
     return;
   }
   if (daemonControlState.kind === 'result') {
@@ -29,11 +40,16 @@ function renderDaemonControl(): void {
   if (availability.kind === 'unknown') {
     button.textContent = MESSAGES.daemonControlUnknown;
     button.disabled = true;
+    setPillTone(button, 'neutral');
     return;
   }
+  // `availability.kind === 'start'` means the daemon is currently STOPPED (starting is the
+  // action offered) — the pill's own text says the fact, not the action (this file's own
+  // `daemonControlState` docstring), so it reads "Daemon stopped"/"Daemon running" here.
   button.textContent =
-    availability.kind === 'start' ? MESSAGES.daemonControlStart : MESSAGES.daemonControlStop;
+    availability.kind === 'start' ? MESSAGES.daemonPillStopped : MESSAGES.daemonPillRunning;
   button.disabled = false;
+  setPillTone(button, availability.kind === 'start' ? 'neutral' : 'success');
 }
 
 async function handleDaemonControlClicked(): Promise<void> {

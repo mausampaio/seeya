@@ -202,6 +202,33 @@ export interface TodayPanelInputs {
  * const data = refreshTodayPanelLiveness(latestTodayPanelInputs, buildLiveSessionIndex(rows));
  * if (data !== null) window.webContents.send(CHANNELS.todayUpdate, data);
  */
+/**
+ * V2-T63 — the lateral's own Today card (`docs/INTERFACE.md` § 1 item 2): `Plan for <day>` plus
+ * "N to resume" when there's a pending briefing, or "Nothing to resume" with no count otherwise.
+ * `resumableCount` is the SAME `hasResumableSession`/`offersResumeCheckbox` rule the panel itself
+ * already uses to decide whether a row offers a checkbox (`runningNow` never counts) — never a
+ * second interpretation of "left to resume" (D-041).
+ */
+export type TodayCardSummary =
+  | { readonly kind: 'pending'; readonly titleText: string; readonly resumableCount: number }
+  | { readonly kind: 'noBriefing'; readonly titleText: string };
+
+/**
+ * @example
+ * buildTodayCardSummary({ kind: 'noBriefing', message: '...' });
+ * // { kind: 'noBriefing', titleText: 'Nothing to resume' }
+ */
+export function buildTodayCardSummary(data: TodayPanelData): TodayCardSummary {
+  if (data.kind === 'noBriefing') {
+    return { kind: 'noBriefing', titleText: MESSAGES.todayCardNothingToResume };
+  }
+  return {
+    kind: 'pending',
+    titleText: MESSAGES.todayPlanTitle(data.day, data.daysAgo),
+    resumableCount: data.rows.filter((row) => offersResumeCheckbox(row.resumeStatus)).length,
+  };
+}
+
 export function refreshTodayPanelLiveness(
   inputs: TodayPanelInputs | null,
   liveSessionIds: ReadonlyMap<string, LiveSessionInfo>,

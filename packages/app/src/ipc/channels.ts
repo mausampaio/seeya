@@ -205,6 +205,12 @@ export const CHANNELS = {
    * theme actually changed, so a pinned `'light'`/`'dark'` preference never triggers a needless
    * repaint just because the OS itself changed. */
   themeUpdate: 'seeya:theme-update',
+  /** Renderer → main: the star, clicked from the lateral's own Favorites section or a row in the
+   * Projects tab (V2-T63, `docs/INTERFACE.md` § 1 item 3) — `favorite` is the state to set (the
+   * renderer already knows what it's toggling FROM, D-041). Resolves once
+   * `favorite-projects.json` is saved and `projectsUpdate` has been pushed, so both places that
+   * show a star reflect the change without polling for it. */
+  toggleFavoriteProject: 'seeya:toggle-favorite-project',
 } as const;
 
 export interface CreateTabRequest {
@@ -267,6 +273,12 @@ export type TerminalFontConfigResponse = TerminalFontOptions;
  * (`electron/theme-view.ts#applyEffectiveTheme`) regardless of which one delivered it. */
 export interface ThemeUpdateEvent {
   readonly effectiveTheme: EffectiveTheme;
+}
+
+/** `CHANNELS.toggleFavoriteProject`'s payload (V2-T63). */
+export interface ToggleFavoriteProjectRequest {
+  readonly projectId: string;
+  readonly favorite: boolean;
 }
 
 /** `CHANNELS.confirmFallbackRequest`'s payload — the exact shape

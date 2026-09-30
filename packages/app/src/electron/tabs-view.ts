@@ -27,6 +27,25 @@ const openTabs = new Map<string, OpenTab>();
 let nextTabId = 0;
 
 /**
+ * V2-T63: every pane the tab strip can show — a terminal's own container (also in `openTabs`
+ * above, for the terminal-specific bits `showTab` needs: `fitAddon.fit()`, `terminal.focus()`) AND
+ * a page tab's own pane (`electron/page-tab-strip.ts#registerPagePane`, which has neither). One
+ * registry so `showTab` below hides/shows BOTH kinds through the same loop — a page tab open at
+ * the same time as a terminal tab always hides the other correctly, and vice versa.
+ */
+const paneContainers = new Map<string, HTMLElement>();
+
+/** `electron/page-tab-strip.ts`'s own registration/removal — kept as functions, not an export of
+ * the map itself, so only this module ever iterates or clears it directly. */
+export function registerPane(id: string, container: HTMLElement): void {
+  paneContainers.set(id, container);
+}
+
+export function unregisterPane(id: string): void {
+  paneContainers.delete(id);
+}
+
+/**
  * Fetched once, at startup (`renderer.ts#main`), before `wireCommandBar` is wired — no tab can be
  * opened before this is populated, so `openTab` never needs a defensive fallback (V2-T2: "a
  * interface lê o config uma vez ao subir"; changing `terminalFontFamily`/`terminalFontSize`
@@ -63,7 +82,9 @@ function newTabId(): string {
   return `tab-${nextTabId}`;
 }
 
-function tabStrip(): HTMLElement {
+/** V2-T63: exported so `electron/page-tab-strip.ts` appends its own buttons to the SAME strip a
+ * terminal tab's button lives in — one strip, both kinds of tab. */
+export function tabStrip(): HTMLElement {
   return document.getElementById('tab-strip') as HTMLElement;
 }
 
@@ -71,9 +92,12 @@ function terminalHost(): HTMLElement {
   return document.getElementById('terminal-host') as HTMLElement;
 }
 
-function showTab(id: string): void {
-  for (const [openId, open] of openTabs) {
-    open.container.hidden = openId !== id;
+/** V2-T63: exported so `electron/page-tab-strip.ts` can show a page tab's own pane through the
+ * SAME function a terminal tab button already uses — one place decides "what's currently visible
+ * in `#main`", regardless of which kind of tab asked for it. */
+export function showTab(id: string): void {
+  for (const [paneId, container] of paneContainers) {
+    container.hidden = paneId !== id;
   }
   const buttons = tabStrip().querySelectorAll<HTMLButtonElement>('button.tab-button');
   for (const button of buttons) {
@@ -83,7 +107,8 @@ function showTab(id: string): void {
   shown?.fitAddon.fit();
   // Maintainer's request (2026-09-17): the tab that was just shown — by "+"/Open, by clicking
   // its button, or by a resume — takes keyboard focus, so typing starts in the terminal
-  // without a second click on it.
+  // without a second click on it. A page tab (no `Terminal` of its own) simply has nothing to
+  // focus here — the browser's own default tab order into its content still works.
   shown?.terminal.focus();
 }
 
@@ -151,6 +176,7 @@ function removeTabUi(id: string, wrapper: HTMLElement, open: OpenTab): void {
   open.container.remove();
   wrapper.remove();
   openTabs.delete(id);
+  unregisterPane(id);
   window.seeya.removeTab({ id });
   const remaining = wasShown ? openTabs.keys().next().value : undefined;
   if (remaining !== undefined) {
@@ -203,6 +229,7 @@ function mountTerminalTab(tab: Tab, label: string): Terminal {
   });
 
   openTabs.set(tab.id, { tab, terminal, fitAddon, container });
+  registerPane(tab.id, container);
   addTabButton(tab.id, label);
   showTab(tab.id);
   return terminal;

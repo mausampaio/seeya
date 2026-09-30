@@ -195,6 +195,29 @@
   color: var(--seeya-text-secondary);
 }
 
+/* V2-T63: the daemon pill is a real <button> (it has to stay clickable), styled like the plain
+ * `.seeya-status-pill` span above but reset of native button chrome and stretched full-width —
+ * `docs/INTERFACE.md` § 1's own "rodapé... pílula do daemon, largura total". Tone still comes from
+ * the same `.seeya-status-pill--<tone>` classes, applied alongside this one
+ * (`electron/daemon-control-view.ts#setPillTone`). */
+.seeya-status-pill-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  border: none;
+  border-radius: var(--seeya-radius-full);
+  padding: var(--seeya-space-2) var(--seeya-space-3);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.seeya-status-pill-button:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
 .seeya-table-row {
   border-bottom: 1px solid var(--seeya-border);
 }

@@ -29,6 +29,9 @@ export const MESSAGES = {
     'resumed.',
   todayPlanTitle: (day: string, daysAgo: number): string =>
     daysAgo === 1 ? `Plan for ${day}` : `Plan for ${day} (${daysAgo} days ago)`,
+  // V2-T63 — the lateral's own Today card (state/today-panel.ts#buildTodayCardSummary).
+  todayCardNothingToResume: 'Nothing to resume',
+  todayCardResumeCount: (count: number): string => `${count} to resume`,
   // V2-T9 item 4: replaces the old todayAlreadyResumed — the checkbox rule now depends on
   // liveness, not just resumed.json (state/today-panel.ts#TodayResumeStatus).
   todayRunningNow: 'running now',
@@ -147,18 +150,25 @@ export const MESSAGES = {
     `End of day at ${time} — in ${remaining}`,
   scheduleStripLeadTimeWarning: (remaining: string): string => `End of day in ${remaining}`,
   scheduleStripEndOfDay: 'End of day: due now — the daemon acts on its next poll.',
-  scheduleStripSnooze15: 'Snooze +15m',
-  scheduleStripSnooze30: 'Snooze +30m',
-  scheduleStripSnooze1h: 'Snooze +1h',
+  // V2-T63 (`docs/INTERFACE.md` § 1's own "Snooze ▾ (menu com +15m, +30m, +1h)"): a single
+  // dropdown replaces the three always-visible buttons this footer had before — the placeholder
+  // option is what shows while nothing is chosen, never a real, selectable increment on its own.
+  scheduleStripSnoozeMenuLabel: 'Snooze ▾',
+  scheduleStripSnooze15: '+15m',
+  scheduleStripSnooze30: '+30m',
+  scheduleStripSnooze1h: '+1h',
   scheduleStripSkipToday: 'Skip today',
 
   // V2-T5b item 3 — Start/Stop daemon (state/daemon-control-panel.ts). `resultText` is whatever
   // the composition root's own start orchestration or
   // `@seeya-ai/engine/scheduler/daemon-control.js#runDaemonStop` already prints for the CLI's own
   // `seeya daemon`/`seeya daemon --stop` (D-039: literal text, not a second wording).
-  daemonControlStart: 'Start daemon',
-  daemonControlStop: 'Stop daemon',
-  daemonControlUnknown: 'Daemon: cannot verify — see the status panel.',
+  // V2-T63 (`docs/INTERFACE.md` § 1's own "pílula do daemon"): the button's own TEXT is now the
+  // state ("Daemon running"/"Daemon stopped"), not the action it offers — clicking it still does
+  // the opposite of what it says, same as before, just worded as the fact it's reporting.
+  daemonPillRunning: 'Daemon running',
+  daemonPillStopped: 'Daemon stopped',
+  daemonControlUnknown: 'Daemon: cannot verify.',
   daemonControlRunning: 'Working…',
 
   // V2-T13 item 4 — the autostart control button (state/autostart-control-panel.ts). Only shown
@@ -167,7 +177,7 @@ export const MESSAGES = {
   // for "seeya autostart enable"/"disable" (D-039).
   autostartControlEnable: 'Enable autostart',
   autostartControlDisable: 'Disable autostart',
-  autostartControlUnknown: 'Autostart: cannot verify — see the status panel.',
+  autostartControlUnknown: 'Autostart: cannot verify.',
   autostartControlRunning: 'Working…',
 
   // V2-T13 item 5 — the ownership-transition dialog (D-045 item 1), shown once per machine.
@@ -330,4 +340,20 @@ export const MESSAGES = {
   adoptResultTitle: 'Adoption result',
   adoptResultOpenProject: 'Open project',
   adoptResultClose: 'Close',
+
+  // V2-T63 — the lateral redesign (docs/INTERFACE.md § 1) and the reusable page-tab mechanism
+  // (§ 2's own "abas de página": Today/Projects/Sessions).
+  sidebarFavoritesHeading: 'Favorites',
+  sidebarFavoriteStarLabel: (favorite: boolean, name: string): string =>
+    favorite ? `Unstar ${name}` : `Star ${name}`,
+  sidebarFavoriteOpenHere: 'open here',
+  sidebarFavoriteLocked: 'locked',
+  sidebarFavoritesEmpty: 'No favorites yet — star a project to pin it here.',
+  sidebarRecentHeading: 'Recent',
+  sidebarRecentEmpty: 'Nothing recent yet.',
+  sidebarAllProjectsLink: (total: number): string => `All projects (${total})`,
+  sidebarSessionsLink: (runningCount: number): string => `Sessions (${runningCount} running)`,
+  pageTabLabelToday: 'Today',
+  pageTabLabelProjects: 'Projects',
+  pageTabLabelSessions: 'Sessions',
 } as const;

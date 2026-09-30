@@ -54,6 +54,12 @@ export interface ProjectPanelRow {
    * layer, same "the state module decides what to say" split every other panel here follows. */
   readonly lockText: string;
   readonly sessions: readonly ProjectPanelSessionRow[];
+  /** V2-T63: whether this project is starred on THIS machine
+   * (`@seeya-ai/engine/core/favorite-projects.js`'s own `favorite-projects.json`, read once per
+   * push by `electron/project-ipc.ts`) — drives both the star shown on this row in the Projects
+   * tab and whether the project also appears in the lateral's own Favorites section
+   * (`state/sidebar-summary.ts`). */
+  readonly favorite: boolean;
 }
 
 export interface ProjectPanelOtherSessionRow extends ProjectPanelSessionRow {
@@ -167,6 +173,7 @@ function lockSessionIdByProjectId(
  *   new Map([['auth-hardening', { kind: 'unlocked' }]]),
  *   'posix',
  *   [],
+ *   new Set(['auth-hardening']),
  * )
  */
 export function buildProjectsPanelData(
@@ -178,6 +185,10 @@ export function buildProjectsPanelData(
   /** V2-T72 item 2 — `WorkspaceRepository.listProjects`'s own `rejected`, the D-022 half of the
    * result this module used to drop entirely. */
   rejected: readonly RejectedDiscoveryRecord[] = [],
+  /** V2-T63 — `Storage.readFavoriteProjectIds()`'s own result, read once per push by the caller.
+   * Defaults to empty so every call site that predates favorites (every test above) keeps
+   * compiling and behaving exactly as before: no project favorited. */
+  favoriteProjectIds: ReadonlySet<string> = new Set(),
 ): ProjectsPanelData {
   const grouping = groupSessionsByProject(
     rows,
@@ -193,6 +204,7 @@ export function buildProjectsPanelData(
       lockStatusByProjectId.get(project.manifest.id) ?? { kind: 'unlocked' },
     ),
     sessions: (grouping.sessionsByProjectId.get(project.manifest.id) ?? []).map(toSessionRow),
+    favorite: favoriteProjectIds.has(project.manifest.id),
   }));
   const otherSessionsByDirectory = groupOtherSessionsByDirectory(
     grouping.otherSessions,

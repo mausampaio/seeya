@@ -162,6 +162,53 @@ decidir se isto é custo real do Preact/das fontes ou ruído da máquina.
 — faixas sobrepostas por inteiro. (d) medido pelo PO: o instalador cresceu ~0,6% (+666 KB) e o
 instalado +1,8 MB, o que as fontes empacotadas e o Preact explicam.
 
+## V2-T63 — antes/depois (lateral nova, favoritos, aba de página)
+
+**Data:** 2026-09-30, mesma máquina da linha de base. Medido com `measure-startup.mjs`/
+`measure-idle.mjs`, e desta vez já como A/B na MESMA sessão (a lição da Q-096/Q-099: comparar só
+contra uma linha de base de outro dia não isola a mudança do estado da máquina naquele momento) —
+`main` (`c1f43a4`, o `HEAD` desta tarefa antes de qualquer commit dela) construído numa segunda
+worktree descartável (`git worktree add --detach`, removida ao final) e esta branch, alternados,
+duas rodadas cada.
+
+| Medida | `main` (rodada 1 / rodada 2) | V2-T63 (rodada 1 / rodada 2) |
+|---|---|---|
+| (a) Tempo até a lista de sessões | 5647–5691 ms (1 rodada — ver nota) | 5672–5978 ms (1 rodada — ver nota) |
+| (b) Memória em repouso (árvore inteira) | 356,3–399,3 MiB / 363,1–400,5 MiB | 383,3–447,8 MiB / 356,4–418,5 MiB |
+| (c) CPU ocioso (janela de 60 s) | 0,29%–0,63% / 0,29%–0,63% | 0,31%–0,68% / 0,52%–0,65% |
+| (d) Instalador / instalado | não medido — ver nota | não medido — ver nota |
+
+**(a) só uma rodada de cada, por construção do próprio script** (`measure-startup.mjs` já faz
+3 lançamentos dentro de uma chamada) — a primeira chamada desta sessão (`V2-T63`) incluiu, uma
+única vez, o download do binário do Electron pelo próprio `npm` (mesma ressalva que a linha de
+base original já registra); os dois RESTANTES desta branch (5672/5674 ms) caem dentro da faixa de
+`main` (5647–5691 ms) — sem indício de custo novo na subida.
+
+**(c) as duas faixas se sobrepõem por inteiro** — sem indício de custo novo no processador parado.
+
+**(b) não dá para afirmar regressão, e também não dá para afirmar que não há nenhuma (D-025).** As
+janelas 2/3 de cada rodada (depois que o primeiro tick de atualização já passou, a leitura mais
+estável — a janela 1 de TODA rodada, `main` incluído, sempre saiu mais alta, efeito de settling
+ainda em curso) ficam bem próximas: `main` 363,1–363,4 MiB / 356,3 MiB contra V2-T63 356,4–383,7 MiB
+/ 383,3–383,7 MiB — a maior parte dentro do mesmo intervalo de `main`, com a segunda rodada desta
+branch (356,4–360,1 MiB) praticamente idêntica à de `main`. O único valor fora da faixa de `main`
+é a primeira janela da primeira rodada desta branch (447,8 MiB) — não se repetiu na segunda rodada
+(418,5 MiB) nem formou um padrão estável; lido como ruído desta sessão (mais variável que a sessão
+em que a V2-T62 foi resolvida), não como custo persistente das mudanças desta tarefa. Esta tarefa
+acrescenta: duas imagens SVG do logo (~7,3 KB cada, sempre no DOM, uma delas sempre `display:none`),
+um módulo novo assinando as MESMAS duas IPCs que outras partes da janela já assinam
+(`onProjectsUpdate`/`onTodayUpdate`, nunca uma nova assinatura de push) e uma leitura a mais de
+`favorite-projects.json` (um arquivo pequeno) por ciclo de atualização — nada que pareça explicar
+30–90 MiB de diferença sozinho. Se um dia isto importar de verdade, cabe uma medição própria com
+mais rodadas, não uma conclusão a partir de duas.
+
+**(d) não medido** — `npm run dist:windows` já foi recusado pelo classificador automático de
+permissão do harness na V2-T62 ("Production Deploy"); não repeti a tentativa nesta tarefa. O que
+esta tarefa acrescenta ao pacote é pequeno o bastante para estimar sem medir: os dois SVGs do logo
+somam ~14,3 KB brutos, e os módulos novos (`tabs/page-tab.ts`, `electron/page-tab-strip.ts`,
+`electron/sidebar-favorites-view.ts`, `state/sidebar-summary.ts`) são poucas centenas de linhas de
+TypeScript — nada perto dos ~666 KB/1,8 MB que a V2-T62 (Preact inteiro + cinco arquivos de fonte)
+já mediu como aceitável.
 
 ## A régua
 

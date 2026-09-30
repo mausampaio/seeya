@@ -22,6 +22,9 @@
  * - `session-search-view.ts` — the id-search field (V2-T55 item 4).
  * - `sidebar-resize-view.ts` — the sidebar's draggable width (PO acceptance of V2-T55,
  *   correction 2).
+ * - `sidebar-favorites-view.ts` — the redesigned lateral's own Today card/Favorites/Recent/
+ *   "All projects"/"Sessions" (V2-T63). Wired LAST: it reads `triggerFavoriteToggle` from
+ *   `projects-list-view.js` and opens page tabs the strip only needs to exist by then, not before.
  */
 import { wireSidebarCollapse } from './sidebar-collapse-view.js';
 import { wireSidebarResize } from './sidebar-resize-view.js';
@@ -32,6 +35,7 @@ import { wireLeftoverChangesConfirmDialog } from './project-leftover-changes-con
 import { wireAdoptFlow } from './adopt-flow-view.js';
 import { wireOtherSessionsDirDialog } from './other-sessions-dir-dialog-view.js';
 import { wireSessionSearchView } from './session-search-view.js';
+import { wireSidebarFavorites } from './sidebar-favorites-view.js';
 
 /** Wired once, at startup, from `renderer.ts#main`. */
 export function wireProjectPanel(): void {
@@ -44,4 +48,5 @@ export function wireProjectPanel(): void {
   wireAdoptFlow();
   wireOtherSessionsDirDialog();
   wireSessionSearchView();
+  wireSidebarFavorites();
 }

@@ -63,6 +63,7 @@ import type {
   FindSessionByIdRequest,
   FindSessionByIdResponse,
   ThemeUpdateEvent,
+  ToggleFavoriteProjectRequest,
 } from '../ipc/channels.js';
 
 export interface SeeyaApi {
@@ -168,6 +169,9 @@ export interface SeeyaApi {
   /** V2-T62 (D-051): pushed whenever the OS's own light/dark preference changes (never on a
    * fixed interval — `electron/main.ts`'s own `nativeTheme.on('updated', ...)` subscription). */
   onThemeUpdate(listener: (event: ThemeUpdateEvent) => void): void;
+  /** V2-T63: the star, from either the lateral or the Projects tab — resolves once saved and
+   * pushed. */
+  toggleFavoriteProject(request: ToggleFavoriteProjectRequest): Promise<void>;
 }
 
 const api: SeeyaApi = {
@@ -291,6 +295,7 @@ const api: SeeyaApi = {
   onThemeUpdate: (listener) => {
     ipcRenderer.on(CHANNELS.themeUpdate, (_event, data: ThemeUpdateEvent) => listener(data));
   },
+  toggleFavoriteProject: (request) => ipcRenderer.invoke(CHANNELS.toggleFavoriteProject, request),
 };
 
 contextBridge.exposeInMainWorld('seeya', api);

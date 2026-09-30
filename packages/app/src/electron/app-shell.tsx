@@ -6,10 +6,26 @@
  * `querySelectorAll` call in the `*-view.ts` modules keeps working unchanged, because this is
  * still a real DOM tree with the same ids, just built by Preact instead of the HTML parser.
  *
- * The sidebar's own CONTENT (project list, Today panel, status panel, schedule strip...) stays as
- * empty containers here, exactly like `index.html` had them — each one is still filled
- * imperatively by its own view module (`project-panel-view.ts`, `today-panel-view.ts`, ...),
- * "montado temporariamente dentro do esqueleto, sem redesenho" (this task's own instructions).
+ * **V2-T63 (`docs/INTERFACE.md` § 1) redesigned the lateral and the footer.** What moved:
+ * - The status panel (`#status-panel`) is GONE from the tree — its useful content lives in the
+ *   footer (agenda, daemon) now; `main.ts` still computes/pushes the text (harmless, nothing
+ *   listens) — removing that push too is a small follow-up left for whoever next touches that
+ *   file, not this task's own scope.
+ * - `#today-panel`, `#projects-list`/`#project-open-result-text`,
+ *   `#other-sessions-list`/`#session-search-*` all kept their OWN ids and inner markup untouched
+ *   (their view modules — `today-panel-view.ts`/`projects-list-view.ts`/
+ *   `other-sessions-dir-dialog-view.ts`/`session-search-view.ts` — needed zero changes) but moved
+ *   into the three page panes (`#page-today`/`#page-projects`/`#page-sessions`,
+ *   `electron/page-tab-strip.ts`) that "All projects"/"Sessions"/the Today card now open as tabs
+ *   — `docs/INTERFACE.md` § 1's own "pode continuar sendo o conteúdo atual dentro de uma aba de
+ *   página", the PO's refinement comment on the task: nothing shown today disappears, it only
+ *   moves from a fixed sidebar region to a tab, same mechanism a terminal tab already uses.
+ * - `#ignored-projects-heading`/`#ignored-projects-list` STAY in the lateral itself (§ 1 item 5
+ *   names them as a lateral bullet of their own, not part of the Projects tab in this task).
+ * - `#settings-button` moved from the footer into the toolbar's own right edge — § 1's footer
+ *   list (end of day / snooze+skip / end day / daemon pill) doesn't include it, and § 2 already
+ *   says where it belongs ("Settings fica no canto direito da barra"); moving it now is a
+ *   one-line relocation, not a redesign of the tab bar itself (still V2-T64's job).
  */
 import { Button } from '../ui/button.js';
 import { DialogsShell } from './dialogs-shell.js';
@@ -23,40 +39,53 @@ export function AppShell() {
             ‹
           </Button>
           <div id="sidebar-content">
-            <h2>Projects</h2>
-            <button id="new-project-button" type="button"></button>
-            <div id="projects-list"></div>
-            <p id="project-open-result-text"></p>
+            <div id="sidebar-logo">
+              <img id="sidebar-logo-light" src="logo/seeya-logo.svg" alt="seeya" />
+              <img id="sidebar-logo-dark" src="logo/seeya-logo-on-dark.svg" alt="seeya" />
+            </div>
+
+            <button id="today-card" type="button"></button>
+
+            <section id="favorites-section">
+              <div class="sidebar-section-header">
+                <h2>Favorites</h2>
+                <button id="new-project-button" type="button"></button>
+              </div>
+              <ul id="favorites-list"></ul>
+            </section>
+
+            <section id="recent-section">
+              <h2>Recent</h2>
+              <ul id="recent-list"></ul>
+            </section>
+
+            <button id="all-projects-link" type="button"></button>
+
             <h2 id="ignored-projects-heading" hidden>
               Ignored projects
             </h2>
             <ul id="ignored-projects-list" hidden></ul>
-            <h2>Other sessions</h2>
-            <ul id="other-sessions-list"></ul>
-            <form id="session-search-form">
-              <label id="session-search-label" for="session-search-input"></label>
-              <input id="session-search-input" type="text" />
-              <button type="submit" id="session-search-button"></button>
-            </form>
-            <p id="session-search-message"></p>
-            <ul id="session-search-result"></ul>
-            <h2>Today</h2>
-            <div id="today-panel"></div>
-            <h2>Status</h2>
-            <pre id="status-panel"></pre>
+
+            <button id="sessions-link" type="button"></button>
+          </div>
+
+          <div id="sidebar-footer">
             <div id="schedule-strip">
               <p id="schedule-strip-text"></p>
-              <button id="schedule-strip-snooze-15" type="button" hidden></button>
-              <button id="schedule-strip-snooze-30" type="button" hidden></button>
-              <button id="schedule-strip-snooze-1h" type="button" hidden></button>
-              <button id="schedule-strip-skip" type="button" hidden></button>
+              <div id="schedule-strip-actions">
+                <select id="schedule-strip-snooze" hidden>
+                  <option value="" selected disabled hidden>
+                    Snooze ▾
+                  </option>
+                </select>
+                <button id="schedule-strip-skip" type="button" hidden></button>
+              </div>
             </div>
             <Button id="end-day-button" />
             <Button id="daemon-control-button" variant="secondary" />
             <p id="daemon-control-result"></p>
             <Button id="autostart-control-button" variant="secondary" hidden />
             <p id="autostart-control-result"></p>
-            <Button id="settings-button" variant="secondary" />
           </div>
         </aside>
         <div id="sidebar-resize-handle"></div>
@@ -67,6 +96,7 @@ export function AppShell() {
               +
             </Button>
             <div id="tab-strip"></div>
+            <Button id="settings-button" variant="secondary" />
           </div>
           <form id="command-bar" hidden>
             <label>
@@ -86,7 +116,27 @@ export function AppShell() {
               Cancel
             </button>
           </form>
-          <div id="terminal-host"></div>
+          <div id="terminal-host">
+            <div id="page-today" class="page-pane" hidden>
+              <div id="today-panel"></div>
+            </div>
+            <div id="page-projects" class="page-pane" hidden>
+              <h2>Projects</h2>
+              <div id="projects-list"></div>
+              <p id="project-open-result-text"></p>
+            </div>
+            <div id="page-sessions" class="page-pane" hidden>
+              <h2>Other sessions</h2>
+              <ul id="other-sessions-list"></ul>
+              <form id="session-search-form">
+                <label id="session-search-label" for="session-search-input"></label>
+                <input id="session-search-input" type="text" />
+                <button type="submit" id="session-search-button"></button>
+              </form>
+              <p id="session-search-message"></p>
+              <ul id="session-search-result"></ul>
+            </div>
+          </div>
         </main>
       </div>
       <DialogsShell />
