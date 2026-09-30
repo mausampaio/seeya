@@ -9200,3 +9200,16 @@ medição.
 mesma máquina, mesmo `measure-idle.mjs` — antes de decidir se isto é custo real (e, se for, o que
 custou) ou ruído. `docs/DESEMPENHO.md` já tem os dois números lado a lado, sem reescrever a linha
 de base de 2026-09-20.
+
+**Resolvida pelo PO em 2026-09-30 — não é regressão.** A/B feito na mesma sessão e na mesma
+máquina, alternando os dois lados, com `measure-idle.mjs` (três janelas de 60 s por rodada), e a
+máquina com ~55% de memória livre (uma primeira tentativa, com a máquina apertada, foi interrompida
+por falta de memória e não conta):
+
+| Rodada | `main` antes da V2-T62 (`a8fb0e0`) | V2-T62 |
+|---|---|---|
+| 1 | 354,7–363,7 MiB | 353,5–363,1 MiB |
+| 2 | 350,8–364,3 MiB | 351,2–362,1 MiB |
+
+As faixas se sobrepõem por inteiro: a fundação em Preact não custou memória mensurável. A
+diferença contra 2026-09-20 é do estado da máquina, o mesmo achado da Q-096.

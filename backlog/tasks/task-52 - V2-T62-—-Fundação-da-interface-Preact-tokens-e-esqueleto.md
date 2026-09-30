@@ -4,7 +4,7 @@ title: 'V2-T62 — Fundação da interface: Preact, tokens e esqueleto'
 status: Review
 assignee: []
 created_date: '2026-09-30 10:33'
-updated_date: '2026-09-30 12:13'
+updated_date: '2026-09-30 13:06'
 labels: []
 milestone: m-2
 dependencies: []
@@ -172,3 +172,13 @@ branches / 95,26% functions / 96,5% lines — todos os pisos por diretório (inc
 completo — ver comentário no TASK-41); Q-099 (memória) sem resolução; (d) tamanho em disco não
 medido.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-09-30 13:06
+---
+Revisão do PO em 2026-09-30: mesclado, portão verde (2918 testes) e também sem identidade global do git (rodado pelo PO — o agente parou e reportou a recusa, sem contornar). Q-099 resolvida pelo PO: A/B de memória na mesma sessão, main de antes contra a V2-T62, sem diferença (350,8–364,3 contra 351,2–363,1 MiB). Tamanho medido pelo PO: instalador +0,6%, instalado +1,8 MB. Achado cosmético (anel de foco no botão de recolher ao abrir) fica para a V2-T63. main.ts (1346 linhas) segue na V2-T51. Falta o aceite do mantenedor com o instalador novo, nos dois temas.
+---
+<!-- COMMENTS:END -->

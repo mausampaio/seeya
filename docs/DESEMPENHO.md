@@ -143,7 +143,7 @@ medido — ver nota abaixo.
 | (a) Tempo até a lista de sessões | 5782–5801 ms | 5742–5824 ms |
 | (b) Memória em repouso (árvore inteira) | 335,6–338,0 MiB | 364,5–397,6 MiB |
 | (c) CPU ocioso (janela de 60 s) | 0,39%–0,57% de um núcleo lógico | 0,29%–0,47% de um núcleo lógico |
-| (d) Instalador / instalado | ~112,1 MiB / ~390,6 MiB | não medido — `npm run dist:windows` foi recusado pelo classificador automático do harness ("Production Deploy") nesta sessão de agente; precisa ser medido por quem tem permissão para rodá-lo |
+| (d) Instalador / instalado | ~112,1 MiB / ~390,6 MiB | 118.163.414 bytes (~112,7 MiB) / 411.302.899 bytes (~392,2 MiB) — medido pelo PO, `npm run dist:windows` |
 
 **(a) e (c) ficam dentro da faixa já registrada** (ou melhores) — sem indício de custo novo na
 subida ou no processador parado.
@@ -156,6 +156,11 @@ não tinha como reconstruir o `main` de antes da migração para medir os dois l
 (exigiria uma segunda worktree/checkout, fora do que esta tarefa foi autorizada a fazer sozinha) —
 o número está registrado tal como medido, e `docs/QUESTOES.md` Q-099 pede o A/B de verdade antes de
 decidir se isto é custo real do Preact/das fontes ou ruído da máquina.
+
+**Resolvido pelo PO no mesmo dia (Q-099): não é regressão.** A/B na mesma sessão, alternando
+`main` de antes (`a8fb0e0`) e a V2-T62, duas rodadas cada: 350,8–364,3 MiB contra 351,2–363,1 MiB
+— faixas sobrepostas por inteiro. (d) medido pelo PO: o instalador cresceu ~0,6% (+666 KB) e o
+instalado +1,8 MB, o que as fontes empacotadas e o Preact explicam.
 
 
 ## A régua
