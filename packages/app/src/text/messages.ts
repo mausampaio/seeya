@@ -276,8 +276,10 @@ export const MESSAGES = {
   } as Record<string, string>,
 
   // V2-T30 — the "Projects" section, its dialogs, and the sidebar's collapse toggle.
-  sidebarCollapseToggleCollapsed: '›',
-  sidebarCollapseToggleExpanded: '‹',
+  // V2-T63 correction: the side-strip toggle's own glyph is a static `<ChevronLeftIcon/>` now
+  // (`app-shell.tsx`/`ui/icons.tsx`), not a text pair swapped at runtime — see
+  // `electron/sidebar-collapse-view.ts#applySidebarCollapsed`'s own docstring for why it never
+  // needed a second "reopen" glyph.
   // Maintainer acceptance, 2026-09-25: the side-strip toggle above wasn't discoverable ("um
   // controle que só se acha sabendo que existe é defeito") — this second, obvious button lives in
   // the toolbar next to "+" instead, with its own glyph pair and a tooltip naming the keyboard

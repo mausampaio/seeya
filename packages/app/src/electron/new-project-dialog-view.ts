@@ -22,12 +22,10 @@ export function wireNewProjectDialog(): void {
   const input = document.getElementById('new-project-id-input') as HTMLInputElement;
   const errorLine = document.getElementById('new-project-error') as HTMLElement;
 
-  // Correction (real-window screenshot review): icon-only "+" — the earlier version set this
-  // button's own `textContent` to the full "New project…" phrase, which read as a second large
-  // text button crowding the "Favorites" heading instead of a small icon next to it.
+  // Correction (real-window screenshot review, second round): the "+" is a static
+  // `<PlusIcon/>`/`aria-label` now (`app-shell.tsx`) — this button's own appearance never
+  // changes, so nothing here sets its content anymore, only its click handler.
   const newProjectButton = document.getElementById('new-project-button') as HTMLButtonElement;
-  newProjectButton.textContent = '+';
-  newProjectButton.setAttribute('aria-label', MESSAGES.newProjectButton);
   newProjectButton.addEventListener('click', () => {
     input.value = '';
     errorLine.textContent = '';

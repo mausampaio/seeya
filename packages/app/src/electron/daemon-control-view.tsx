@@ -5,6 +5,7 @@
  */
 import { MESSAGES } from '../text/messages.js';
 import { reduceDaemonControl, type DaemonControlState } from '../state/daemon-control-panel.js';
+import { PlayIcon, StopIcon, mountIcon } from '../ui/icons.js';
 
 /**
  * V2-T5b item 3: "Start daemon"/"Stop daemon" — one native button, driven end to end by
@@ -13,27 +14,26 @@ import { reduceDaemonControl, type DaemonControlState } from '../state/daemon-co
  */
 let daemonControlState: DaemonControlState = { kind: 'idle', availability: { kind: 'unknown' } };
 
-/** V2-T63 correction (real-window screenshot review): the pill is a dot + a label
- * (`#daemon-pill-dot`/`#daemon-pill-label`) reporting the FACT, plus a separate small icon button
- * (`#daemon-control-button`, ▶/■) that performs the action — replaces the earlier version, where
- * the whole pill was one button and had no visible stop affordance at all. `setDotTone` mirrors
- * `sidebar-favorites-view.ts`'s own single-call-clears-stale-class shape. */
-function setDotTone(dot: HTMLElement, tone: 'success' | 'neutral'): void {
-  dot.classList.remove('sidebar-pill-dot--success', 'sidebar-pill-dot--neutral');
-  dot.classList.add(`sidebar-pill-dot--${tone}`);
+/** V2-T63 correction (real-window screenshot review, third round): a SOLID tone background on
+ * the pill itself (`index.css`'s own `#daemon-pill.daemon-pill--success`) — the dot
+ * (`#daemon-pill-dot`) and the label text both inherit that colour via `currentColor`/normal
+ * cascade, so this is the one place that decides the tone, never three separate colour
+ * assignments to keep in sync. */
+function setPillTone(pill: HTMLElement, tone: 'success' | 'neutral'): void {
+  pill.classList.toggle('daemon-pill--success', tone === 'success');
 }
 
 function renderDaemonControl(): void {
-  const dot = document.getElementById('daemon-pill-dot') as HTMLElement;
+  const pill = document.getElementById('daemon-pill') as HTMLElement;
   const label = document.getElementById('daemon-pill-label') as HTMLElement;
   const button = document.getElementById('daemon-control-button') as HTMLButtonElement;
   const result = document.getElementById('daemon-control-result') as HTMLElement;
 
   if (daemonControlState.kind === 'running') {
     label.textContent = MESSAGES.daemonControlRunning;
-    setDotTone(dot, 'neutral');
+    setPillTone(pill, 'neutral');
     button.disabled = true;
-    button.textContent = '';
+    mountIcon(button, null);
     return;
   }
   if (daemonControlState.kind === 'result') {
@@ -42,9 +42,9 @@ function renderDaemonControl(): void {
   const availability = daemonControlState.availability;
   if (availability.kind === 'unknown') {
     label.textContent = MESSAGES.daemonControlUnknown;
-    setDotTone(dot, 'neutral');
+    setPillTone(pill, 'neutral');
     button.disabled = true;
-    button.textContent = '';
+    mountIcon(button, null);
     button.setAttribute('aria-label', MESSAGES.daemonControlUnknown);
     return;
   }
@@ -54,9 +54,9 @@ function renderDaemonControl(): void {
   // BUTTON is the action, glyph and `aria-label` both naming what clicking it does.
   const running = availability.kind === 'stop';
   label.textContent = running ? MESSAGES.daemonPillRunning : MESSAGES.daemonPillStopped;
-  setDotTone(dot, running ? 'success' : 'neutral');
+  setPillTone(pill, running ? 'success' : 'neutral');
   button.disabled = false;
-  button.textContent = running ? '■' : '▶';
+  mountIcon(button, running ? <StopIcon /> : <PlayIcon />);
   button.setAttribute(
     'aria-label',
     running ? MESSAGES.daemonControlStopAction : MESSAGES.daemonControlStartAction,

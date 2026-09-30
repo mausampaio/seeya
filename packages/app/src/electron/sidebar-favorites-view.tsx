@@ -18,6 +18,7 @@ import {
 } from '../state/sidebar-summary.js';
 import type { ProjectsPanelData } from '../state/projects-panel.js';
 import { pageTabId, type PageTabKind } from '../tabs/page-tab.js';
+import { CalendarIcon, FolderIcon, StarIcon, mountIcon } from '../ui/icons.js';
 import { onActiveTabChanged } from './tabs-view.js';
 import { openOrFocusPageTab } from './page-tab-strip.js';
 import { triggerFavoriteToggle } from './projects-list-view.js';
@@ -42,7 +43,10 @@ function renderTodayCard(data: TodayPanelData): void {
   const icon = document.createElement('span');
   icon.className = 'today-card-icon';
   icon.setAttribute('aria-hidden', 'true');
-  icon.textContent = '📅';
+  // Correction (real-window screenshot review, second round): the real icon set
+  // (`ui/icons.tsx`, identity § 6.4) instead of the 📅 emoji — mounted, never a second hand-drawn
+  // copy of the same SVG.
+  mountIcon(icon, <CalendarIcon />);
   row.appendChild(icon);
   const title = document.createElement('span');
   title.className = 'today-card-title';
@@ -85,7 +89,11 @@ function renderFavoriteRow(row: FavoriteProjectRow): HTMLLIElement {
   star.className = 'project-favorite-star';
   star.setAttribute('aria-pressed', 'true');
   star.setAttribute('aria-label', MESSAGES.sidebarFavoriteStarLabel(true, row.name));
-  star.textContent = '★';
+  // Correction (real-window screenshot review, second round): a filled, brand-coloured
+  // `<StarIcon filled/>` — identity § 6.4's own "a estrela do favorito é da cor da marca, não
+  // amarela/laranja" — never the ★ glyph (rendered by the OS/browser's own emoji font, coloured
+  // by CSS, but still not this project's own icon language).
+  mountIcon(star, <StarIcon filled />);
   star.addEventListener('click', (event) => {
     event.stopPropagation();
     triggerFavoriteToggle(row.projectId, true);
@@ -119,11 +127,23 @@ function renderFavoriteRow(row: FavoriteProjectRow): HTMLLIElement {
   return item;
 }
 
+/** Correction (real-window screenshot review, item 3): a folder icon at the same position the
+ * Favorites list's own star occupies (`.sidebar-favorite-star`'s own width/gap, mirrored by
+ * `.sidebar-recent-icon` in `index.css`) — outline, tertiary colour (never the project's brand or
+ * warning colour: a Recent row isn't a favorite), so the two lists' rows line up. */
 function renderRecentRow(row: {
   readonly projectId: string;
   readonly name: string;
 }): HTMLLIElement {
   const item = document.createElement('li');
+  item.className = 'sidebar-recent-row';
+
+  const icon = document.createElement('span');
+  icon.className = 'sidebar-recent-icon';
+  icon.setAttribute('aria-hidden', 'true');
+  mountIcon(icon, <FolderIcon />);
+  item.appendChild(icon);
+
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'sidebar-recent-name';
@@ -176,10 +196,11 @@ function render(): void {
 }
 
 /** Correction (real-window screenshot review, item 6): icon + label + a plain right-aligned
- * total — never the combined "All projects (N)" string the earlier version rendered. */
+ * total — never the combined "All projects (N)" string the earlier version rendered. The icon
+ * itself (`<FolderIcon/>`) is static JSX now (`app-shell.tsx`), never touched here — this only
+ * ever updates the label/count next to it. */
 function renderAllProjectsRow(total: number): void {
   const row = document.getElementById('all-projects-link') as HTMLElement;
-  (row.querySelector('.sidebar-nav-icon') as HTMLElement).textContent = '📁';
   (row.querySelector('.sidebar-nav-label') as HTMLElement).textContent =
     MESSAGES.sidebarAllProjectsLabel;
   (row.querySelector('.sidebar-nav-count') as HTMLElement).textContent = String(total);
@@ -188,10 +209,10 @@ function renderAllProjectsRow(total: number): void {
 /** Correction (real-window screenshot review, item 6): icon + label + the green dotted "N
  * running" pill — same `.seeya-status-pill` classes the Today card's own pill uses, tone `success`
  * when something IS running, `neutral` otherwise (never hidden: "how many are running" is the
- * fact this row exists to show, even when the answer is zero). */
+ * fact this row exists to show, even when the answer is zero). The icon itself
+ * (`<ChatBalloonIcon/>`) is static JSX now, same reasoning as `renderAllProjectsRow` above. */
 function renderSessionsRow(runningCount: number): void {
   const row = document.getElementById('sessions-link') as HTMLElement;
-  (row.querySelector('.sidebar-nav-icon') as HTMLElement).textContent = '💬';
   (row.querySelector('.sidebar-nav-label') as HTMLElement).textContent =
     MESSAGES.sidebarSessionsLabel;
   const count = row.querySelector('.sidebar-nav-count') as HTMLElement;

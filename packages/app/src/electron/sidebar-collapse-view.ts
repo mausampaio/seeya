@@ -10,7 +10,6 @@
  * (`#sidebar-toggle-button`) and the `Ctrl+B` keyboard shortcut, both driving the exact same state
  * and `localStorage` key as the side strip, never a second source of truth.
  */
-import { MESSAGES } from '../text/messages.js';
 import {
   encodeSidebarCollapsedPreference,
   parseSidebarCollapsedPreference,
@@ -54,10 +53,11 @@ function writeSidebarCollapsedPreference(collapsed: boolean): void {
 function applySidebarCollapsed(collapsed: boolean): void {
   const sidebar = sidebarElement();
   sidebar.classList.toggle('collapsed', collapsed);
-  const stripToggle = document.getElementById('sidebar-collapse-toggle') as HTMLButtonElement;
-  stripToggle.textContent = collapsed
-    ? MESSAGES.sidebarCollapseToggleCollapsed
-    : MESSAGES.sidebarCollapseToggleExpanded;
+  // V2-T63 correction (real-window review): `#sidebar-collapse-toggle` carries a static
+  // `<ChevronLeftIcon/>` now (`app-shell.tsx`), never touched again here — it only ever shows
+  // while the sidebar is EXPANDED (the whole header hides along with the rest of `#sidebar-main`
+  // while collapsed, this file's own `index.css` docstring), so it never needed a second,
+  // "reopen" glyph to swap to in the first place.
   const toolbarToggle = document.getElementById('sidebar-toggle-button') as HTMLButtonElement;
   const label = sidebarToggleButtonLabel(collapsed);
   toolbarToggle.textContent = label.glyph;

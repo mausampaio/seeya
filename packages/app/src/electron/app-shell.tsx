@@ -39,8 +39,18 @@
  * only ever happens from there or `Ctrl+B`; reopening is the toolbar's own `#sidebar-toggle-button`
  * (already always visible, open or collapsed) — `docs/INTERFACE.md`'s own "o botão da barra de
  * abas a reabre".
+ *
+ * **Second correction round (same day, same review): emoji → the real icon set
+ * (`ui/icons.tsx`, identity § 6.4).** The collapse chevron, "+", and the two static nav rows'
+ * icons (folder for "All projects", a chat balloon for "Sessions") are placed here, once, and
+ * never touched again — `sidebar-favorites-view.ts`'s own re-render only ever updates the
+ * LABEL/COUNT spans next to them now. The Today card's own icon stays imperative (that whole
+ * button is rebuilt from scratch every push, to add/remove the "N to resume" pill) — mounted via
+ * `ui/icons.tsx#mountIcon`, the exact same component, never a second hand-drawn copy.
  */
 import { Button } from '../ui/button.js';
+import { ChatBalloonIcon, ChevronLeftIcon, FolderIcon, PlusIcon } from '../ui/icons.js';
+import { MESSAGES } from '../text/messages.js';
 import { DialogsShell } from './dialogs-shell.js';
 
 export function AppShell() {
@@ -60,7 +70,7 @@ export function AppShell() {
                 iconOnly
                 aria-label="Collapse sidebar"
               >
-                ‹
+                <ChevronLeftIcon />
               </Button>
             </div>
             <div id="sidebar-content">
@@ -69,7 +79,13 @@ export function AppShell() {
               <section id="favorites-section">
                 <div class="sidebar-section-header">
                   <h2>Favorites</h2>
-                  <button id="new-project-button" type="button"></button>
+                  <button
+                    id="new-project-button"
+                    type="button"
+                    aria-label={MESSAGES.newProjectButton}
+                  >
+                    <PlusIcon />
+                  </button>
                 </div>
                 <ul id="favorites-list"></ul>
               </section>
@@ -80,7 +96,9 @@ export function AppShell() {
               </section>
 
               <button id="all-projects-link" class="sidebar-nav-row" type="button">
-                <span class="sidebar-nav-icon" aria-hidden="true"></span>
+                <span class="sidebar-nav-icon">
+                  <FolderIcon />
+                </span>
                 <span class="sidebar-nav-label"></span>
                 <span class="sidebar-nav-count"></span>
               </button>
@@ -91,7 +109,9 @@ export function AppShell() {
               <ul id="ignored-projects-list" hidden></ul>
 
               <button id="sessions-link" class="sidebar-nav-row" type="button">
-                <span class="sidebar-nav-icon" aria-hidden="true"></span>
+                <span class="sidebar-nav-icon">
+                  <ChatBalloonIcon />
+                </span>
                 <span class="sidebar-nav-label"></span>
                 <span class="sidebar-nav-count"></span>
               </button>
