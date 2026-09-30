@@ -4,7 +4,7 @@ title: 'V2-T63 — Lateral nova: favoritos, recentes, contador e daemon'
 status: Review
 assignee: []
 created_date: '2026-09-30 10:33'
-updated_date: '2026-09-30 19:22'
+updated_date: '2026-09-30 19:30'
 labels: []
 milestone: m-2
 dependencies:
@@ -145,5 +145,11 @@ author: agente
 created: 2026-09-30 19:22
 ---
 Segunda correcao do aceite (2026-09-30), mesma branch tarefa/V2-T63-lateral-correcao, commits 84a4004 e c9b9373. Layout de uma coluna confirmado certo pelo PO na primeira correcao; esta trata os 2 defeitos visiveis + 2 ajustes restantes: (1) logo duplicado no tema claro -- causa raiz era especificidade CSS (#sidebar-logo img, id+tipo, vencia #sidebar-logo-dark { display:none }, so id, mesmo fora de ordem), corrigido dando aos dois seletores de escolha dois ids (sempre mais especifico); os SVGs mestres de design/ nunca precisaram de mudanca, os dois sempre tiveram o mesmo viewBox. (2) Nenhum emoji mais -- packages/app/src/ui/icons.tsx, modulo novo e reusavel (calendario, pasta, balao, estrela, mais, recolher, play, stop, relogio, ajustes, terminal, fechar), tracado 1.75px, grade 24, nunca preenchido+contorno misturados no mesmo icone; a estrela e a unica com estado (contorno por padrao, preenchida com --seeya-brand-text so quando favorita, nunca amarelo/laranja). (3) Recent ganhou o icone de pasta (contorno, cor terciaria) alinhado com a posicao da estrela em Favorites. (4) Pilula do daemon: fundo solido por estado (--seeya-success-bg/text rodando, --seeya-surface-hover parado), radius-md (10px, nao mais pilula 9999px), altura ~32px -- o estado rodando (fundo verde) foi conferido por leitura do CSS, nao capturado (nenhum daemon real rodando na fixture desta verificacao; o estado parado, capturado, prova a mesma regra de fundo/raio/altura). npm run verificar verde (303 arquivos, 3007 passando, 4 puladas pre-existentes) rodado duas vezes. Capturas novas (claro, escuro, recolhido) salvas no scratchpad da sessao do agente, caminho passado ao mantenedor fora deste arquivo. Registro do Windows e hash de protocol-handler.json reais conferidos identicos antes e depois desta rodada tambem.
+---
+
+author: PO
+created: 2026-09-30 19:30
+---
+Revisão do PO da correção do aceite (2026-09-30): duas rodadas. A primeira publicação saiu com a lateral em duas colunas e faixa violeta — o PO não tinha olhado a janela real antes de publicar (falha de processo, corrigida: tarefa de tela agora entrega capturas e o PO as confere). Rodada 1: uma coluna, faixa fora, rótulos, cartão Today, linhas de navegação, pílula com botão. Rodada 2: logo do tema claro (especificidade CSS), ícones de traço em ui/icons.tsx no lugar de emoji, pasta em Recent, pílula com fundo sólido. Capturas conferidas pelo PO nos dois temas e recolhido. Portão verde (3007 testes), também sem identidade global do git. Falta o aceite do mantenedor com o instalador.
 ---
 <!-- COMMENTS:END -->
