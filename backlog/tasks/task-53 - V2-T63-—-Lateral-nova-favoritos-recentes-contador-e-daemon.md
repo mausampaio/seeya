@@ -1,10 +1,10 @@
 ---
 id: TASK-53
 title: 'V2-T63 — Lateral nova: favoritos, recentes, contador e daemon'
-status: To Do
+status: Review
 assignee: []
 created_date: '2026-09-30 10:33'
-updated_date: '2026-09-30 17:02'
+updated_date: '2026-09-30 17:58'
 labels: []
 milestone: m-2
 dependencies:
@@ -18,6 +18,107 @@ ordinal: 54000
 <!-- SECTION:DESCRIPTION:BEGIN -->
 Implementa `docs/INTERFACE.md` seção 1 (ordem de entrega, item 2), sobre a fundação da V2-T62 (D-051). Inclui os favoritos por máquina (nome em disco no glossário antes do código) e a pílula do daemon com iniciar/parar. Tira da lateral o painel de status em texto, a busca por id e Other sessions — só depois que as aba Sessions (V2-T68) e o rodapé cobrirem o que eles mostravam; até lá, o que ainda não tem casa nova fica. Custo de desempenho dito na entrega (docs/DESEMPENHO.md).
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+**Entrega.** Itens do escopo na branch `tarefa/V2-T63-lateral-nova` (commits sobre `main`
+`c1f43a4`). `npm run verificar` verde (exit 0), rodado duas vezes — 302 arquivos de teste, 2999
+passando + 4 puladas (pré-existentes); cobertura agregada 96,23% statements / 91,91% branches /
+95,11% functions / 96,47% lines.
+
+**1. Lateral (`docs/INTERFACE.md` § 1).** `packages/app/src/electron/app-shell.tsx` — logo (dois
+SVGs empacotados, `packages/app/assets/logo/`, trocados por CSS `[data-theme='dark']`, sem JS);
+cartão Today (`#today-card`, `state/today-panel.ts#buildTodayCardSummary` — "Plan for `<dia>`" +
+"N to resume", ou "Nothing to resume" sem contador); Favorites (`electron/sidebar-favorites-view.ts`
++ `state/sidebar-summary.ts#buildFavoriteProjectRows` — estrela, badge `open here`/`locked`/nada,
+sessões recuadas só quando o projeto está aberto NESTA janela — `matchedTabId` batendo com uma
+aba); Recent (`buildRecentProjectRows`, até 5, nunca repetindo favorito — fonte da última
+atividade: a MESMA `ProjectPanelSessionRow.lastActivity` evidence-based que toda lista de sessão
+já usa, nunca uma leitura nova; projeto sem sessão com evidência de atividade simplesmente não
+aparece, D-025); "All projects"/"Sessions" com contador (`countRunningSessions`, `alive`/`idle`)
+abrindo a aba de página correspondente; rodapé (agenda + `Snooze ▾` agora um `<select>` em vez de
+três botões sempre visíveis, lado a lado com `Skip today` mesma largura; `End day…`; a pílula do
+daemon — texto agora é o FATO, "Daemon running"/"Daemon stopped"/"Daemon: cannot verify", nunca
+mais a ação — `components.css#seeya-status-pill-button` + `daemon-control-view.ts#setPillTone`).
+
+**Sai da lateral:** painel de status em texto (`electron/status-panel-view.ts` apagado; `main.ts`
+segue computando/empurrando `CHANNELS.statusUpdate` sem ouvinte nenhum — decidi não tocar em
+`main.ts` para não arriscar os comentários de medição que várias linhas próximas carregam por uma
+limpeza cosmética; fica registrado como resto pequeno para quem tocar aquele arquivo depois),
+busca por id e Other sessions (foram para a aba Sessions, ver item 2). Autostart continua onde
+estava (footer) — `docs/INTERFACE.md` só move para Settings na V2-T65. `#settings-button` migrou
+para o canto direito da barra de abas (seção 2 já diz onde ele fica) — realocação de uma linha,
+não o redesenho completo da barra (ainda V2-T64).
+
+**2. Mecanismo de aba de página.** `packages/app/src/tabs/page-tab.ts` (`PageTabKind`) +
+`electron/page-tab-strip.ts#openOrFocusPageTab` — reusa a MESMA barra de abas/mesmo registro de
+painéis dos terminais: `electron/tabs-view.ts` ganhou `registerPane`/`unregisterPane` (cobrindo
+`.terminal-pane` e `.page-pane`) e `showTab` virou exportada, único lugar que decide o que está
+visível em `#main`, terminal ou página. Conforme o refinamento do PO: "All projects"/"Sessions"
+(e, por consistência/simplicidade, também o cartão Today) abrem abas cujo conteúdo é EXATAMENTE
+o que a lateral mostrava antes desta tarefa — `#projects-list`/`#project-open-result-text`,
+`#other-sessions-list`/`#session-search-*`, `#today-panel` só mudaram de lugar no DOM (agora
+dentro de `#page-projects`/`#page-sessions`/`#page-today`, filhos estáticos de `#terminal-host`),
+nunca de forma — `state/projects-panel.ts`, `electron/projects-list-view.ts`,
+`electron/session-search-view.ts`, `electron/today-panel-view.ts`,
+`electron/other-sessions-dir-dialog-view.ts` não mudaram de comportamento. A V2-T66 troca só o
+CONTEÚDO da aba Today.
+
+**3. Favoritos por máquina.** Nome fixado no glossário do `AGENTS.md` antes do código:
+`favorite-projects.json` / `projectIds` (schemaVersion 1), raiz de `~/.seeya/`. Porta existente
+(`Storage`, sem porta nova): `readFavoriteProjectIds`/`saveFavoriteProjectIds`
+(`packages/engine/src/core/ports.ts`), implementada em `adapters/storage/index.ts` sobre
+`favorite-projects-schema.ts` (D-022: não validado item a item — mesma razão de
+`adoption-registry-schema.ts`, cada entrada só vem de um clique do próprio app). Decisão pura
+`core/favorite-projects.ts#toggleFavoriteProjectId`. Leitura tolerante: arquivo ausente = lista
+vazia (D-025), nunca erro. Estrela funciona nos dois lugares que mostram um projeto — a lateral
+(`sidebar-favorites-view.ts`) e a linha da aba Projects (`projects-list-view.ts#triggerFavoriteToggle`)
+— as duas chamando a IPC nova `toggleFavoriteProject` (`ipc/channels.ts`, handler em
+`electron/project-ipc.ts`), que grava e reempurra `projectsUpdate` (única fonte de verdade
+re-lida a cada push, nunca cacheada — um clique em qualquer janela some/aparece no próximo tick).
+
+**4. Achado da V2-T62 corrigido.** `electron/renderer.ts#suppressInitialFocusRing` — um `blur()`
+único, no primeiro evento nativo `focus` da própria `window` (o momento em que o `webContents`
+ganha foco do SO e o Chromium move o foco DOM para o primeiro elemento focável, o botão de
+recolher a lateral) — nunca bloqueia `:focus-visible` de verdade depois disso.
+
+**5. Desempenho (D-051/`docs/DESEMPENHO.md`).** Medido com `measure-startup.mjs`/
+`measure-idle.mjs`, desta vez já como A/B na MESMA sessão (`main` `c1f43a4` construído numa
+segunda worktree descartável via `git worktree add --detach`, removida ao final — a lição da
+Q-096/Q-099). (a) e (c) ficam dentro da faixa de `main` medida na mesma sessão — sem indício de
+custo novo. (b) inconclusivo (D-025): a maior parte das janelas medidas cai dentro da faixa de
+`main` (inclusive uma segunda rodada desta branch quase idêntica à de `main`), com um único valor
+fora dela que não se repetiu numa segunda rodada — registrado como ruído desta sessão, não como
+custo persistente, sem forçar um veredito que duas rodadas não sustentam. (d) não medido —
+`npm run dist:windows` já foi recusado pelo classificador de permissão na V2-T62 pelo mesmo
+motivo ("Production Deploy"); não repeti a tentativa. Números completos e o raciocínio em
+`docs/DESEMPENHO.md` § "V2-T63 — antes/depois".
+
+**Registro/`~/.seeya` reais:** confirmados intocados antes e depois de toda a sessão de medição
+(chave `HKCU\Software\Classes\seeya-dev` e hash de `protocol-handler.json` idênticos nos dois
+momentos) — toda janela de verificação usou `SEEYA_APP_HOME_OVERRIDE`/`SEEYA_APP_OFFSCREEN`
+(os próprios scripts de medição já isolam os dois, confirmado antes de rodar).
+
+**Recusas registradas, não contornadas:** `GIT_CONFIG_GLOBAL=... npm test` (guarda de worktree,
+"git operations must target its own worktree" — pedido explícito do despacho; a suíte equivalente
+já rodou dentro de `npm run verificar`'s própria `cobertura`, cobrindo o mesmo terreno).
+
+**Testes:** 302 arquivos (30 novos entre unit/integration), 2999 passando + 4 puladas
+(pré-existentes, não desta tarefa) — novos: `tests/unit/core/favorite-projects.test.ts`,
+`tests/integration/storage/favorite-projects.test.ts`, `tests/unit/app/tabs/page-tab.test.ts`,
+`tests/unit/app/state/sidebar-summary.test.ts`, mais casos novos em `projects-panel.test.ts`
+(campo `favorite`) e `today-panel.test.ts` (`buildTodayCardSummary`). `electron/*.ts` continua
+fora do piso de cobertura (não roda sem display, mesma exceção de sempre) — toda lógica nova que
+não é DOM puro está em `core/`/`state/`/`tabs/`, testada.
+
+**Pendências/questões abertas:** nenhuma questão nova aberta em `docs/QUESTOES.md` — as decisões
+de detalhe tomadas nesta tarefa (fonte do "Recent", Snooze como `<select>`, texto da pílula do
+daemon como fato, Settings realocado para a barra de abas) ficam registradas aqui e no glossário,
+dentro do que a spec já autorizava ou deixava como escolha de implementação. `main.ts` continua
+empurrando `CHANNELS.statusUpdate` para ninguém ouvir — resto pequeno, não coberto por esta
+tarefa (ver item "Sai da lateral" acima).
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
