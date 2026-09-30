@@ -54,6 +54,7 @@
  * // C:\\seeya\\workspace\\auth-hardening.'
  */
 import path from 'node:path';
+import { MANIFEST_OWNERSHIP_NOTE } from '../../core/project-manifest-ownership.js';
 
 export function buildAdoptionInstruction(projectDir: string): string {
   const agentsFile = path.join(projectDir, 'AGENTS.md');
@@ -75,6 +76,7 @@ export function buildAdoptionInstruction(projectDir: string): string {
     `— into ${knowHowFile} specifically; that is the first thing lost when a session gets ` +
     'summarized. For any credential, token or secret, write down where it lives and how to reach ' +
     'it (a skill, a config file, a path) — never its value. Mark anything you are not sure about ' +
-    `as uncertain rather than stating it as fact. Write only inside ${projectDir}.`
+    `as uncertain rather than stating it as fact. ${MANIFEST_OWNERSHIP_NOTE} ` +
+    `Write only inside ${projectDir}.`
   );
 }
