@@ -70,7 +70,14 @@ function suppressInitialFocusRing(): void {
  */
 async function main(): Promise<void> {
   suppressInitialFocusRing();
-  render(AppShell(), document.getElementById('root') as HTMLElement);
+  // D-052 (V2-T75) production defect, found by real-window screenshot verification: `AppShell`
+  // now calls `useSidebarCollapse` (a real hook) at its own top level, so it MUST be mounted as a
+  // proper Preact component (`<AppShell />`) — calling it as a plain function (`AppShell()`, what
+  // this line did before this task, back when the whole tree was static markup with no hooks of
+  // its own) skips Preact's own component-render setup entirely, and every hook inside throws
+  // `Cannot read properties of undefined (reading '__H')` the instant it runs, since there is no
+  // owning component instance for `useState`/`useEffect` to attach to.
+  render(<AppShell />, document.getElementById('root') as HTMLElement);
 
   setTerminalFontConfig(await window.seeya.getTerminalFontConfig());
   await wireTheme();
