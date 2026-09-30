@@ -29,10 +29,10 @@ const SPAWN_MESSAGE =
 // same lesson D-038 already drew from four `spawn` call sites that forgot `windowsHide` on their
 // own.
 const ELECTRON_MESSAGE =
-  "electron can only be imported in packages/app/src/electron/** — that's the one directory " +
-  'whose wiring cannot run headless (no display), which is also why it is excluded from ' +
-  "packages/app/src's coverage floor (vitest.config.ts). Every other module keeps its logic " +
-  'testable in plain Node; electron/ only wires IPC to it.';
+  "electron can only be imported in packages/app/src/main/** — that's the main-process side " +
+  '(window, IPC, preload, D-052), whose wiring cannot run headless (no display), which is also ' +
+  "why it is excluded from packages/app/src's coverage floor (vitest.config.ts). Every other " +
+  'module keeps its logic testable in plain Node; main/ only wires IPC to it.';
 const NODE_PTY_MESSAGE =
   'node-pty can only be imported in packages/app/src/pty/** — a tab is a process the seeya app ' +
   'launches (D-038: invisible by default, which ConPTY already gives for free, spike M item 4), ' +
@@ -183,9 +183,9 @@ export default tseslint.config(
   // (packages/app/src is inside that glob too, so the same "last wins" hazard applies to it and
   // the spawn ban has to be repeated here, not assumed inherited).
   {
-    // packages/app/src/electron/**: electron IS allowed here (it's the one place D-042's own
-    // wiring lives) — node-pty and a raw node:child_process spawn are not.
-    files: ['packages/app/src/electron/**/*.ts'],
+    // packages/app/src/main/**: electron IS allowed here (it's the one place D-042/D-052's own
+    // main-process wiring lives) — node-pty and a raw node:child_process spawn are not.
+    files: ['packages/app/src/main/**/*.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -216,11 +216,12 @@ export default tseslint.config(
     },
   },
   {
-    // Every other packages/app/src file (composition/, tabs/, sidebar/, state/, ipc/, text/):
-    // neither electron nor node-pty nor a raw spawn — this is the pure, testable logic D-041's
-    // "tudo que tiver lógica fica fora de electron/" describes.
+    // Every other packages/app/src file (composition/, tabs/, sidebar/, state/, ipc/, text/,
+    // renderer/): neither electron nor node-pty nor a raw spawn — this is the pure, testable
+    // logic D-041's "tudo que tiver lógica fica fora de electron/" describes, now read as "fica
+    // fora de main/" (D-052).
     files: ['packages/app/src/**/*.ts'],
-    ignores: ['packages/app/src/electron/**/*.ts', 'packages/app/src/pty/**/*.ts'],
+    ignores: ['packages/app/src/main/**/*.ts', 'packages/app/src/pty/**/*.ts'],
     rules: {
       'no-restricted-imports': [
         'error',

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>seeya</title>
+    <link rel="stylesheet" href="xterm.css" />
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="components.css" />
+    <link rel="stylesheet" href="index.css" />
+    <!--
+      D-052 (V2-T75): the design system's own CSS modules (`renderer/components/**/*.module.css`,
+      `renderer/features/**/*.module.css`), bundled by esbuild alongside `renderer.js` (same
+      entry, `outdir` instead of `outfile` — see `scripts/build.mjs`'s own comment). `index.css`/
+      `components.css` above keep styling the LEGACY screens (`renderer/legacy/**`) exactly as
+      before; nothing in this file moved from one stylesheet to the other, this is a new one.
+    -->
+    <link rel="stylesheet" href="renderer.css" />
+  </head>
+  <body>
+    <!--
+      V2-T62 (D-051), reorganized by D-052 (V2-T75): the whole window (the lateral, the tab bar,
+      every dialog) is Preact markup — the design-system-built parts in `renderer/App.tsx`/
+      `renderer/features/sidebar/`, the not-yet-rewritten parts in `renderer/legacy/` — rendered
+      once into this single mount point by `renderer.tsx#main`. This file no longer carries the
+      tree by hand.
+    -->
+    <div id="root"></div>
+    <script type="module" src="renderer.js"></script>
+  </body>
+</html>

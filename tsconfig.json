@@ -26,32 +26,34 @@
     "vitest.config.ts",
     "eslint.config.js"
   ],
-  // V2-T2: packages/app/src/electron/** (main-process wiring, preload, renderer bootstrap) uses
-  // real DOM globals this flat, ES2023-only program doesn't declare — packages/app/tsconfig.json
-  // (its own file, own comment) is the one program that type-checks it, via `npm run build`
-  // (tsc -b) and via ESLint's per-file nearest-tsconfig auto-discovery. Everything else under
-  // packages/app/src (composition/, tabs/, sidebar/, state/, pty/, ipc/, text/ — no DOM, no
-  // Electron-only globals) stays in THIS flat program like every other package's pure code, so
-  // `tsc -p tsconfig.json --noEmit` still catches a type error in it without needing a build first.
+  // D-052 (V2-T75, replacing V2-T2's own electron/**): packages/app/src/main/** (main-process
+  // wiring — window, IPC, preload) uses real Electron/DOM-adjacent globals this flat, ES2023-only
+  // program doesn't declare — packages/app/tsconfig.json (its own file, own comment) is the one
+  // program that type-checks it, via `npm run build` (tsc -b) and via ESLint's per-file
+  // nearest-tsconfig auto-discovery. Everything else under packages/app/src (composition/, tabs/,
+  // sidebar/, state/, pty/, ipc/, text/ — no DOM, no Electron-only globals) stays in THIS flat
+  // program like every other package's pure code, so `tsc -p tsconfig.json --noEmit` still catches
+  // a type error in it without needing a build first.
   //
-  // V2-T62 (D-051): packages/app/src/ui/** (Preact components) joins electron/** in this
-  // exclusion, for the same DOM reason — Preact's own JSX typings (`preact/jsx-runtime`) reference
-  // DOM lib globals (`EventTarget`, `HTMLElement`, ...) even in a component that never touches
-  // `document` itself, so a `.tsx` file cannot type-check under this ES2023-only program.
-  // `tests/unit/app/ui/**` is excluded alongside it, for a subtler reason (measured, not assumed):
-  // `exclude` only trims the INITIAL set of root files this program type-checks from its `include`
-  // globs — it does NOT stop a file from being pulled in anyway once something else in the program
-  // imports it. A test under `tests/` (which stays in `include` below) importing a `.tsx` from
-  // `ui/` would still drag that DOM-typed file straight back into this DOM-less program. Both
-  // `ui/**` and its own tests each get their OWN leaf `tsconfig.json` instead
-  // (`packages/app/src/ui/tsconfig.json`, `tests/unit/app/ui/tsconfig.json` — literally named
-  // "tsconfig.json", not some other name, because that is the one filename typescript-eslint's
-  // `projectService` walks up looking for; a differently-named file at the repo root was invisible
-  // to it, measured directly). Each is also its own explicit `tsc --noEmit` step in
-  // `npm run verificar`. Unlike electron/**, `ui/**` has no Electron/display dependency at all and
-  // stays IN
-  // vitest's coverage floor (its tests call each component function directly and inspect the
-  // vnode it returns, no DOM needed to run); it just needs a DIFFERENT type-checking program, not
-  // none at all.
-  "exclude": ["packages/app/src/electron", "packages/app/src/ui", "tests/unit/app/ui"]
+  // packages/app/src/renderer/** (V2-T75: the Preact design system, features, hooks, the
+  // renderer's own typed ipc client, and the legacy screens not yet rewritten in it) joins main/**
+  // in this exclusion, for the DOM reason V2-T62 first found for the old ui/**: Preact's own JSX
+  // typings (`preact/jsx-runtime`) reference DOM lib globals (`EventTarget`, `HTMLElement`, ...)
+  // even in a component that never touches `document` itself, and the renderer's own plain `.ts`
+  // modules (legacy view wiring) touch real `document`/`window` directly. `tests/unit/app/renderer/**`
+  // is excluded alongside it, for a subtler reason (measured, not assumed): `exclude` only trims
+  // the INITIAL set of root files this program type-checks from its `include` globs — it does NOT
+  // stop a file from being pulled in anyway once something else in the program imports it. A test
+  // under `tests/` (which stays in `include` above) importing a `.tsx` from `renderer/` would
+  // still drag that DOM-typed file straight back into this DOM-less program. Both `renderer/**`
+  // and its own tests each get their OWN leaf `tsconfig.json` instead
+  // (`packages/app/src/renderer/tsconfig.json`, `tests/unit/app/renderer/tsconfig.json` —
+  // literally named "tsconfig.json", not some other name, because that is the one filename
+  // typescript-eslint's `projectService` walks up looking for; a differently-named file at the
+  // repo root was invisible to it, measured directly, V2-T62). Each is also its own explicit
+  // `tsc --noEmit` step in `npm run verificar`. Unlike main/**, `renderer/**` has no Electron
+  // main-process dependency at all and stays IN vitest's coverage floor (its component tests
+  // render for real with `@testing-library/preact`/`happy-dom`, D-052 — no Electron needed to
+  // run, no display needed); it just needs a DIFFERENT type-checking program, not none at all.
+  "exclude": ["packages/app/src/main", "packages/app/src/renderer", "tests/unit/app/renderer"]
 }
