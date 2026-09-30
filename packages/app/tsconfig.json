@@ -14,9 +14,19 @@
   // The root tsconfig.json's own "exclude" (see that file) drops packages/app/src/electron from
   // the FLAT `tsc -p tsconfig.json --noEmit` program precisely so that check never needs DOM
   // either — this file is the only program that ever type-checks electron/**.
+  // V2-T62 (D-051): "jsx"/"jsxImportSource" compile `.tsx` (`src/ui/**`, `src/electron/app-shell.tsx`
+  // and its own sub-components) through `preact/jsx-runtime` — never `preact/compat` (D-051's own
+  // "sem a camada de compatibilidade com React"). The repo's OTHER program that also type-checks
+  // `src/ui/**` (`tsconfig.app-ui.json`, at the repo root — see that file's own comment for why a
+  // second program exists at all) repeats these same two settings, since the two programs cover
+  // different, non-overlapping file sets (this one is `src` only, that one is `src/ui` plus its
+  // own tests) but the SAME two directories' `.tsx` files need to agree on what a bare `<div/>`
+  // compiles to regardless of which program is checking it at the moment.
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact",
     "composite": true,
     "declaration": true,
     "declarationMap": true,

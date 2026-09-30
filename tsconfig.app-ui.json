@@ -1,0 +1,24 @@
+{
+  // V2-T62 (D-051): the second flat, non-composite type checker this repo runs (alongside the
+  // root `tsconfig.json`), scoped to exactly the two directories `tsconfig.json` excludes for the
+  // same reason: `packages/app/src/ui/**` (the Preact base components) and its own unit tests
+  // (`tests/unit/app/ui/**`). Preact's JSX typings reference DOM lib globals even in a component
+  // that never touches `document` — a `.tsx` file cannot type-check under the root program's
+  // ES2023-only `lib`, and adding "DOM" there would leak browser globals into every engine/cli
+  // file for no reason any of them needs (`tsconfig.json`'s own comment). This file is the
+  // narrower fix, mirroring `packages/app/tsconfig.json`'s own reasoning for `electron/**` one
+  // level further: DOM lib PLUS the JSX compiler options (`react-jsx` transform through
+  // `preact/jsx-runtime`, never `preact/compat` — D-051) that only these two directories need.
+  //
+  // Run as its own step in `npm run verificar` (`tsc -p tsconfig.app-ui.json --noEmit`), right
+  // after the root flat check — two programs, two `tsc` invocations, same "no test touches a
+  // prior build" discipline as the root program (this one is `noEmit` too).
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact"
+  },
+  "include": ["packages/app/src/ui", "tests/unit/app/ui"]
+}

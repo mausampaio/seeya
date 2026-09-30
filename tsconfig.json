@@ -33,5 +33,21 @@
   // packages/app/src (composition/, tabs/, sidebar/, state/, pty/, ipc/, text/ — no DOM, no
   // Electron-only globals) stays in THIS flat program like every other package's pure code, so
   // `tsc -p tsconfig.json --noEmit` still catches a type error in it without needing a build first.
-  "exclude": ["packages/app/src/electron"]
+  //
+  // V2-T62 (D-051): packages/app/src/ui/** (Preact components) joins electron/** in this
+  // exclusion, for the same DOM reason — Preact's own JSX typings (`preact/jsx-runtime`) reference
+  // DOM lib globals (`EventTarget`, `HTMLElement`, ...) even in a component that never touches
+  // `document` itself, so a `.tsx` file cannot type-check under this ES2023-only program.
+  // `tests/unit/app/ui/**` is excluded alongside it, for a subtler reason (measured, not assumed):
+  // `exclude` only trims the INITIAL set of root files this program type-checks from its `include`
+  // globs — it does NOT stop a file from being pulled in anyway once something else in the program
+  // imports it. A test under `tests/` (which stays in `include` below) importing a `.tsx` from
+  // `ui/` would still drag that DOM-typed file straight back into this DOM-less program. Both
+  // `ui/**` and its own tests move to `tsconfig.app-ui.json` instead (a second, narrow flat
+  // program, DOM + jsx enabled, run as its own step in `npm run verificar` — see that file's own
+  // comment) — unlike electron/**, `ui/**` has no Electron/display dependency at all and stays IN
+  // vitest's coverage floor (its tests call each component function directly and inspect the
+  // vnode it returns, no DOM needed to run); it just needs a DIFFERENT type-checking program, not
+  // none at all.
+  "exclude": ["packages/app/src/electron", "packages/app/src/ui", "tests/unit/app/ui"]
 }

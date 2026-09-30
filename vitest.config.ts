@@ -371,6 +371,13 @@ const ENGINE_ALIAS_DEPS_INLINE = { server: { deps: { inline: ['@seeya-ai/engine'
 
 export default defineConfig({
   ...ENGINE_ALIAS,
+  // V2-T62 (D-051): explicit, not relying on Vite's own tsconfig auto-discovery for `.tsx`
+  // (`tsconfig.base.json`'s own comment on `"types": ["node"]` already burned this project once on
+  // implicit config discovery depending on which file happens to be in the program) — every `.tsx`
+  // in this repo compiles through `preact/jsx-runtime`, never `preact/compat` (D-051's own "sem a
+  // camada de compatibilidade com React"), matching `packages/app/tsconfig.json` and
+  // `tsconfig.app-ui.json`'s identical two settings for `tsc`.
+  esbuild: { jsx: 'automatic', jsxImportSource: 'preact' },
   test: {
     ...ENGINE_ALIAS_DEPS_INLINE,
     passWithNoTests: true,
@@ -387,6 +394,10 @@ export default defineConfig({
         'packages/engine/src/**/*.ts',
         'packages/cli/src/**/*.ts',
         'packages/app/src/**/*.ts',
+        // V2-T62 (D-051): the Preact base components (`src/ui/**`) and the window skeleton
+        // (`src/electron/app-shell.tsx` and its sub-components) — the `.ts` glob above never
+        // matches `.tsx`.
+        'packages/app/src/**/*.tsx',
       ],
       exclude:
         process.platform === 'win32'
