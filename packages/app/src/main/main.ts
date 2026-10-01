@@ -7,7 +7,7 @@
  * its own.
  */
 import path from 'node:path';
-import { writeFile } from 'node:fs/promises';
+import { appendFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, ipcMain, nativeTheme } from 'electron';
 import { CHANNELS } from '../ipc/channels.js';
@@ -210,6 +210,10 @@ async function captureVerificationScreenshot(
   // change and push the `openHere` badge it produces — none of which this process controls the
   // timing of.
   const usesTabPidFixture = process.env.SEEYA_APP_VERIFICATION_TAB_PID_PATH !== undefined;
+  // SEEYA_APP_AUTO_TERMINAL_RESIZE_REPRO's own click sequence (open tab, wait for the shell's own
+  // banner, type, switch to a page tab, collapse, expand, switch back) sums to roughly 5.2s of
+  // scheduled sleeps alone, each followed by a real `executeJavaScript` round trip on top.
+  const usesTerminalResizeRepro = process.env.SEEYA_APP_AUTO_TERMINAL_RESIZE_REPRO === '1';
   // PO review (V2-T75, 2026-10-01, round 2): `usesV2T55Instrumentation`'s own bucket was bumped
   // from 7000ms to 22000ms here as a band-aid for a real production defect — `useSidebar.ts`'s own
   // `projects`/`today` state used to be driven ONLY by the `CHANNELS.projectsUpdate`/`todayUpdate`
@@ -233,11 +237,13 @@ async function captureVerificationScreenshot(
       ? 8000
       : usesTabPidFixture
         ? 35000
-        : usesV2T55Instrumentation
-          ? 7000
-          : usesTabStripDemo
-            ? 4500
-            : 2500,
+        : usesTerminalResizeRepro
+          ? 8000
+          : usesV2T55Instrumentation
+            ? 7000
+            : usesTabStripDemo
+              ? 4500
+              : 2500,
   );
   const image = await window.webContents.capturePage();
   const { writeFile } = await import('node:fs/promises');
@@ -603,6 +609,75 @@ function createWindow(clock: Clock): BrowserWindow {
         .then(() =>
           window.webContents.executeJavaScript(
             "document.getElementById('schedule-strip-snooze-button')?.click();",
+          ),
+        );
+    });
+  }
+  // SEEYA_APP_AUTO_TERMINAL_RESIZE_REPRO: V2-T75-terminal-resize's own before/after reproduction
+  // — opens a real shell tab (the system default, `cmd`/clink on Windows), "types" into it
+  // (`window.seeya.writeTab` directly, the same channel real keystrokes go through — avoids the
+  // fragility of synthesizing keyboard events into xterm's own hidden textarea), switches to a
+  // page tab (the terminal pane goes `hidden`), collapses the sidebar, re-expands it (both trigger
+  // the width transition this bug is about), and switches back to the shell tab — the exact
+  // maintainer repro. Paired with `SEEYA_APP_VERIFICATION_RESIZE_LOG_PATH` (this file's own
+  // `resizeTab` handler, above): read that file afterwards for the resize sequence sent to the
+  // pty. Never set by `npm run app` or the README.
+  if (process.env.SEEYA_APP_AUTO_TERMINAL_RESIZE_REPRO === '1') {
+    window.webContents.once('did-finish-load', () => {
+      void clock
+        .sleep(600)
+        .then(() => window.webContents.executeJavaScript(dismissDaemonOwnershipTransitionScript))
+        .then(() => clock.sleep(600))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('new-tab-button').click();",
+          ),
+        )
+        .then(() => clock.sleep(300))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('new-tab-kind-shell').click();",
+          ),
+        )
+        .then(() => clock.sleep(300))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('new-tab-form').requestSubmit();",
+          ),
+        )
+        // The shell's own startup banner (cmd/clink's own version/update-check text) needs real
+        // wall-clock time to print — generous on purpose, this step is never timing-critical.
+        .then(() => clock.sleep(1200))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "window.seeya.writeTab({ id: 'tab-1', data: 'echo hello from seeya\\r' });",
+          ),
+        )
+        .then(() => clock.sleep(500))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('all-projects-link')?.click();",
+          ),
+        )
+        .then(() => clock.sleep(300))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('sidebar-collapse-toggle')?.click();",
+          ),
+        )
+        // Longer than the transition itself (`--seeya-motion-panel`, 200ms) plus
+        // `sidebar-transition-watcher.ts`'s own 400ms fallback — long enough that, with the fix,
+        // the deferred fit has already landed by the time the next step fires.
+        .then(() => clock.sleep(700))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('sidebar-toggle-button')?.click();",
+          ),
+        )
+        .then(() => clock.sleep(700))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            'document.querySelector(\'[role="tab"][aria-selected="false"]\')?.click();',
           ),
         );
     });
@@ -1032,6 +1107,16 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
 
   ipcMain.on(CHANNELS.resizeTab, (_event, request: ResizeTabRequest) => {
     ptyManager.resize(request.id, request.cols, request.rows);
+    // SEEYA_APP_VERIFICATION_RESIZE_LOG_PATH: same "instrumentação só do spike" class as every
+    // other `SEEYA_APP_*` flag this file reads (never set by `npm run app`) — V2-T75-terminal-
+    // resize's own before/after proof: one line per `resize-tab` this process ever sends to a
+    // pty, so a verification run can show the exact sequence (absurd cols/rows mid-transition
+    // before the fix; none while hidden, one correct resize on return, after it).
+    const resizeLogPath = process.env.SEEYA_APP_VERIFICATION_RESIZE_LOG_PATH;
+    if (resizeLogPath !== undefined) {
+      const line = `${context.clock.now().toISOString()} id=${request.id} cols=${request.cols} rows=${request.rows}\n`;
+      void appendFile(resizeLogPath, line);
+    }
   });
 
   // docs/PLANO-DE-ENTREGA.md V2-T2 item 3: "fechar a aba encerra o processo". The tab's `onExit`
