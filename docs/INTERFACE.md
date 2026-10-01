@@ -54,8 +54,8 @@ de abas. Os dois juntos na tela confundem.
 **Movimento e profundidade da lateral** (aceite do mantenedor, 2026-10-01): abrir e recolher a
 lateral tem transição de largura (180–240 ms, easing da identidade, seção 6.5; sem animação com
 `prefers-reduced-motion`). A lateral fica visualmente **acima** do conteúdo: sombra suave na borda
-direita (no tema escuro, sombra menor e borda reforçada, identidade 6.3). É a única exceção
-deliberada à regra "sombra só para sobreposição real", decidida pelo mantenedor.
+direita (no tema escuro, sombra menor e borda reforçada, identidade 6.3). A exceção está registrada na
+identidade visual, seção 6.3.
 
 Continuam valendo: recolher a lateral (botão e `Ctrl+B`), redimensionar (180–480 px, padrão
 280, lembrado por máquina), foco devolvido ao terminal ao fechar um diálogo.
