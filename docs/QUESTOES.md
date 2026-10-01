@@ -9290,3 +9290,39 @@ tarefa pequena, só de conversão mecânica (CSS module + teste renderizado, sem
 das tarefas de região começarem.
 
 **Resposta:** (preenchida pelo PO)
+
+## Q-103 — V2-T66: `vitest` não detecta classe CSS ausente num `.module.css` — achado por captura real, nunca pela suíte
+
+**Bloqueia:** não — registro, não pedido de decisão urgente (o defeito concreto que isto escondeu
+já foi corrigido nesta própria tarefa — ver o glossário de `AGENTS.md`, "defeito de produção —
+`EmptyState` faltando uma classe CSS").
+
+**Contexto.** `EmptyState.tsx` chamava `cx(styles, 'description')` sem que `.description`
+existisse em `EmptyState.module.css` — `renderer/components/css-class.ts#cx`'s own `requiredClass`
+lança exatamente para este caso, por desenho (D-024: "nunca uma classe silenciosamente ausente").
+O teste renderizado de `EmptyState` (`tests/unit/app/renderer/components/EmptyState.test.tsx`)
+passou mesmo assim, porque este projeto nunca configurou `test.css` em `vitest.config.ts` — o
+default do Vitest para um import `.module.css` sob teste é um **mock que devolve o próprio nome da
+classe para qualquer chave consultada**, nunca `undefined`. Isso significa que `requiredClass`
+nunca lança dentro de um teste, não importa quão errado o `.module.css` real esteja: a suíte inteira
+está cega para esta classe específica de defeito, para TODO componente com CSS module já escrito,
+não só os desta tarefa. Só a prova visual real (uma captura de janela de verdade, item exigido por
+`docs/INTERFACE.md`/pelo contrato de tarefa) expôs isto — e só porque `SEEYA_APP_DEBUG_CONSOLE`
+(nova nesta tarefa) encaminhou a exceção do renderer para o stdout; sem ela, o sintoma visível
+teria sido só "a janela abre em branco", sem dizer por quê.
+
+**Por que não corrigi a configuração agora.** Ligar `test.css: true` (ou um reporter equivalente)
+muda o comportamento de TODA a suíte de componentes de uma vez — decisão de ferramental, fora do
+escopo de uma tarefa de região, e com um custo que não medi (tempo de execução, possíveis falsos
+positivos em testes que já existem). Uma alternativa mais barata seria um guard dedicado (como
+`tests/integration/guards/dialog-display-css.test.ts` já faz para outro problema de CSS) que lê
+cada par `.tsx`/`.module.css` e confere que toda classe citada em `cx(styles, ...)` existe de
+verdade no arquivo — sem precisar mudar o comportamento do `vitest` para o resto da suíte.
+
+**Opções que enxergo:** A) deixar como está, registrado aqui — a prova visual de cada tarefa de
+região continua sendo o guarda-corpo real contra esta classe de defeito. B) medir o custo de
+`test.css: true` e decidir se vale a pena para toda a suíte. C) escrever o guard dedicado (classe
+citada vs. classe definida), mais barato de avaliar que B e sem efeito colateral em testes
+existentes.
+
+**Resposta:** (preenchida pelo PO)
