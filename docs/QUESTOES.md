@@ -9236,7 +9236,17 @@ não recortei.
 estruturalmente neste arquivo decidir o recorte. B) despachar uma tarefa pequena só para dividir
 `format-project.ts` por comando, sem mudar texto nenhum.
 
-**Resposta:** (preenchida pelo PO)
+**Resposta:** **FECHADA pela V2-T76 — opção B.** `format-project.ts` foi renomeado (`git mv`) para
+`format-project-adopt.ts` (adoção era o maior bloco de conteúdo) e dividido por comando, sem mudar
+texto nem comportamento (saída da CLI byte-idêntica, provada pelos testes existentes — só caminhos
+de import mudaram em `project-command.ts`/`format-project-undo.ts`/`tests/unit/cli/
+format-project.test.ts`): `format-project-shared.ts` (helpers usados por mais de um comando —
+`formatInvalidIdLine`/`formatRepositoriesSummary`/`formatLockStatusLine`), `format-project-
+lifecycle.ts` (`create`/`list`/`show`), `format-project-open.ts` (`add-repo`/`open`),
+`format-project-audit.ts` (`audit`, com `formatEscapedCommitLine` compartilhada com o aviso
+pré-lançamento do `open`) e `format-project-adopt.ts` (`adopt`, o que sobrou). `remove`/
+`remove-repo`/`revert-adoption` já estavam em `format-project-undo.ts` desde antes — fora do
+escopo desta questão. Nenhum arquivo passa de ~230 linhas agora.
 
 ## Q-101 — V2-T73: `packages/engine/src/adapters/workspace/index.ts` já estava acima do teto de 500 linhas
 
@@ -9258,7 +9268,19 @@ argumenta para `format-project.ts`).
 tarefa pequena para recortar `adapters/workspace/index.ts` por responsabilidade (manifesto/commit/
 hooks/lock), sem mudar comportamento.
 
-**Resposta:** (preenchida pelo PO)
+**Resposta:** **FECHADA pela V2-T76 — opção B.** Mesmo recorte que `revert.ts`/`audit.ts`/
+`manifest-restore.ts` já estabeleciam para este arquivo (mecânica pesada num módulo à parte,
+método de `FsWorkspaceRepository` reduzido a um delegate de uma linha), estendido ao resto do
+arquivo: `project-manifest-files.ts` (leitura/escrita do `seeya.json` — `projectExists`/
+`writeProjectSkeleton`/`writeProjectManifest`/`readProjectManifest`/`listProjects`), `commit.ts`
+(o ciclo de vida do commit, incluindo a reasserção do `.gitignore` que `commitAll` já fazia antes
+de cada commit) e `generated-files.ts` (o gancho de git/gancho do harness/`CLAUDE.md` que o
+próprio seeya escreve no projeto — `installCommitMsgHook`/`installHarnessHook`/
+`isClaudeMdVersioned`/`installGeneratedClaudeMd`). `index.ts` ficou com a classe, o ciclo de vida
+de init/identidade e um punhado de consultas git pequenas sem irmão próprio ainda — caiu de 562
+para 277 linhas. Nenhuma API pública mudou: `index.ts` continua exportando o mesmo
+`FsWorkspaceRepository` no mesmo subcaminho. Sem mudança de comportamento — provado pela suíte de
+integração existente (`tests/integration/workspace/`), sem alteração de asserção.
 
 ## Q-102 — V2-T75: nove componentes de `ui/` migraram de lugar sem CSS module/teste renderizado
 
