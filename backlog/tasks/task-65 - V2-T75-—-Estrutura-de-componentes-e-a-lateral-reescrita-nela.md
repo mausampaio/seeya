@@ -4,7 +4,7 @@ title: V2-T75 — Estrutura de componentes e a lateral reescrita nela
 status: Review
 assignee: []
 created_date: '2026-09-30 21:21'
-updated_date: '2026-10-01 00:48'
+updated_date: '2026-10-01 01:03'
 labels: []
 milestone: m-2
 dependencies: []
@@ -221,5 +221,19 @@ created: 2026-10-01 00:48
 4. Medicao da subida — confirmado que o instante medido continua sendo o sessionsUpdate com a lista REAL descoberta: a relocacao de main.ts para main/ foi renomeacao pura (0 insercoes/delecoes, git show 9e9231e), e writeStartupTiming roda depois de buildSidebarRows(discovery)+o envio real. Remedido com o cache do binario de dev limpo: 668-747ms, mesma faixa — a diferenca contra a linha de base de 5,6-6,0s nao e explicada por este cache de verificacao nem por mudanca de codigo desta tarefa; registrado em docs/DESEMPENHO.md como medido, nao como melhoria.
 
 npm run verificar verde apos as quatro correcoes. Quatro capturas novas (claro/escuro/recolhida/parado) confirmadas visualmente, caminhos no scratchpad da sessao. Registro/protocol-handler.json reais conferidos identicos antes e depois. Segue em Review.
+---
+
+author: agente
+created: 2026-10-01 01:03
+---
+Correcao do item 2 (contraste dos icones fantasmas), commit 8ca39de. Causa real achada com getComputedStyle num processo Electron de verdade (nao so pixel de screenshot): o <svg> de #sidebar-collapse-toggle/#new-project-button media width computado 10px contra o atributo HTML width=24, com ZERO regras de CSS batendo (percorri todas as 5 folhas de estilo carregadas com element.matches()) — e o mesmo 10px nos dois icones, apesar de geometrias de traco totalmente diferentes (chevron diagonal vs cruz simetrica), o que descarta explicacao por bounding-box de conteudo.
+
+Explicacao: width/height em <svg> sao presentational hints do UA stylesheet, nao CSS — a resolucao de flex-basis:auto do Chromium nao trata esses atributos como 'tamanho especificado' do jeito que trata num <img>, entao o item flex encolhe para bem menos que o quadrado pedido. CSS explicito (style inline width/height) sempre vence o atributo presentational e e respeitado por flex-basis:auto.
+
+Apliquei em outlineIcon, filledIcon e StarIcon (os tres construtores de svg em Icon.tsx), nao so nos dois call sites — confirmado de novo com getComputedStyle (width/height computados agora batem com o pedido) e com uma captura real onde '+' e '<' aparecem com o mesmo peso visual do icone de pasta/estrela nas linhas ao lado.
+
+Tambem corrigi o comentario desatualizado (falava em 20px, o codigo sempre usou 24px desde a primeira tentativa deste defeito).
+
+Bundle usado na captura final: packages/app/dist/electron/{main,renderer}.js de 2026-09-30 21:57 (recompilado com node scripts/build.mjs em packages/app logo antes da captura, sem nenhum codigo de diagnostico). npm run verificar verde. Caminho da captura: v2t75-icons-fixed-final.png (scratchpad da sessao, nao no repositorio). Registro/protocol-handler.json reais conferidos identicos antes e depois. Segue em Review.
 ---
 <!-- COMMENTS:END -->
