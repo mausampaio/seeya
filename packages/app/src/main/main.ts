@@ -425,19 +425,26 @@ function createWindow(clock: Clock): BrowserWindow {
     });
   }
   // SEEYA_APP_AUTO_TOGGLE_SIDEBAR: same "instrumentação só do spike" class as the six above —
-  // clicks the real toolbar sidebar-toggle button (maintainer acceptance, 2026-09-25: the original
-  // 20px side-strip toggle wasn't discoverable on its own), so an agent with no keyboard/mouse of
-  // its own can prove the button is visible in the toolbar and flips the sidebar from open to
-  // collapsed in a single real screenshot — the companion run with this flag unset already shows
-  // the open state, so the pair covers "both states" without any code here needing to decide
-  // which one to show. Never set by `npm run app` or the README.
+  // clicks the real sidebar-collapse button, so an agent with no keyboard/mouse of its own can
+  // prove the sidebar flips from open to collapsed in a single real screenshot — the companion run
+  // with this flag unset already shows the open state, so the pair covers "both states" without
+  // any code here needing to decide which one to show. Never set by `npm run app` or the README.
+  //
+  // PO review (V2-T75, 2026-10-01): clicks `#sidebar-collapse-toggle` now, not
+  // `#sidebar-toggle-button` — the single-toggle-button fix (`docs/INTERFACE.md`'s own "um botão
+  // de recolher por vez") made `#sidebar-toggle-button` the TOOLBAR's own reopen button, only ever
+  // rendered once the sidebar is ALREADY collapsed; clicking it while expanded (the window's own
+  // starting state, no prior collapse) found no such element and did nothing, leaving every
+  // capture with this flag set showing the sidebar still open. `#sidebar-collapse-toggle` is the
+  // header's own button, rendered exactly while expanded — the one that can actually collapse it
+  // from the window's own starting state.
   if (process.env.SEEYA_APP_AUTO_TOGGLE_SIDEBAR === '1') {
     window.webContents.once('did-finish-load', () => {
       void clock
         .sleep(500)
         .then(() =>
           window.webContents.executeJavaScript(
-            "document.getElementById('sidebar-toggle-button')?.click();",
+            "document.getElementById('sidebar-collapse-toggle')?.click();",
           ),
         );
     });
