@@ -86,22 +86,11 @@
   overflow-wrap: anywhere;
 }
 
-/* These two are the one documented exception to "no raw font-size" in this file: their text is
- * never a Preact child — `renderer/legacy/end-day-dialog-view.ts`/`autostart-control-view.ts` set
- * `.textContent` on these exact ids directly (this component only renders the stable, empty
- * anchor, see its own docstring) — so `Text` has nothing to wrap. The pixel values below match
- * `Text`'s own `caption` variant exactly (identity § 4.4, 12/16), rather than the un-scaled 11px
- * this used to be, so a legacy-filled result line still reads at a real scale step. */
+/* V2-T65: `.daemonResult`'s text is a real `Text` child now (`caption` variant, D-052 item 7) —
+ * this rule only ever spaces/wraps it. `.autostartResult` is gone with it (the autostart anchor
+ * this footer used to render for `renderer/legacy/autostart-control-view.ts`, apagado by this
+ * task — docs/INTERFACE.md's own "o botão de autostart sai do rodapé da lateral"). */
 .daemonResult {
   margin: 0;
-  font-size: 12px;
-  line-height: 16px;
-  white-space: pre-wrap;
-}
-
-.autostartResult {
-  margin: 0;
-  font-size: 12px;
-  line-height: 16px;
   white-space: pre-wrap;
 }

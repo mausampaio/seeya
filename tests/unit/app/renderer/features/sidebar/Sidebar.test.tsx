@@ -26,12 +26,16 @@ describe('Sidebar (D-052, V2-T75 — integration)', () => {
       'ignored-projects-list',
       'end-day-button',
       'daemon-control-button',
-      'autostart-control-button',
-      'autostart-control-result',
       'sidebar-resize-handle',
     ]) {
       expect(container.querySelector(`#${id}`), `expected #${id} to be rendered`).not.toBeNull();
     }
+  });
+
+  it("never renders the autostart anchor any more (V2-T65 — moved to Settings' own General section)", () => {
+    const { container } = render(<Sidebar collapsed={false} onToggleCollapse={() => {}} />);
+    expect(container.querySelector('#autostart-control-button')).toBeNull();
+    expect(container.querySelector('#autostart-control-result')).toBeNull();
   });
 
   it('applies the collapsed class only when collapsed', () => {

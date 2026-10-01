@@ -1,0 +1,11 @@
+/* V2-T65 (D-052) — the vertical list itself; `NavItem` already owns its own row's typography/
+ * spacing (D-052 item 7), so this file only ever stacks the rows. */
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--seeya-space-1);
+  flex-shrink: 0;
+  width: 160px;
+  border-right: 1px solid var(--seeya-border);
+  padding-right: var(--seeya-space-4);
+}

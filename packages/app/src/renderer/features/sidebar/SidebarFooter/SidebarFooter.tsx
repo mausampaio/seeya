@@ -1,13 +1,16 @@
 /**
  * D-052 (V2-T75): the lateral's own footer (`docs/INTERFACE.md` § 1 item 7) — schedule strip,
- * "End day…", the daemon pill, and autostart. Replaces
- * `renderer/legacy/schedule-strip-view.ts`/`daemon-control-view.ts` entirely (deleted by this
- * task); `renderer/legacy/end-day-dialog-view.ts`/`autostart-control-view.ts` stay legacy-owned
- * (`docs/INTERFACE.md`'s own "Cuidados: autostart continua no rodapé até a V2-T65") — this
- * component renders only the stable anchor elements (`#end-day-button`, `#autostart-control-button`,
- * `#autostart-control-result`) those two modules already attach to by id, unchanged, never a
- * bound `onClick`/reactive text for them (`NavList.tsx`'s own docstring has the same reasoning:
- * a legacy module toggles these on every push of its own, not just once).
+ * "End day…", and the daemon pill. Replaces `renderer/legacy/schedule-strip-view.ts`/
+ * `daemon-control-view.ts` entirely (deleted by that task); `renderer/legacy/
+ * end-day-dialog-view.ts` stays legacy-owned — this component renders only the stable anchor
+ * elements (`#end-day-button`) that module already attaches to by id, unchanged, never a bound
+ * `onClick`/reactive text for it (`NavList.tsx`'s own docstring has the same reasoning: a legacy
+ * module toggles this on every push of its own, not just once).
+ *
+ * V2-T65 (`docs/INTERFACE.md`'s own "o botão de autostart sai do rodapé da lateral"): the
+ * autostart anchor this component used to render for `renderer/legacy/autostart-control-view.ts`
+ * (apagado by that task) is gone — the switch moved to Settings' own General section
+ * (`renderer/features/settings/GeneralSection/`).
  *
  * PO review (2026-10-01), `docs/INTERFACE.md` § 1 item 7:
  * - The schedule line is now an icon + two-text row (`ClockIcon`, `primary` at weight 500,
@@ -157,13 +160,11 @@ export function SidebarFooter(): JSX.Element {
             {running ? <StopIcon /> : <PlayIcon />}
           </IconButton>
         </div>
-        {daemon.kind === 'result' && <p class={cx(styles, 'daemonResult')}>{daemon.resultText}</p>}
-
-        {/* Legacy-owned anchors — see this component's own docstring. */}
-        <Button id="autostart-control-button" variant="secondary" size="sm" hidden>
-          {MESSAGES.autostartControlEnable}
-        </Button>
-        <p id="autostart-control-result" class={cx(styles, 'autostartResult')} />
+        {daemon.kind === 'result' && (
+          <Text as="p" variant="caption" tone="secondary" className={cx(styles, 'daemonResult')}>
+            {daemon.resultText}
+          </Text>
+        )}
       </Stack>
     </Surface>
   );

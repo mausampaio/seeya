@@ -16,9 +16,9 @@
  * other pane in this component uses, instead of each page tab button toggling it by hand.
  *
  * **Settings** (`docs/INTERFACE.md` § 2 item 2) is an `IconButton` with a gear icon and
- * `aria-label` now — its CLICK wiring is untouched, still `renderer/legacy/settings-dialog-view.ts
- * #wireSettingsDialog` attaching by the same `#settings-button` id (that dialog's own redesign is
- * V2-T65, out of this task's scope) — this component only changed its visual chrome.
+ * `aria-label`; its click opens `renderer/features/settings/SettingsDialog` (V2-T65) via
+ * `onOpenSettings`, a prop rather than imperative `getElementById` wiring (D-052 item 2) — owned by
+ * `App.tsx`, same reasoning as `leading` above (the dialog needs the open state too).
  *
  * `SettingsIcon size={20}` (PO review): the bare default (16px) inside this button's own `size="md"`
  * (32px) box read smaller/fainter than the tab icons next to it (16px, but in their own compact
@@ -49,6 +49,8 @@ export interface TabStripProps {
    * docstring: it necessarily lives OUTSIDE the lateral, since it's what reopens it). Optional only
    * for a test that doesn't care about it. */
   readonly leading?: ComponentChildren;
+  /** Opens the Settings dialog (V2-T65) — optional only for a test that doesn't care about it. */
+  readonly onOpenSettings?: () => void;
 }
 
 export function TabStrip(props: TabStripProps): JSX.Element {
@@ -140,6 +142,7 @@ export function TabStrip(props: TabStripProps): JSX.Element {
           variant="ghost"
           size="md"
           aria-label={MESSAGES.settingsButton}
+          onClick={() => props.onOpenSettings?.()}
         >
           <SettingsIcon size={20} />
         </IconButton>
