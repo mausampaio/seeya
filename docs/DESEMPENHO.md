@@ -230,18 +230,31 @@ classificador automático de permissão do harness ("Production Deploy"), tentat
 **(b) fica dentro da faixa já registrada** — sem indício de custo novo em repouso.
 
 **(a) e (c) saíram muito abaixo de toda entrada anterior deste documento — registrado como medido,
-não como melhoria desta tarefa (D-025).** `measure-startup.mjs`'s own comentário já dizia, antes
-desta tarefa, "~1s this file's own measurements actually saw" (o teto de 20 s do script foi
-dimensionado para isso) — um número muito mais próximo dos 689–693 ms medidos agora do que dos
-5,6–6,0 s que as três entradas anteriores deste documento registraram com o MESMO método. Esta
-tarefa não mexeu em `SessionProvider`/na descoberta de sessão nem no laço de atualização — nada no
-que mudou (reorganização de diretório, design system, lateral reescrita em componentes) toca o
-caminho entre o `spawn()` e o primeiro `sessionsUpdate`. A explicação mais provável é variação da
-própria máquina entre sessões de medição (a mesma incerteza que a seção "Linha de base" já registra
-para (b)/(c): antivírus, disco, outros processos) — não uma mudança desta tarefa. Mesma leitura
-para (c): nenhuma CPU nova em repouso foi acrescentada por este trabalho. Se um dia isto importar
-de verdade (por exemplo, se a faixa de 5,6–6,0 s for a real e esta de 689–693 ms for a anômala),
-cabe uma medição própria com A/B explícito, não uma conclusão a partir de uma sessão.
+não como melhoria desta tarefa (D-025).** Revisão do PO pediu para confirmar que o instante medido
+ainda é o `sessionsUpdate` COM a lista descoberta (não um envio vazio anterior, nem um evento que
+mudou de lugar com a reestruturação do `main/`) antes deste número entrar aqui — duas verificações
+feitas:
+
+1. **O código é byte-a-byte o mesmo.** `git show 9e9231e --stat -- packages/app/src/main/main.ts`
+   (o commit que moveu `electron/main.ts` para `main/main.ts`) mostra `0` inserções/deleções — uma
+   renomeação pura. `writeStartupTiming` continua chamada dentro do `onTick` do laço de atualização,
+   DEPOIS de `rows = buildSidebarRows(discovery, ...)` (a descoberta real já aconteceu) e do
+   `window.webContents.send(CHANNELS.sessionsUpdate, { rows })` — nunca antes, nunca um envio
+   vazio. Esta tarefa não tocou `main.ts` além dessa renomeação.
+2. **Reproduzido com o cache do binário de desenvolvimento limpo** (`%APPDATA%\Electron\Cache` e
+   `\Code Cache` apagados antes de medir, eliminando qualquer aquecimento desta sessão de
+   verificação): 668–747 ms, três rodadas — a mesma faixa de antes, não os 5,6–6,0 s históricos.
+
+Com o quê é medido confirmado correto e a faixa reproduzível mesmo a frio, a causa mais provável
+da diferença continua sendo variação da MÁQUINA entre sessões de medição diferentes (a mesma
+incerteza que a seção "Linha de base" já registra para (b)/(c): antivírus, disco, outros
+processos) — não uma mudança desta tarefa, que não tocou `SessionProvider`/a descoberta de sessão
+nem o laço de atualização. Mesma leitura para (c): nenhuma CPU nova em repouso foi acrescentada por
+este trabalho. `measure-startup.mjs`'s own comentário já dizia, antes desta tarefa, "~1s this
+file's own measurements actually saw" — mais perto da faixa medida agora do que da faixa histórica
+de 5,6–6,0 s. Se um dia isto importar de verdade (por exemplo, se a faixa histórica for a real e
+esta for a anômala), cabe uma medição própria com A/B explícito numa segunda worktree com o código
+anterior — o que esta revisão não reconstruiu, por custo de tempo.
 
 ## A régua
 
