@@ -286,7 +286,10 @@ export const MESSAGES = {
     'Applies immediately, across the whole window and the terminal — no restart needed. ' +
     '"System" follows this computer\'s own light/dark switch.',
   settingsAutostartLabel: 'Start with the system',
-  settingsAutostartDescription: 'Launches seeya automatically when you log in.',
+  // V2-T65 PO review: what starts at login is the DAEMON (end-day's own scheduler), not this
+  // window — the earlier wording ("Launches seeya automatically") claimed the window itself.
+  settingsAutostartDescription:
+    'Starts the daemon at login, so end day happens even with this window closed.',
   // D-025: two different reasons for the same disabled state, never collapsed into one vaguer
   // sentence — `ownerKind` is the actual evidence `resolveAutostartControlAvailability` already
   // tracked (`state/autostart-control-panel.ts`) and used to just discard.

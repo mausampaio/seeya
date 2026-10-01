@@ -4,6 +4,7 @@ import { cleanup, render } from '@testing-library/preact';
 import type { ComponentChildren } from 'preact';
 import {
   CalendarIcon,
+  CameraIcon,
   ChatBalloonIcon,
   ChevronDownIcon,
   ChevronLeftIcon,
@@ -15,7 +16,6 @@ import {
   PlayIcon,
   PlusIcon,
   SettingsIcon,
-  SlidersIcon,
   StarIcon,
   StopIcon,
   TerminalIcon,
@@ -41,7 +41,7 @@ describe('outline icons (D-052, V2-T75 — real render; identity § 6.4)', () =>
     TerminalIcon,
     CloseIcon,
     LockIcon,
-    SlidersIcon,
+    CameraIcon,
     CompassIcon,
   ];
 

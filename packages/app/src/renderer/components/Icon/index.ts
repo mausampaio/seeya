@@ -1,5 +1,6 @@
 export {
   CalendarIcon,
+  CameraIcon,
   ChatBalloonIcon,
   ChevronDownIcon,
   ChevronLeftIcon,
@@ -12,7 +13,6 @@ export {
   PlayIcon,
   PlusIcon,
   SettingsIcon,
-  SlidersIcon,
   StarIcon,
   StopIcon,
   TerminalIcon,

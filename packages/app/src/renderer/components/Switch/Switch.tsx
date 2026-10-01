@@ -12,6 +12,12 @@
  *
  * Brought to the CSS-module/render-tested pattern by V2-T65 (D-052, Q-102) — first production
  * caller is Settings' own General section (`docs/INTERFACE.md` § 8's own autostart switch).
+ *
+ * **Label variant (PO review, V2-T65):** `body-sm`/`weight={500}`/`tone="secondary"` — the SAME
+ * triple `TextField`'s own label and the standalone "Theme" label (`GeneralSection.tsx`) already
+ * use, so every field label in Settings reads at one consistent size. "Start with the system"
+ * used to render at `body-md` (16px), visibly larger than "Theme" (14px) right above it — the PO's
+ * own screenshot review caught this as the one field-label size that didn't match.
  */
 import type { ComponentChildren, JSX } from 'preact';
 import styles from './Switch.module.css';
@@ -45,7 +51,7 @@ export function Switch(props: SwitchProps): JSX.Element {
           disabled={disabled}
           onChange={(event) => props.onChange?.((event.target as HTMLInputElement).checked)}
         />
-        <Text as="span" variant="body-md">
+        <Text as="span" variant="body-sm" weight={500} tone="secondary">
           {props.label}
         </Text>
       </label>

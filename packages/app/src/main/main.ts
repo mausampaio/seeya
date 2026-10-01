@@ -1084,10 +1084,10 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
     (): TerminalFontConfigResponse => context.initialTerminalFontOptions,
   );
 
-  // V2-T65: Settings' own General section — `app.getVersion()`, read fresh each call (cheap,
-  // in-process) but never pushed: a running window's own installed version cannot change under
-  // it until relaunched.
-  ipcMain.handle(CHANNELS.getAppVersion, (): string => app.getVersion());
+  // V2-T65 (PO review): Settings' own General section — `__SEEYA_APP_VERSION__`
+  // (`build-constants.d.ts`'s own docstring has why this is never `app.getVersion()`), never
+  // pushed: a running window's own installed version cannot change under it until relaunched.
+  ipcMain.handle(CHANNELS.getAppVersion, (): string => __SEEYA_APP_VERSION__);
 
   // V2-T62 (D-051): the window's effective theme — "system" has a live counterpart
   // (`getTerminalFontConfig` above deliberately does not, its own docstring explains why), so

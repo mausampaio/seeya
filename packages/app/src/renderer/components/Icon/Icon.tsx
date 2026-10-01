@@ -9,7 +9,8 @@
  * Every icon is drawn on a 24-unit grid, one style per icon (outline — `fill="none"`,
  * `stroke="currentColor"` — or filled — `fill="currentColor"`, `stroke="none"` — never both mixed
  * within the same icon): `CalendarIcon`/`FolderIcon`/`ChatBalloonIcon`/`ChevronLeftIcon`/
- * `PlusIcon`/`ClockIcon`/`SettingsIcon`/`TerminalIcon`/`CloseIcon` are outline; `PlayIcon`/
+ * `PlusIcon`/`ClockIcon`/`SettingsIcon`/`TerminalIcon`/`CloseIcon`/`CameraIcon`/`CompassIcon` are
+ * outline; `PlayIcon`/
  * `StopIcon` are filled (the conventional shape for a media-style control, legible at a small
  * size in a way an outline triangle/square isn't); `StarIcon` is the one icon with a real
  * `filled` prop (outline by default, filled — brand-coloured — only when `filled` is true, the
@@ -261,15 +262,17 @@ export function CloseIcon(props: IconProps = {}): JSX.Element {
   return outlineIcon([<path d="M6 6l12 12M18 6L6 18" />], props);
 }
 
-/** Settings' own "Capture" section nav row (V2-T65, `docs/INTERFACE.md` § 8) — three sliders,
- * the conventional shape for adjustable parameters (budget, concurrency, retries). */
-export function SlidersIcon(props: IconProps = {}): JSX.Element {
+/** Settings' own "Capture" section nav row (V2-T65, `docs/INTERFACE.md` § 8). PO review: the
+ * first attempt here (`SlidersIcon`) reused `SettingsIcon`'s own three-line/three-dot path with
+ * only the coordinates nudged — close enough to read as the SAME icon as General right above it
+ * in the nav, confirmed by the PO's own screenshot review. A camera (capture = a snapshot of a
+ * session) is a genuinely distinct shape: a body + a lens, no lines/dots in common with any other
+ * icon in this set. */
+export function CameraIcon(props: IconProps = {}): JSX.Element {
   return outlineIcon(
     [
-      <path d="M5 6h7M16 6h3M5 12h3M12 12h7M5 18h11M20 18h0" />,
-      <circle cx="14" cy="6" r="2" />,
-      <circle cx="10" cy="12" r="2" />,
-      <circle cx="18" cy="18" r="2" />,
+      <path d="M4 8.5a1.5 1.5 0 0 1 1.5-1.5h2.3l1-1.5h6.4l1 1.5h2.3A1.5 1.5 0 0 1 20 8.5v8a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 16.5Z" />,
+      <circle cx="12" cy="12.5" r="3.2" />,
     ],
     props,
   );

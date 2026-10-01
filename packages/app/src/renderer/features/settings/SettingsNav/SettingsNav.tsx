@@ -11,12 +11,12 @@ import styles from './SettingsNav.module.css';
 import { cx } from '../../../components/css-class.js';
 import { NavItem } from '../../../components/NavItem/index.js';
 import {
+  CameraIcon,
   ClockIcon,
   CompassIcon,
   FolderIcon,
   type IconProps,
   SettingsIcon,
-  SlidersIcon,
   TerminalIcon,
 } from '../../../components/Icon/index.js';
 import { MESSAGES } from '../../../../text/messages.js';
@@ -34,7 +34,10 @@ const SECTIONS: readonly {
 }[] = [
   { id: 'general', Icon: SettingsIcon },
   { id: 'schedule', Icon: ClockIcon },
-  { id: 'capture', Icon: SlidersIcon },
+  // PO review (V2-T65): Capture used to share SettingsIcon's own path (nudged coordinates only,
+  // close enough to read as the same icon as General right above it) — a camera is genuinely
+  // distinct, see CameraIcon's own docstring.
+  { id: 'capture', Icon: CameraIcon },
   { id: 'discovery', Icon: CompassIcon },
   { id: 'terminal', Icon: TerminalIcon },
   { id: 'projects', Icon: FolderIcon },
