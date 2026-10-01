@@ -4,7 +4,7 @@ title: V2-T74 — Janela sem a barra de menu do Electron
 status: Review
 assignee: []
 created_date: '2026-09-30 18:38'
-updated_date: '2026-10-01 20:30'
+updated_date: '2026-10-01 20:41'
 labels: []
 milestone: m-2
 dependencies: []
@@ -142,3 +142,13 @@ Windows, daemon, app instalado e autostart do mantenedor nunca tocados (só leit
 antes/depois). Nenhum `npm run app`/`build.mjs --dev` rodado. Nenhuma dependência nova. Nenhum
 `git stash`/`--no-verify`.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-10-01 20:41
+---
+Revisão do PO em 2026-10-01: mesclado. Prova pelo registro da janela real (menu nulo, barra invisível, copiar/colar ida e volta num campo e no terminal real); macOS por função pura testada + documentação do Electron. Portão do zero verde (3320 testes), também sem identidade global do git. Falta o aceite do mantenedor com o instalador.
+---
+<!-- COMMENTS:END -->
