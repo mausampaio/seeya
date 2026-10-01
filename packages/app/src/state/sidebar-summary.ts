@@ -35,6 +35,11 @@ export interface ProjectSidebarRow {
   readonly name: string;
   readonly badge: FavoriteLockBadge;
   readonly sessions: ProjectPanelRow['sessions'];
+  /** PO review (2026-10-01), `docs/INTERFACE.md` § 1's own "três estados visuais na linha de
+   * projeto": whether THIS project's own open tab is the one currently showing in the strip —
+   * `hasActiveTabSession`'s own evidence below. Distinct from `badge === 'openHere'`, which only
+   * means a tab is open SOMEWHERE in this window, not that it's the one on screen right now. */
+  readonly activeTab: boolean;
 }
 
 export type FavoriteProjectRow = ProjectSidebarRow;
@@ -46,13 +51,24 @@ function resolveProjectLockBadge(project: ProjectPanelRow): FavoriteLockBadge {
   return project.lockText === 'unlocked' ? 'none' : 'locked';
 }
 
+/** `null` `activeTabId` (no tab open at all, or a page tab active) never matches any session's
+ * `matchedTabId` — `matchSessionsToTabs`'s own contract never produces `null` as a real tab id
+ * (`sidebar/session-match.ts`), so this is a plain equality check, not a guess (D-025). */
+function hasActiveTabSession(
+  sessions: ProjectPanelRow['sessions'],
+  activeTabId: string | null,
+): boolean {
+  return activeTabId !== null && sessions.some((session) => session.matchedTabId === activeTabId);
+}
+
 /**
  * @example
- * buildFavoriteProjectRows([{ ...project, favorite: true }]);
- * // [{ projectId: 'auth-hardening', name: 'Auth hardening', badge: 'none', sessions: [] }]
+ * buildFavoriteProjectRows([{ ...project, favorite: true }], null);
+ * // [{ projectId: 'auth-hardening', name: 'Auth hardening', badge: 'none', sessions: [], activeTab: false }]
  */
 export function buildFavoriteProjectRows(
   projects: readonly ProjectPanelRow[],
+  activeTabId: string | null,
 ): readonly FavoriteProjectRow[] {
   return projects
     .filter((project) => project.favorite)
@@ -63,6 +79,7 @@ export function buildFavoriteProjectRows(
         name: project.name,
         badge,
         sessions: badge === 'openHere' ? project.sessions : [],
+        activeTab: hasActiveTabSession(project.sessions, activeTabId),
       };
     });
 }
@@ -90,11 +107,12 @@ const MAX_RECENT_PROJECTS = 5;
  * "a lateral mostra só o atalho" — a favorite already has its own, permanent shortcut).
  *
  * @example
- * buildRecentProjectRows([nonFavoriteWithActivity, favoriteWithActivity]);
+ * buildRecentProjectRows([nonFavoriteWithActivity, favoriteWithActivity], null);
  * // only nonFavoriteWithActivity, even if it were less recent
  */
 export function buildRecentProjectRows(
   projects: readonly ProjectPanelRow[],
+  activeTabId: string | null,
 ): readonly RecentProjectRow[] {
   const withActivity: RecentProjectRow[] = [];
   for (const project of projects) {
@@ -112,6 +130,7 @@ export function buildRecentProjectRows(
       lastActivity,
       badge,
       sessions: badge === 'openHere' ? project.sessions : [],
+      activeTab: hasActiveTabSession(project.sessions, activeTabId),
     });
   }
   return withActivity

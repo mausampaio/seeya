@@ -63,6 +63,7 @@ export function FavoritesSection(props: FavoritesSectionProps): JSX.Element {
               name={row.name}
               badge={row.badge}
               sessions={row.sessions}
+              activeTab={row.activeTab}
               leading={{ kind: 'favoriteStar', onToggleFavorite: props.onToggleFavorite }}
               onOpenProject={props.onOpenProject}
             />

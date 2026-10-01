@@ -43,6 +43,7 @@ export function RecentSection(props: RecentSectionProps): JSX.Element {
               name={row.name}
               badge={row.badge}
               sessions={row.sessions}
+              activeTab={row.activeTab}
               leading={{ kind: 'folder' }}
               onOpenProject={props.onOpenProject}
             />

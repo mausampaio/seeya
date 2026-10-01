@@ -93,8 +93,8 @@ export function useSidebar(): SidebarData {
 
   return {
     todayCard: buildTodayCardSummary(today),
-    favorites: buildFavoriteProjectRows(projects.projects),
-    recent: buildRecentProjectRows(projects.projects),
+    favorites: buildFavoriteProjectRows(projects.projects, activeTabId),
+    recent: buildRecentProjectRows(projects.projects, activeTabId),
     allProjectsCount: projects.projects.length,
     runningSessionsCount: countRunningSessions(
       projects.projects,
