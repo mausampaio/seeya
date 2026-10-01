@@ -22,33 +22,42 @@ function terminalStripTab(
 }
 
 describe('buildTabStripEntries (V2-T64)', () => {
-  it('a page tab shows its own fixed label/icon', () => {
+  it('a page tab shows its own fixed label/icon, never an exited suffix', () => {
     const tabs: StripTab[] = [{ kind: 'page', id: 'page-today', pageKind: 'today' }];
     expect(buildTabStripEntries(tabs, 'page-today')).toEqual([
-      { id: 'page-today', label: 'Today', icon: 'calendar', active: true, exited: false },
+      {
+        id: 'page-today',
+        label: 'Today',
+        exitedText: null,
+        icon: 'calendar',
+        active: true,
+        exited: false,
+      },
     ]);
   });
 
-  it('a running terminal tab shows its plain label, never the exited suffix', () => {
+  it('a running terminal tab shows its plain label, with no exited suffix', () => {
     const tabs = [terminalStripTab({ origin: 'project', label: 'auth-hardening' })];
     const [entry] = buildTabStripEntries(tabs, null);
     expect(entry).toEqual({
       id: 'tab-1',
       label: 'auth-hardening',
+      exitedText: null,
       icon: 'folder',
       active: false,
       exited: false,
     });
   });
 
-  it('an exited terminal tab appends "· exited (code N)" and reports exited: true', () => {
+  it('an exited terminal tab keeps its plain label and reports "exited (N)" separately', () => {
     const exitedTab = markExited(
       withPid(createTab({ id: 'tab-1', command: '', args: [], cwd: '/code/app' }), 42),
       1,
     );
     const tabs = [terminalStripTab({ tab: exitedTab, label: 'shell' })];
     const [entry] = buildTabStripEntries(tabs, 'tab-1');
-    expect(entry?.label).toBe('shell exited (code 1)');
+    expect(entry?.label).toBe('shell');
+    expect(entry?.exitedText).toBe('exited (1)');
     expect(entry?.exited).toBe(true);
     expect(entry?.active).toBe(true);
   });

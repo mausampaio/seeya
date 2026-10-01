@@ -19,10 +19,14 @@
   font-weight: 500;
 }
 
-/* The label still reads the exited suffix (`state/tab-strip.ts#terminalTabLabel`) — dimming on
- * top is a visual reinforcement, never the only signal (identity § 8: "estado sempre com texto ou
- * ícone, nunca só cor"). */
-.exited {
+/* Dims the icon and the tab's own name — never the `.exitedText` suffix (it already carries its
+ * own, deliberately muted colour, `--seeya-text-tertiary`; stacking this opacity on top of that
+ * would wash it out further) and never the close button (PO review, V2-T64: it stays the one fully
+ * legible, highest-contrast thing on an exited tab, since closing it is the obvious next action).
+ * A visual reinforcement on top of the "· exited (N)" text, never the only signal (identity § 8:
+ * "estado sempre com texto ou ícone, nunca só cor"). */
+.exited .icon,
+.exited .label {
   opacity: 0.7;
 }
 
@@ -52,6 +56,15 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* "· exited (N)" (PO review, V2-T64 — `docs/INTERFACE.md`'s own "· exited") — its own colour,
+ * never the item's base text colour, and never squeezed by `.label`'s own ellipsis (`flex: none`,
+ * `white-space: nowrap`: `.label` shrinks to make room for this fixed-size suffix instead). */
+.exitedText {
+  flex: none;
+  white-space: nowrap;
+  color: var(--seeya-text-tertiary);
 }
 
 .close {

@@ -45,12 +45,15 @@ export type StripTab = TerminalStripTab | PageStripTab;
 
 export interface TabStripEntry {
   readonly id: string;
+  /** Always just the tab's own name — e.g. "shell" — never the exited state concatenated onto it
+   * (PO review, V2-T64: `docs/INTERFACE.md`'s own "· exited" renders in its own colour,
+   * `TabStripItem`'s own `exitedText` span, so it has to be a separate string, not baked in). */
   readonly label: string;
+  /** "exited (N)" when the tab's process has ended, `null` otherwise (never exited for a page
+   * tab) — `TabStripItem` renders this after a "·" separator, in `--seeya-text-tertiary`. */
+  readonly exitedText: string | null;
   readonly icon: TabStripIconKind;
   readonly active: boolean;
-  /** Drives the item's own visual treatment — the `· exited` text is already baked into `label`
-   * (same wording `MESSAGES.tabExited` always gave), this is for anything else that needs to know
-   * without re-parsing the label (e.g. `TabStripItem`'s own dimmed styling). */
   readonly exited: boolean;
 }
 
@@ -60,11 +63,12 @@ const PAGE_TAB_LABEL: Record<PageTabKind, string> = {
   sessions: MESSAGES.pageTabLabelSessions,
 };
 
-function terminalTabLabel(entry: TerminalStripTab): string {
-  if (isRunning(entry.tab) || entry.tab.status.kind !== 'exited') {
-    return entry.label;
-  }
-  return `${entry.label} ${MESSAGES.tabExited(entry.tab.status.exitCode)}`;
+/** `null` while running or for a page tab (`buildTabStripEntries`'s own page branch never calls
+ * this) — never an empty string standing in for "nothing to show". */
+function terminalExitedText(tab: Tab): string | null {
+  return isRunning(tab) || tab.status.kind !== 'exited'
+    ? null
+    : MESSAGES.tabExited(tab.status.exitCode);
 }
 
 /**
@@ -73,7 +77,7 @@ function terminalTabLabel(entry: TerminalStripTab): string {
  *   [{ kind: 'page', id: 'page-today', pageKind: 'today' }],
  *   'page-today',
  * );
- * // [{ id: 'page-today', label: 'Today', icon: 'calendar', active: true, exited: false }]
+ * // [{ id: 'page-today', label: 'Today', exitedText: null, icon: 'calendar', active: true, exited: false }]
  */
 export function buildTabStripEntries(
   tabs: readonly StripTab[],
@@ -85,6 +89,7 @@ export function buildTabStripEntries(
       return {
         id: entry.id,
         label: PAGE_TAB_LABEL[entry.pageKind],
+        exitedText: null,
         icon: resolvePageTabIcon(entry.pageKind),
         active,
         exited: false,
@@ -92,7 +97,8 @@ export function buildTabStripEntries(
     }
     return {
       id: entry.id,
-      label: terminalTabLabel(entry),
+      label: entry.label,
+      exitedText: terminalExitedText(entry.tab),
       icon: resolveTerminalTabIcon(entry.origin),
       active,
       exited: !isRunning(entry.tab),

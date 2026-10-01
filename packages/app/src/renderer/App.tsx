@@ -12,6 +12,7 @@
  * strip's own toolbar row — `TabStrip`'s own `leading` prop, its docstring explains why).
  */
 import { IconButton } from './components/IconButton/index.js';
+import { ChevronLeftIcon, ChevronRightIcon } from './components/Icon/index.js';
 import { sidebarToggleButtonLabel } from '../state/sidebar-collapse.js';
 import { DialogsShell } from './legacy/dialogs-shell.js';
 import { Sidebar, useSidebarCollapse } from './features/sidebar/index.js';
@@ -20,6 +21,10 @@ import { TabStrip } from './features/tabs/index.js';
 export function AppShell() {
   const { collapsed, toggle } = useSidebarCollapse();
   const toggleLabel = sidebarToggleButtonLabel(collapsed);
+  // V2-T64 PO review: a real icon, same size/weight as Favorites' own "+" (IconButton size="sm",
+  // a 24px icon filling its 24px box exactly, identity § 6.4's own preferred grid) — the `«`/`»`
+  // text glyphs this button used before read as plain characters, not iconography, at this size.
+  const ToggleIcon = toggleLabel.icon === 'collapse' ? ChevronLeftIcon : ChevronRightIcon;
 
   return (
     <>
@@ -30,11 +35,12 @@ export function AppShell() {
             leading={
               <IconButton
                 id="sidebar-toggle-button"
+                size="sm"
                 variant="ghost"
                 aria-label={toggleLabel.tooltip}
                 onClick={toggle}
               >
-                {toggleLabel.glyph}
+                <ToggleIcon size={24} />
               </IconButton>
             }
           />

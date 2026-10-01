@@ -1,21 +1,32 @@
 /* D-052 (V2-T75 left this unstyled, Q-102; V2-T64 brings it to the pattern) — same visual result
  * the global `.seeya-segmented-control*` classes already gave (`renderer/legacy/components.css`),
  * now scoped to this component alone. The border between two adjacent options uses the DOM's
- * sibling combinator (`.option + .option`, plain CSS, no JS "is this the first option" logic). */
+ * sibling combinator (`.option + .option`, plain CSS, no JS "is this the first option" logic).
+ *
+ * `display: flex` + `width: 100%` (PO review, V2-T64) — the New tab popover's own fields below
+ * this control (`Directory`, the conditional `Command`) are full-width; `inline-flex`'s own
+ * shrink-to-content sizing left a visible empty gap to the right of this control's own last
+ * segment, misaligned with them. Every caller of this component gets the full-width behaviour now
+ * (this control's only production caller so far, the popover, always wants it filling its row —
+ * a shrink-to-content segmented control sitting ALONE in its own row has no obvious use here yet;
+ * revisit with a `fullWidth` prop if a future caller needs the narrower shape). */
 .group {
-  display: inline-flex;
+  display: flex;
+  width: 100%;
   border: 1px solid var(--seeya-border);
   border-radius: var(--seeya-radius-md);
   overflow: hidden;
 }
 
 .option {
+  flex: 1;
   border: none;
   background: var(--seeya-surface);
   color: var(--seeya-text-secondary);
   font-family: var(--seeya-font-sans);
   font-size: 13px;
   padding: var(--seeya-space-1) var(--seeya-space-3);
+  text-align: center;
   cursor: pointer;
   transition: background-color var(--seeya-motion-micro) var(--seeya-motion-easing);
 }

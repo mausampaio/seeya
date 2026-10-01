@@ -19,6 +19,14 @@
  * `aria-label` now — its CLICK wiring is untouched, still `renderer/legacy/settings-dialog-view.ts
  * #wireSettingsDialog` attaching by the same `#settings-button` id (that dialog's own redesign is
  * V2-T65, out of this task's scope) — this component only changed its visual chrome.
+ *
+ * `SettingsIcon size={20}` (PO review): the bare default (16px) inside this button's own `size="md"`
+ * (32px) box read smaller/fainter than the tab icons next to it (16px, but in their own compact
+ * `TabStripItem` layout, not a 32px button) — 20px fills more of the box while staying inside the
+ * identity's own 20/24px preferred icon grid (§ 6.4). Colour already came from `variant="ghost"`
+ * (`IconButton.module.css`'s own `.ghost { color: var(--seeya-text-secondary) }`) — never grey on
+ * its own, confirmed against a real DOM dump, not just a screenshot (same "offscreen rendering is
+ * a poor judge of stroke/size" lesson V2-T75's own icon fix already measured).
  */
 import { useEffect, useRef } from 'preact/hooks';
 import type { ComponentChildren, JSX } from 'preact';
@@ -79,8 +87,13 @@ export function TabStrip(props: TabStripProps): JSX.Element {
             />
           ))}
         </div>
-        <IconButton id="settings-button" variant="ghost" aria-label={MESSAGES.settingsButton}>
-          <SettingsIcon />
+        <IconButton
+          id="settings-button"
+          variant="ghost"
+          size="md"
+          aria-label={MESSAGES.settingsButton}
+        >
+          <SettingsIcon size={20} />
         </IconButton>
       </div>
       <NewTabPopover

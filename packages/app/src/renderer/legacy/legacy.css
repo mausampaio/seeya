@@ -152,13 +152,13 @@ body {
  * collapsed), to the left of the tab strip's own "+" (`renderer/features/tabs/TabStrip.module.css`
  * styles the toolbar row itself since V2-T64; this id is still App.tsx's own, unmoved by that
  * task). The 20px side-strip toggle (#sidebar-collapse-toggle above) stays as a secondary
- * shortcut, not replaced. */
-#sidebar-toggle-button {
-  width: 28px;
-  height: 28px;
-  font-size: 14px;
-  padding: 0;
-}
+ * shortcut, not replaced.
+ *
+ * V2-T64 PO review: no id-selector sizing rule here any more — an id selector is MORE specific
+ * than `IconButton`'s own `.sm` class (`renderer/components/IconButton/IconButton.module.css`),
+ * so this used to win and silently override the 24×24 box `size="sm"` asks for (the exact same
+ * class of bug `#new-tab-button`/`#settings-button` had before this task removed their own
+ * leftover rules below). The button's own `size="sm"` prop (`App.tsx`) now governs its size. */
 
 #session-list,
 #today-panel ul {

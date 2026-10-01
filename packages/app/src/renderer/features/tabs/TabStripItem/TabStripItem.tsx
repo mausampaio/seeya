@@ -11,7 +11,7 @@
  *
  * @example
  * <TabStripItem
- *   entry={{ id: 'tab-1', label: 'claude', icon: 'terminal', active: true, exited: false }}
+ *   entry={{ id: 'tab-1', label: 'claude', exitedText: null, icon: 'terminal', active: true, exited: false }}
  *   onSelect={showTab}
  *   onClose={closeTab}
  * />
@@ -60,6 +60,9 @@ export function TabStripItem(props: TabStripItemProps): JSX.Element {
           <Icon size={16} />
         </span>
         <span class={cx(styles, 'label')}>{entry.label}</span>
+        {entry.exitedText !== null && (
+          <span class={cx(styles, 'exitedText')}> · {entry.exitedText}</span>
+        )}
       </button>
       <IconButton
         variant="ghost"

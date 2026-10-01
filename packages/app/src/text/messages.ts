@@ -9,7 +9,12 @@
 export const MESSAGES = {
   windowTitle: 'seeya',
   statusHeading: 'Status',
-  tabExited: (exitCode: number): string => `exited (code ${exitCode})`,
+  // V2-T64 PO review: "exited (N)" — the "code" word dropped, `docs/INTERFACE.md`'s own "· exited"
+  // is the exact state text a tab's own exited suffix renders (`state/tab-strip.ts
+  // #buildTabStripEntries`'s own `exitedText`, kept apart from `label` so `TabStripItem` can give
+  // it its own colour — the "·" separator itself is this component's own markup, not part of this
+  // string).
+  tabExited: (exitCode: number): string => `exited (${exitCode})`,
 
   // V2-T64 — the tab strip's own "+" button and its New tab popover (`docs/INTERFACE.md` § 2),
   // replacing the former command bar (`commandBar*`, removed with it).
@@ -292,11 +297,11 @@ export const MESSAGES = {
   // needed a second "reopen" glyph.
   // Maintainer acceptance, 2026-09-25: the side-strip toggle above wasn't discoverable ("um
   // controle que só se acha sabendo que existe é defeito") — this second, obvious button lives in
-  // the toolbar next to "+" instead, with its own glyph pair and a tooltip naming the keyboard
-  // shortcut (state/sidebar-toggle-shortcut.ts's own docstring has why it's scoped to "no terminal
-  // focused").
-  sidebarToggleButtonShow: '»',
-  sidebarToggleButtonHide: '«',
+  // the toolbar next to "+" instead, with a tooltip naming the keyboard shortcut
+  // (state/sidebar-toggle-shortcut.ts's own docstring has why it's scoped to "no terminal
+  // focused"). V2-T64 PO review: its own icon is a real `ChevronLeftIcon`/`ChevronRightIcon` now
+  // (`state/sidebar-collapse.ts#SidebarToggleButtonIcon`), never a text glyph pair — this module
+  // keeps only the tooltip text, text being its whole job (this file's own top comment).
   sidebarToggleTooltipShow: 'Show sidebar (Ctrl+B)',
   sidebarToggleTooltipHide: 'Hide sidebar (Ctrl+B)',
   projectsHeading: 'Projects',

@@ -92,7 +92,14 @@ describe('useTabStrip (V2-T64)', () => {
     void act(() => result.current.openNewTab('claude', [], '/code/app'));
     expect(result.current.popoverOpen).toBe(false);
     expect(result.current.entries).toEqual([
-      { id: 'tab-1', label: 'claude', icon: 'terminal', active: true, exited: false },
+      {
+        id: 'tab-1',
+        label: 'claude',
+        exitedText: null,
+        icon: 'terminal',
+        active: true,
+        exited: false,
+      },
     ]);
     expect(result.current.activeId).toBe('tab-1');
     expect(result.current.terminalTabs[0]?.spawnRequest).toEqual({
@@ -121,7 +128,14 @@ describe('useTabStrip (V2-T64)', () => {
       }),
     );
     expect(result.current.entries).toEqual([
-      { id: 'resume-1', label: 'auth fix', icon: 'balloon', active: true, exited: false },
+      {
+        id: 'resume-1',
+        label: 'auth fix',
+        exitedText: null,
+        icon: 'balloon',
+        active: true,
+        exited: false,
+      },
     ]);
   });
 
@@ -140,13 +154,13 @@ describe('useTabStrip (V2-T64)', () => {
     expect(result.current.entries[0]?.icon).toBe('folder');
   });
 
-  it('a tab exit event marks the entry exited, with the "· exited (code N)" suffix', () => {
+  it('a tab exit event marks the entry exited, with the "exited (N)" suffix kept separate', () => {
     const { fireTabExit } = fakeApiWithCapturedListeners();
     const { result } = renderHook(() => useTabStrip());
     void act(() => result.current.openNewTab('', [], ''));
     void act(() => fireTabExit({ id: 'tab-1', exitCode: 1 }));
     expect(result.current.entries[0]).toEqual(
-      expect.objectContaining({ label: 'shell exited (code 1)', exited: true }),
+      expect.objectContaining({ label: 'shell', exitedText: 'exited (1)', exited: true }),
     );
   });
 
