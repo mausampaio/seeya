@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   buildTodayCardSummary,
   buildTodayPanelData,
+  defaultResumeInCwd,
   formatTodayCardDayLabel,
   hasResumableSession,
   offersResumeCheckbox,
   refreshTodayPanelLiveness,
+  resumableSelection,
   type TodaySessionRow,
 } from '../../../../packages/app/src/state/today-panel.js';
 import type { PendingBriefingLookup } from '@seeya-ai/engine/application/find-pending-briefing.js';
@@ -469,5 +471,62 @@ describe('buildTodayCardSummary (V2-T63)', () => {
       dayLabel: 'yesterday',
       resumableCount: 1,
     });
+  });
+});
+
+describe('defaultResumeInCwd (V2-T66)', () => {
+  it('is undefined with an empty history (D-025: never a guess)', () => {
+    expect(defaultResumeInCwd([])).toBeUndefined();
+  });
+
+  it('is undefined when every entry has since stopped existing', () => {
+    const history = [{ cwd: '/old', firstDay: '2026-08-14', lastDay: '2026-08-14', exists: false }];
+    expect(defaultResumeInCwd(history)).toBeUndefined();
+  });
+
+  it('picks the most recent EXISTING entry, even when the very last entry no longer exists', () => {
+    const history = [
+      { cwd: '/first', firstDay: '2026-08-10', lastDay: '2026-08-12', exists: true },
+      { cwd: '/second', firstDay: '2026-08-13', lastDay: '2026-08-15', exists: true },
+      { cwd: '/gone', firstDay: '2026-08-16', lastDay: '2026-08-16', exists: false },
+    ];
+    expect(defaultResumeInCwd(history)).toBe('/second');
+  });
+});
+
+describe('resumableSelection (V2-T66)', () => {
+  function row(overrides: Partial<TodaySessionRow> = {}): TodaySessionRow {
+    return {
+      sessionId: 'a',
+      displaySessionId: 'a',
+      name: 'alpha',
+      cwd: '/a',
+      firstPlanLine: null,
+      resumeStatus: { kind: 'neverResumed' },
+      cwdHistory: [],
+      ...overrides,
+    };
+  }
+
+  it('includes a selected row that still offers the checkbox', () => {
+    const rows = [row({ sessionId: 'a' })];
+    expect(resumableSelection(rows, new Set(['a']))).toEqual(['a']);
+  });
+
+  it('excludes a selected row that stopped offering the checkbox (now runningNow)', () => {
+    const rows = [
+      row({ sessionId: 'a', resumeStatus: { kind: 'runningNow', matchedTabId: null } }),
+    ];
+    expect(resumableSelection(rows, new Set(['a']))).toEqual([]);
+  });
+
+  it('excludes a row that offers the checkbox but was never selected', () => {
+    const rows = [row({ sessionId: 'a' })];
+    expect(resumableSelection(rows, new Set())).toEqual([]);
+  });
+
+  it('preserves row order for a multi-row selection', () => {
+    const rows = [row({ sessionId: 'a' }), row({ sessionId: 'b' }), row({ sessionId: 'c' })];
+    expect(resumableSelection(rows, new Set(['c', 'a']))).toEqual(['a', 'c']);
   });
 });

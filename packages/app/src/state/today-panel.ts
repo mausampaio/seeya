@@ -316,3 +316,42 @@ export function refreshTodayPanelLiveness(
   }
   return buildTodayPanelData(inputs.lookup, inputs.cwdHistoryBySessionId, liveSessionIds);
 }
+
+/**
+ * V2-T66 — the "Resume in" selector's own implicit default (`docs/INTERFACE.md` § 3's own "o mais
+ * recente por padrão"): the most recent EXISTING directory in `history`, or `undefined` when none
+ * exists (D-025 — never a guess). Shared by `renderer/features/today/CwdChangeNotice` (what the
+ * `Select` shows when nobody has touched it) and `useToday.ts#resumeSelected` (what actually gets
+ * submitted for a session nobody touched the selector for) — the same single source of truth
+ * `today-panel-view.ts`'s own `renderResumeInSelect` used to be for both at once, now split across
+ * two call sites that must agree (D-041: never re-derived differently in either place).
+ *
+ * @example
+ * defaultResumeInCwd([
+ *   { cwd: 'C:\\old', firstDay: '2026-08-14', lastDay: '2026-08-14', exists: false },
+ *   { cwd: 'C:\\new', firstDay: '2026-08-16', lastDay: '2026-08-16', exists: true },
+ * ]); // 'C:\\new'
+ */
+export function defaultResumeInCwd(history: readonly CwdHistoryEntry[]): string | undefined {
+  return history.filter((entry) => entry.exists).at(-1)?.cwd;
+}
+
+/**
+ * V2-T66 — the sessionIds from `rows` a "Resume selected" click should actually submit: still
+ * offering the checkbox (`offersResumeCheckbox`) AND present in `selected`. A session that stopped
+ * offering one since it was checked (it just started running on a later tick) is silently excluded
+ * rather than submitted — `useToday.ts`'s own docstring on why this never needs the legacy DOM
+ * panel's snapshot/restore dance: selection lives as hook state, untouched by a `data` refresh, so
+ * this filter is the only pruning a stale entry ever needs.
+ *
+ * @example
+ * resumableSelection(rows, new Set(['a', 'b'])); // ['a'] if 'b' is already runningNow
+ */
+export function resumableSelection(
+  rows: readonly TodaySessionRow[],
+  selected: ReadonlySet<string>,
+): readonly string[] {
+  return rows
+    .filter((row) => offersResumeCheckbox(row.resumeStatus) && selected.has(row.sessionId))
+    .map((row) => row.sessionId);
+}
