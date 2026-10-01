@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { useRef } from 'preact/hooks';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render } from '@testing-library/preact';
 import { IconButton } from '../../../../../packages/app/src/renderer/components/IconButton/index.js';
@@ -63,5 +64,23 @@ describe('IconButton (D-052, V2-T75)', () => {
   it('is never a submit button', () => {
     const { getByRole } = render(<IconButton aria-label="x">i</IconButton>);
     expect((getByRole('button') as HTMLButtonElement).type).toBe('button');
+  });
+
+  it('exposes the underlying node via buttonRef (V2-T64 — Popover anchor positioning)', () => {
+    let captured: HTMLButtonElement | null = null;
+    function Harness() {
+      const buttonRef = useRef<HTMLButtonElement>(null);
+      captured = buttonRef.current;
+      return (
+        <IconButton aria-label="+" buttonRef={buttonRef}>
+          +
+        </IconButton>
+      );
+    }
+    const { getByRole, rerender } = render(<Harness />);
+    // The ref is only populated AFTER the DOM commit — re-render once to read it back, same
+    // "measure after mount" shape `Popover.tsx#positionNear` itself relies on.
+    rerender(<Harness />);
+    expect(captured).toBe(getByRole('button'));
   });
 });

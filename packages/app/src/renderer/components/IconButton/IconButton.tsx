@@ -12,7 +12,7 @@
  *   <PlusIcon />
  * </IconButton>
  */
-import type { ComponentChildren, JSX, TargetedMouseEvent } from 'preact';
+import type { ComponentChildren, JSX, RefObject, TargetedMouseEvent } from 'preact';
 import styles from './IconButton.module.css';
 import { cx, mergeClassName } from '../css-class.js';
 import type { ButtonVariant } from '../Button/Button.js';
@@ -28,6 +28,11 @@ export interface IconButtonProps {
   readonly onClick?: (event: TargetedMouseEvent<HTMLButtonElement>) => void;
   readonly 'aria-label': string;
   readonly children: ComponentChildren;
+  /** V2-T64: a plain DOM ref to the underlying `<button>` — never Preact's own `ref` prop (which
+   * this project has no `forwardRef` for without `preact/compat`, D-051: no compatibility layer).
+   * Needed by a caller that has to MEASURE this button (`Popover`'s own anchor positioning — the
+   * tab strip's "+" button is the first one). Optional: most callers never need the node itself. */
+  readonly buttonRef?: RefObject<HTMLButtonElement | null>;
 }
 
 export function IconButton(props: IconButtonProps): JSX.Element {
@@ -37,6 +42,11 @@ export function IconButton(props: IconButtonProps): JSX.Element {
   );
   return (
     <button
+      // Conditional spread, not `ref={props.buttonRef}` directly — `buttonRef` is an OPTIONAL prop
+      // (`RefObject<...> | undefined`), and this project's `exactOptionalPropertyTypes` (D-024's
+      // own strictness) treats "present, valued `undefined`" as a different shape than "absent" —
+      // Preact's own `ref` JSX attribute type only accepts the latter.
+      {...(props.buttonRef !== undefined ? { ref: props.buttonRef } : {})}
       id={props.id}
       type="button"
       class={className}

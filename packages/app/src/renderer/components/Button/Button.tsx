@@ -27,6 +27,10 @@ export interface ButtonProps {
   readonly disabled?: boolean;
   readonly hidden?: boolean;
   readonly className?: string;
+  /** V2-T64: a native tooltip for when the visible label is already a shortened form of a longer
+   * fact (e.g. the New tab popover's own recent-directory shortcuts, `shortenDirectoryPath`) —
+   * optional, most buttons have no need for a second, longer text. */
+  readonly title?: string;
   readonly onClick?: (event: TargetedMouseEvent<HTMLButtonElement>) => void;
   readonly children: ComponentChildren;
 }
@@ -49,6 +53,7 @@ export function Button(props: ButtonProps): JSX.Element {
       class={className}
       disabled={props.disabled}
       hidden={props.hidden}
+      title={props.title}
       onClick={props.onClick}
     >
       {props.children}

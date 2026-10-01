@@ -1,0 +1,19 @@
+/* D-052/V2-T64. */
+.heading {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--seeya-text);
+}
+
+.recentLabel {
+  font-size: 12px;
+  color: var(--seeya-text-tertiary);
+}
+
+/* Lets the directory text field grow to fill the row, with the "Browse…" button keeping its own
+ * natural width beside it (`NewTabPopover.tsx`'s own horizontal Stack). */
+.directoryField {
+  flex: 1;
+  min-width: 0;
+}
