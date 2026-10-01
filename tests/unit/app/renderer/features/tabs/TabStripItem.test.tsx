@@ -9,7 +9,14 @@ import { classesOf } from '../../components/_dom.js';
 afterEach(cleanup);
 
 function entry(overrides: Partial<TabStripEntry> = {}): TabStripEntry {
-  return { id: 'tab-1', label: 'claude', icon: 'terminal', active: false, exited: false, ...overrides };
+  return {
+    id: 'tab-1',
+    label: 'claude',
+    icon: 'terminal',
+    active: false,
+    exited: false,
+    ...overrides,
+  };
 }
 
 describe('TabStripItem (V2-T64)', () => {

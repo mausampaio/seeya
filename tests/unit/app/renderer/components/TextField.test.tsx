@@ -33,17 +33,13 @@ describe('TextField (V2-T62, D-051; CSS module + render tests since V2-T64)', ()
 
   it('calls onInput with the new value', () => {
     const onInput = vi.fn();
-    const { getByLabelText } = render(
-      <TextField id="x" label="X" value="" onInput={onInput} />,
-    );
+    const { getByLabelText } = render(<TextField id="x" label="X" value="" onInput={onInput} />);
     fireEvent.input(getByLabelText('X'), { target: { value: 'typed' } });
     expect(onInput).toHaveBeenCalledWith('typed');
   });
 
   it('disables the input when asked', () => {
-    const { getByLabelText } = render(
-      <TextField id="x" label="X" value="" disabled />,
-    );
+    const { getByLabelText } = render(<TextField id="x" label="X" value="" disabled />);
     expect((getByLabelText('X') as HTMLInputElement).disabled).toBe(true);
   });
 });

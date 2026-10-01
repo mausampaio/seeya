@@ -13,7 +13,11 @@ import type { ProjectsPanelData } from '../../../../../../packages/app/src/state
 
 afterEach(cleanup);
 
-const EMPTY_PANEL: ProjectsPanelData = { projects: [], otherSessionsByDirectory: [], ignoredProjects: [] };
+const EMPTY_PANEL: ProjectsPanelData = {
+  projects: [],
+  otherSessionsByDirectory: [],
+  ignoredProjects: [],
+};
 
 /** A named double over the slice of `SeeyaApi` this hook actually drives — captures each
  * registered listener so a test can fire it directly, and hands back the `closeTab`/`removeTab`
@@ -64,7 +68,9 @@ describe('useTabStrip (V2-T64)', () => {
 
   it('becomes ready once the terminal font config resolves', async () => {
     window.seeya = createFakeSeeyaApi({
-      getTerminalFontConfig: vi.fn(() => Promise.resolve({ fontFamily: 'Geist Mono', fontSize: 15 })),
+      getTerminalFontConfig: vi.fn(() =>
+        Promise.resolve({ fontFamily: 'Geist Mono', fontSize: 15 }),
+      ),
     });
     const { result } = renderHook(() => useTabStrip());
     await waitFor(() => expect(result.current.ready).toBe(true));
@@ -106,7 +112,13 @@ describe('useTabStrip (V2-T64)', () => {
     const { fireResumeTabOpened } = fakeApiWithCapturedListeners();
     const { result } = renderHook(() => useTabStrip());
     void act(() =>
-      fireResumeTabOpened({ id: 'resume-1', label: 'auth fix', cwd: '/code/app', pid: 123, kind: 'session' }),
+      fireResumeTabOpened({
+        id: 'resume-1',
+        label: 'auth fix',
+        cwd: '/code/app',
+        pid: 123,
+        kind: 'session',
+      }),
     );
     expect(result.current.entries).toEqual([
       { id: 'resume-1', label: 'auth fix', icon: 'balloon', active: true, exited: false },
@@ -200,8 +212,12 @@ describe('useTabStrip (V2-T64)', () => {
     const { result } = renderHook(() => useTabStrip());
     const fitA = vi.fn();
     const fitB = vi.fn();
-    void act(() => result.current.registerHandle('a', { write: vi.fn(), fit: fitA, focus: vi.fn() }));
-    void act(() => result.current.registerHandle('b', { write: vi.fn(), fit: fitB, focus: vi.fn() }));
+    void act(() =>
+      result.current.registerHandle('a', { write: vi.fn(), fit: fitA, focus: vi.fn() }),
+    );
+    void act(() =>
+      result.current.registerHandle('b', { write: vi.fn(), fit: fitB, focus: vi.fn() }),
+    );
     void act(() => result.current.fitAll());
     expect(fitA).toHaveBeenCalledTimes(1);
     expect(fitB).toHaveBeenCalledTimes(1);

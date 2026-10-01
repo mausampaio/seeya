@@ -65,7 +65,7 @@ describe('Popover (D-052, V2-T64)', () => {
     expect(dialog.open).toBe(false);
   });
 
-  it('a click on the popover\'s own content never closes it', () => {
+  it("a click on the popover's own content never closes it", () => {
     const onRequestClose = vi.fn();
     const { getByTestId } = render(<Harness open onRequestClose={onRequestClose} />);
     fireEvent.click(getByTestId('content'));

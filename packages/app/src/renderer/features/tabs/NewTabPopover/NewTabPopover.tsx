@@ -43,7 +43,10 @@ const KIND_OPTIONS = NEW_TAB_KINDS.map((kind) => ({
   id: `new-tab-kind-${kind}`,
 }));
 
-function RecentDirectories(props: { readonly dirs: readonly string[]; readonly onPick: (dir: string) => void }) {
+function RecentDirectories(props: {
+  readonly dirs: readonly string[];
+  readonly onPick: (dir: string) => void;
+}) {
   if (props.dirs.length === 0) {
     return null;
   }
@@ -52,7 +55,14 @@ function RecentDirectories(props: { readonly dirs: readonly string[]; readonly o
       <span class={cx(styles, 'recentLabel')}>{MESSAGES.newTabRecentDirectoriesLabel}</span>
       <Stack direction="horizontal" gap="xs" wrap>
         {props.dirs.map((dir) => (
-          <Button key={dir} type="button" variant="secondary" size="sm" title={dir} onClick={() => props.onPick(dir)}>
+          <Button
+            key={dir}
+            type="button"
+            variant="secondary"
+            size="sm"
+            title={dir}
+            onClick={() => props.onPick(dir)}
+          >
             {shortenDirectoryPath(dir)}
           </Button>
         ))}
@@ -90,7 +100,12 @@ export function NewTabPopover(props: NewTabPopoverProps): JSX.Element {
   }
 
   return (
-    <Popover id={props.id} open={props.open} anchorRef={props.anchorRef} onRequestClose={props.onClose}>
+    <Popover
+      id={props.id}
+      open={props.open}
+      anchorRef={props.anchorRef}
+      onRequestClose={props.onClose}
+    >
       <form id="new-tab-form" onSubmit={handleSubmit}>
         <Stack gap="md">
           <p class={cx(styles, 'heading')}>{MESSAGES.newTabPopoverHeading}</p>
@@ -125,7 +140,12 @@ export function NewTabPopover(props: NewTabPopoverProps): JSX.Element {
           </Stack>
           <RecentDirectories dirs={props.recentDirectories} onPick={setDirectory} />
           <Stack direction="horizontal" gap="sm" justify="end">
-            <Button id="new-tab-popover-cancel" type="button" variant="secondary" onClick={props.onClose}>
+            <Button
+              id="new-tab-popover-cancel"
+              type="button"
+              variant="secondary"
+              onClick={props.onClose}
+            >
               {MESSAGES.newTabCancelButton}
             </Button>
             <Button id="new-tab-popover-open" type="submit" variant="primary">

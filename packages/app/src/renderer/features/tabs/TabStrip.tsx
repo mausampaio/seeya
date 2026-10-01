@@ -64,10 +64,19 @@ export function TabStrip(props: TabStripProps): JSX.Element {
     <>
       <div class={cx(styles, 'toolbar')}>
         {props.leading}
-        <NewTabButton buttonRef={newTabButtonRef} disabled={!data.ready} onClick={data.openPopover} />
+        <NewTabButton
+          buttonRef={newTabButtonRef}
+          disabled={!data.ready}
+          onClick={data.openPopover}
+        />
         <div class={cx(styles, 'tabs')} role="tablist">
           {data.entries.map((entry) => (
-            <TabStripItem key={entry.id} entry={entry} onSelect={data.selectTab} onClose={data.closeTab} />
+            <TabStripItem
+              key={entry.id}
+              entry={entry}
+              onSelect={data.selectTab}
+              onClose={data.closeTab}
+            />
           ))}
         </div>
         <IconButton id="settings-button" variant="ghost" aria-label={MESSAGES.settingsButton}>

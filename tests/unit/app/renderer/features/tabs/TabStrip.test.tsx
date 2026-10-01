@@ -3,7 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vite
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/preact';
 import { createFakeSeeyaApi } from '../../_fake-seeya-api.js';
 import { TabStrip } from '../../../../../../packages/app/src/renderer/features/tabs/TabStrip.js';
-import type { CreateTabRequest, CreateTabResponse } from '../../../../../../packages/app/src/ipc/channels.js';
+import type {
+  CreateTabRequest,
+  CreateTabResponse,
+} from '../../../../../../packages/app/src/ipc/channels.js';
 
 afterEach(cleanup);
 
@@ -42,7 +45,9 @@ describe('TabStrip (V2-T64)', () => {
 
   it('clicking "+" opens the New tab popover', async () => {
     const { getByRole, container } = render(<TabStrip />);
-    await waitFor(() => expect((getByRole('button', { name: 'New tab' }) as HTMLButtonElement).disabled).toBe(false));
+    await waitFor(() =>
+      expect((getByRole('button', { name: 'New tab' }) as HTMLButtonElement).disabled).toBe(false),
+    );
     fireEvent.click(getByRole('button', { name: 'New tab' }));
     const popover = container.querySelector('#new-tab-popover') as HTMLDialogElement;
     expect(popover.open).toBe(true);
@@ -50,11 +55,15 @@ describe('TabStrip (V2-T64)', () => {
 
   it('submitting the popover opens a new tab, shown in the strip and as the active pane', async () => {
     const { getByRole, container } = render(<TabStrip />);
-    await waitFor(() => expect((getByRole('button', { name: 'New tab' }) as HTMLButtonElement).disabled).toBe(false));
+    await waitFor(() =>
+      expect((getByRole('button', { name: 'New tab' }) as HTMLButtonElement).disabled).toBe(false),
+    );
     fireEvent.click(getByRole('button', { name: 'New tab' }));
     fireEvent.submit(container.querySelector('#new-tab-form') as HTMLFormElement);
     await waitFor(() => expect(getByRole('tab').textContent).toContain('claude'));
-    expect(createTab).toHaveBeenCalledWith(expect.objectContaining({ id: 'tab-1', command: 'claude' }));
+    expect(createTab).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'tab-1', command: 'claude' }),
+    );
   });
 
   it('Settings is an icon button with an accessible name, never visible text', () => {
