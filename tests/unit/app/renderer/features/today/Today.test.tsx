@@ -168,16 +168,24 @@ describe('Today (D-052, V2-T66)', () => {
   });
 
   it(
-    'shows the resume result even when the refetch afterward comes back noBriefing (the one ' +
+    'shows the resume result even when the push that lands first comes back noBriefing (the one ' +
       'pending session in that day being resumed leaves nothing left pending) -- regression, ' +
-      'a real capture during this task found the result silently disappearing behind the empty state',
+      'a real capture during this task found the result silently disappearing behind the empty ' +
+      'state; PO review of V2-T66 moved the refresh itself from a second getTodayPanel fetch to ' +
+      "the handler's own todayUpdate push (CHANNELS.resumeSelected, main/main.ts), so this now " +
+      'exercises that same push instead',
     async () => {
       const onlyOneSessionPending: TodayPanelData = {
         ...PENDING_DATA,
         rows: [PENDING_DATA.rows[0]!],
       };
-      const resumeSelected = vi.fn(() =>
-        Promise.resolve({
+      let push: ((data: TodayPanelData) => void) | undefined;
+      const resumeSelected = vi.fn(() => {
+        // The real handler sends `todayUpdate` BEFORE its own invoke response resolves (same
+        // "push then return" order as `main.ts`) — reproduced here with a microtask push ahead of
+        // the resolved promise.
+        push?.({ kind: 'noBriefing', message: 'Nothing captured yet.' });
+        return Promise.resolve({
           resumed: [
             {
               kind: 'resumed' as const,
@@ -190,13 +198,14 @@ describe('Today (D-052, V2-T66)', () => {
           invalidFallbackAnswers: [],
           remaining: [],
           stoppedEarly: false as const,
-        }),
-      );
+        });
+      });
       window.seeya = createFakeSeeyaApi({
-        getTodayPanel: vi
-          .fn()
-          .mockResolvedValueOnce(onlyOneSessionPending)
-          .mockResolvedValueOnce({ kind: 'noBriefing', message: 'Nothing captured yet.' }),
+        getTodayPanel: () => Promise.resolve(onlyOneSessionPending),
+        onTodayUpdate: (listener) => {
+          push = listener;
+          return () => {};
+        },
         resumeSelected,
       });
       const { getByRole, getByText } = render(<Today />);

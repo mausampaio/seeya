@@ -232,22 +232,32 @@ describe('useToday (D-052, V2-T66)', () => {
       expect(result.current.resuming).toBe(false);
     });
 
-    it('applies the result, clears the selection, and refetches the panel once it resolves', async () => {
-      const freshData = pendingData({ day: '2026-10-01' });
-      const getTodayPanel = vi
-        .fn()
-        .mockResolvedValueOnce(pendingData())
-        .mockResolvedValueOnce(freshData);
+    it('applies the result and clears the selection, without a second getTodayPanel fetch', async () => {
+      // PO review of V2-T66: `CHANNELS.resumeSelected`'s own handler (main/main.ts) now pushes a
+      // fresh `todayUpdate` itself, right before resolving — the same push the sidebar's "Today"
+      // card reads — so this hook must never fetch a second time on its own; `data` is expected to
+      // come from the push below, exercised the same way as the "a push always wins" test above.
+      const getTodayPanel = vi.fn(() => Promise.resolve(pendingData()));
       const resumeSelected = vi.fn(() => Promise.resolve(resumedResponse()));
-      window.seeya = createFakeSeeyaApi({ getTodayPanel, resumeSelected });
+      let push: ((data: TodayPanelData) => void) | undefined;
+      window.seeya = createFakeSeeyaApi({
+        getTodayPanel,
+        resumeSelected,
+        onTodayUpdate: (listener) => {
+          push = listener;
+          return () => {};
+        },
+      });
       const { result } = renderHook(() => useToday());
       await act(async () => {
         await Promise.resolve();
       });
       void act(() => result.current.toggleSession('a', true));
 
+      const freshData = pendingData({ day: '2026-10-01' });
       await act(async () => {
         result.current.resumeSelected();
+        push?.(freshData);
         await Promise.resolve();
         await Promise.resolve();
       });
@@ -255,7 +265,7 @@ describe('useToday (D-052, V2-T66)', () => {
       expect(result.current.result).toEqual(resumedResponse());
       expect(result.current.selectedSessionIds.size).toBe(0);
       expect(result.current.data).toEqual(freshData);
-      expect(getTodayPanel).toHaveBeenCalledTimes(2);
+      expect(getTodayPanel).toHaveBeenCalledTimes(1);
     });
   });
 

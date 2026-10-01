@@ -1348,6 +1348,11 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // (`build-constants.d.ts`'s own docstring has why this is never `app.getVersion()`), never
   // pushed: a running window's own installed version cannot change under it until relaunched.
   ipcMain.handle(CHANNELS.getAppVersion, (): string => __SEEYA_APP_VERSION__);
+  // V2-T66 PO review, item 2: `context.homeDir` (never `os.homedir()` read fresh here or in the
+  // renderer) — it already carries `SEEYA_APP_HOME_OVERRIDE` when a verification run set one, so
+  // the `~`-abbreviation a verification screenshot proves is against the SAME home the fixture
+  // itself was built under, not the real machine's.
+  ipcMain.handle(CHANNELS.getHomeDir, (): string => context.homeDir);
 
   // V2-T62 (D-051): the window's effective theme — "system" has a live counterpart
   // (`getTerminalFontConfig` above deliberately does not, its own docstring explains why), so
@@ -1571,6 +1576,14 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
           window.webContents.send(CHANNELS.resumeProgress, event);
         },
       );
+
+      // PO review of V2-T66 (2026-09-xx): the sidebar's own "Today" card reads the SAME
+      // `todayUpdate` channel (useSidebar.ts) as the Today tab itself — pushing the freshly
+      // resumed state here, right after resumeSessions resolves, is what keeps the sidebar's
+      // count in sync with the tab's own result at the same instant, instead of leaving it stale
+      // until the next ambient refresh tick (up to REFRESH_INTERVAL_MS away). Same pattern as
+      // `endDayRun` above.
+      window.webContents.send(CHANNELS.todayUpdate, await buildFreshTodayPanelData());
 
       return buildResumeSummary(result, resolveLabel);
     },

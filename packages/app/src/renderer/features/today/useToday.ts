@@ -13,14 +13,16 @@
  * (`state/today-panel.ts`) is the only pruning a stale selected id (one that stopped offering a
  * checkbox on a later tick) ever needs, applied fresh every render.
  *
- * **Why `resumeSelected` re-fetches `getTodayPanel` itself, rather than waiting for the next
- * ambient push.** `CHANNELS.resumeSelected`'s own handler (`main/main.ts`) never pushes a fresh
- * `todayUpdate` — it only returns the `ResumeSummaryResponse`. The legacy panel called
- * `refreshTodayPanel()` (a second `getTodayPanel` invoke) right after, for the exact same reason:
- * without it, a just-resumed session would keep showing its checkbox until the next ambient
- * refresh tick, up to `REFRESH_INTERVAL_MS` later.
+ * **Why `resumeSelected` never fetches `getTodayPanel` itself.** `CHANNELS.resumeSelected`'s own
+ * handler (`main/main.ts`) pushes a fresh `todayUpdate` right after `resumeSessions` resolves,
+ * before returning the `ResumeSummaryResponse` — the same push the sidebar's own "Today" card
+ * reads (`useSidebar.ts`), so the two stay in sync at the same instant instead of one of them
+ * waiting for the next ambient refresh tick (PO review of V2-T66). `data` here updates itself from
+ * that push through the `onTodayUpdate` subscription below; a second `getTodayPanel` invoke from
+ * this hook would just be a redundant read of the same fact.
  */
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import type { PathPlatformHint } from '@seeya-ai/engine/core/cwd-normalization.js';
 import { getSeeyaApi } from '../../ipc/client.js';
 import type { ResumeProgressUpdateEvent, ResumeSummaryResponse } from '../../../ipc/channels.js';
 import {
@@ -30,6 +32,13 @@ import {
 } from '../../../state/today-panel.js';
 
 const NO_BRIEFING_YET: TodayPanelData = { kind: 'noBriefing', message: '' };
+
+// Same `platform === 'win32' ? 'win32' : 'posix'` mapping `composition/index.ts` uses to compute
+// `AppContext.platformHint` from `process.platform` — here it's `window.seeya.platform`
+// (`main/preload.ts`'s own synchronous property), the renderer's own equivalent, read once.
+function toPlatformHint(platform: NodeJS.Platform): PathPlatformHint {
+  return platform === 'win32' ? 'win32' : 'posix';
+}
 
 export interface TodayControls {
   readonly data: TodayPanelData;
@@ -47,11 +56,20 @@ export interface TodayControls {
   readonly progress: ResumeProgressUpdateEvent | null;
   readonly result: ResumeSummaryResponse | null;
   readonly resumeSelected: () => void;
+  /** PO review of V2-T66, item 2 — this window's own home directory (empty string until
+   * `getHomeDir` resolves, D-025: the least-specific state, never a guess) and platform, for
+   * `SessionCard`/`CwdChangeNotice` to abbreviate every `cwd` they show. */
+  readonly homeDir: string;
+  readonly platformHint: PathPlatformHint;
 }
 
 export function useToday(): TodayControls {
   const api = getSeeyaApi();
   const [data, setData] = useState<TodayPanelData>(NO_BRIEFING_YET);
+  const [homeDir, setHomeDir] = useState('');
+  useEffect(() => {
+    void api.getHomeDir().then(setHomeDir);
+  }, [api]);
   const receivedPushRef = useRef(false);
   useEffect(() => {
     const unsubscribe = api.onTodayUpdate((event) => {
@@ -129,13 +147,12 @@ export function useToday(): TodayControls {
         sessionIds: selection,
         chosenCwdBySessionId: chosenCwdForRequest,
       })
-      .then(async (response) => {
+      .then((response) => {
         setResult(response);
         setProgress(null);
         setSelectedSessionIds(new Set());
-        // See this file's own top docstring for why a second fetch, not a wait for the next push.
-        const fresh = await api.getTodayPanel();
-        setData(fresh);
+        // See this file's own top docstring: `data` already refreshed itself from the handler's
+        // own `todayUpdate` push, sent before this response.
         setResuming(false);
       });
   }, [api, data, resuming, selection, chosenCwdBySessionId]);
@@ -153,5 +170,7 @@ export function useToday(): TodayControls {
     progress,
     result,
     resumeSelected,
+    homeDir,
+    platformHint: toPlatformHint(api.platform),
   };
 }
