@@ -4,7 +4,7 @@ title: 'V2-T65 — Settings nova: seções, tema e autostart'
 status: Review
 assignee: []
 created_date: '2026-09-30 10:34'
-updated_date: '2026-10-01 15:34'
+updated_date: '2026-10-01 15:54'
 labels: []
 milestone: m-2
 dependencies:
@@ -173,5 +173,11 @@ author: PO
 created: 2026-10-01 13:37
 ---
 2026-10-01, aceite do mantenedor: hoje a troca de tema só vale depois de fechar e abrir o app. A V2-T65 aplica a troca ao vivo — o controle de tema em Settings e o modo System acompanhando o SO — na janela inteira e no terminal, sem reiniciar.
+---
+
+author: Claude Sonnet 5
+created: 2026-10-01 15:54
+---
+PO review of the v2t65-screens/* captures: structure, navigation, inline error, and live theme were correct. Four fixes applied on this same branch, all re-verified with new screenshots: (1) version — General used to show Electron's own runtime version (44.3.0) whenever unpackaged, which is every npm run app launch; now baked at build time from @seeya-ai/app's own package.json via esbuild define (__SEEYA_APP_VERSION__), never app.getVersion() — confirmed in new captures showing seeya 0.1.0; (2) label size — Switch's label rendered at body-md (16px), visibly larger than the standalone Theme label (14px); brought to the same body-sm/weight-500/tone-secondary triple as every other field label; (3) autostart text — corrected to Starts the daemon at login, so end day happens even with this window closed., since the window itself never launches at login, only the daemon does; (4) icon — Capture's nav icon used to reuse SettingsIcon's own path with only coordinates nudged, reading as the same icon as General right above it; replaced with a genuinely distinct CameraIcon. Re-verified: Windows registry (HKCU\Software\Classes\seeya and seeya-dev) and protocol-handler.json SHA-256 hash unchanged before/after this capture round (same hash as the prior round). dist erased and npm run verificar run clean: all green, 343 test files, 3280 tests passing, 4 pre-existing skips, coverage identical to the previous round (95.42/91.06/94.38/95.62 stmts/branches/funcs/lines). Committed on tarefa/V2-T65-settings. Status stays Review.
 ---
 <!-- COMMENTS:END -->
