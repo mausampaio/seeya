@@ -170,10 +170,11 @@ export const MESSAGES = {
   todaySummaryResumedWithoutPlanNote: (noteText: string): string =>
     `Resumed without yesterday's plan — ${noteText}.`,
 
-  // V2-T5a item 1 — the "End day..." button and its preview-as-confirmation dialog. The report
-  // text itself (`endDayReport`, filled in by the renderer) is `formatEndDayReport`'s own literal
-  // output (`@seeya-ai/engine/application/format-end-day.js`) — never duplicated here (D-039's
-  // "the interface shows the literal text").
+  // V2-T5a item 1, reworked by V2-T69 into structured preview/progress/result views
+  // (`docs/INTERFACE.md` § 6, principle 5 — "nada de texto da CLI despejado na tela"): the
+  // "End day…" button and its preview/progress/result dialog. No more `reportText` here — every
+  // list comes from `state/end-day-sessions.ts`'s own structured rows, built from the same
+  // `EndDayResult` the CLI's own `formatEndDayReport` reads, never that function's literal text.
   endDayButton: 'End day…',
   endDayDialogTitle: 'End day',
   endDayDialogLoadingPreview: 'Loading preview…',
@@ -189,13 +190,39 @@ export const MESSAGES = {
     'This is a ceiling the capture itself enforces, never an estimate of what it will spend.',
   endDayRunNow: 'Run end-day now',
   endDayCancel: 'Cancel',
+  endDayWillBeCapturedHeading: (count: number): string => `Will be captured · ${count}`,
+  endDayNotCapturedHeading: (count: number): string => `Not captured · ${count}`,
+  endDayNothingToShow: 'Nothing to show.',
 
-  // V2-T5a item 4 — running and the final result. "capturing N of M: <name>" mirrors
-  // todayResumeProgress's own wording for the other daily-cycle progress line.
-  endDayRunningNoProgressYet: 'Starting…',
+  // V2-T69 — "em andamento": the headline mirrors todayResumeProgress's own wording for the other
+  // daily-cycle progress line. The gap between clicking "Run end-day now" and the first progress
+  // event (discovery + eligibility run for real before any session starts, `application/end-day.ts
+  // `'s own pipeline — a genuine, sometimes multi-second wait, not a cosmetic delay) is the
+  // `starting` phase's own job (`state/end-day-panel.ts`): it shows the frozen preview with this
+  // button's own `loading` state, never a "running" view with nothing yet to report.
   endDayCaptureProgress: (index: number, total: number, name: string): string =>
     `Capturing ${index} of ${total}: ${name}...`,
+  endDayHide: 'Hide',
+  endDayStatusWaiting: 'Waiting',
+  endDayStatusCapturing: 'Capturing',
+  endDayStatusCaptured: 'Captured',
+  endDayStatusIneligible: 'Skipped',
+  endDayStatusClosed: 'Closed',
+  endDayStatusFailed: 'Failed',
+
+  // V2-T69 — the result view's own three sections and its one action.
+  endDayResultCapturedHeading: (count: number): string => `Captured · ${count}`,
+  endDayResultFailedHeading: (count: number): string => `Failed · ${count}`,
+  endDayResultSkippedHeading: (count: number): string => `Skipped · ${count}`,
+  endDayOpenToday: 'Open Today',
   endDayClose: 'Close',
+
+  // V2-T69 — the sidebar footer's own reopen affordance (`docs/INTERFACE.md` § 6: "o rodapé da
+  // lateral mostra que há captura em andamento e permite reabrir") once the dialog is hidden while
+  // a capture is still running, or finished without anyone watching.
+  endDayFooterCapturing: (index: number, total: number): string =>
+    `Capturing ${index} of ${total}…`,
+  endDayFooterFinishedHidden: 'End day finished — view results',
 
   // V2-T5b item 1 — the faixa de horário (state/schedule-strip.ts). One PAIR of strings per
   // `ScheduleDecision` variant (D-024, "nada achatado") — `primary` (weight 500, left) and

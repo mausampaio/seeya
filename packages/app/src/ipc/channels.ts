@@ -14,6 +14,11 @@ import type { AutostartControlAvailability } from '../state/autostart-control-pa
 import type { SettingsRow, ProjectPolicyLine } from '../state/settings-panel.js';
 import type { ProjectPanelOtherSessionRow, ProjectsPanelData } from '../state/projects-panel.js';
 import type { EffectiveTheme } from '../theme/resolve-theme.js';
+import type {
+  EndDayNotCapturedRow,
+  EndDayReasonRow,
+  EndDaySessionSummaryRow,
+} from '../state/end-day-sessions.js';
 
 export const CHANNELS = {
   /** Renderer → main: open a new tab. */
@@ -442,13 +447,18 @@ export interface ResumeTabOpenedEvent {
 export type PickDirectoryResponse =
   { readonly canceled: true } | { readonly canceled: false; readonly path: string };
 
-/** `CHANNELS.endDayPreview`'s response (V2-T5a item 1). `reportText` is the literal
- * `formatEndDayReport` output for a `dryRun: true` run — same content `seeya end-day --dry-run`
- * prints. `costCeiling` is `state/end-day-preview.ts#EndDayCostCeiling`, re-declared here rather
- * than imported (same "ipc/channels.ts is pure, no engine-adjacent app module imports it back"
- * shape `ResumeSummaryResponse` above already has for its own list entries). */
+/** `CHANNELS.endDayPreview`'s response (V2-T5a item 1, reworked by V2-T69 into structured rows —
+ * no more `reportText`, `docs/INTERFACE.md` principle 5). `willBeCaptured`/`notCaptured` are
+ * `state/end-day-sessions.ts#buildEndDayPreviewRows`'s own output for a `dryRun: true` run — the
+ * SAME `EndDayResult` `seeya end-day --dry-run`'s own `formatEndDayReport` reads, just shaped for a
+ * list instead of a paragraph. `costCeiling` is `state/end-day-preview.ts#EndDayCostCeiling`,
+ * re-declared here rather than imported (same "ipc/channels.ts is pure, no engine-adjacent app
+ * module imports it back" shape `ResumeSummaryResponse` above already has for its own list
+ * entries) — unlike the row types above, which DO import from `state/`, since this shape has no
+ * engine type underneath it to keep this module decoupled from. */
 export interface EndDayPreviewResponse {
-  readonly reportText: string;
+  readonly willBeCaptured: readonly EndDaySessionSummaryRow[];
+  readonly notCaptured: readonly EndDayNotCapturedRow[];
   readonly costCeiling: {
     readonly sessionsInScope: number;
     readonly budgetPerSessionUsd: number;
@@ -457,20 +467,33 @@ export interface EndDayPreviewResponse {
   };
 }
 
-/** `CHANNELS.endDayRun`'s response (V2-T5a item 4) — the literal `formatEndDayReport` output for
- * the real run, same content `seeya end-day` prints. */
+/** `CHANNELS.endDayRun`'s response (V2-T5a item 4, reworked by V2-T69) — the real run's own three
+ * final buckets (`state/end-day-sessions.ts#buildEndDayResultRows`), same `EndDayResult`
+ * `seeya end-day`'s own `formatEndDayReport` reads. */
 export interface EndDayRunResponse {
-  readonly reportText: string;
+  readonly captured: readonly EndDaySessionSummaryRow[];
+  readonly failed: readonly EndDayReasonRow[];
+  readonly skipped: readonly EndDayReasonRow[];
 }
 
-/** `CHANNELS.endDayProgress`'s payload — mirrors `ResumeProgressUpdateEvent` above exactly (same
- * "N of M: name" shape), projected from `application/end-day.ts`'s own `CaptureProgressEvent` by
- * `state/end-day-progress.ts#projectEndDayProgressEvent`. */
-export interface EndDayProgressUpdateEvent {
-  readonly index: number;
-  readonly total: number;
-  readonly name: string;
-}
+/** `CHANNELS.endDayProgress`'s payload (V2-T69) — both `CaptureProgressEvent` kinds now cross the
+ * IPC boundary, keyed by `sessionId` (never just `name`, which two sessions could share), so
+ * `state/end-day-panel.ts#reduceEndDayPanel` can update the right row in the running view's own
+ * per-session list — see `state/end-day-progress.ts`'s own docstring for why `captureFinished` is
+ * forwarded now when V2-T5a deliberately dropped it. */
+export type EndDayProgressUpdateEvent =
+  | {
+      readonly kind: 'started';
+      readonly sessionId: string;
+      readonly name: string;
+      readonly index: number;
+      readonly total: number;
+    }
+  | {
+      readonly kind: 'finished';
+      readonly sessionId: string;
+      readonly outcome: 'captured' | 'ineligible' | 'failed';
+    };
 
 /** `CHANNELS.scheduleUpdate`'s payload and `CHANNELS.snoozeToday`/`CHANNELS.skipToday`'s response
  * — the exact shape `state/schedule-strip.ts#buildScheduleStripData` produces (V2-T5b item 1). */

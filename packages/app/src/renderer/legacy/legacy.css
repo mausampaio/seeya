@@ -24,9 +24,9 @@ body {
   font-family: var(--seeya-font-sans);
   /* V2-T30/V2-T48 item 6: "a janela nunca deve ter barra de rolagem própria" — every region that
    * needs to scroll its own content already sets its own `overflow-y: auto` (#sidebar,
-   * #end-day-dialog-report, #settings-rows); the DOCUMENT itself never should, even for the one
-   * frame a terminal might render oversized before its own resize observer corrects it
-   * (renderer.ts#wireWindowResize's own docstring). */
+   * .page-pane); the DOCUMENT itself never should, even for the one frame a terminal might render
+   * oversized before its own resize observer corrects it (renderer.ts#wireWindowResize's own
+   * docstring). */
   overflow: hidden;
 }
 
@@ -233,10 +233,12 @@ body {
   margin-top: 12px;
 }
 
-/* V2-T5a items 1/4: the "End day..." preview-as-confirmation/progress/result dialog — same
- * shape as #fallback-dialog above (native <dialog>, showModal()), wider to fit
- * formatEndDayReport's own multi-line report text. V2-T62 (D-051): see #fallback-dialog's own
- * comment above — base dialog styling now comes from `.seeya-dialog`. */
+/* V2-T5a items 1/4, superseded by V2-T69: the "End day..." dialog's CONTENT is a real Preact
+ * component now (`renderer/features/end-day/EndDayDialog.tsx`, its own CSS module) — only the
+ * `#end-day-dialog` id itself survives here, since `Dialog.tsx` still renders its chrome through
+ * `.seeya-dialog` (V2-T62, D-051) and this id rule is the one thing that shared class deliberately
+ * leaves to each caller (width). The former `#end-day-dialog-report`/`-cost`/`-progress`/`-actions`
+ * rules, for elements this task's own markup no longer renders, are removed with it. */
 #end-day-dialog {
   max-width: 640px;
   width: 90vw;
@@ -244,30 +246,6 @@ body {
 
 #end-day-dialog h3 {
   margin: 0 0 8px;
-}
-
-#end-day-dialog-report {
-  max-height: 50vh;
-  overflow-y: auto;
-  font-size: 12px;
-  white-space: pre-wrap;
-  background: var(--seeya-surface-subtle);
-  border: 1px solid var(--seeya-border);
-  border-radius: var(--seeya-radius-sm);
-  padding: 8px;
-}
-
-#end-day-dialog-cost,
-#end-day-dialog-progress {
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-#end-day-dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 12px;
 }
 
 /* V2-T14: the Settings dialog — same shape as #end-day-dialog above (native <dialog>,

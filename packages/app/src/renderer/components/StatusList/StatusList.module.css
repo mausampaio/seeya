@@ -1,0 +1,47 @@
+/* D-052 (V2-T69). */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--seeya-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--seeya-space-3);
+  padding: var(--seeya-space-2) var(--seeya-space-3);
+  border-radius: var(--seeya-radius-md);
+  background: var(--seeya-surface-subtle);
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* `code` already sets a monospace font (`Text.module.css`) — this just keeps it from competing
+ * visually with the title above it. */
+.meta {
+  opacity: 0.85;
+}
+
+.detail {
+  max-width: 48ch;
+}
+
+.badges {
+  display: flex;
+  align-items: center;
+  gap: var(--seeya-space-1);
+  flex-shrink: 0;
+}
+
+.empty {
+  padding: var(--seeya-space-2) 0;
+}

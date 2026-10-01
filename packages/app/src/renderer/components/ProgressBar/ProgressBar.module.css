@@ -1,0 +1,19 @@
+/* D-052 (V2-T69): a fixed-height track with an animated fill — `height`/`border-radius` both come
+ * from this file, never from an ambient line-height, so the bar reads the same size regardless of
+ * the text sitting above it. */
+.track {
+  width: 100%;
+  height: var(--seeya-space-2);
+  border-radius: var(--seeya-radius-full);
+  background: var(--seeya-surface-subtle);
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  background: var(--seeya-brand);
+  border-radius: var(--seeya-radius-full);
+  /* `renderer/tokens.css`'s own global `prefers-reduced-motion` rule already zeroes this duration
+   * for anyone with that preference — no local media query needed here. */
+  transition: width var(--seeya-motion-panel) var(--seeya-motion-easing);
+}

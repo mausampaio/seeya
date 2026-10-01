@@ -1,0 +1,10 @@
+/* D-052 (V2-T69). */
+.pane {
+  min-width: 420px;
+  max-width: 560px;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}

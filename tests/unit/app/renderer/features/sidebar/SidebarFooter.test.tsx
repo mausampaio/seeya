@@ -9,12 +9,51 @@ import type { DaemonControlAvailability } from '../../../../../../packages/app/s
 
 afterEach(cleanup);
 
-describe('SidebarFooter (D-052, V2-T75)', () => {
-  it('renders the legacy-owned end-day anchor, and the real daemon control button', () => {
+describe('SidebarFooter (D-052, V2-T75/V2-T69)', () => {
+  it('renders the real end-day trigger button, and the daemon control button', () => {
     window.seeya = createFakeSeeyaApi();
-    const { container } = render(<SidebarFooter />);
+    const { container, getByText } = render(<SidebarFooter />);
     expect(container.querySelector('#end-day-button')).not.toBeNull();
     expect(container.querySelector('#daemon-control-button')).not.toBeNull();
+    expect(getByText('End day…')).not.toBeNull();
+  });
+
+  it('clicking End day… opens the dialog with the structured preview (V2-T69)', async () => {
+    const endDayPreview = vi.fn(() =>
+      Promise.resolve({
+        willBeCaptured: [
+          {
+            sessionId: 's1',
+            name: 'alpha',
+            cwd: '~/alpha',
+            state: 'ended' as const,
+            mode: 'lean' as const,
+          },
+        ],
+        notCaptured: [],
+        costCeiling: {
+          sessionsInScope: 1,
+          budgetPerSessionUsd: 0.5,
+          captureModel: 'sonnet',
+          totalCeilingUsd: 0.5,
+        },
+      }),
+    );
+    window.seeya = createFakeSeeyaApi({ endDayPreview });
+    const { getByRole, getByText } = render(<SidebarFooter />);
+
+    // `fireEvent.click` flushes synchronously on its own (same "sync callback, immediate finish()"
+    // shape `useEndDay.test.tsx`'s own top comment documents) — a SEPARATE async `act()` is what
+    // lets the already-queued `endDayPreview().then()` callback actually run against the
+    // now-current state.
+    fireEvent.click(getByRole('button', { name: 'End day…' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(endDayPreview).toHaveBeenCalledTimes(1);
+    expect(getByText('Will be captured · 1')).not.toBeNull();
+    expect(getByText('alpha')).not.toBeNull();
   });
 
   it("never renders the autostart anchor any more (V2-T65 — moved to Settings' own General section)", () => {

@@ -53,6 +53,7 @@ import type {
   ResumeTabOpenedKind,
 } from '../ipc/channels.js';
 import type { Clock } from '@seeya-ai/engine/core/ports.js';
+import { systemClock } from '@seeya-ai/engine/adapters/clock/index.js';
 import {
   applyConfigFieldUpdate,
   parseConfigFieldUpdate,
@@ -62,12 +63,17 @@ import { findPendingBriefing } from '@seeya-ai/engine/application/find-pending-b
 import { readCwdHistory } from '@seeya-ai/engine/application/cwd-history.js';
 import { resumeSessions } from '@seeya-ai/engine/application/start-day.js';
 import { endDay } from '@seeya-ai/engine/application/end-day.js';
-import { formatEndDayReport } from '@seeya-ai/engine/application/format-end-day.js';
 import { buildEndDayNotice } from '@seeya-ai/engine/application/end-day-notice.js';
 import { decideSchedule, emptyDayState } from '@seeya-ai/engine/core/schedule.js';
 import { localDayString } from '@seeya-ai/engine/core/day.js';
 import type { Config, Handoff } from '@seeya-ai/engine/core/types.js';
-import { buildAppContext, toEndDayDeps, type AppContext } from '../composition/index.js';
+import {
+  buildAppContext,
+  toEndDayDeps,
+  type AppContext,
+  type BuildAppContextOverrides,
+} from '../composition/index.js';
+import { VerificationFakeHandoffGenerator } from '../composition/verification-fake-generator.js';
 import { shouldMarkLinuxProtocolRegistered } from '../composition/linux-protocol-marker.js';
 import { resolveProtocolScheme, type ProtocolScheme } from '../composition/protocol-scheme.js';
 import { shouldRegisterProtocolScheme } from '../composition/protocol-registration-eligibility.js';
@@ -79,6 +85,7 @@ import {
 } from '../composition/menu-policy.js';
 import { MESSAGES } from '../text/messages.js';
 import { buildEndDayCostCeiling } from '../state/end-day-preview.js';
+import { buildEndDayPreviewRows, buildEndDayResultRows } from '../state/end-day-sessions.js';
 import { projectEndDayProgressEvent } from '../state/end-day-progress.js';
 import { buildScheduleStripData } from '../state/schedule-strip.js';
 import { resolveDaemonControlAvailability } from '../state/daemon-control-panel.js';
@@ -153,6 +160,42 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
  * (six ticks) to reason about.
  */
 const REFRESH_INTERVAL_MS = 10_000;
+
+/** `SEEYA_APP_VERIFY_END_DAY_FAKE`'s own per-session artificial delay (V2-T69) — see that flag's
+ * own comment, where `contextOverrides` is built, and the click-automation block below for the
+ * full timing this buys a mid-flight "progress" screenshot. */
+const END_DAY_FAKE_DELAY_MS = 2000;
+
+/**
+ * `SEEYA_APP_VERIFY_END_DAY_FAKE`'s own screenshot delay per scenario (V2-T69) — `null` when the
+ * flag isn't set at all, so `captureVerificationScreenshot`'s own ternary below falls through to
+ * its other buckets unaffected. Timings line up with the click-automation block and
+ * `END_DAY_FAKE_DELAY_MS` above, including that block's own 7400ms before the first click (3000ms
+ * before even trying to dismiss a stray daemon-ownership dialog — measured empirically: its own
+ * decline button stays disabled/"Working…" for a beat after the window loads — + 4400ms more
+ * margin for the dialog's own async check, `usesV2T55Instrumentation`'s own measured "~1.3-4s on
+ * EVERY call"): `'preview'` only needs the
+ * dry-run round trip on top of that (fast — it never calls a generator, real or fake);
+ * `'progress'`/`'hidden'` land partway through three sequential fake-delayed sessions (one
+ * `captured`, one `capturing`, one `waiting`, `docs/INTERFACE.md` § 6 item 2); `'result'` waits
+ * for all three plus the near-instant poisoned session (a pre-corrupted `~/.seeya` handoff, never
+ * the generator — `evaluateFullEligibility`'s own documented "corruption is a visible failure"
+ * path) to finish.
+ */
+function resolveEndDayFakeScreenshotDelayMs(scenario: string | undefined): number | null {
+  switch (scenario) {
+    case 'preview':
+      return 9000;
+    case 'progress':
+      return 11500;
+    case 'hidden':
+      return 12000;
+    case 'result':
+      return 21000;
+    default:
+      return null;
+  }
+}
 
 /**
  * V2-T3's own aceite: "captura de tela ... com uma linha de glifos Nerd
@@ -264,17 +307,18 @@ async function captureVerificationScreenshot(
   // measured "~1.3-4s on EVERY call" `checkDaemonOwnershipTransitionOffer` round trip plus a
   // buffer, the one genuinely slow step this category's flags still share.
   await clock.sleep(
-    process.env.SEEYA_APP_AUTO_END_DAY === '1'
-      ? 8000
-      : usesTabPidFixture
-        ? 35000
-        : usesTerminalResizeRepro
-          ? 8000
-          : usesV2T55Instrumentation
-            ? 7000
-            : usesTabStripDemo
-              ? 4500
-              : 2500,
+    resolveEndDayFakeScreenshotDelayMs(process.env.SEEYA_APP_VERIFY_END_DAY_FAKE) ??
+      (process.env.SEEYA_APP_AUTO_END_DAY === '1'
+        ? 8000
+        : usesTabPidFixture
+          ? 35000
+          : usesTerminalResizeRepro
+            ? 8000
+            : usesV2T55Instrumentation
+              ? 7000
+              : usesTabStripDemo
+                ? 4500
+                : 2500),
   );
   const image = await window.webContents.capturePage();
   const { writeFile } = await import('node:fs/promises');
@@ -933,6 +977,64 @@ function createWindow(clock: Clock): BrowserWindow {
             "document.getElementById('end-day-dialog-run')?.click();",
           ),
         );
+    });
+  }
+  // SEEYA_APP_VERIFY_END_DAY_FAKE (V2-T69): drives the real "End day…" dialog
+  // (`renderer/features/end-day/`) to one of four views for a screenshot, entirely against the
+  // FAKE generator `contextOverrides` wired above — never the real, billed `claude -p` the
+  // original `SEEYA_APP_AUTO_END_DAY` above calls. Dismisses a stray daemon-ownership-transition
+  // dialog FIRST, same reasoning as the two flags below this one — self-contained on purpose
+  // (one inline click, not the full `dismissDaemonOwnershipTransitionScript` those two share,
+  // which also re-expands the sidebar — irrelevant here and declared further down this function)
+  // so this flag never depends on `SEEYA_APP_AUTO_DECLINE_DAEMON_OWNERSHIP_TRANSITION` also being
+  // set. `'preview'` then clicks End day and stops there (the dry-run preview never calls a
+  // generator at all, real or fake, so no extra wait is needed beyond the IPC round trip).
+  // `'progress'`/`'result'`/`'hidden'` also click "Run end-day now" (`#end-day-dialog-run`, same
+  // id the structured dialog keeps from the legacy one) — with `END_DAY_FAKE_DELAY_MS` (2000ms)
+  // per session and `captureConcurrency: 1` in the fixture's own `config.json` (sequential, so
+  // the three "will be captured" sessions never race each other),
+  // `resolveEndDayFakeScreenshotDelayMs`'s own `'progress'`/`'hidden'` bucket lands inside the
+  // SECOND session's own capture window — one row already `captured`, one `capturing`, one still
+  // `waiting`. `'hidden'` additionally clicks `Hide` (`#end-day-dialog-hide`) at that same point,
+  // so the screenshot shows the SIDEBAR's own `describeEndDayFooterLabel` reopen affordance
+  // instead of the dialog. `'result'`'s own bucket waits for all three sessions AND the
+  // near-instant poisoned one (a pre-corrupted `~/.seeya` handoff the fixture writes, never a
+  // generator failure) to finish. Never set by `npm run app` or the README.
+  const endDayFakeScenario = process.env.SEEYA_APP_VERIFY_END_DAY_FAKE;
+  if (endDayFakeScenario !== undefined) {
+    window.webContents.once('did-finish-load', () => {
+      let sequence = clock
+        .sleep(3000)
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('daemon-ownership-transition-decline')?.click();",
+          ),
+        )
+        .then(() => clock.sleep(4400))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('end-day-button').click();",
+          ),
+        );
+      if (endDayFakeScenario !== 'preview') {
+        sequence = sequence
+          .then(() => clock.sleep(800))
+          .then(() =>
+            window.webContents.executeJavaScript(
+              "document.getElementById('end-day-dialog-run')?.click();",
+            ),
+          );
+      }
+      if (endDayFakeScenario === 'hidden') {
+        sequence = sequence
+          .then(() => clock.sleep(3000))
+          .then(() =>
+            window.webContents.executeJavaScript(
+              "document.getElementById('end-day-dialog-hide')?.click();",
+            ),
+          );
+      }
+      void sequence;
     });
   }
   // SEEYA_APP_AUTO_SNOOZE_15: same "instrumentação só do spike" class as the four above — clicks
@@ -1830,21 +1932,23 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
     },
   );
 
-  // V2-T5a item 1: "End day..." — the dry-run preview shown as the confirmation itself (D-039,
-  // D-002: this NEVER writes a handoff or terminates a process — dryRun: true stops every write
-  // right before it happens, application/end-day.ts's own top comment). skipGeneration: true
-  // (review fix) means this NEVER calls a real generator either — unlike `seeya end-day --dry-run`
-  // itself (whose own contract, S2-T5, still calls the real lean generator during a dry run: a
-  // command the person already decided to run), a preview the person has NOT confirmed anything
-  // for yet must not spend a real, billed model call — see EndDayOptions.skipGeneration's own
-  // docstring for the full reasoning. The report text is still formatEndDayReport's own literal
-  // rendering (the SAME function `seeya end-day` uses, V2-T5a item 2), just fed a result whose
-  // sessions never had the model actually called — so its CONTENT differs from
-  // `seeya end-day --dry-run` for lean sessions specifically, honestly (D-025): no "understanding"
-  // this preview never produced. The cost ceiling has no CLI equivalent, so it's computed here.
+  // V2-T5a item 1, reworked by V2-T69 into structured rows: "End day..." — the dry-run preview
+  // shown as the confirmation itself (D-039, D-002: this NEVER writes a handoff or terminates a
+  // process — dryRun: true stops every write right before it happens, application/end-day.ts's own
+  // top comment). skipGeneration: true (review fix) means this NEVER calls a real generator either
+  // — unlike `seeya end-day --dry-run` itself (whose own contract, S2-T5, still calls the real
+  // lean generator during a dry run: a command the person already decided to run), a preview the
+  // person has NOT confirmed anything for yet must not spend a real, billed model call — see
+  // EndDayOptions.skipGeneration's own docstring for the full reasoning.
+  // `state/end-day-sessions.ts#buildEndDayPreviewRows` is the SAME `EndDayResult` `seeya end-day
+  // --dry-run`'s own `formatEndDayReport` reads, just shaped into the "Will be captured"/"Not
+  // captured" lists `docs/INTERFACE.md` § 6 asks for instead of that function's literal paragraph
+  // (principle 5) — its CONTENT still differs from `seeya end-day --dry-run` for lean sessions
+  // specifically, honestly (D-025): no "understanding" this preview never produced, since none of
+  // these rows carry one. The cost ceiling has no CLI equivalent, so it's computed here.
   //
-  // V2-T16: `config` is read fresh, right here, for the report/cost-ceiling rendering — `endDay`
-  // itself already reads its own fresh copy internally (`application/end-day.ts`'s own
+  // V2-T16: `config` is read fresh, right here, for the cost-ceiling rendering — `endDay` itself
+  // already reads its own fresh copy internally (`application/end-day.ts`'s own
   // `storage.readConfig()` call), so this was never about `endDay`'s behavior; it was `main.ts`
   // formatting the RESULT against a config snapshot taken at window startup.
   ipcMain.handle(CHANNELS.endDayPreview, async (): Promise<EndDayPreviewResponse> => {
@@ -1854,21 +1958,29 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
       scope: { kind: 'fullDay' },
     });
     const config = await context.storage.readConfig();
+    const { willBeCaptured, notCaptured } = buildEndDayPreviewRows(
+      result,
+      context.homeDir,
+      context.platformHint,
+    );
     return {
-      reportText: formatEndDayReport(result, config),
+      willBeCaptured,
+      notCaptured,
       costCeiling: buildEndDayCostCeiling(result.sessionsInScope, config),
     };
   });
 
-  // V2-T5a item 4: "Run end-day now" — the real run (dryRun: false), notified through the SAME
-  // Notifier/buildEndDayNotice seeya end-day uses (composition/index.ts#buildAppContext wires the
-  // real adapter, D-020). The status panel picks up whatever this run wrote/terminated on its own
-  // next tick (runRefreshLoop below, at most REFRESH_INTERVAL_MS away — no separate push needed).
+  // V2-T5a item 4, reworked by V2-T69: "Run end-day now" — the real run (dryRun: false), notified
+  // through the SAME Notifier/buildEndDayNotice seeya end-day uses (composition/index.ts
+  // #buildAppContext wires the real adapter, D-020). The status panel picks up whatever this run
+  // wrote/terminated on its own next tick (runRefreshLoop below, at most REFRESH_INTERVAL_MS away —
+  // no separate push needed). `buildEndDayResultRows` replaces `formatEndDayReport` here — the
+  // response is the same `EndDayResult`'s own captured/failed/skipped buckets, structured.
   //
-  // V2-T66: the "Today" panel is now refreshed and PUSHED from here, not fetched explicitly by the
-  // renderer after this resolves — `renderer/legacy/end-day-dialog-view.ts` used to call
-  // `today-panel-view.ts#refreshTodayPanel()` for that (the deleted DOM-at-hand panel's own
-  // imperative refresh), but Today is a real, independently-mounted component now
+  // V2-T66: the "Today" panel is refreshed and PUSHED from here, not fetched explicitly by the
+  // renderer after this resolves — `renderer/legacy/end-day-dialog-view.ts` (apagado by V2-T69,
+  // and already apagado of its own `today-panel-view.ts#refreshTodayPanel()` call by V2-T66) used
+  // to call that for a DOM-at-hand panel; Today is a real, independently-mounted component now
   // (`renderer/features/today/Today.tsx`) with no reference a sibling dialog could call into —
   // `CHANNELS.todayUpdate`, the same push every ambient refresh tick already uses, is the only
   // channel left that reaches it.
@@ -1882,10 +1994,7 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
         dryRun: false,
         scope: { kind: 'fullDay' },
         onCaptureProgress: (event) => {
-          const projected = projectEndDayProgressEvent(event);
-          if (projected !== null) {
-            window.webContents.send(CHANNELS.endDayProgress, projected);
-          }
+          window.webContents.send(CHANNELS.endDayProgress, projectEndDayProgressEvent(event));
         },
       });
       const notice = buildEndDayNotice(result);
@@ -1897,11 +2006,8 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
           // never derail the day's own ending.
         }
       }
-      // V2-T16: fresh read, same reasoning as `endDayPreview` above.
-      const config = await context.storage.readConfig();
-      const report = formatEndDayReport(result, config);
       window.webContents.send(CHANNELS.todayUpdate, await buildFreshTodayPanelData());
-      return { reportText: report };
+      return buildEndDayResultRows(result, context.homeDir, context.platformHint);
     } finally {
       endDayRunInProgress = false;
     }
@@ -2265,7 +2371,24 @@ if (!gotSingleInstanceLock) {
     // registration and the marker file live outside whatever home this window is pointed at, so
     // redirecting the home alone was never enough to isolate them (see that module's own docstring).
     const homeOverride = process.env.SEEYA_APP_HOME_OVERRIDE;
-    const context = await buildAppContext(homeOverride);
+    // SEEYA_APP_VERIFY_END_DAY_FAKE (V2-T69): 'preview' | 'progress' | 'result' | 'hidden' — picks
+    // which of End day's own views (`renderer/features/end-day/`) the click-automation block below
+    // drives the window to before `captureVerificationScreenshot` fires. Whenever set at all, BOTH
+    // generators become `VerificationFakeHandoffGenerator` (`composition/verification-fake-
+    // generator.ts`) — a real, billed `claude -p` must never run just because someone wanted a
+    // screenshot of the progress/result view. `END_DAY_FAKE_DELAY_MS` is what spaces sessions out
+    // enough for a mid-flight screenshot to show one `captured`, one `capturing`, one `waiting`
+    // (see the click-automation block's own comment for the exact timing this buys). Never set by
+    // `npm run app` or the README.
+    const endDayFakeScenario = process.env.SEEYA_APP_VERIFY_END_DAY_FAKE;
+    const contextOverrides: BuildAppContextOverrides =
+      endDayFakeScenario !== undefined
+        ? {
+            leanGenerator: new VerificationFakeHandoffGenerator(systemClock, END_DAY_FAKE_DELAY_MS),
+            deepGenerator: new VerificationFakeHandoffGenerator(systemClock, END_DAY_FAKE_DELAY_MS),
+          }
+        : {};
+    const context = await buildAppContext(homeOverride, contextOverrides);
 
     // V2-T10 item 1: the scheme THIS window registers — packaged installs still claim plain
     // `seeya`, a dev launch (`npm run app`) now claims `seeya-dev` instead, so the two worlds

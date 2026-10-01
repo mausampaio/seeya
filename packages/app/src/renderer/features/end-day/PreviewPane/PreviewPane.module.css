@@ -1,0 +1,15 @@
+/* D-052 (V2-T69). */
+.pane {
+  min-width: 420px;
+  max-width: 560px;
+}
+
+.heading {
+  margin-bottom: var(--seeya-space-2);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--seeya-space-2);
+}
