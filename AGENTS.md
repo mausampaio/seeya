@@ -629,7 +629,14 @@ troca a captura única de sempre por `captureLiveThemeToggleVerification` — ab
 captura a seção General num tema, clica o segmento **Dark**, espera a troca ao vivo (o mesmo
 `saveSetting` empurrando `themeUpdate` de volta, o conserto de produção desta tarefa) e captura de
 novo, as duas sem reiniciar a janela; a única instrumentação com dois arquivos de captura em vez
-de um) —
+de um) e `SEEYA_APP_VERIFY_MENU_AND_CLIPBOARD_PATH` (V2-T74: `webContents.capturePage()` nunca
+mostra a barra de menu nativa — é moldura da janela, não conteúdo da página, com ou sem
+`offscreen` — então esta instrumentação lê `Menu.getApplicationMenu()`/`window.isMenuBarVisible()`
+direto do Electron e grava, no arquivo indicado; combinada com `SEEYA_APP_AUTO_OPEN_SHELL_TAB=1`,
+também prova copiar/colar sem nenhum menu: um texto conhecido circula por `#new-project-id-input`
+via `webContents.copy()`/`.paste()`, e um marcador colado no terminal real via `.paste()` aparece
+em `.xterm-rows` — os mesmos eventos `'copy'`/`'paste'` que `@xterm/xterm` já escuta por conta
+própria, lido no pacote instalado antes de escrever a instrumentação) —
 mesma categoria de `SEEYA_DAEMON_CHILD`
 acima (nunca vão para disco, ninguém digita), mas nenhuma delas é lida por `npm run app` nem
 documentada no `README.md`: existem só para um agente sem tela/teclado próprios provar a janela
