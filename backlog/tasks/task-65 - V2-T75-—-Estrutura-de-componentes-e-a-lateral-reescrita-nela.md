@@ -4,7 +4,7 @@ title: V2-T75 — Estrutura de componentes e a lateral reescrita nela
 status: Review
 assignee: []
 created_date: '2026-09-30 21:21'
-updated_date: '2026-10-01 12:20'
+updated_date: '2026-10-01 13:11'
 labels: []
 milestone: m-2
 dependencies: []
@@ -396,5 +396,71 @@ author: PO
 created: 2026-10-01 12:20
 ---
 Revisão do PO em 2026-10-01 da rodada de aceite do mantenedor sobre a lateral (agenda, Snooze em menu, terminal com tema e margem, um botão de recolher por vez, hover do x, transição e sombra da lateral, Text e escala tipográfica, ProjectRow comum a Favorites e Recent, Divider, ícones alinhados). Três rodadas de captura conferidas pelo PO; a última achou um defeito de produção: a lateral ficava 10-20 s vazia ao abrir porque a primeira pintura descartava o resultado do invoke — corrigido no hook de assinatura (fetchInitial). Mesclado, portão do zero verde (3223 testes), também sem identidade global do git. Nota: o tamanho de texto dos botões legados (End day, autostart) depende de o CSS do Button repetir a escala, porque o código legado ainda troca o texto deles — sai quando as regiões legadas forem reescritas.
+---
+
+author: agente
+created: 2026-10-01 13:10
+---
+Urgent defect reported by the maintainer on Windows (npm run app, applies to the installed
+build too): collapsing/expanding the sidebar (or switching to a page/another terminal tab) while
+a terminal tab sits hidden left it mis-rendered on return -- cursor on the wrong line/column,
+typed text frozen over old text, duplicated prompt lines. Recovered on another resize for
+cmd/clink and claude (both do a full repaint); never recovered for PowerShell/bash under WSL
+(both only redraw the changed region). New branch tarefa/V2-T75-terminal-resize from main
+(0fb620d), separate from TASK-65's own branch (already merged).
+
+Root cause, confirmed by a real reproduction: useTabStrip.ts's own fitAll() fit EVERY registered
+terminal handle on any host resize, including a hidden one's. @xterm/addon-fit's FitAddon
+measures getComputedStyle on the terminal's parent -- for anything inside a display:none
+ancestor that resolves to 0px, and the addon's own Math.max(2, ...)/Math.max(1, ...) clamps down
+to a 2x1 terminal rather than refusing outright. Sent to the pty, ConPTY/the shell re-lays out
+its own line-wrapping state for a 2x1 screen.
+
+Fix, three commits:
+1. 0a3b7b2 -- state/terminal-resize.ts#decideTerminalResize, a single pure decision (hidden /
+invalid dimensions / unchanged / valid) that TerminalPane's own fit() now goes through before
+ever calling resizeTab. Hidden skips FitAddon.fit() entirely too, so xterm's own internal buffer
+never gets resized to begin with. A resize is now only sent when dimensions actually changed
+from the last one sent.
+2. add0784 -- sidebar-transition-watcher.ts#watchSidebarWidthTransition tracks the sidebar's own
+width transition via document-level transitionstart/transitionend (bubbling, no import needed
+between tabs/sidebar), with a requestAnimationFrame-polled fallback for when transitionend never
+fires (prefers-reduced-motion zeroes the duration). TabStrip.tsx's own ResizeObserver now skips
+fitAll() entirely while the sidebar is still transitioning, deferring to the same fitAll() once
+it settles -- no intermediate resizes sent to the pty during the transition.
+3. e8e739a -- verification-only instrumentation (never read by npm run app):
+SEEYA_APP_VERIFICATION_RESIZE_LOG_PATH logs every resize-tab this process sends to a pty;
+SEEYA_APP_AUTO_TERMINAL_RESIZE_REPRO runs the maintainer's own repro end to end (open shell tab,
+type into it via window.seeya.writeTab directly, switch to a page tab, collapse the sidebar,
+re-expand it, switch back).
+
+Real before/after reproduction, same --user-data-dir disposable technique as always, against the
+real compiled app (not a simulation): BEFORE (fix temporarily stashed), the resize log shows 25
+resize-tab calls for the one tab, cols/rows collapsing to 9x5 for about a second while the
+terminal was hidden behind the Projects page tab, landing on a FINAL 101x38 that still does not
+match the original 113x38 -- and the screenshot shows the terminal visibly corrupted (the prompt
+line duplicated and overlapping, typed output missing, cursor floating top-right, disconnected
+from the prompt). AFTER (fix restored), the resize log shows exactly ONE resize-tab call for the
+whole sequence (the initial fit, before the page-tab switch) -- none while hidden, and no
+duplicate on return since the dimensions on return matched the one already sent -- and the
+screenshot shows the shell correctly rendered: echo hello from seeya, its own output, and a
+fresh prompt with the cursor in the right place.
+
+Screenshots: v2t75-terminal-resize-BEFORE-bug.png, v2t75-terminal-resize-AFTER-fixed.png.
+
+Process: packages/*/dist deleted before every npm run verificar run (green, 337 test files, 3241
+tests passed); protocol-handler.json hash and both seeya/seeya-dev registry keys confirmed
+unchanged before and after every capture in this round; no stray Electron processes left
+running. New unit tests: terminal-resize.test.ts (the four pure cases), three new TerminalPane
+tests through the real render path (hidden never resizes, becoming visible resizes, fitting
+twice with no change sends only one resize -- each confirmed to fail against the pre-fix code
+before being left green), and sidebar-transition-watcher.test.ts (six cases covering the
+transition/fallback/dispose behavior). Leaving the task in Review.
+---
+
+author: agente
+created: 2026-10-01 13:11
+---
+Correction to the previous comment: the BEFORE resize log has 30 resize-tab lines for the one tab (wc -l on terminal-resize-before.log), not 25 -- miscounted by eye from the pasted terminal output. Does not change the finding: AFTER still shows exactly 1.
 ---
 <!-- COMMENTS:END -->
