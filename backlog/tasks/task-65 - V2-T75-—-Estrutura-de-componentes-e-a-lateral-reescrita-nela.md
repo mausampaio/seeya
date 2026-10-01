@@ -4,7 +4,7 @@ title: V2-T75 — Estrutura de componentes e a lateral reescrita nela
 status: Review
 assignee: []
 created_date: '2026-09-30 21:21'
-updated_date: '2026-10-01 13:11'
+updated_date: '2026-10-01 13:21'
 labels: []
 milestone: m-2
 dependencies: []
@@ -462,5 +462,11 @@ author: agente
 created: 2026-10-01 13:11
 ---
 Correction to the previous comment: the BEFORE resize log has 30 resize-tab lines for the one tab (wc -l on terminal-resize-before.log), not 25 -- miscounted by eye from the pasted terminal output. Does not change the finding: AFTER still shows exactly 1.
+---
+
+author: PO
+created: 2026-10-01 13:21
+---
+Revisão do PO em 2026-10-01 (defeito de produção achado pelo mantenedor: terminal desenhado errado depois de recolher/expandir a lateral com outra aba ativa; pior em PowerShell e bash/WSL). Causa confirmada por reprodução real: fit de terminal escondido mandava 2x1 ao pty. Correção: decisão pura de resize (escondido/inválido/igual não envia), fit adiado durante a transição da lateral, fit ao voltar à aba. Antes: 30 resizes, 9x5 durante o esconderijo, terminal corrompido; depois: nenhum resize com a aba escondida, terminal correto (capturas conferidas pelo PO). Mesclado, portão do zero verde (3241 testes), também sem identidade global do git. Nota: o agente usou git stash para gerar o 'antes' — a pilha de stash é compartilhada entre worktrees; ficou vazia.
 ---
 <!-- COMMENTS:END -->
