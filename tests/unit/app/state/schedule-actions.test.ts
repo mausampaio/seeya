@@ -30,7 +30,8 @@ describe('snoozeTodayNow', () => {
 
       // First click: config.json still says 11:00. +15m -> effective 11:15.
       const first = await snoozeTodayNow(storage, clock, 15);
-      expect(first.text).toBe('End of day at 11:15 — in 2 h 15 min');
+      expect(first.primary).toBe('End of day 11:15');
+      expect(first.secondary).toBe('in 2 h 15 min');
 
       // The person opens Settings and changes endOfDayTime to 09:30 — the same write
       // electron/main.ts's own CHANNELS.saveSetting handler performs.
@@ -41,7 +42,8 @@ describe('snoozeTodayNow', () => {
       // A caller still holding that first Config would compute 11:00 + 30m = 11:30 here — the
       // exact stale value the maintainer watched the strip flash before this task.
       const second = await snoozeTodayNow(storage, clock, 15);
-      expect(second.text).toBe('End of day at 10:00 — in 1 h 0 min');
+      expect(second.primary).toBe('End of day 10:00');
+      expect(second.secondary).toBe('in 1 h 0 min');
     },
   );
 
@@ -68,7 +70,8 @@ describe('skipTodayNow', () => {
     const result = await skipTodayNow(storage, clock);
 
     expect(result).toEqual({
-      text: 'End of day: skipped today.',
+      primary: 'End of day',
+      secondary: 'skipped today',
       canSnooze: false,
       canSkip: false,
     });

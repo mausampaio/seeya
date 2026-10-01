@@ -7,16 +7,23 @@
  * already pushes the sidebar/status panel on); `electron/renderer.ts` only renders whatever comes
  * back.
  *
- * **D-024, "nada achatado": six variants, six distinct strings, never one template with a
+ * **D-024, "nada achatado": six variants, six distinct string PAIRS, never one template with a
  * conditional clause bolted on.** `waiting`/`leadTimeWarning`/`endOfDay` are also the only three
  * that offer Snooze/Skip — `disabled`/`skipped`/`alreadyEnded` have nothing left to adjust today
  * (`docs/PLANO-DE-ENTREGA.md` V2-T5b item 1's own list).
+ *
+ * PO review (2026-10-01, `docs/INTERFACE.md` § 1 item 7): the single flat `text` string this used
+ * to carry read as loose text with no hierarchy between the fact ("End of day") and the detail
+ * ("in 3 h 52 min"). `primary`/`secondary` are the icon row's own two halves — `SidebarFooter`
+ * renders them through `Text` with the weight/tone the identity asks for; this module only decides
+ * the WORDS, never how they're styled.
  */
 import { minutesRemaining, type ScheduleDecision } from '@seeya-ai/engine/core/schedule.js';
 import { MESSAGES } from '../text/messages.js';
 
 export interface ScheduleStripData {
-  readonly text: string;
+  readonly primary: string;
+  readonly secondary: string;
   readonly canSnooze: boolean;
   readonly canSkip: boolean;
 }
@@ -44,33 +51,50 @@ function formatRemaining(totalMinutes: number): string {
   return hours > 0 ? `${hours} h ${remainder} min` : `${remainder} min`;
 }
 
-const ADJUSTABLE: ScheduleStripData = { text: '', canSnooze: true, canSkip: true };
-const FIXED: ScheduleStripData = { text: '', canSnooze: false, canSkip: false };
+const ADJUSTABLE = { canSnooze: true, canSkip: true } as const;
+const FIXED = { canSnooze: false, canSkip: false } as const;
 
 export function buildScheduleStripData(decision: ScheduleDecision, now: Date): ScheduleStripData {
   switch (decision.kind) {
     case 'disabled':
-      return { ...FIXED, text: MESSAGES.scheduleStripDisabled };
+      return {
+        ...FIXED,
+        primary: MESSAGES.scheduleStripPrimary,
+        secondary: MESSAGES.scheduleStripNotConfigured,
+      };
     case 'skipped':
-      return { ...FIXED, text: MESSAGES.scheduleStripSkipped };
+      return {
+        ...FIXED,
+        primary: MESSAGES.scheduleStripPrimary,
+        secondary: MESSAGES.scheduleStripSkippedToday,
+      };
     case 'alreadyEnded':
-      return { ...FIXED, text: MESSAGES.scheduleStripAlreadyEnded };
+      return {
+        ...FIXED,
+        primary: MESSAGES.scheduleStripPrimary,
+        secondary: MESSAGES.scheduleStripAlreadyRanToday,
+      };
     case 'waiting':
       return {
         ...ADJUSTABLE,
-        text: MESSAGES.scheduleStripWaiting(
-          formatLocalTime(decision.effectiveEndOfDay),
+        primary: MESSAGES.scheduleStripWaitingPrimary(formatLocalTime(decision.effectiveEndOfDay)),
+        secondary: MESSAGES.scheduleStripRemaining(
           formatRemaining(minutesRemaining(decision.effectiveEndOfDay, now)),
         ),
       };
     case 'leadTimeWarning':
       return {
         ...ADJUSTABLE,
-        text: MESSAGES.scheduleStripLeadTimeWarning(
+        primary: MESSAGES.scheduleStripPrimary,
+        secondary: MESSAGES.scheduleStripRemaining(
           formatRemaining(minutesRemaining(decision.effectiveEndOfDay, now)),
         ),
       };
     case 'endOfDay':
-      return { ...ADJUSTABLE, text: MESSAGES.scheduleStripEndOfDay };
+      return {
+        ...ADJUSTABLE,
+        primary: MESSAGES.scheduleStripPrimary,
+        secondary: MESSAGES.scheduleStripDueNow,
+      };
   }
 }

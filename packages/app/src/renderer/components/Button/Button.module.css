@@ -28,21 +28,20 @@
   width: 100%;
 }
 
-/* Sizes (identity § 4.4's own type scale: body-sm/body-md, plus the padding that keeps each
- * size's own tap target readable). */
+/* Sizes — padding only (D-052 item 7, PO review 2026-10-01): the TEXT size for each of these now
+ * comes from `Text` (`Button.tsx`'s own `TEXT_VARIANT_BY_SIZE`, identity § 4.4's
+ * body-sm/body-md/body-lg), never a one-off pixel value here. This keeps only what `Text` can't
+ * express — the tap-target padding each size needs. */
 .sm {
   padding: var(--seeya-space-1) var(--seeya-space-3);
-  font-size: 13px;
 }
 
 .md {
   padding: var(--seeya-space-2) var(--seeya-space-4);
-  font-size: 14px;
 }
 
 .lg {
   padding: var(--seeya-space-3) var(--seeya-space-6);
-  font-size: 16px;
 }
 
 /* Variants. */

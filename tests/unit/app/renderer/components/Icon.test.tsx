@@ -5,6 +5,7 @@ import type { ComponentChildren } from 'preact';
 import {
   CalendarIcon,
   ChatBalloonIcon,
+  ChevronDownIcon,
   ChevronLeftIcon,
   ClockIcon,
   CloseIcon,
@@ -32,6 +33,7 @@ describe('outline icons (D-052, V2-T75 — real render; identity § 6.4)', () =>
     ChatBalloonIcon,
     PlusIcon,
     ChevronLeftIcon,
+    ChevronDownIcon,
     ClockIcon,
     SettingsIcon,
     TerminalIcon,

@@ -1,6 +1,7 @@
 export {
   CalendarIcon,
   ChatBalloonIcon,
+  ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   ClockIcon,

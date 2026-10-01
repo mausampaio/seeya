@@ -9,17 +9,32 @@
  * bound `onClick`/reactive text for them (`NavList.tsx`'s own docstring has the same reasoning:
  * a legacy module toggles these on every push of its own, not just once).
  *
+ * PO review (2026-10-01), `docs/INTERFACE.md` § 1 item 7:
+ * - The schedule line is now an icon + two-text row (`ClockIcon`, `primary` at weight 500,
+ *   `secondary` in tertiary tone) instead of one flat string — `state/schedule-strip.ts` decides
+ *   the words, this component only lays them out.
+ * - Snooze is a `Button` + `ChevronDownIcon` opening a `Menu` (`+15m`/`+30m`/`+1h`), replacing the
+ *   earlier unstyled native `<select>`. Snooze/Skip sit side by side with EQUAL width via `Grid`
+ *   (two columns, one `GridItem` each) — never raw flexbox `flex: 1` at the call site.
+ * - End day/Snooze/Skip/autostart all render at `size="sm"` now (`Button`'s own `body-sm`,
+ *   D-052 item 7) — before this they were three different sizes (`md` for End day/autostart,
+ *   `sm` for Skip, the native `<select>`'s own UA font for Snooze).
+ *
  * @example
  * <SidebarFooter/>
  */
 import type { JSX } from 'preact';
+import { useRef, useState } from 'preact/hooks';
 import styles from './SidebarFooter.module.css';
 import { cx, mergeClassName } from '../../../components/css-class.js';
 import { Surface } from '../../../components/Surface/index.js';
 import { Stack } from '../../../components/Stack/index.js';
+import { Grid, GridItem } from '../../../components/Grid/index.js';
 import { Button } from '../../../components/Button/index.js';
 import { IconButton } from '../../../components/IconButton/index.js';
-import { PlayIcon, StopIcon } from '../../../components/Icon/index.js';
+import { Menu } from '../../../components/Menu/index.js';
+import { Text } from '../../../components/Text/index.js';
+import { ChevronDownIcon, ClockIcon, PlayIcon, StopIcon } from '../../../components/Icon/index.js';
 import { MESSAGES } from '../../../../text/messages.js';
 import { useSidebarFooter } from './useSidebarFooter.js';
 
@@ -29,8 +44,15 @@ const SNOOZE_OPTIONS: readonly [15 | 30 | 60, string][] = [
   [60, MESSAGES.scheduleStripSnooze1h],
 ];
 
+const SNOOZE_MENU_ITEMS = SNOOZE_OPTIONS.map(([minutes, label]) => ({
+  value: String(minutes),
+  label,
+}));
+
 export function SidebarFooter(): JSX.Element {
   const { schedule, onSnooze, onSkip, daemon, onDaemonControlClicked } = useSidebarFooter();
+  const [snoozeMenuOpen, setSnoozeMenuOpen] = useState(false);
+  const snoozeTriggerRef = useRef<HTMLButtonElement>(null);
 
   const running = daemon.availability.kind === 'stop';
   const unknown = daemon.availability.kind === 'unknown';
@@ -46,51 +68,84 @@ export function SidebarFooter(): JSX.Element {
     ? MESSAGES.daemonControlStopAction
     : MESSAGES.daemonControlStartAction;
 
+  function handleSnoozeSelect(value: string): void {
+    const minutes = Number(value);
+    if (minutes === 15 || minutes === 30 || minutes === 60) {
+      onSnooze(minutes);
+    }
+  }
+
   return (
     <Surface padding="sm" bordered={false} className={cx(styles, 'footerDivider')}>
       <Stack gap="sm">
         <div>
-          <p class={cx(styles, 'scheduleText')}>{schedule.text}</p>
+          <div class={cx(styles, 'scheduleRow')}>
+            <ClockIcon size={14} class={cx(styles, 'scheduleIcon')} />
+            <Text
+              as="span"
+              variant="caption"
+              weight={500}
+              truncate
+              className={cx(styles, 'schedulePrimary')}
+            >
+              {schedule.primary}
+            </Text>
+            <Text
+              as="span"
+              variant="caption"
+              tone="tertiary"
+              className={cx(styles, 'scheduleSecondary')}
+            >
+              {schedule.secondary}
+            </Text>
+          </div>
           {(schedule.canSnooze || schedule.canSkip) && (
-            <div class={cx(styles, 'scheduleActions')}>
+            <Grid columns={2} gap="sm" className={cx(styles, 'scheduleActions')}>
               {schedule.canSnooze && (
-                <select
-                  aria-label={MESSAGES.scheduleStripSnoozeMenuLabel}
-                  value=""
-                  onChange={(event) => {
-                    const minutes = Number((event.target as HTMLSelectElement).value);
-                    (event.target as HTMLSelectElement).value = '';
-                    if (minutes === 15 || minutes === 30 || minutes === 60) {
-                      onSnooze(minutes);
-                    }
-                  }}
-                >
-                  <option value="" disabled hidden>
-                    {MESSAGES.scheduleStripSnoozeMenuLabel}
-                  </option>
-                  {SNOOZE_OPTIONS.map(([minutes, label]) => (
-                    <option key={minutes} value={minutes}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
+                <GridItem span={1}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    fullWidth
+                    buttonRef={snoozeTriggerRef}
+                    onClick={() => setSnoozeMenuOpen((open) => !open)}
+                  >
+                    <span class={cx(styles, 'snoozeTriggerContent')}>
+                      {MESSAGES.scheduleStripSnoozeMenuLabel}
+                      <ChevronDownIcon size={14} />
+                    </span>
+                  </Button>
+                  <Menu
+                    id="schedule-strip-snooze-menu"
+                    open={snoozeMenuOpen}
+                    anchorRef={snoozeTriggerRef}
+                    ariaLabel={MESSAGES.scheduleStripSnoozeMenuLabel}
+                    items={SNOOZE_MENU_ITEMS}
+                    onSelect={handleSnoozeSelect}
+                    onRequestClose={() => setSnoozeMenuOpen(false)}
+                  />
+                </GridItem>
               )}
               {schedule.canSkip && (
-                <Button variant="secondary" size="sm" onClick={onSkip}>
-                  {MESSAGES.scheduleStripSkipToday}
-                </Button>
+                <GridItem span={1}>
+                  <Button variant="secondary" size="sm" fullWidth onClick={onSkip}>
+                    {MESSAGES.scheduleStripSkipToday}
+                  </Button>
+                </GridItem>
               )}
-            </div>
+            </Grid>
           )}
         </div>
 
-        <Button id="end-day-button" fullWidth>
+        <Button id="end-day-button" size="sm" fullWidth>
           {MESSAGES.endDayButton}
         </Button>
 
         <div class={daemonPillClassName}>
           <span class={cx(styles, 'daemonDot')} aria-hidden="true" />
-          <span class={cx(styles, 'daemonLabel')}>{daemonLabel}</span>
+          <Text as="span" variant="body-sm" weight={500} className={cx(styles, 'daemonLabel')}>
+            {daemonLabel}
+          </Text>
           <IconButton
             id="daemon-control-button"
             variant="ghost"
@@ -104,7 +159,7 @@ export function SidebarFooter(): JSX.Element {
         {daemon.kind === 'result' && <p class={cx(styles, 'daemonResult')}>{daemon.resultText}</p>}
 
         {/* Legacy-owned anchors — see this component's own docstring. */}
-        <Button id="autostart-control-button" variant="secondary" hidden>
+        <Button id="autostart-control-button" variant="secondary" size="sm" hidden>
           {MESSAGES.autostartControlEnable}
         </Button>
         <p id="autostart-control-result" class={cx(styles, 'autostartResult')} />

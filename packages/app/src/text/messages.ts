@@ -158,20 +158,24 @@ export const MESSAGES = {
     `Capturing ${index} of ${total}: ${name}...`,
   endDayClose: 'Close',
 
-  // V2-T5b item 1 — the faixa de horário (state/schedule-strip.ts). One string per
-  // `ScheduleDecision` variant (D-024, "nada achatado"), computed on every refresh tick from the
+  // V2-T5b item 1 — the faixa de horário (state/schedule-strip.ts). One PAIR of strings per
+  // `ScheduleDecision` variant (D-024, "nada achatado") — `primary` (weight 500, left) and
+  // `secondary` (tertiary colour, right), the icon+two-text row `docs/INTERFACE.md` § 1 item 7
+  // asks for (PO review, 2026-10-01: the earlier single flat `text` string read as loose text with
+  // no visual hierarchy between the fact and the detail). Computed on every refresh tick from the
   // same `decideSchedule` the daemon itself polls.
-  scheduleStripDisabled: 'End of day: not configured.',
-  scheduleStripSkipped: 'End of day: skipped today.',
-  scheduleStripAlreadyEnded: 'End of day: already ran today.',
-  scheduleStripWaiting: (time: string, remaining: string): string =>
-    `End of day at ${time} — in ${remaining}`,
-  scheduleStripLeadTimeWarning: (remaining: string): string => `End of day in ${remaining}`,
-  scheduleStripEndOfDay: 'End of day: due now — the daemon acts on its next poll.',
-  // V2-T63 (`docs/INTERFACE.md` § 1's own "Snooze ▾ (menu com +15m, +30m, +1h)"): a single
-  // dropdown replaces the three always-visible buttons this footer had before — the placeholder
-  // option is what shows while nothing is chosen, never a real, selectable increment on its own.
-  scheduleStripSnoozeMenuLabel: 'Snooze ▾',
+  scheduleStripPrimary: 'End of day',
+  scheduleStripWaitingPrimary: (time: string): string => `End of day ${time}`,
+  scheduleStripNotConfigured: 'not configured',
+  scheduleStripSkippedToday: 'skipped today',
+  scheduleStripAlreadyRanToday: 'already ran today',
+  scheduleStripRemaining: (remaining: string): string => `in ${remaining}`,
+  scheduleStripDueNow: 'due now',
+  // V2-T63 (`docs/INTERFACE.md` § 1's own "Snooze ▾ (menu com +15m, +30m, +1h)"): a menu replaces
+  // the three always-visible buttons this footer had before. PO review (2026-10-01): the trigger
+  // moved from an unstyled native `<select>` to a `Button` with a real `ChevronDownIcon` next to
+  // it — the label itself no longer carries the "▾" glyph, the icon draws it now.
+  scheduleStripSnoozeMenuLabel: 'Snooze',
   scheduleStripSnooze15: '+15m',
   scheduleStripSnooze30: '+30m',
   scheduleStripSnooze1h: '+1h',

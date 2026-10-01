@@ -9,12 +9,23 @@
  * <Button variant="secondary" size="sm">Cancel</Button>
  * <Button fullWidth>End day…</Button>
  */
-import type { ComponentChildren, JSX, TargetedMouseEvent } from 'preact';
+import type { ComponentChildren, JSX, RefObject, TargetedMouseEvent } from 'preact';
 import styles from './Button.module.css';
 import { cx, mergeClassName } from '../css-class.js';
+import { Text, type TextVariant } from '../Text/index.js';
 import type { Size } from '../props.js';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost';
+
+/** D-052 item 7 (PO review, 2026-10-01): `size`'s own padding scale (`Button.module.css`) stays a
+ * `Size`, but the TEXT itself now always comes from `Text` — this is the one place that decides
+ * which identity variant each size means, so every `Button` in the app reads at an actual scale
+ * step instead of the three one-off pixel values (13/14/16) this used to hardcode. */
+const TEXT_VARIANT_BY_SIZE: Record<Size, TextVariant> = {
+  sm: 'body-sm',
+  md: 'body-md',
+  lg: 'body-lg',
+};
 
 export interface ButtonProps {
   readonly id?: string;
@@ -33,6 +44,10 @@ export interface ButtonProps {
   readonly title?: string;
   readonly onClick?: (event: TargetedMouseEvent<HTMLButtonElement>) => void;
   readonly children: ComponentChildren;
+  /** PO review (2026-10-01): a plain DOM ref to the underlying `<button>` — same reasoning as
+   * `IconButton`'s own `buttonRef` (no `forwardRef` without `preact/compat`, D-051). The Snooze
+   * trigger (`SidebarFooter`) needs this to anchor its own `Menu` (`Popover`'s own positioning). */
+  readonly buttonRef?: RefObject<HTMLButtonElement | null>;
 }
 
 export function Button(props: ButtonProps): JSX.Element {
@@ -48,6 +63,10 @@ export function Button(props: ButtonProps): JSX.Element {
   );
   return (
     <button
+      // Conditional spread, not `ref={props.buttonRef}` directly — see `IconButton.tsx`'s own
+      // identical comment (`exactOptionalPropertyTypes` treats "present, valued `undefined`"
+      // differently from "absent", and Preact's `ref` JSX attribute type only accepts the latter).
+      {...(props.buttonRef !== undefined ? { ref: props.buttonRef } : {})}
       id={props.id}
       type={props.type ?? 'button'}
       class={className}
@@ -56,7 +75,9 @@ export function Button(props: ButtonProps): JSX.Element {
       title={props.title}
       onClick={props.onClick}
     >
-      {props.children}
+      <Text as="span" variant={TEXT_VARIANT_BY_SIZE[props.size ?? 'md']} weight={500}>
+        {props.children}
+      </Text>
     </button>
   );
 }

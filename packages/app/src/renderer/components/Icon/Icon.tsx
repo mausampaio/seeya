@@ -203,6 +203,12 @@ export function ChevronLeftIcon(props: IconProps = {}): JSX.Element {
   return outlineIcon([<path d="M15 5l-7 7 7 7" />], props);
 }
 
+/** The Snooze menu's own trigger chevron (`docs/INTERFACE.md` § 1 item 7 — "Snooze ▾ (menu com
+ * +15m, +30m, +1h)") — a disclosure indicator, never a direction of travel like the two above. */
+export function ChevronDownIcon(props: IconProps = {}): JSX.Element {
+  return outlineIcon([<path d="M5 9l7 7 7-7" />], props);
+}
+
 /** The toolbar's own reopen state (V2-T64 PO review) — `ChevronLeftIcon`'s own mirror, for the
  * ONE button that toggles both directions (`App.tsx`, `state/sidebar-collapse.ts
  * #SidebarToggleButtonIcon`): collapsed shows this pointing right ("open this way"), expanded

@@ -17,7 +17,12 @@ import {
   type DaemonControlState,
 } from '../../../../state/daemon-control-panel.js';
 
-const NO_SCHEDULE_YET: ScheduleUpdateEvent = { text: '', canSnooze: false, canSkip: false };
+const NO_SCHEDULE_YET: ScheduleUpdateEvent = {
+  primary: '',
+  secondary: '',
+  canSnooze: false,
+  canSkip: false,
+};
 
 const INITIAL_DAEMON_CONTROL_STATE: DaemonControlState = {
   kind: 'idle',
