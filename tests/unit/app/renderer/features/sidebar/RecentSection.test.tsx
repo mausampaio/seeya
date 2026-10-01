@@ -12,6 +12,7 @@ const PLAIN_ROW: RecentProjectRow = {
   lastActivity: new Date('2026-09-30T12:00:00.000Z'),
   badge: 'none',
   sessions: [],
+  activeTab: false,
 };
 
 describe('RecentSection (D-052, V2-T75)', () => {

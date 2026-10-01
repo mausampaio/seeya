@@ -12,11 +12,47 @@
   border-radius: var(--seeya-radius-sm);
 }
 
-/* The project open in THIS window (PO review, 2026-10-01: "o projeto da aba ativa ganha fundo
- * surface-subtle... como no protótipo") — same evidence (`badge === 'openHere'`) the lock status
- * below already uses, now also a background on the whole row (including its indented sessions). */
-.rowActive {
+/* PO review (2026-10-01), `docs/INTERFACE.md` § 1's own "três estados visuais na linha de
+ * projeto": hover, the same treatment `NavItem.module.css`'s own `.navItem:hover` uses
+ * (`--seeya-surface-hover`) — reused here rather than invented fresh, same token, same mechanism
+ * (a plain `:hover` pseudo-class, nothing JS-driven: NavItem's own hover isn't a prop either).
+ * Applied to the whole row, matching `.rowOpenHere`/`.rowActiveTab` below (both already colour the
+ * whole row, including any indented sessions, not just `.main`). Specificity mirrors NavItem's own
+ * `.navItem:hover` on purpose (class + pseudo-class, 0,2,0): hovering a row that's ALSO
+ * `.rowOpenHere`/`.rowActiveTab` (both single-class, 0,1,0) still shows hover feedback, the exact
+ * precedence NavItem already has between its own `:hover` and `.active`. */
+.row:hover {
+  background: var(--seeya-surface-hover);
+}
+
+/* The project open in THIS window (`badge === 'openHere'`) — same evidence the lock status below
+ * already uses, as a background on the whole row (including its indented sessions). Renamed from
+ * `.rowActive` (PO review, 2026-10-01): "active" now names something more specific, the project
+ * whose tab is on screen RIGHT NOW — see `.rowActiveTab` below, which this project can be without
+ * also being that. */
+.rowOpenHere {
   background: var(--seeya-surface-subtle);
+}
+
+/* PO review (2026-10-01): the project whose own open tab is the one CURRENTLY showing in the
+ * strip (`ProjectRowProps.activeTab`, `state/sidebar-summary.ts#hasActiveTabSession`) — the same
+ * treatment `NavItem.module.css`'s own `.active` uses (`--seeya-brand-soft`), "por cima do
+ * cartão": declared AFTER `.rowOpenHere` above, on purpose. Every active-tab row is also an
+ * open-tab row (there's no active tab without a matched session to be it), so the two classes are
+ * always applied together on that one row — same-specificity source-order tiebreak (both single
+ * class selectors, both in this one file) is what makes this background win over the plain card's
+ * instead of the other way around. */
+.rowActiveTab {
+  background: var(--seeya-brand-soft);
+}
+
+/* Mirrors `NavItem.module.css`'s own `.active .label` exactly — a descendant selector targeting
+ * `Text`'s own class (`.nameText`, via its `className` prop, `ProjectRow.tsx`), specificity 0,2,0,
+ * which beats `Text`'s own `.tonePrimary` (0,1,0) regardless of stylesheet order; see that file's
+ * own comment for why inheriting the colour from `.rowActiveTab` alone would never work (`Text`
+ * always sets its own explicit `color`, so nothing short of targeting its own class overrides it). */
+.rowActiveTab .nameText {
+  color: var(--seeya-brand-text);
 }
 
 .main {

@@ -22,6 +22,7 @@ const OPEN_HERE_ROW: FavoriteProjectRow = {
       matchedTabId: 'tab-1',
     },
   ],
+  activeTab: false,
 };
 
 describe('FavoritesSection (D-052, V2-T75)', () => {

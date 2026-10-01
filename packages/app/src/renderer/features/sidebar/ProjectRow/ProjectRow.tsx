@@ -45,6 +45,13 @@ export interface ProjectRowProps {
   readonly badge: FavoriteLockBadge;
   readonly sessions: readonly ProjectPanelSessionRow[];
   readonly leading: ProjectRowLeading;
+  /** PO review (2026-10-01), `docs/INTERFACE.md` § 1's own "três estados visuais na linha de
+   * projeto": whether THIS project's own open tab is the one currently showing in the strip —
+   * `state/sidebar-summary.ts#hasActiveTabSession`'s own evidence, distinct from `badge ===
+   * 'openHere'` (which only means a tab is open SOMEWHERE, not that it's the one on screen right
+   * now). Optional, same defensive default as `NavItem`'s own `active?: boolean` — every existing
+   * caller that doesn't care about this state keeps working unchanged. */
+  readonly activeTab?: boolean;
   readonly onOpenProject: (projectId: string) => void;
 }
 
@@ -106,10 +113,18 @@ function LockStatus(props: { readonly badge: FavoriteLockBadge }): JSX.Element |
 }
 
 export function ProjectRow(props: ProjectRowProps): JSX.Element {
-  const active = props.badge === 'openHere';
+  const hasOpenTab = props.badge === 'openHere';
+  // `=== true`, not a bare boolean coercion: `activeTab` is optional (`undefined` for every
+  // caller that hasn't computed it), same defensive pattern `NavItem.tsx`'s own `active === true`
+  // already uses.
+  const isActiveTab = props.activeTab === true;
   const { leading } = props;
   return (
-    <li class={mergeClassName(cx(styles, 'row', active && 'rowActive'))}>
+    <li
+      class={mergeClassName(
+        cx(styles, 'row', hasOpenTab && 'rowOpenHere', isActiveTab && 'rowActiveTab'),
+      )}
+    >
       <div class={cx(styles, 'main')}>
         {leading.kind === 'favoriteStar' ? (
           <button
@@ -139,7 +154,8 @@ export function ProjectRow(props: ProjectRowProps): JSX.Element {
             variant="body-sm"
             truncate
             title={props.name}
-            {...(active ? { weight: 500 as const } : {})}
+            className={cx(styles, 'nameText')}
+            {...(hasOpenTab ? { weight: 500 as const } : {})}
           >
             {props.name}
           </Text>
