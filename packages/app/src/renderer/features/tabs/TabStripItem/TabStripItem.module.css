@@ -9,7 +9,15 @@
   color: var(--seeya-text-secondary);
 }
 
-.item:hover {
+/* PO review (2026-10-01, docs/INTERFACE.md § 2's own "hover distinto"): the whole-tab highlight
+ * is suppressed while the pointer is specifically over `.close` — `IconButton`'s own `.ghost:hover`
+ * rule (`IconButton.module.css`) already gives the × its own distinct feedback ("fundo próprio,
+ * cor de texto mais forte" is literally that rule's `background`/`color`, unchanged here); this is
+ * the one thing neither component's own props can express (hover is a CSS pseudo-class relationship
+ * between an element and a descendant, not UI state either component tracks in JS) — without it,
+ * both backgrounds would be the SAME `--seeya-surface-hover`, reading as one blob instead of "it's
+ * clear which click closes". */
+.item:hover:not(:has(.close:hover)) {
   background: var(--seeya-surface-hover);
 }
 
