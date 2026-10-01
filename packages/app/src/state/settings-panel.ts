@@ -15,6 +15,16 @@
  * shown as `'default'`, even on the rare chance someone wrote that exact number into `config.json`
  * on purpose — the LESS specific claim D-025 asks for when the evidence can't tell the two apart,
  * never the more specific one it would be tempting to imagine.
+ *
+ * **V2-T65: only `main/main.ts` may import a VALUE from this file.** `DEFAULT_CONFIG`/
+ * `EDITABLE_CONFIG_KEYS`/`formatConfigValue` are runtime imports from `@seeya-ai/engine/adapters/
+ * storage/config-schema.js` — an `adapters/` module, not pure (it reads `process.platform` at its
+ * own top level) — safe in `main/`'s Node context, but it broke the renderer bundle when a
+ * renderer file imported a value from here (see `settings-fields.ts`'s own docstring for the full
+ * production defect this fixes). Everything the RENDERER needs (`SettingsRow`/`ProjectPolicyLine`/
+ * `SettingsSection`, `groupSettingsRowsBySection`, `findSettingsRow`) now lives in
+ * `settings-fields.ts`, which has no such import — `renderer/features/settings/**` imports from
+ * THAT file, never this one.
  */
 import {
   DEFAULT_CONFIG,
@@ -24,14 +34,54 @@ import {
 } from '@seeya-ai/engine/adapters/storage/config-schema.js';
 import type { Config } from '@seeya-ai/engine/core/types.js';
 import { MESSAGES } from '../text/messages.js';
+import {
+  findSettingsRow,
+  groupSettingsRowsBySection,
+  type ProjectPolicyLine,
+  type SettingsRow,
+  type SettingsSection,
+  type SettingsValueOrigin,
+} from './settings-fields.js';
 
-export type SettingsValueOrigin = 'default' | 'chosen';
+// Re-exported for every EXISTING caller of this module (`main/main.ts`, `ipc/channels.ts`, this
+// file's own tests) — none of them need to change which module they import from; only new
+// RENDERER code (V2-T65) reaches for `settings-fields.ts` directly, for the reason this file's own
+// docstring explains.
+export type {
+  EditableConfigKey,
+  ProjectPolicyLine,
+  SettingsRow,
+  SettingsSection,
+  SettingsValueOrigin,
+};
+export { findSettingsRow, groupSettingsRowsBySection };
 
-export interface SettingsRow {
-  readonly key: EditableConfigKey;
-  readonly description: string;
-  readonly value: string;
-  readonly origin: SettingsValueOrigin;
+type GenericFieldKey = Exclude<EditableConfigKey, 'theme'>;
+
+/** One entry per `EDITABLE_CONFIG_KEYS` minus `theme` — `buildSettingsRows`'s own test proves
+ * every generic key has a section, the same completeness guarantee it already proves for
+ * descriptions/labels. */
+const SETTINGS_SECTION_BY_KEY: Record<GenericFieldKey, SettingsSection> = {
+  endOfDayTime: 'schedule',
+  leadTimesInMinutes: 'schedule',
+  overdueFireThresholdMinutes: 'schedule',
+  leadTimeHysteresisMinutes: 'schedule',
+  captureModel: 'capture',
+  budgetPerSessionUsd: 'capture',
+  captureConcurrency: 'capture',
+  forkCleanupDays: 'capture',
+  maxGitRootsToVisit: 'capture',
+  maxCaptureAttemptsPerSessionPerDay: 'capture',
+  relevanceHours: 'discovery',
+  idleMinutes: 'discovery',
+  ignore: 'discovery',
+  maxBriefingScanDays: 'discovery',
+  terminalFontFamily: 'terminal',
+  terminalFontSize: 'terminal',
+};
+
+function isGenericFieldKey(key: EditableConfigKey): key is GenericFieldKey {
+  return key !== 'theme';
 }
 
 /** `leadTimesInMinutes`/`ignore` are the only array-shaped editable fields — every other one is a
@@ -57,25 +107,13 @@ export function buildSettingsRows(config: Config): readonly SettingsRow[] {
       : 'chosen';
     return {
       key,
+      label: MESSAGES.settingsFieldLabels[key] ?? key,
       description: MESSAGES.settingsFieldDescriptions[key] ?? '',
       value: formatConfigValue(value),
       origin,
+      section: isGenericFieldKey(key) ? SETTINGS_SECTION_BY_KEY[key] : null,
     };
   });
-}
-
-/**
- * V2-T14's own "o que não entra": `projectPolicy` isn't scalar, so it never gets a `SettingsRow` —
- * it "aparece só para leitura, uma linha por cwd, e continua sendo editada pela CLI"
- * (`seeya config policy <cwd>`, unchanged). Same per-entry shape
- * `cli/config-command.ts#renderProjectPolicyLine` already prints, reimplemented here rather than
- * imported — `app/` and `cli/` are two independent composition roots that never import each other
- * (D-043) — a one-line format, not logic worth a shared module for.
- */
-export interface ProjectPolicyLine {
-  readonly cwd: string;
-  readonly canTerminate: boolean;
-  readonly deepCapture: boolean;
 }
 
 export function buildProjectPolicyLines(config: Config): readonly ProjectPolicyLine[] {
