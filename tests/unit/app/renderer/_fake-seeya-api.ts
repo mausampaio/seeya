@@ -45,9 +45,17 @@ export function createFakeSeeyaApi(overrides: Partial<SeeyaApi> = {}): SeeyaApi 
     endDayRun: neverCalled('endDayRun'),
     onEndDayProgress: vi.fn(),
     onScheduleUpdate: vi.fn(noopUnsubscribe),
+    // V2-T75 PO review (round 3): `useSidebarFooter` now calls this unconditionally on mount
+    // (`fetchInitial`, the same first-paint fix `getProjectsPanel`/`getTodayPanel` already needed
+    // above) — a real resolving value, not `neverCalled`.
+    getScheduleStrip: vi.fn(() =>
+      Promise.resolve({ primary: '', secondary: '', canSnooze: false, canSkip: false }),
+    ),
     snoozeToday: neverCalled('snoozeToday'),
     skipToday: neverCalled('skipToday'),
     onDaemonAvailabilityUpdate: vi.fn(noopUnsubscribe),
+    // V2-T75 PO review (round 3): same reasoning as `getScheduleStrip` above.
+    getDaemonAvailability: vi.fn(() => Promise.resolve({ kind: 'unknown' as const })),
     daemonControl: neverCalled('daemonControl'),
     getSettingsPanel: neverCalled('getSettingsPanel'),
     saveSetting: neverCalled('saveSetting'),

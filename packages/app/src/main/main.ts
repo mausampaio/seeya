@@ -33,8 +33,10 @@ import type {
   EndDayPreviewResponse,
   EndDayRunResponse,
   ScheduleUpdateEvent,
+  ScheduleStripResponse,
   SnoozeTodayRequest,
   DaemonAvailabilityUpdateEvent,
+  DaemonAvailabilityResponse,
   DaemonControlRequest,
   DaemonControlResponse,
   SettingsPanelResponse,
@@ -62,7 +64,7 @@ import { formatEndDayReport } from '@seeya-ai/engine/application/format-end-day.
 import { buildEndDayNotice } from '@seeya-ai/engine/application/end-day-notice.js';
 import { decideSchedule, emptyDayState } from '@seeya-ai/engine/core/schedule.js';
 import { localDayString } from '@seeya-ai/engine/core/day.js';
-import type { Handoff } from '@seeya-ai/engine/core/types.js';
+import type { Config, Handoff } from '@seeya-ai/engine/core/types.js';
 import { buildAppContext, toEndDayDeps, type AppContext } from '../composition/index.js';
 import { shouldMarkLinuxProtocolRegistered } from '../composition/linux-protocol-marker.js';
 import { resolveProtocolScheme, type ProtocolScheme } from '../composition/protocol-scheme.js';
@@ -201,33 +203,41 @@ async function captureVerificationScreenshot(
   const usesTabStripDemo =
     process.env.SEEYA_APP_AUTO_TAB_STRIP_DEMO === '1' ||
     process.env.SEEYA_APP_AUTO_OPEN_NEW_TAB_POPOVER === '1';
-  // PO review (V2-T75, 2026-10-01): `usesV2T55Instrumentation`'s own 7000ms bucket (below) was
-  // too short for a verification run whose capture needs real Favorites/Recent/"All projects"
-  // sidebar data — the Projects panel's state (`renderer/features/sidebar/useSidebar.ts`) is
-  // deliberately updated ONLY by the `CHANNELS.projectsUpdate` PUSH, never by the "first paint"
-  // `getProjectsPanel` invoke's own return value (that hook's own docstring: "every consumer...
-  // always agrees on one value, never two slightly different reads racing each other"). The
-  // ambient loop's FIRST tick (`REFRESH_INTERVAL_MS`, 10s) fires before the renderer's own
-  // `<script>` has necessarily registered its `onProjectsUpdate` listener (this file's own
-  // `CHANNELS.getProjectsPanel` comment already measured that race for the Projects tab), so the
-  // sidebar only gets real data on the SECOND tick — and that second tick's own work (one
-  // `describeProjectLockStatus` git-touching read per project, `project-ipc.ts`'s own
-  // `readProjectsWithLockStatus`) adds real wall-clock time on top of the plain
-  // `REFRESH_INTERVAL_MS * 2` arithmetic. Measured against a real disposable
-  // `SEEYA_APP_HOME_OVERRIDE` fixture (three projects, two favorites, one locked): confirmed via
-  // a live DOM read (`document.getElementById('favorites-section').textContent`) that 11000ms
-  // still consistently captured the stale "No favorites yet"/"All projects 0" state while
-  // 22000ms reliably captured the real data — the render itself was never the problem (a parallel
-  // check proved every component involved renders correctly the instant its props update), purely
-  // the wait needed to be long enough for that second tick's own push to land at all.
+  // SEEYA_APP_VERIFICATION_TAB_PID_PATH (V2-T75 PO review, round 3, item 4): the longest bucket of
+  // all — a verification run using this flag needs time for an EXTERNAL process to read the pid
+  // this file's own `createTab` handler just wrote, fold it into the fixture's own session file on
+  // disk, AND for the ambient refresh loop's next tick (`REFRESH_INTERVAL_MS`, 10s) to re-read that
+  // change and push the `openHere` badge it produces — none of which this process controls the
+  // timing of.
+  const usesTabPidFixture = process.env.SEEYA_APP_VERIFICATION_TAB_PID_PATH !== undefined;
+  // PO review (V2-T75, 2026-10-01, round 2): `usesV2T55Instrumentation`'s own bucket was bumped
+  // from 7000ms to 22000ms here as a band-aid for a real production defect — `useSidebar.ts`'s own
+  // `projects`/`today` state used to be driven ONLY by the `CHANNELS.projectsUpdate`/`todayUpdate`
+  // PUSH, with the "first paint" `getProjectsPanel`/`getTodayPanel` invoke's own return value
+  // called and thrown away. The ambient loop's FIRST tick (`REFRESH_INTERVAL_MS`, 10s) fires
+  // before the renderer's own `<script>` has necessarily registered its `onProjectsUpdate`
+  // listener, so the sidebar only got real data on the SECOND tick, up to `REFRESH_INTERVAL_MS * 2`
+  // later — hence 22000ms.
+  //
+  // PO review (round 3): that was the wrong fix — waiting longer hid the defect instead of fixing
+  // it (the REAL window showed the same empty state for the same 10-20s on every open, not just
+  // this verification script). `useIpcSubscription.ts`'s own `fetchInitial` parameter now seeds
+  // `useSidebar.ts`/`useSidebarFooter.ts`'s state from the invoke's answer as soon as it resolves,
+  // so the sidebar has real data within one IPC round trip, independent of the ambient tick
+  // entirely. Reverted to the original 7000ms bucket, whose reasoning (below) was never about this
+  // race in the first place: it covers `SEEYA_APP_AUTO_DECLINE_DAEMON_OWNERSHIP_TRANSITION`'s own
+  // measured "~1.3-4s on EVERY call" `checkDaemonOwnershipTransitionOffer` round trip plus a
+  // buffer, the one genuinely slow step this category's flags still share.
   await clock.sleep(
     process.env.SEEYA_APP_AUTO_END_DAY === '1'
       ? 8000
-      : usesV2T55Instrumentation
-        ? 22000
-        : usesTabStripDemo
-          ? 4500
-          : 2500,
+      : usesTabPidFixture
+        ? 35000
+        : usesV2T55Instrumentation
+          ? 7000
+          : usesTabStripDemo
+            ? 4500
+            : 2500,
   );
   const image = await window.webContents.capturePage();
   const { writeFile } = await import('node:fs/promises');
@@ -783,6 +793,42 @@ function createWindow(clock: Clock): BrowserWindow {
 }
 
 /**
+ * The faixa de horário's own data — shared by `CHANNELS.getScheduleStrip`'s own handler, the
+ * ambient tick's own `scheduleUpdate` push, and `saveSetting`'s own immediate recompute (V2-T75 PO
+ * review, round 3: these three call sites used to each run the same `decideSchedule` call inline,
+ * which is exactly the duplication AGENTS.md's "nada de duplicação" rules out). `config` is
+ * accepted already-resolved so a caller that just read or wrote it (the ambient tick, `saveSetting`)
+ * never pays for a second `readConfig()` — `getScheduleStrip`'s own handler is the only caller that
+ * has to read it itself.
+ */
+async function computeScheduleEvent(
+  context: Pick<AppContext, 'storage' | 'clock'>,
+  config: Config,
+): Promise<ScheduleUpdateEvent> {
+  const now = context.clock.now();
+  const today = localDayString(now);
+  const dayState = (await context.storage.readState()) ?? emptyDayState(today);
+  const { decision } = decideSchedule(config, dayState, now);
+  return buildScheduleStripData(decision, now);
+}
+
+/**
+ * The daemon pill's own availability — shared by `CHANNELS.getDaemonAvailability`'s own handler,
+ * the ambient tick's own `daemonAvailabilityUpdate` push, and `daemonControl`'s own post-action
+ * recompute (same deduplication reasoning as `computeScheduleEvent` above).
+ */
+async function computeDaemonAvailabilityEvent(
+  context: Pick<AppContext, 'storage' | 'processControl' | 'clock'>,
+): Promise<DaemonAvailabilityUpdateEvent> {
+  const liveLockCheck = await checkLiveLock({
+    storage: context.storage,
+    processControl: context.processControl,
+    clock: context.clock,
+  });
+  return resolveDaemonControlAvailability(liveLockCheck);
+}
+
+/**
  * Wires every IPC channel to `PtyManager` and starts the sidebar/status refresh loop. The only
  * logic here is "which tab does this event belong to" and "which window does this update go to" —
  * never anything about a pty, a process, or how to compute a session row (that's `pty/`, `state/`
@@ -963,6 +1009,19 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
         rows: request.rows,
       });
       tabs = updateTab(tabs, request.id, (tab) => withPid(tab, pid));
+      // SEEYA_APP_VERIFICATION_TAB_PID_PATH: same "instrumentação só do spike" class as every
+      // other `SEEYA_APP_*` flag this file reads (never set by `npm run app`, never documented in
+      // the README) — V2-T75 PO review (round 3), item 4's own capture: proving a project shows
+      // `openHere` (`matchingTabId`, `sidebar/session-match.ts`'s own "by pid, and only by pid")
+      // needs a discovered session whose `pid` equals a REAL tab's pid, and the fixture used for
+      // every other V2-T75 screenshot has no way to predict that pid in advance (the OS assigns
+      // it at spawn time). Writing it out here, for a verification run to read and fold back into
+      // its own fixture session file before the ambient tick after this one, is simpler and more
+      // reliable than guessing at it from the OS process tree externally.
+      const tabPidPath = process.env.SEEYA_APP_VERIFICATION_TAB_PID_PATH;
+      if (tabPidPath !== undefined) {
+        await writeFile(tabPidPath, String(pid), 'utf8');
+      }
       return { id: request.id, pid };
     },
   );
@@ -1203,13 +1262,21 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
     async (_event, request: DaemonControlRequest): Promise<DaemonControlResponse> => {
       const resultText =
         request.action === 'start' ? await context.startDaemon() : await context.stopDaemon();
-      const liveLockCheck = await checkLiveLock({
-        storage: context.storage,
-        processControl: context.processControl,
-        clock: context.clock,
-      });
-      return { resultText, availability: resolveDaemonControlAvailability(liveLockCheck) };
+      return { resultText, availability: await computeDaemonAvailabilityEvent(context) };
     },
+  );
+
+  // V2-T75 PO review (round 3): fetched once at startup — see `CHANNELS.getScheduleStrip`'s own
+  // docstring (the invoke-discard production defect this fixes).
+  ipcMain.handle(CHANNELS.getScheduleStrip, async (): Promise<ScheduleStripResponse> => {
+    const config = await context.storage.readConfig();
+    return computeScheduleEvent(context, config);
+  });
+
+  // V2-T75 PO review (round 3): fetched once at startup — same reasoning as `getScheduleStrip`
+  // above.
+  ipcMain.handle(CHANNELS.getDaemonAvailability, async (): Promise<DaemonAvailabilityResponse> =>
+    computeDaemonAvailabilityEvent(context),
   );
 
   // V2-T14 item 1: the Settings dialog's own rows — re-read from disk on every open (never cached,
@@ -1236,11 +1303,7 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
       const updated = applyConfigFieldUpdate(current, parsed.key, parsed.value);
       await context.storage.saveConfig(updated);
 
-      const now = context.clock.now();
-      const today = localDayString(now);
-      const dayState = (await context.storage.readState()) ?? emptyDayState(today);
-      const { decision } = decideSchedule(updated, dayState, now);
-      const scheduleEvent: ScheduleUpdateEvent = buildScheduleStripData(decision, now);
+      const scheduleEvent = await computeScheduleEvent(context, updated);
       // D-052 (V2-T75): pushed too, not just returned in the response — the lateral's own
       // schedule strip (`renderer/features/sidebar/SidebarFooter`) is a reactive component now,
       // driven ONLY by `onScheduleUpdate` pushes (the same channel the ambient tick above already
@@ -1390,10 +1453,7 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
       // every 30s, read fresh every tick (never cached: a snooze/skip typed in another terminal,
       // or the daemon's own poll, can change `estado.json` between ticks — D-025, the interface
       // never shows a stale decision on purpose).
-      const today = localDayString(now);
-      const dayState = (await context.storage.readState()) ?? emptyDayState(today);
-      const { decision } = decideSchedule(liveConfig, dayState, now);
-      const scheduleEvent: ScheduleUpdateEvent = buildScheduleStripData(decision, now);
+      const scheduleEvent = await computeScheduleEvent(context, liveConfig);
       window.webContents.send(CHANNELS.scheduleUpdate, scheduleEvent);
 
       // V2-T5b item 3: a SECOND checkLiveLock this tick (buildStatusPanelText's own
@@ -1403,13 +1463,7 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
       // precomputed LiveLockCheck INTO describeDaemonState would mean changing that function's own
       // signature for a caller outside its existing two (seeya status/--status), which is a
       // bigger change than this task's own scope.
-      const liveLockCheck = await checkLiveLock({
-        storage: context.storage,
-        processControl: context.processControl,
-        clock: context.clock,
-      });
-      const daemonAvailabilityEvent: DaemonAvailabilityUpdateEvent =
-        resolveDaemonControlAvailability(liveLockCheck);
+      const daemonAvailabilityEvent = await computeDaemonAvailabilityEvent(context);
       window.webContents.send(CHANNELS.daemonAvailabilityUpdate, daemonAvailabilityEvent);
 
       // V2-T13 item 4: from the SAME cached status `autostartReport` above already reads (never a

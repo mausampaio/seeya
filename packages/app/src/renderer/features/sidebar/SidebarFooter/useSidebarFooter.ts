@@ -40,9 +40,15 @@ export interface SidebarFooterControls {
 export function useSidebarFooter(): SidebarFooterControls {
   const api = getSeeyaApi();
   // Wrapped in an arrow function — see `useSidebar.ts`'s own comment on the identical fix.
+  //
+  // V2-T75 PO review (2026-10-01, round 3), production defect: `getScheduleStrip` is new in this
+  // round, added specifically so the schedule line doesn't sit on `NO_SCHEDULE_YET` for up to two
+  // refresh intervals after open — same "fetchInitial seeds state, push drives updates" fix as
+  // `useSidebar.ts`'s own `projects`/`today`, see `useIpcSubscription`'s own docstring.
   const schedule = useIpcSubscription<ScheduleUpdateEvent>(
     (listener) => api.onScheduleUpdate(listener),
     NO_SCHEDULE_YET,
+    () => api.getScheduleStrip(),
   );
   const [daemon, dispatch] = useReducer(reduceDaemonControl, INITIAL_DAEMON_CONTROL_STATE);
 
@@ -58,6 +64,18 @@ export function useSidebarFooter(): SidebarFooterControls {
       }),
     [api],
   );
+
+  // V2-T75 PO review (round 3): the SAME first-paint fix as `schedule` above, new in this round —
+  // `getDaemonAvailability` seeds the pill before the first ambient tick, instead of leaving
+  // `INITIAL_DAEMON_CONTROL_STATE`'s own "unknown" showing for up to two refresh intervals.
+  // `reduceDaemonControl`'s own `availabilityUpdated` case is already safe against this resolving
+  // after a click started a real command (`state.kind === 'running'` short-circuits it, same as a
+  // push landing mid-command) — no extra guard needed here.
+  useEffect(() => {
+    void api.getDaemonAvailability().then((availability) => {
+      dispatch({ kind: 'availabilityUpdated', availability });
+    });
+  }, [api]);
 
   const onSnooze = useCallback(
     (minutes: 15 | 30 | 60) => {
