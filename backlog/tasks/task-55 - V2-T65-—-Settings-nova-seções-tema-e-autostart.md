@@ -4,7 +4,7 @@ title: 'V2-T65 — Settings nova: seções, tema e autostart'
 status: Review
 assignee: []
 created_date: '2026-09-30 10:34'
-updated_date: '2026-10-01 16:02'
+updated_date: '2026-10-01 18:05'
 labels: []
 milestone: m-2
 dependencies:
@@ -185,5 +185,11 @@ author: PO
 created: 2026-10-01 16:02
 ---
 Revisão do PO em 2026-10-01: duas rodadas de captura conferidas. Rodada 1: Settings como feature (seções, campos com rótulo legível, salvar ao sair, erro na linha, custom/default), tema ao vivo (o saveSetting não empurrava o tema — corrigido), autostart como interruptor (saiu do rodapé), Dialog/Switch/TextField/SegmentedControl trazidos ao padrão; dois defeitos achados pela janela real (process is not defined no renderer; vnode de ícone compartilhado). Rodada 2: versão vinda do package.json (dev mostrava a do Electron), rótulos no mesmo tamanho, texto do autostart correto, ícone próprio para Capture. Mesclado junto da linha de projeto, portão do zero verde (3288 testes), também sem identidade global do git. Falta o aceite do mantenedor com o instalador.
+---
+
+author: Claude Sonnet 5
+created: 2026-10-01 18:05
+---
+Dois defeitos achados pelo mantenedor, branch tarefa/V2-T65-estado-na-tela (a partir de main 154cf46), corrigidos e verificados: (1) Settings continuava visivel apos Done -- SettingsDialog.module.css tinha display:flex incondicional na propria .dialog; o dialogo fica montado a vida inteira da janela e Dialog.tsx so chama .close() (tira o atributo open), e regra de autor sempre vence a folha do navegador (dialog:not([open]){display:none}) independente de especificidade -- a janela ficava pintada e clicavel por tras ate outra interacao re-renderizar. Corrigido movendo display para .dialog[open]. Guard geral novo (tests/integration/guards/dialog-display-css.test.ts) varre todo <dialog>/<Dialog> de renderer/, nao so este arquivo -- confirmado que reprova contra o CSS antigo antes de aceitar como prova; nao deu para provar com getComputedStyle renderizado porque o texto do CSS vem vazio sob Vitest/happy-dom (medido com import ?inline). Captura real: abrir Settings, clicar Done, capturar na mesma sequencia sem outra interacao -- diagolo some por completo no frame seguinte. (2) Skip/Snooze so atualizavam na proxima atualizacao automatica -- onSnooze/onSkip descartavam a resposta de snoozeToday/skipToday (nenhum dos dois canais empurra depois de agir); corrigido aplicando a resposta na hora. Estado de trabalho virou prop do componente: loading? no Button/IconButton/Switch (com Spinner novo), reservando a largura mesmo antes de carregar para nao pular o layout. Aplicado em Skip, Snooze (botao gatilho), botao do daemon (que so desabilitava por unknown, nunca durante o proprio comando) e interruptor de autostart (ja desabilitava, ganhou so o indicador visual). Varredura completa: onFieldBlur (Settings) e toggleFavoriteProject ja aplicavam a resposta/push na hora, sem o mesmo defeito; openProject/adoptSession sao fire-and-forget deliberado (a aba que abre e o feedback). Captura real: clicar Skip today e capturar logo depois -- 'End of day: skipped today' aparece na mesma captura, sem push. Confirmado registro do Windows (seeya/seeya-dev) e hash do protocol-handler.json inalterados antes/depois. dist apagado e npm run verificar rodado limpo duas vezes (antes e depois dos commits): tudo verde, 345 arquivos de teste, 3313 testes passando, 4 skips pre-existentes, zero violacoes de dependencia. Quatro commits pequenos na branch. Status permanece Review.
 ---
 <!-- COMMENTS:END -->
