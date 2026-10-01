@@ -4,6 +4,7 @@ title: V2-T76 — Dividir format-project.ts e adapters/workspace/index.ts
 status: Review
 assignee: []
 created_date: '2026-10-01 19:21'
+updated_date: '2026-10-01 20:31'
 labels: []
 milestone: m-0
 dependencies: []
@@ -77,3 +78,13 @@ three separate full runs, each time a DIFFERENT subset of its own cases (none to
 injection it can't verify stays inside the worktree) — not worked around, reported here as
 instructed.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-10-01 20:31
+---
+Revisão do PO em 2026-10-01: mesclado. Recorte por comando (CLI) e por grupo de operação (adaptador); maior arquivo 277 linhas; nenhuma asserção alterada; Q-100/Q-101 fechadas. Portão do zero: um único caso do guard de eslint estourou o tempo sob carga (três agentes rodando) e passou isolado e na rodada sem identidade global do git (3313 testes) — instabilidade ambiental já relatada pelo agente, não regressão.
+---
+<!-- COMMENTS:END -->
