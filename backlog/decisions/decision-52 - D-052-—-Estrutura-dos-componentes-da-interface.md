@@ -44,7 +44,8 @@ e na leitura do código pelo mantenedor em 2026-09-30: "não existe separação 
 6. **O que varia e se repete vira prop tipada** (acréscimo do mantenedor, 2026-09-30): tom
    (`tone`: os papéis da identidade — neutral, brand, success, warning, danger), tamanho (`size`:
    sm, md, lg), variante quando há mais de uma (`variant`), estado (`active`, `disabled`), largura
-   (`fullWidth`). Uniões literais no tipo, padrão explícito, e o CSS module traduz cada valor em
+   (`fullWidth`), trabalho em andamento (`loading`: desabilita, mostra o indicador, mantém a largura —
+   quem usa o componente controla o valor). Uniões literais no tipo, padrão explícito, e o CSS module traduz cada valor em
    tokens — nunca uma classe ou um estilo avulso no lugar de usar o componente. Os nomes das props
    compartilhadas e seus valores ficam no glossário do `AGENTS.md`.
 7. **Texto só pela escala tipográfica** (aceite do mantenedor, 2026-10-01 — a lateral saiu com
