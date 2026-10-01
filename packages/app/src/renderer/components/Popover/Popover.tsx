@@ -58,8 +58,22 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), Math.max(max, min));
 }
 
+/** Whether `dialogHeight` should open BELOW `anchorRect` (V2-T75 PO review, round 3: the Snooze
+ * menu, anchored near the bottom of the sidebar, used to always open downward — covering its own
+ * trigger button and the "End day…" button under it, since `positionNear` only ever clamped the
+ * result to the viewport instead of ever choosing the other side). Opens above only when below
+ * doesn't fit AND above has more room; ties and the "neither fits" case both keep the long-standing
+ * default (below) — `positionNear`'s own `clamp` already keeps the result fully on-screen either
+ * way, so this only changes which side is PREFERRED, never whether the popover stays visible. */
+function fitsBelow(anchorRect: DOMRect, dialogHeight: number): boolean {
+  const spaceBelow = window.innerHeight - anchorRect.bottom - ANCHOR_GAP_PX - VIEWPORT_MARGIN_PX;
+  const spaceAbove = anchorRect.top - ANCHOR_GAP_PX - VIEWPORT_MARGIN_PX;
+  return spaceBelow >= dialogHeight || spaceBelow >= spaceAbove;
+}
+
 /** Positions `dialog` (already shown — `getBoundingClientRect` on a closed `<dialog>` is always
- * zero) just under `anchor`, clamped so it never renders off-screen on either axis. */
+ * zero) next to `anchor` — below it when there's room, above it otherwise (`fitsBelow` above) —
+ * clamped so it never renders off-screen on either axis. */
 function positionNear(dialog: HTMLDialogElement, anchor: HTMLElement): void {
   const anchorRect = anchor.getBoundingClientRect();
   const dialogRect = dialog.getBoundingClientRect();
@@ -68,8 +82,11 @@ function positionNear(dialog: HTMLDialogElement, anchor: HTMLElement): void {
     VIEWPORT_MARGIN_PX,
     window.innerWidth - dialogRect.width - VIEWPORT_MARGIN_PX,
   );
+  const rawTop = fitsBelow(anchorRect, dialogRect.height)
+    ? anchorRect.bottom + ANCHOR_GAP_PX
+    : anchorRect.top - ANCHOR_GAP_PX - dialogRect.height;
   const top = clamp(
-    anchorRect.bottom + ANCHOR_GAP_PX,
+    rawTop,
     VIEWPORT_MARGIN_PX,
     window.innerHeight - dialogRect.height - VIEWPORT_MARGIN_PX,
   );
