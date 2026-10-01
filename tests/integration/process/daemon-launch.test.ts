@@ -50,6 +50,22 @@ async function waitForFile(filePath: string, timeoutMs: number): Promise<void> {
   }
 }
 
+/** Polls until the file has content — `waitForFile` only proves it exists, and a writer's own
+ * create-then-write leaves a window where it exists but is still empty. */
+async function readNonEmpty(filePath: string, timeoutMs: number): Promise<string> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const content = await readFile(filePath, 'utf8');
+    if (content.length > 0) {
+      return content;
+    }
+    if (Date.now() > deadline) {
+      throw new Error(`${filePath} stayed empty for ${timeoutMs}ms`);
+    }
+    await sleep(20);
+  }
+}
+
 describe('spawnDetachedDaemon', () => {
   it('resolves with a real, live pid, detached and unreferenced', async () => {
     const tmp = await mkdtemp(path.join(tmpdir(), 'seeya-daemon-launch-'));
@@ -111,7 +127,10 @@ describe('spawnDetachedDaemon', () => {
         args: [readyMarker],
       });
       await waitForFile(readyMarker, 5_000);
-      expect(await readFile(readyMarker, 'utf8')).toBe('1');
+      // The child's `writeFileSync` creates the file before it writes the content, so "the file
+      // exists" can be observed while it is still empty — a race that failed this test on the
+      // Ubuntu CI runner (read '' instead of '1'). Wait for the content, not just the file.
+      expect(await readNonEmpty(readyMarker, 5_000)).toBe('1');
       // Best-effort cleanup — this one exits on its own almost immediately, unlike the fixture
       // above, so a failed kill here (process already gone) is not itself a problem.
       try {
