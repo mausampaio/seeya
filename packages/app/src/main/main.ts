@@ -201,11 +201,30 @@ async function captureVerificationScreenshot(
   const usesTabStripDemo =
     process.env.SEEYA_APP_AUTO_TAB_STRIP_DEMO === '1' ||
     process.env.SEEYA_APP_AUTO_OPEN_NEW_TAB_POPOVER === '1';
+  // PO review (V2-T75, 2026-10-01): `usesV2T55Instrumentation`'s own 7000ms bucket (below) was
+  // too short for a verification run whose capture needs real Favorites/Recent/"All projects"
+  // sidebar data — the Projects panel's state (`renderer/features/sidebar/useSidebar.ts`) is
+  // deliberately updated ONLY by the `CHANNELS.projectsUpdate` PUSH, never by the "first paint"
+  // `getProjectsPanel` invoke's own return value (that hook's own docstring: "every consumer...
+  // always agrees on one value, never two slightly different reads racing each other"). The
+  // ambient loop's FIRST tick (`REFRESH_INTERVAL_MS`, 10s) fires before the renderer's own
+  // `<script>` has necessarily registered its `onProjectsUpdate` listener (this file's own
+  // `CHANNELS.getProjectsPanel` comment already measured that race for the Projects tab), so the
+  // sidebar only gets real data on the SECOND tick — and that second tick's own work (one
+  // `describeProjectLockStatus` git-touching read per project, `project-ipc.ts`'s own
+  // `readProjectsWithLockStatus`) adds real wall-clock time on top of the plain
+  // `REFRESH_INTERVAL_MS * 2` arithmetic. Measured against a real disposable
+  // `SEEYA_APP_HOME_OVERRIDE` fixture (three projects, two favorites, one locked): confirmed via
+  // a live DOM read (`document.getElementById('favorites-section').textContent`) that 11000ms
+  // still consistently captured the stale "No favorites yet"/"All projects 0" state while
+  // 22000ms reliably captured the real data — the render itself was never the problem (a parallel
+  // check proved every component involved renders correctly the instant its props update), purely
+  // the wait needed to be long enough for that second tick's own push to land at all.
   await clock.sleep(
     process.env.SEEYA_APP_AUTO_END_DAY === '1'
       ? 8000
       : usesV2T55Instrumentation
-        ? 7000
+        ? 22000
         : usesTabStripDemo
           ? 4500
           : 2500,
