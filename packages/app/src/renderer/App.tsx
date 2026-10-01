@@ -32,16 +32,23 @@ export function AppShell() {
         <Sidebar collapsed={collapsed} onToggleCollapse={toggle} />
         <main id="main">
           <TabStrip
+            // PO review (2026-10-01, docs/INTERFACE.md's own "Um botão de recolher por vez"): this
+            // button ONLY reopens a COLLAPSED lateral — while it's open, the lateral's own header
+            // button (`Sidebar.tsx#sidebar-collapse-toggle`) is the only one on screen. Showing
+            // both at once ("os dois juntos na tela confundem", same doc) was the defect: before
+            // this review, `leading` was always rendered regardless of `collapsed`.
             leading={
-              <IconButton
-                id="sidebar-toggle-button"
-                size="sm"
-                variant="ghost"
-                aria-label={toggleLabel.tooltip}
-                onClick={toggle}
-              >
-                <ToggleIcon size={24} />
-              </IconButton>
+              collapsed ? (
+                <IconButton
+                  id="sidebar-toggle-button"
+                  size="sm"
+                  variant="ghost"
+                  aria-label={toggleLabel.tooltip}
+                  onClick={toggle}
+                >
+                  <ToggleIcon size={24} />
+                </IconButton>
+              ) : undefined
             }
           />
         </main>
