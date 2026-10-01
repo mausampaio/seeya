@@ -1,43 +1,54 @@
 import { describe, expect, it } from 'vitest';
 import {
-  resolveTerminalTheme,
-  TERMINAL_THEME_DARK,
-  TERMINAL_THEME_LIGHT,
+  buildTerminalThemeFromTokens,
+  FALLBACK_TERMINAL_THEME,
 } from '../../../../packages/app/src/state/terminal-theme.js';
 
 const HEX_COLOUR = /^#[0-9a-f]{6}$/;
 
-describe('TERMINAL_THEME_DARK', () => {
+describe('FALLBACK_TERMINAL_THEME', () => {
   it('is a set of six-digit hex colours', () => {
-    for (const [key, value] of Object.entries(TERMINAL_THEME_DARK)) {
+    for (const [key, value] of Object.entries(FALLBACK_TERMINAL_THEME)) {
       expect(value, key).toMatch(HEX_COLOUR);
     }
   });
 
   it('never uses pure black as the background (the maintainer measured it as tiring to read)', () => {
-    expect(TERMINAL_THEME_DARK.background).not.toBe('#000000');
+    expect(FALLBACK_TERMINAL_THEME.background).not.toBe('#000000');
   });
 });
 
-// V2-T62 (D-051): the light counterpart — "o terminal segue o tema".
-describe('TERMINAL_THEME_LIGHT', () => {
-  it('is a set of six-digit hex colours', () => {
-    for (const [key, value] of Object.entries(TERMINAL_THEME_LIGHT)) {
-      expect(value, key).toMatch(HEX_COLOUR);
-    }
+// PO review (2026-10-01): the terminal's own colours now come straight from the same CSS tokens
+// every other surface in the window reads — `buildTerminalThemeFromTokens` is the pure function
+// that shape maps through (the DOM read itself lives in `renderer/legacy/theme-view.ts`, outside
+// this module on purpose, so this stays testable with made-up strings instead of a real window).
+describe('buildTerminalThemeFromTokens', () => {
+  it('background/foreground/cursor map straight from the resolved background/text tokens', () => {
+    const theme = buildTerminalThemeFromTokens({
+      background: '#18181d',
+      text: '#f7f7f8',
+      brandSoft: '#25214e',
+    });
+    expect(theme.background).toBe('#18181d');
+    expect(theme.foreground).toBe('#f7f7f8');
+    expect(theme.cursor).toBe('#f7f7f8');
   });
 
-  it('never uses pure white as the background text on white (kept legible, matches the tokens)', () => {
-    expect(TERMINAL_THEME_LIGHT.foreground).not.toBe(TERMINAL_THEME_LIGHT.background);
+  it('selection background maps from the resolved brand-soft token', () => {
+    const theme = buildTerminalThemeFromTokens({
+      background: '#ffffff',
+      text: '#121214',
+      brandSoft: '#eceaff',
+    });
+    expect(theme.selectionBackground).toBe('#eceaff');
   });
-});
 
-describe('resolveTerminalTheme', () => {
-  it('picks TERMINAL_THEME_DARK for "dark"', () => {
-    expect(resolveTerminalTheme('dark')).toBe(TERMINAL_THEME_DARK);
-  });
-
-  it('picks TERMINAL_THEME_LIGHT for "light"', () => {
-    expect(resolveTerminalTheme('light')).toBe(TERMINAL_THEME_LIGHT);
+  it('never uses the same colour for foreground and background — kept legible whatever the two resolved tokens are', () => {
+    const theme = buildTerminalThemeFromTokens({
+      background: '#ffffff',
+      text: '#121214',
+      brandSoft: '#eceaff',
+    });
+    expect(theme.foreground).not.toBe(theme.background);
   });
 });
