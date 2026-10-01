@@ -65,6 +65,7 @@ import type {
   FindSessionByIdResponse,
   ThemeUpdateEvent,
   ToggleFavoriteProjectRequest,
+  PickDirectoryResponse,
 } from '../ipc/channels.js';
 
 export interface SeeyaApi {
@@ -186,6 +187,9 @@ export interface SeeyaApi {
   /** V2-T63: the star, from either the lateral or the Projects tab — resolves once saved and
    * pushed. */
   toggleFavoriteProject(request: ToggleFavoriteProjectRequest): Promise<void>;
+  /** V2-T64: the New tab popover's "Browse…" button — the native OS folder picker, run in the
+   * main process (`main/directory-picker-ipc.ts`). */
+  pickDirectory(): Promise<PickDirectoryResponse>;
 }
 
 /**
@@ -306,6 +310,7 @@ const api: SeeyaApi = {
   getEffectiveTheme: () => ipcRenderer.invoke(CHANNELS.getEffectiveTheme),
   onThemeUpdate: (listener) => subscribe(CHANNELS.themeUpdate, listener),
   toggleFavoriteProject: (request) => ipcRenderer.invoke(CHANNELS.toggleFavoriteProject, request),
+  pickDirectory: () => ipcRenderer.invoke(CHANNELS.pickDirectory),
 };
 
 contextBridge.exposeInMainWorld('seeya', api);

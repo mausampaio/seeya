@@ -33,6 +33,7 @@ import {
   removeFallbackContextFile,
   writeFallbackContextFile,
 } from '@seeya-ai/engine/adapters/resumption/context-file.js';
+import type { ResumeTabOpenedKind } from '../ipc/channels.js';
 
 /** One tab opened for a resume attempt — just enough to key the exit registry and mark the pty
  * record (`tabs/tab-model.ts#withPid`) by. */
@@ -59,6 +60,9 @@ export interface TabResumeOpener {
     readonly args: readonly string[];
     readonly cwd: string;
     readonly label: string;
+    /** V2-T64: which icon the tab strip shows for the resulting tab
+     * (`ipc/channels.ts#ResumeTabOpenedKind`'s own docstring). */
+    readonly kind: ResumeTabOpenedKind;
   }): Promise<OpenedResumeTab>;
   /** One-shot: fires at most once, whenever `id`'s tab process actually ends, however long that
    * takes (`ExitListenerRegistry`, the real implementation's own module). */
@@ -158,6 +162,7 @@ export class TabSessionResumer implements SessionResumer {
       args: buildResumeArgs(sessionId, prompt),
       cwd,
       label: this.options.resolveLabel(sessionId),
+      kind: 'session',
     });
     const raced = await raceExitAgainstGrace(
       this.options.opener,
@@ -184,6 +189,7 @@ export class TabSessionResumer implements SessionResumer {
       args: buildResumeWithoutPromptArgs(sessionId),
       cwd,
       label: this.options.resolveLabel(sessionId),
+      kind: 'session',
     });
     const raced = await raceExitAgainstGrace(
       this.options.opener,
@@ -230,6 +236,7 @@ export class TabSessionResumer implements SessionResumer {
       args: buildFallbackArgs(contextFilePath),
       cwd,
       label: this.options.resolveLabel(sessionId),
+      kind: 'session',
     });
     this.options.opener.onceExit(tab.id, () => {
       void removeFallbackContextFile(contextFilePath);

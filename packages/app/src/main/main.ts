@@ -46,6 +46,7 @@ import type {
   DaemonOwnershipTransitionOfferResponse,
   AnswerDaemonOwnershipTransitionRequest,
   ThemeUpdateEvent,
+  ResumeTabOpenedKind,
 } from '../ipc/channels.js';
 import type { Clock } from '@seeya-ai/engine/core/ports.js';
 import {
@@ -118,6 +119,7 @@ import {
 } from '../resume/tab-session-resumer.js';
 import { wireProjectIpc } from './project-ipc.js';
 import { wireSessionSearchIpc } from './session-search-ipc.js';
+import { wireDirectoryPickerIpc } from './directory-picker-ipc.js';
 
 /** `TabSessionResumer`'s `claudeCommand` in production — the same default the CLI's own
  * `ClaudeSessionResumer#resolveClaudeBinary` falls back to when nothing overrides it
@@ -272,21 +274,38 @@ function createWindow(clock: Clock): BrowserWindow {
     });
   }
   // SEEYA_APP_AUTO_OPEN_SHELL_TAB: same "instrumentação só do spike" class as SEEYA_APP_OFFSCREEN
-  // above — clicks the real "+" button and submits the real command bar with both fields left
-  // blank (the same elements and handlers a person would use, for the "leave blank for a shell"
-  // case), a few seconds after load, so an agent with no keyboard/mouse of its own can prove a
-  // shell tab really opens a pty (docs/PLANO-DE-ENTREGA.md V2-T2 aceite: process tree, window
-  // count). Never set by `npm run app` or the README. **V2-T3:** also sends
-  // `NERD_GLYPH_PROOF_LINE` (this file's own docstring above) through the tab's data channel, so
-  // the same screenshot proves the embedded Nerd Font renders real glyphs, not boxes.
+  // above — clicks the real "+" button (V2-T64: opens the New tab popover, replacing the former
+  // command bar), picks the "Shell" segment and leaves `Directory` blank (the same elements and
+  // handlers a person would use, for the "leave blank for the home directory" case), then submits
+  // the real form, a few seconds after load, so an agent with no keyboard/mouse of its own can
+  // prove a shell tab really opens a pty (docs/PLANO-DE-ENTREGA.md V2-T2 aceite: process tree,
+  // window count). Three separate `executeJavaScript` calls, each after its own short sleep —
+  // same "give Preact's own state update a turn to flush before the next step reads it" discipline
+  // `SEEYA_APP_AUTO_EDIT_SETTINGS` below already needs (a single script clicking the segment and
+  // calling `requestSubmit()` back to back would submit against the PREVIOUS render's closure,
+  // before the click's `setState` had actually re-rendered the form). Never set by `npm run app`
+  // or the README. **V2-T3:** also sends `NERD_GLYPH_PROOF_LINE` (this file's own docstring above)
+  // through the tab's data channel, so the same screenshot proves the embedded Nerd Font renders
+  // real glyphs, not boxes.
   if (process.env.SEEYA_APP_AUTO_OPEN_SHELL_TAB === '1') {
     window.webContents.once('did-finish-load', () => {
       void clock
         .sleep(300)
         .then(() =>
           window.webContents.executeJavaScript(
-            "document.getElementById('new-tab-button').click(); " +
-              "document.getElementById('command-bar').requestSubmit();",
+            "document.getElementById('new-tab-button').click();",
+          ),
+        )
+        .then(() => clock.sleep(200))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('new-tab-kind-shell').click();",
+          ),
+        )
+        .then(() => clock.sleep(200))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('new-tab-form').requestSubmit();",
           ),
         )
         .then(() => clock.sleep(200))
@@ -633,6 +652,7 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
     readonly args: readonly string[];
     readonly cwd: string;
     readonly label: string;
+    readonly kind: ResumeTabOpenedKind;
   }): Promise<OpenedResumeTab> {
     const resolved = await resolveHarnessOrThrow(context, options.command, options.args);
     nextResumeTabId += 1;
@@ -650,7 +670,13 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
       rows: 24,
     });
     tabs = updateTab(tabs, id, (tab) => withPid(tab, pid));
-    const event: ResumeTabOpenedEvent = { id, label: options.label, cwd: options.cwd, pid };
+    const event: ResumeTabOpenedEvent = {
+      id,
+      label: options.label,
+      cwd: options.cwd,
+      pid,
+      kind: options.kind,
+    };
     window.webContents.send(CHANNELS.resumeTabOpened, event);
     return { id, pid };
   }
@@ -667,6 +693,8 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // V2-T55 item 4: the id-search field's own IPC — same "own module, main.ts doesn't grow" split
   // `wireProjectIpc` already established.
   wireSessionSearchIpc(context);
+  // V2-T64: the New tab popover's "Browse…" button — same "own module" split as the two above.
+  wireDirectoryPickerIpc(window);
 
   // V2-T3: fetched once by `renderer.ts#main`, before any `new Terminal({...})` is constructed —
   // the two-way handshake (`invoke`, not `send`) matches `createTab` below, the only other channel

@@ -24,6 +24,7 @@ import type {
 import { buildOpenArgs } from '@seeya-ai/engine/adapters/harness/args.js';
 import { buildAdoptArgs } from '@seeya-ai/engine/adapters/harness/adopt-args.js';
 import type { TabResumeOpener } from './tab-session-resumer.js';
+import type { ResumeTabOpenedKind } from '../ipc/channels.js';
 
 /** Opens a tab and resolves once it exits, mapping a spawn failure (e.g. `claude` not found on
  * `PATH` — `electron/main.ts#resolveHarnessOrThrow`'s own thrown error) onto `failedToStart` rather
@@ -36,6 +37,7 @@ async function openTabAndAwaitExit(
     readonly args: readonly string[];
     readonly cwd: string;
     readonly label: string;
+    readonly kind: ResumeTabOpenedKind;
   },
 ): Promise<HarnessOpenResult> {
   try {
@@ -73,6 +75,7 @@ export class ProjectOpenTabLauncher implements HarnessLauncher {
       args: buildOpenArgs(addDirs, sessionId, systemPromptAppend),
       cwd,
       label: this.options.label,
+      kind: 'project',
     });
   }
 }
@@ -100,6 +103,7 @@ export class ProjectAdoptTabLauncher implements SessionAdoptionLauncher {
       args: buildAdoptArgs(originalSessionId, forkSessionId, projectDir),
       cwd: originalCwd,
       label: this.options.label,
+      kind: 'session',
     });
   }
 }

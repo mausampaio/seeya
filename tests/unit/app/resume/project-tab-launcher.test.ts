@@ -17,6 +17,7 @@ class FakeOpener implements TabResumeOpener {
     readonly args: readonly string[];
     readonly cwd: string;
     readonly label: string;
+    readonly kind: 'project' | 'session';
   }> = [];
   private readonly listeners = new Map<string, (exitCode: number) => void>();
   private nextId = 0;
@@ -27,6 +28,7 @@ class FakeOpener implements TabResumeOpener {
     readonly args: readonly string[];
     readonly cwd: string;
     readonly label: string;
+    readonly kind: 'project' | 'session';
   }): Promise<OpenedResumeTab> {
     this.openedTabs.push(options);
     if (this.failNextOpen) {
@@ -78,6 +80,7 @@ describe('ProjectOpenTabLauncher (V2-T30 item 3)', () => {
         ],
         cwd: '/seeya/workspace/auth-hardening',
         label: 'auth-hardening',
+        kind: 'project',
       },
     ]);
 

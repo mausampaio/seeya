@@ -33,6 +33,7 @@ class FakeOpener implements TabResumeOpener {
     readonly args: readonly string[];
     readonly cwd: string;
     readonly label: string;
+    readonly kind: 'project' | 'session';
   }> = [];
   private readonly listeners = new Map<string, (exitCode: number) => void>();
   private nextId = 0;
@@ -42,6 +43,7 @@ class FakeOpener implements TabResumeOpener {
     readonly args: readonly string[];
     readonly cwd: string;
     readonly label: string;
+    readonly kind: 'project' | 'session';
   }): Promise<OpenedResumeTab> {
     this.openedTabs.push(options);
     this.nextId += 1;
@@ -141,6 +143,7 @@ describe('TabSessionResumer#attemptResume', () => {
         args: ['--resume', 'session-1', "yesterday's plan"],
         cwd: '/project',
         label: 'label-for-session-1',
+        kind: 'session',
       },
     ]);
   });
@@ -215,6 +218,7 @@ describe('TabSessionResumer#resumeWithoutPrompt (V2-T7)', () => {
         args: ['--resume', 'session-1'],
         cwd: '/project',
         label: 'label-for-session-1',
+        kind: 'session',
       },
     ]);
   });
