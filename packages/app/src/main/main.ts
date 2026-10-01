@@ -9,7 +9,8 @@
 import path from 'node:path';
 import { appendFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { app, BrowserWindow, ipcMain, nativeTheme } from 'electron';
+import { app, BrowserWindow, clipboard, ipcMain, Menu, nativeTheme } from 'electron';
+import type { MenuItemConstructorOptions } from 'electron';
 import { CHANNELS } from '../ipc/channels.js';
 import type {
   CreateTabRequest,
@@ -71,6 +72,11 @@ import { shouldMarkLinuxProtocolRegistered } from '../composition/linux-protocol
 import { resolveProtocolScheme, type ProtocolScheme } from '../composition/protocol-scheme.js';
 import { shouldRegisterProtocolScheme } from '../composition/protocol-registration-eligibility.js';
 import { resolveWindowIconPath } from '../composition/window-icon.js';
+import {
+  resolveApplicationMenuPolicy,
+  type MenuEntry,
+  type MenuSection,
+} from '../composition/menu-policy.js';
 import { MESSAGES } from '../text/messages.js';
 import { buildEndDayCostCeiling } from '../state/end-day-preview.js';
 import { projectEndDayProgressEvent } from '../state/end-day-progress.js';
@@ -354,6 +360,231 @@ async function writeStartupTiming(clock: Clock, timingPath: string): Promise<voi
   await writeFile(timingPath, payload, 'utf8');
 }
 
+/**
+ * V2-T74: the fiação half of `composition/menu-policy.ts#resolveApplicationMenuPolicy` — that
+ * module only produces data (`ApplicationMenuPolicy`), this function is the one place that calls
+ * the real Electron `Menu` API with it. `Menu.setApplicationMenu` is process-global, not
+ * per-window (Electron's own docs: "the menu will be set as each window's top menu"), so this
+ * runs exactly ONCE, in `app.whenReady()` below, before any `BrowserWindow` is created — never
+ * from `createWindow` itself, which can run again on macOS's own `activate` (no second
+ * application menu to apply there).
+ *
+ * `Menu.setApplicationMenu(null)` (the `'none'` branch) removes the menu bar on Windows/Linux
+ * entirely, rather than just hiding it behind Alt the way the `BrowserWindow` option
+ * `autoHideMenuBar` would — this task's own aceite asks for the bar to be gone, not hidden.
+ */
+function applyApplicationMenuPolicy(platform: NodeJS.Platform, appName: string): void {
+  const policy = resolveApplicationMenuPolicy(platform, appName);
+  if (policy.kind === 'none') {
+    Menu.setApplicationMenu(null);
+    return;
+  }
+  Menu.setApplicationMenu(Menu.buildFromTemplate(toElectronMenuTemplate(policy.template)));
+}
+
+/** `composition/menu-policy.ts`'s own `MenuSection[]` → Electron's real
+ * `MenuItemConstructorOptions[]` — the one place this mapping happens, since that module cannot
+ * import Electron's type at all (see its own docstring on the `electron`-stays-in-main/ boundary,
+ * D-052). */
+function toElectronMenuTemplate(sections: readonly MenuSection[]): MenuItemConstructorOptions[] {
+  return sections.map((section) => ({
+    label: section.label,
+    submenu: section.submenu.map(toElectronMenuItem),
+  }));
+}
+
+/** `MenuItemConstructorOptions['role']` is `(... literal roles) | undefined` (the property is
+ * optional) — `NonNullable` here is what lets `toElectronMenuItem` assign a definite role value
+ * under this package's own `exactOptionalPropertyTypes: true` (an explicit `role: undefined`
+ * would otherwise be a different, rejected assignment from simply omitting the key). */
+type ElectronMenuRole = NonNullable<MenuItemConstructorOptions['role']>;
+
+function toElectronMenuItem(entry: MenuEntry): MenuItemConstructorOptions {
+  if (entry.kind === 'separator') {
+    return { type: 'separator' };
+  }
+  // `MenuRoleEntry.role` is a plain `string` in `composition/menu-policy.ts` (that module cannot
+  // import Electron's own role union either) — every value `buildMacMenuTemplate` actually
+  // produces ('about', 'quit', 'undo', 'redo', 'cut', 'copy', 'paste', 'selectAll') is one of
+  // Electron's own documented `MenuItem` roles, asserted here once, at the only call site.
+  return { role: entry.role as ElectronMenuRole };
+}
+
+/** The exact string `verifyMenuAndClipboard`'s text-field round trip types into
+ * `#new-project-id-input`, copies out, clears, and expects back after a `webContents.paste()` —
+ * distinctive enough that it can never collide with a real project id a person typed. */
+const CLIPBOARD_TEXT_FIELD_MARKER = 'seeya-v2t74-field-marker';
+
+/** The exact string `verifyMenuAndClipboard`'s terminal check writes to the OS clipboard and
+ * expects to see echoed back into the pty's own visible output after a `webContents.paste()` —
+ * distinctive enough to never appear in a shell's own banner by coincidence. */
+const CLIPBOARD_TERMINAL_MARKER = 'seeya-v2t74-terminal-marker';
+
+/**
+ * V2-T74: round-trips `CLIPBOARD_TEXT_FIELD_MARKER` through a REAL text field
+ * (`#new-project-id-input`, opened by `#new-project-button`) using the same `webContents.copy()`
+ * `webContents.paste()` Electron calls a menu's Cut/Copy/Paste role would otherwise trigger — the
+ * one proof this task's own aceite needs that survives even with the application menu removed
+ * entirely (`applyApplicationMenuPolicy`'s own `'none'` branch, Windows/Linux). Closes the dialog
+ * again with `#new-project-cancel`, leaving no trace in `~/.seeya/`.
+ */
+async function verifyTextFieldClipboardRoundTrip(
+  window: BrowserWindow,
+  clock: Clock,
+): Promise<{ copiedText: string; pastedBack: string }> {
+  await window.webContents.executeJavaScript(`
+    (() => {
+      document.getElementById('new-project-button').click();
+      const input = document.getElementById('new-project-id-input');
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+      setter.call(input, ${JSON.stringify(CLIPBOARD_TEXT_FIELD_MARKER)});
+      input.select();
+    })();
+  `);
+  window.webContents.copy();
+  // Electron 44's own `clipboard` module is promise-based (`electron.d.ts`'s own
+  // `readText(): Promise<string>`, checked against the installed package before writing this —
+  // older Electron versions documented this synchronously, and assuming that from memory would
+  // have been exactly the "erro clássico" AGENTS.md warns against). Measured: reading back
+  // IMMEDIATELY after `.copy()` sometimes raced ahead of the main process actually receiving the
+  // OS clipboard write (`copiedText` came back empty once, even though the later `.paste()` below
+  // proved the real clipboard DID hold the marker) — this short wait is what fixed it.
+  await clock.sleep(100);
+  const copiedText = await clipboard.readText();
+  await window.webContents.executeJavaScript(`
+    (() => {
+      const input = document.getElementById('new-project-id-input');
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+      setter.call(input, '');
+      input.focus();
+    })();
+  `);
+  window.webContents.paste();
+  const pastedBack = (await window.webContents.executeJavaScript(
+    "document.getElementById('new-project-id-input').value",
+  )) as string;
+  await window.webContents.executeJavaScript(
+    "document.getElementById('new-project-cancel').click();",
+  );
+  return { copiedText, pastedBack };
+}
+
+/**
+ * V2-T74: proves a paste into the real embedded terminal (`@xterm/xterm`, opened by
+ * `SEEYA_APP_AUTO_OPEN_SHELL_TAB`) still works with no application menu present at all.
+ *
+ * **Why `webContents.paste()` targeting `.xterm-helper-textarea` is the real mechanism, not a
+ * shortcut around it.** Read from the installed package before writing this function
+ * (`node_modules/@xterm/xterm/lib/xterm.js`): `@xterm/xterm` registers its own `'paste'` listener
+ * on both its hidden textarea and its outer element (`handlePasteEvent`), and its own `'copy'`
+ * listener on the terminal element when a selection exists (`copyHandler`) — the exact standard
+ * DOM `ClipboardEvent`s `webContents.paste()`/`.copy()` dispatch, independent of whether any
+ * `Menu` exists. A real `Ctrl+V` keypress or a macOS menu's Paste role ends up triggering the same
+ * event this function triggers directly.
+ *
+ * Reads the pasted marker back from `.xterm-rows` — the DOM renderer's own row container
+ * (`@xterm/xterm` ships no WebGL/canvas addon here, `packages/app/package.json`, so the default
+ * DOM renderer is what's mounted, and its rendered text is readable `textContent`, never a canvas
+ * pixel this function would have no way to read). `helperTextareaFound`/`activeElementDebug`/
+ * `terminalTextSnapshot` ride along in the result — this IS the verification report, so a run
+ * that comes back `false` should say why (no textarea mounted yet? focus landed somewhere else?)
+ * rather than a bare boolean someone has to re-run with print statements to explain.
+ */
+async function verifyTerminalPaste(
+  window: BrowserWindow,
+  clock: Clock,
+): Promise<{
+  markerVisibleInTerminal: boolean;
+  helperTextareaFound: boolean;
+  activeElementDebug: string;
+  terminalTextSnapshot: string;
+}> {
+  await clipboard.writeText(CLIPBOARD_TERMINAL_MARKER);
+  const helperTextareaFound = (await window.webContents.executeJavaScript(
+    "document.querySelector('.xterm-helper-textarea') !== null",
+  )) as boolean;
+  await window.webContents.executeJavaScript(
+    "document.querySelector('.xterm-helper-textarea')?.focus();",
+  );
+  const activeElementDebug = (await window.webContents.executeJavaScript(
+    "document.activeElement ? document.activeElement.tagName + '.' + document.activeElement.className : 'null'",
+  )) as string;
+  window.webContents.paste();
+  await clock.sleep(1500);
+  const terminalText = (await window.webContents.executeJavaScript(
+    "document.querySelector('.xterm-rows')?.textContent ?? '<no .xterm-rows>'",
+  )) as string;
+  return {
+    markerVisibleInTerminal: terminalText.includes(CLIPBOARD_TERMINAL_MARKER),
+    helperTextareaFound,
+    activeElementDebug,
+    terminalTextSnapshot: terminalText.slice(0, 400),
+  };
+}
+
+/**
+ * V2-T74: verification-only instrumentation proving two facts a `capturePage()` screenshot cannot
+ * show at all — `webContents.capturePage()` only ever captures the web contents (the HTML the
+ * renderer paints), never the native window chrome a menu bar is part of, on an offscreen window
+ * or not (this task's own aceite names exactly this limitation). Reads `Menu.getApplicationMenu()`
+ * and `window.isMenuBarVisible()` straight from Electron, and — only when
+ * `SEEYA_APP_AUTO_OPEN_SHELL_TAB` is ALSO set, so a real pty already exists to paste into — proves
+ * copy/paste still works via `verifyTextFieldClipboardRoundTrip`/`verifyTerminalPaste` above.
+ *
+ * Writes one JSON file to `outputPath`; never read by `npm run app`, same "instrumentação só do
+ * spike" discipline as every other `SEEYA_APP_*` flag in this file.
+ */
+async function verifyMenuAndClipboard(
+  window: BrowserWindow,
+  clock: Clock,
+  outputPath: string,
+): Promise<void> {
+  const applicationMenu = Menu.getApplicationMenu();
+  const menuState = {
+    platform: process.platform,
+    applicationMenuIsNull: applicationMenu === null,
+    menuItemLabels: applicationMenu?.items.map((item) => item.label) ?? null,
+    isMenuBarVisible: window.isMenuBarVisible(),
+  };
+
+  if (process.env.SEEYA_APP_AUTO_OPEN_SHELL_TAB !== '1') {
+    const payload = { menuState, clipboard: { skipped: 'SEEYA_APP_AUTO_OPEN_SHELL_TAB not set' } };
+    await writeFile(outputPath, JSON.stringify(payload, null, 2), 'utf8');
+    return;
+  }
+
+  // Long enough after load for SEEYA_APP_AUTO_OPEN_SHELL_TAB's own three-step sequence (~900ms
+  // total, this file's own comment on that flag) to have opened the shell tab and for its prompt
+  // to have printed.
+  await clock.sleep(3000);
+  const textField = await verifyTextFieldClipboardRoundTrip(window, clock);
+  const terminal = await verifyTerminalPaste(window, clock);
+  const payload = { menuState, clipboard: { textField, terminal } };
+  await writeFile(outputPath, JSON.stringify(payload, null, 2), 'utf8');
+}
+
+/**
+ * V2-T74: the one shortcut the default menu's own "View > Toggle Developer Tools" used to give
+ * for free (`Ctrl+Shift+I`/`F12` on Windows/Linux, `Cmd+Option+I` on macOS) — this task's own
+ * aceite names it explicitly ("ferramentas de desenvolvedor só fora do app empacotado, se fizer
+ * falta"). `!app.isPackaged` is the same check `composition/protocol-scheme.ts#resolveProtocolScheme`
+ * already uses to tell a dev launch (`npm run app`) from an installed build — the packaged app
+ * never wires this at all, not even dormant, so there is no DevTools entry point to find in it.
+ */
+function wireDevToolsShortcut(window: BrowserWindow): void {
+  if (app.isPackaged) {
+    return;
+  }
+  window.webContents.on('before-input-event', (_event, input) => {
+    const isF12 = input.key === 'F12';
+    const isCtrlOrCmdShiftI =
+      input.key.toLowerCase() === 'i' && input.shift && (input.control || input.meta);
+    if (input.type === 'keyDown' && (isF12 || isCtrlOrCmdShiftI)) {
+      window.webContents.toggleDevTools();
+    }
+  });
+}
+
 function createWindow(clock: Clock): BrowserWindow {
   // SEEYA_APP_WINDOW_WIDTH/SEEYA_APP_WINDOW_HEIGHT: same "instrumentação só do spike" class as
   // every other SEEYA_APP_* flag — a verification screenshot's own requested canvas size (e.g.
@@ -394,6 +625,7 @@ function createWindow(clock: Clock): BrowserWindow {
     },
   });
   void window.loadFile(path.join(HERE, 'index.html'));
+  wireDevToolsShortcut(window);
 
   const screenshotPath = process.env.SEEYA_APP_SCREENSHOT_PATH;
   // SEEYA_APP_THEME_TOGGLE_AFTER_SCREENSHOT_PATH (V2-T65): when set ALONGSIDE
@@ -451,6 +683,15 @@ function createWindow(clock: Clock): BrowserWindow {
           const event: TabDataEvent = { id: 'tab-1', data: NERD_GLYPH_PROOF_LINE };
           window.webContents.send(CHANNELS.tabData, event);
         });
+    });
+  }
+  // SEEYA_APP_VERIFY_MENU_AND_CLIPBOARD_PATH (V2-T74): writes `verifyMenuAndClipboard`'s own JSON
+  // report — the menu-bar state always, and (combined with SEEYA_APP_AUTO_OPEN_SHELL_TAB=1) the
+  // copy/paste round trip too. Never set by `npm run app` or the README.
+  const verifyMenuAndClipboardPath = process.env.SEEYA_APP_VERIFY_MENU_AND_CLIPBOARD_PATH;
+  if (verifyMenuAndClipboardPath !== undefined) {
+    window.webContents.once('did-finish-load', () => {
+      void verifyMenuAndClipboard(window, clock, verifyMenuAndClipboardPath);
     });
   }
   // SEEYA_APP_AUTO_SWITCH_TO_ALL_PROJECTS: V2-T75-linha-de-projeto's own before/after proof —
@@ -1901,6 +2142,11 @@ if (!gotSingleInstanceLock) {
         });
       }
     }
+
+    // V2-T74: process-global (`Menu.setApplicationMenu` is not per-window), so it runs exactly
+    // once here, before any `BrowserWindow` exists — never from inside `createWindow`, which can
+    // run again from the `activate` handler below on macOS.
+    applyApplicationMenuPolicy(process.platform, app.name);
 
     const window = createWindow(context.clock);
     wireIpc(window, context);
