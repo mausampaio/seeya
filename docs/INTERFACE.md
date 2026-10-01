@@ -72,6 +72,10 @@ De cima para baixo:
    seção. Cada linha: estrela, nome e o estado do lock quando houver (`open here` na cor da marca,
    `locked` na cor de atenção). O projeto aberto nesta janela mostra, recuadas, as sessões dele
    com ponto de estado, nome e id curto.
+   O projeto da aba ativa tem destaque próprio na lateral (fundo `surface-subtle`, como no
+   protótipo); as sessões dele aparecem como linha com ponto de estado, nome e id curto em mono —
+   nunca o texto cru `nome [id] (estado)`. Linha longa trunca com reticências; a lateral nunca
+   rola na horizontal.
 4. **Recent:** até 5 projetos pela última atividade, sem repetir favoritos. Derivado, não gravado.
 5. **All projects** com o total → abre a aba Projects. Um subdiretório do espaço de trabalho cujo
    `seeya.json` não valida nunca some em silêncio (V2-T72 item 2): aparece como **Ignored

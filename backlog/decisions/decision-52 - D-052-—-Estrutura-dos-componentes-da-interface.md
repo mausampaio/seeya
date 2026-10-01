@@ -47,7 +47,12 @@ e na leitura do código pelo mantenedor em 2026-09-30: "não existe separação 
    (`fullWidth`). Uniões literais no tipo, padrão explícito, e o CSS module traduz cada valor em
    tokens — nunca uma classe ou um estilo avulso no lugar de usar o componente. Os nomes das props
    compartilhadas e seus valores ficam no glossário do `AGENTS.md`.
-7. **Testes de componente renderizados**, com `@testing-library/preact` e `happy-dom` como
+7. **Texto só pela escala tipográfica** (aceite do mantenedor, 2026-10-01 — a lateral saiu com
+   cinco tamanhos de fonte sem critério): um componente `Text` com `variant` tirado da escala da
+   identidade (seção 4.4 — `body-md`, `body-sm`, `caption`, `heading-*`), `tone` (primário,
+   secundário, terciário) e `weight` (400, 500, 600). Os componentes do design system usam a mesma
+   escala internamente. O CSS de uma região não define `font-size` nem `line-height`.
+8. **Testes de componente renderizados**, com `@testing-library/preact` e `happy-dom` como
    dependências de desenvolvimento (aprovadas pelo mantenedor em 2026-09-30): o componente é
    montado e testado pelo que a pessoa vê e faz, não pelo objeto que a função devolve.
 
