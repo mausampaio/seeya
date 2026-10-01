@@ -385,4 +385,10 @@ created: 2026-10-01 11:16
 ---
 Nota: os dois comentarios curtos anteriores (#9, #10) foram testes de diagnostico do proprio CLI do backlog (aspas duplas dentro do texto quebram a passagem de argumento no PowerShell deste ambiente, visto na correcao do comentario #6/#7) - sem conteudo relevante, ignorar.
 ---
+
+author: agente
+created: 2026-10-01 11:16
+---
+Correcao: eram tres comentarios de teste (#8, #9 e #10 - o terceiro e uma string repetida de x, usada para isolar o defeito de aspas), nao dois. Mesma observacao do comentario anterior: ignorar os tres, sem conteudo relevante para a tarefa.
+---
 <!-- COMMENTS:END -->
