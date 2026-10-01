@@ -167,6 +167,49 @@ describe('Today (D-052, V2-T66)', () => {
     expect(getByText('Resuming 1 of 1: payments-webhooks...')).not.toBeNull();
   });
 
+  it(
+    'shows the resume result even when the refetch afterward comes back noBriefing (the one ' +
+      'pending session in that day being resumed leaves nothing left pending) -- regression, ' +
+      'a real capture during this task found the result silently disappearing behind the empty state',
+    async () => {
+      const onlyOneSessionPending: TodayPanelData = {
+        ...PENDING_DATA,
+        rows: [PENDING_DATA.rows[0]!],
+      };
+      const resumeSelected = vi.fn(() =>
+        Promise.resolve({
+          resumed: [
+            {
+              kind: 'resumed' as const,
+              sessionId: 'a',
+              name: 'payments-webhooks',
+              cwd: '/code/payments',
+            },
+          ],
+          skipped: [],
+          invalidFallbackAnswers: [],
+          remaining: [],
+          stoppedEarly: false as const,
+        }),
+      );
+      window.seeya = createFakeSeeyaApi({
+        getTodayPanel: vi
+          .fn()
+          .mockResolvedValueOnce(onlyOneSessionPending)
+          .mockResolvedValueOnce({ kind: 'noBriefing', message: 'Nothing captured yet.' }),
+        resumeSelected,
+      });
+      const { getByRole, getByText } = render(<Today />);
+      await waitFor(() => expect(getByRole('checkbox')).not.toBeNull());
+      fireEvent.click(getByRole('checkbox'));
+      fireEvent.click(getByRole('button', { name: 'Resume selected' }));
+
+      await waitFor(() => expect(getByText('Resumed')).not.toBeNull());
+      expect(getByText('payments-webhooks (/code/payments)')).not.toBeNull();
+      expect(getByText('Nothing captured yet.')).not.toBeNull();
+    },
+  );
+
   it('Clear selection empties the checked set', async () => {
     window.seeya = createFakeSeeyaApi({ getTodayPanel: () => Promise.resolve(PENDING_DATA) });
     const { getByRole, getByText } = render(<Today />);

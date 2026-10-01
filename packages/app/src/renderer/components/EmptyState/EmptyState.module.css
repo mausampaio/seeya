@@ -15,6 +15,10 @@
   color: var(--seeya-text);
 }
 
+.description {
+  max-width: 420px;
+}
+
 .action {
   margin-top: var(--seeya-space-2);
 }

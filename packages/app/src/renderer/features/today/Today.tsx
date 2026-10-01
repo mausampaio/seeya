@@ -9,8 +9,16 @@
  *
  * No briefing at all: `EmptyState` with the same combined "either nothing has been captured yet,
  * or everything already resumed" text `MESSAGES.todayNoBriefing` always gave
- * (`docs/INTERFACE.md`'s own "estado vazio com o texto de hoje").
+ * (`docs/INTERFACE.md`'s own "estado vazio com o texto de hoje"). `ResumeProgress`/`ResumeResult`
+ * render ABOVE that empty state too, never swallowed by it — a fixture/day with only one pending
+ * session resumes into exactly this shape (the day has nothing left pending the instant that one
+ * session is marked resumed), and `docs/INTERFACE.md` § 3's own "aparecem na própria aba, acima
+ * dos cartões" promises the result stays visible regardless of whether any card is left under it
+ * (confirmed by a real capture during this task's own verification — the earlier version of this
+ * component returned the empty state unconditionally before ever checking `controls.result`,
+ * which silently dropped a genuinely successful resume's own confirmation).
  *
+
  * `disabledReason` for "Resume selected" is decided HERE, not inside `SelectionFooter` (D-041):
  * `hasResumable === false` means every row is already `runningNow` (nothing resumable at all,
  * `MESSAGES.todayAllSessionsRunning`); `hasResumable === true` with nothing checked yet means
@@ -37,52 +45,53 @@ export function Today(): JSX.Element {
   const controls = useToday();
   const { data } = controls;
 
-  if (data.kind === 'noBriefing') {
-    return (
-      <div class={cx(styles, 'today')}>
-        <EmptyState title={MESSAGES.todayCardNothingToResume} description={data.message} />
-      </div>
-    );
-  }
-
-  const disabledReason = !controls.hasResumable
-    ? MESSAGES.todayAllSessionsRunning
-    : controls.selectedCount === 0
-      ? MESSAGES.todaySelectNoneReason
-      : undefined;
+  const disabledReason =
+    data.kind === 'pending' && !controls.hasResumable
+      ? MESSAGES.todayAllSessionsRunning
+      : data.kind === 'pending' && controls.selectedCount === 0
+        ? MESSAGES.todaySelectNoneReason
+        : undefined;
 
   return (
     <div class={cx(styles, 'today')}>
       <div class={cx(styles, 'scroll')}>
-        <PlanHeader
-          day={data.day}
-          daysAgo={data.daysAgo}
-          capturedAt={data.capturedAt}
-          sessionCount={data.rows.length}
-        />
         <ResumeProgress progress={controls.progress} />
         {controls.result !== null && <ResumeResult result={controls.result} />}
-        <Stack gap="sm">
-          {data.rows.map((row) => (
-            <SessionCard
-              key={row.sessionId}
-              row={row}
-              checked={controls.selectedSessionIds.has(row.sessionId)}
-              disabled={controls.resuming}
-              chosenCwd={controls.chosenCwdBySessionId.get(row.sessionId)}
-              onToggle={controls.toggleSession}
-              onChooseCwd={controls.setChosenCwd}
+        {data.kind === 'noBriefing' ? (
+          <EmptyState title={MESSAGES.todayCardNothingToResume} description={data.message} />
+        ) : (
+          <>
+            <PlanHeader
+              day={data.day}
+              daysAgo={data.daysAgo}
+              capturedAt={data.capturedAt}
+              sessionCount={data.rows.length}
             />
-          ))}
-        </Stack>
+            <Stack gap="sm">
+              {data.rows.map((row) => (
+                <SessionCard
+                  key={row.sessionId}
+                  row={row}
+                  checked={controls.selectedSessionIds.has(row.sessionId)}
+                  disabled={controls.resuming}
+                  chosenCwd={controls.chosenCwdBySessionId.get(row.sessionId)}
+                  onToggle={controls.toggleSession}
+                  onChooseCwd={controls.setChosenCwd}
+                />
+              ))}
+            </Stack>
+          </>
+        )}
       </div>
-      <SelectionFooter
-        selectedCount={controls.selectedCount}
-        resuming={controls.resuming}
-        disabledReason={disabledReason}
-        onClearSelection={controls.clearSelection}
-        onResumeSelected={controls.resumeSelected}
-      />
+      {data.kind === 'pending' && (
+        <SelectionFooter
+          selectedCount={controls.selectedCount}
+          resuming={controls.resuming}
+          disabledReason={disabledReason}
+          onClearSelection={controls.clearSelection}
+          onResumeSelected={controls.resumeSelected}
+        />
+      )}
     </div>
   );
 }
