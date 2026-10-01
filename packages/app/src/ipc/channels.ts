@@ -211,6 +211,12 @@ export const CHANNELS = {
    * `favorite-projects.json` is saved and `projectsUpdate` has been pushed, so both places that
    * show a star reflect the change without polling for it. */
   toggleFavoriteProject: 'seeya:toggle-favorite-project',
+  /** Renderer → main: the New tab popover's own "Browse…" button (V2-T64, `docs/INTERFACE.md` § 2)
+   * — opens the native OS folder picker (`dialog.showOpenDialog`, main process only; a renderer
+   * with `contextIsolation`/`sandbox` on has no such API of its own). A cancelled picker and an
+   * empty `Directory` field are different facts (D-025): `canceled: true` leaves whatever the
+   * person had already typed untouched, never clearing it. */
+  pickDirectory: 'seeya:pick-directory',
 } as const;
 
 export interface CreateTabRequest {
@@ -382,12 +388,28 @@ export interface ResumeProgressUpdateEvent {
   readonly name: string;
 }
 
+/** `ResumeTabOpenedEvent.kind` (V2-T64, `docs/INTERFACE.md` § 2's own "ícone por tipo") — which
+ * icon the tab strip shows: `'project'` for `seeya project open`'s own tab
+ * (`resume/project-tab-launcher.ts#ProjectOpenTabLauncher`), `'session'` for a resumed OR an
+ * adopted session (`TabSessionResumer`/`ProjectAdoptTabLauncher` — the two share one icon, the
+ * spec never asks to tell them apart visually). A tab opened from the New tab popover never goes
+ * through this event at all (`CHANNELS.createTab` instead) — it is always the generic terminal
+ * icon, regardless of which command was typed. */
+export type ResumeTabOpenedKind = 'project' | 'session';
+
 export interface ResumeTabOpenedEvent {
   readonly id: string;
   readonly label: string;
   readonly cwd: string;
   readonly pid: number;
+  readonly kind: ResumeTabOpenedKind;
 }
+
+/** `CHANNELS.pickDirectory`'s response (V2-T64) — a discriminated union (D-024), never a nullable
+ * `path`: a cancelled picker and "no directory chosen yet" read the same to a caller that only
+ * checks for `null`, but they are different facts (D-025) and this type keeps them that way. */
+export type PickDirectoryResponse =
+  { readonly canceled: true } | { readonly canceled: false; readonly path: string };
 
 /** `CHANNELS.endDayPreview`'s response (V2-T5a item 1). `reportText` is the literal
  * `formatEndDayReport` output for a `dryRun: true` run — same content `seeya end-day --dry-run`

@@ -10,9 +10,9 @@ describe('MESSAGES', () => {
     }
   });
 
-  it('tabExited renders the exit code', () => {
-    expect(MESSAGES.tabExited(0)).toBe('exited (code 0)');
-    expect(MESSAGES.tabExited(130)).toBe('exited (code 130)');
+  it('tabExited renders the exit code (V2-T64 PO review: no "code" word)', () => {
+    expect(MESSAGES.tabExited(0)).toBe('exited (0)');
+    expect(MESSAGES.tabExited(130)).toBe('exited (130)');
   });
 
   // V2-T7 item 4: the fallback dialog's body text depends on whether "Resume without the plan" is

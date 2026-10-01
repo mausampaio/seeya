@@ -32,17 +32,17 @@ describe('encodeSidebarCollapsedPreference', () => {
   });
 });
 
-describe('sidebarToggleButtonLabel (maintainer acceptance, 2026-09-25)', () => {
-  it('collapsed: the glyph offers to show it again, and the tooltip names the shortcut', () => {
+describe('sidebarToggleButtonLabel (maintainer acceptance, 2026-09-25; icon since V2-T64 PO review)', () => {
+  it('collapsed: the icon offers to expand it again, and the tooltip names the shortcut', () => {
     expect(sidebarToggleButtonLabel(true)).toEqual({
-      glyph: '»',
+      icon: 'expand',
       tooltip: 'Show sidebar (Ctrl+B)',
     });
   });
 
-  it('expanded: the glyph offers to hide it, and the tooltip names the shortcut', () => {
+  it('expanded: the icon offers to collapse it, and the tooltip names the shortcut', () => {
     expect(sidebarToggleButtonLabel(false)).toEqual({
-      glyph: '«',
+      icon: 'collapse',
       tooltip: 'Hide sidebar (Ctrl+B)',
     });
   });

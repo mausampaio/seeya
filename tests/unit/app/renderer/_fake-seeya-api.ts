@@ -26,7 +26,10 @@ export function createFakeSeeyaApi(overrides: Partial<SeeyaApi> = {}): SeeyaApi 
     resizeTab: vi.fn(),
     closeTab: vi.fn(),
     removeTab: vi.fn(),
-    getTerminalFontConfig: neverCalled('getTerminalFontConfig'),
+    // V2-T64: `useTabStrip` now calls this unconditionally on mount (gates the "+" button until
+    // it resolves) — every test that mounts `<TabStrip/>`/`useTabStrip` needs a real value, not
+    // `neverCalled`, the same reasoning `getProjectsPanel`/`getTodayPanel` below already follow.
+    getTerminalFontConfig: vi.fn(() => Promise.resolve({ fontFamily: 'monospace', fontSize: 14 })),
     onTabData: vi.fn(),
     onTabExit: vi.fn(),
     onSessionsUpdate: vi.fn(),
@@ -71,6 +74,7 @@ export function createFakeSeeyaApi(overrides: Partial<SeeyaApi> = {}): SeeyaApi 
     getEffectiveTheme: neverCalled('getEffectiveTheme'),
     onThemeUpdate: vi.fn(noopUnsubscribe),
     toggleFavoriteProject: vi.fn(() => Promise.resolve()),
+    pickDirectory: neverCalled('pickDirectory'),
   };
   return { ...base, ...overrides };
 }

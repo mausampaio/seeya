@@ -1,0 +1,10 @@
+/* D-052/V2-T64. Fills `#terminal-host` (`position: relative`, `renderer/legacy/legacy.css`) —
+ * every pane stacks in the same box, and the `hidden` attribute (UA default `display: none`, no
+ * override needed) is what shows only the active one. Background colour is set imperatively by
+ * `terminal-theme-registry.ts`'s own `setBackground` callback, matching the live colours of
+ * whichever `TerminalTheme` is currently active — a CSS variable would lag one theme switch behind
+ * the `@xterm/xterm` instance's own `options.theme`, which this component sets at the same time. */
+.pane {
+  position: absolute;
+  inset: 0;
+}

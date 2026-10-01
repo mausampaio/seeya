@@ -131,8 +131,12 @@ async function handleSettingsOpenClicked(): Promise<void> {
 
 /** Wired once, at startup. */
 export function wireSettingsDialog(): void {
+  // V2-T64: `#settings-button` is an icon-only `IconButton` now (`renderer/features/tabs/
+  // TabStrip.tsx`) with its own static JSX label (`aria-label`, never visible text) — this used to
+  // overwrite that with `MESSAGES.settingsButton` as plain `textContent`, which is exactly what
+  // visibly replaced the gear icon with the word "Settings" in a real window (found by this task's
+  // own verification screenshot). Only the click listener belongs here now.
   const openButton = document.getElementById('settings-button') as HTMLButtonElement;
-  openButton.textContent = MESSAGES.settingsButton;
   openButton.addEventListener('click', () => {
     void handleSettingsOpenClicked();
   });

@@ -1,0 +1,21 @@
+/* D-052/V2-T64. `position: fixed; margin: 0` overrides the `<dialog>` UA stylesheet's own
+ * centring (`position: fixed; inset: 0; margin: auto`) — `Popover.tsx`'s own `positionNear` then
+ * sets `top`/`left` explicitly once the dialog is open and measurable. A real box-shadow/border
+ * (the identity's own popover elevation, § 6.3), never the full-screen `::backdrop` tint
+ * `renderer/legacy/components.css`'s own `.seeya-dialog::backdrop` gives the bigger dialogs —
+ * a popover anchored under a button reads as floating chrome, not as a screen take-over. */
+.popover {
+  position: fixed;
+  margin: 0;
+  max-width: min(320px, calc(100vw - 16px));
+  border: 1px solid var(--seeya-border);
+  border-radius: var(--seeya-radius-md);
+  background: var(--seeya-surface);
+  color: var(--seeya-text);
+  box-shadow: var(--seeya-shadow-popover);
+  padding: var(--seeya-space-4);
+}
+
+.popover::backdrop {
+  background: transparent;
+}

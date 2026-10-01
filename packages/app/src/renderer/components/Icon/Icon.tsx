@@ -190,6 +190,14 @@ export function ChevronLeftIcon(props: IconProps = {}): JSX.Element {
   return outlineIcon([<path d="M15 5l-7 7 7 7" />], props);
 }
 
+/** The toolbar's own reopen state (V2-T64 PO review) — `ChevronLeftIcon`'s own mirror, for the
+ * ONE button that toggles both directions (`App.tsx`, `state/sidebar-collapse.ts
+ * #SidebarToggleButtonIcon`): collapsed shows this pointing right ("open this way"), expanded
+ * shows `ChevronLeftIcon` pointing left ("close this way"). */
+export function ChevronRightIcon(props: IconProps = {}): JSX.Element {
+  return outlineIcon([<path d="M9 5l7 7-7 7" />], props);
+}
+
 export function PlayIcon(props: IconProps = {}): JSX.Element {
   return filledIcon(
     [

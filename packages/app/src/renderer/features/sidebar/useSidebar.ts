@@ -7,9 +7,10 @@
  * — this hook needs BOTH `ProjectsPanelData` and `TodayPanelData` together, so it keeps its own
  * subscriptions to each rather than reaching into another view module's private state.
  *
- * `activeTabId` still comes from `renderer/legacy/tabs-view.ts#onActiveTabChanged` — the single
- * place tab visibility changes, unchanged by this task — and opening a page tab still goes through
- * `renderer/legacy/page-tab-strip.ts#openOrFocusPageTab`, the mechanism the V2-T66/67/68 region
+ * `activeTabId` comes from `renderer/features/tabs#onActiveTabChanged` (V2-T64: moved out of the
+ * now-deleted `renderer/legacy/tabs-view.ts`, same mechanism) — the single place tab visibility
+ * changes — and opening a page tab goes through `renderer/features/tabs#openOrFocusPageTab` (moved
+ * out of the deleted `renderer/legacy/page-tab-strip.ts`), the mechanism the V2-T66/67/68 region
  * tasks will keep reusing.
  */
 import { useEffect, useState } from 'preact/hooks';
@@ -25,8 +26,7 @@ import {
   type RecentProjectRow,
 } from '../../../state/sidebar-summary.js';
 import { buildTodayCardSummary, type TodayCardSummary } from '../../../state/today-panel.js';
-import { onActiveTabChanged } from '../../legacy/tabs-view.js';
-import { openOrFocusPageTab } from '../../legacy/page-tab-strip.js';
+import { onActiveTabChanged, openOrFocusPageTab } from '../tabs/index.js';
 import { pageTabId, type PageTabKind } from '../../../tabs/page-tab.js';
 
 const NO_BRIEFING_TODAY: TodayPanelData = { kind: 'noBriefing', message: '' };

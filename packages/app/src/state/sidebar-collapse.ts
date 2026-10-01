@@ -34,13 +34,20 @@ export function encodeSidebarCollapsedPreference(collapsed: boolean): string {
   return collapsed ? 'true' : 'false';
 }
 
+/** V2-T64 PO review: a real icon, never a text glyph (`«`/`»` read as plain characters at this
+ * button's size, not as iconography) — `renderer/App.tsx` maps this to `ChevronLeftIcon`/
+ * `ChevronRightIcon` (`renderer/components/Icon/`). Kept as a plain union here, not the icon
+ * component itself, so this module stays free of any Preact/DOM import (same "provable without a
+ * DOM" reasoning this function's own docstring already gives). */
+export type SidebarToggleButtonIcon = 'collapse' | 'expand';
+
 export interface SidebarToggleButtonLabel {
-  readonly glyph: string;
+  readonly icon: SidebarToggleButtonIcon;
   readonly tooltip: string;
 }
 
 /**
- * The toolbar's sidebar-toggle button's glyph and tooltip for a given state (maintainer
+ * The toolbar's sidebar-toggle button's icon and tooltip for a given state (maintainer
  * acceptance, 2026-09-25). Pulled out as a pure function so `electron/sidebar-collapse-view.ts`
  * carries no branching of its own (D-041) and so "does the label/tooltip update correctly per
  * state" is provable without a DOM — this package has no jsdom/happy-dom dependency, and
@@ -49,11 +56,11 @@ export interface SidebarToggleButtonLabel {
  * directory rather than adding a new test-only dependency for three lines of wiring.
  *
  * @example
- * sidebarToggleButtonLabel(false) // { glyph: '«', tooltip: 'Hide sidebar (Ctrl+B)' }
- * sidebarToggleButtonLabel(true)  // { glyph: '»', tooltip: 'Show sidebar (Ctrl+B)' }
+ * sidebarToggleButtonLabel(false) // { icon: 'collapse', tooltip: 'Hide sidebar (Ctrl+B)' }
+ * sidebarToggleButtonLabel(true)  // { icon: 'expand', tooltip: 'Show sidebar (Ctrl+B)' }
  */
 export function sidebarToggleButtonLabel(collapsed: boolean): SidebarToggleButtonLabel {
   return collapsed
-    ? { glyph: MESSAGES.sidebarToggleButtonShow, tooltip: MESSAGES.sidebarToggleTooltipShow }
-    : { glyph: MESSAGES.sidebarToggleButtonHide, tooltip: MESSAGES.sidebarToggleTooltipHide };
+    ? { icon: 'expand', tooltip: MESSAGES.sidebarToggleTooltipShow }
+    : { icon: 'collapse', tooltip: MESSAGES.sidebarToggleTooltipHide };
 }
