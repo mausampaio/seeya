@@ -4,7 +4,7 @@ title: V2-T75 — Estrutura de componentes e a lateral reescrita nela
 status: Review
 assignee: []
 created_date: '2026-09-30 21:21'
-updated_date: '2026-10-01 00:10'
+updated_date: '2026-10-01 00:48'
 labels: []
 milestone: m-2
 dependencies: []
@@ -199,3 +199,27 @@ consistente com o resto da tarefa, e mantive - registrado aqui para constar, nã
 Nenhuma nova além da Q-102 (já registrada em `docs/QUESTOES.md`, pendência dos 9 componentes
 migrados sem CSS/teste reescritos).
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: agente
+created: 2026-10-01 00:48
+---
+Correção pós-revisão do PO (4 itens), mesma branch, commits c5bd32b/6135209/9b60c95:
+
+1. Rodapé sem padding horizontal — Sidebar.tsx/SidebarFooter envolvido em Surface(padding=sm)+Stack(gap=sm) em vez de CSS avulso; mesmo token --seeya-space-2 que o conteudo ja usava.
+
+2. Contraste dos icones fantasmas — a cor ja estava certa (text-secondary, ~7:1 de contraste matematico nos dois temas); o defeito real era strokeWidth fixo em unidades do viewBox, que encolhe junto com o size (2 de 24 unidades a size=16 rende so ~1.33px, abaixo do piso 1.5-2px da identidade secao 6.4). Corrigido para manter o traco RENDERIZADO constante independente do size; os dois icones tambem subiram para o grid preferencial de 24px. Confirmado por dump real do DOM (width/height/strokeWidth) de um processo Electron vivo, nao so por pixel de screenshot — a captura offscreen deste sandbox mostrou-se pouco sensivel a mudancas de tamanho/traco na comparacao visual, mas o DOM entregue a um usuario real esta correto. Teste de regressao adicionado.
+---
+
+author: agente
+created: 2026-10-01 00:48
+---
+3. Captura do tema claro tampada pelo dialogo — fixtures agora gravam daemon-ownership-transition.json pre-respondido (como a V2-T63 fez), eliminando o dialogo nas quatro capturas novas.
+
+4. Medicao da subida — confirmado que o instante medido continua sendo o sessionsUpdate com a lista REAL descoberta: a relocacao de main.ts para main/ foi renomeacao pura (0 insercoes/delecoes, git show 9e9231e), e writeStartupTiming roda depois de buildSidebarRows(discovery)+o envio real. Remedido com o cache do binario de dev limpo: 668-747ms, mesma faixa — a diferenca contra a linha de base de 5,6-6,0s nao e explicada por este cache de verificacao nem por mudanca de codigo desta tarefa; registrado em docs/DESEMPENHO.md como medido, nao como melhoria.
+
+npm run verificar verde apos as quatro correcoes. Quatro capturas novas (claro/escuro/recolhida/parado) confirmadas visualmente, caminhos no scratchpad da sessao. Registro/protocol-handler.json reais conferidos identicos antes e depois. Segue em Review.
+---
+<!-- COMMENTS:END -->
