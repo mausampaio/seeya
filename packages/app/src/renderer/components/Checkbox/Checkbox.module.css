@@ -1,0 +1,40 @@
+/* V2-T66 (D-052, Q-102) — replaces the global `.seeya-checkbox*` rules (`renderer/legacy/
+ * components.css`), which never gave the box its own real size/colour (an unstyled, browser-
+ * default checkbox with a gap before its label). `align-items: flex-start`, not `center` (the
+ * V2-T62 default this file removes): Today's own session cards (this component's first production
+ * caller) pass a multi-line block as `label`, and centering the box against the FULL block height
+ * would float it away from the first text line it's meant to sit beside. */
+.checkbox {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--seeya-space-2);
+  cursor: pointer;
+}
+
+.input {
+  flex-shrink: 0;
+  /* Optical alignment against the label's own first line of text (`body-sm`'s 20px line-height,
+   * `Text.module.css`) — a plain top-aligned 18px box reads a little high against that baseline. */
+  margin-top: 2px;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--seeya-brand);
+  cursor: pointer;
+}
+
+.input:disabled {
+  cursor: not-allowed;
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--seeya-focus-ring);
+  outline-offset: 2px;
+}
+
+.checkbox:has(.input:disabled) {
+  cursor: not-allowed;
+}
+
+.label {
+  min-width: 0;
+}

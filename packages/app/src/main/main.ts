@@ -168,6 +168,30 @@ const REFRESH_INTERVAL_MS = 10_000;
 const NERD_GLYPH_PROOF_LINE = '  \r\n';
 
 /**
+ * V2-T66 bug fix: every `captureXVerification` function below used to compute
+ * `Number(process.env.SEEYA_APP_QUIT_AFTER_MS ?? '')` and check `Number.isFinite(...)` inline —
+ * `Number('')` is `0` in JavaScript, not `NaN`, so leaving the variable UNSET (every normal run,
+ * and every verification run that only wants a screenshot while the window stays open) was
+ * silently read as "quit after 0ms", quitting the app the instant the LAST capture finished
+ * regardless of intent. Found while chasing a real defect in this task's own two-screenshot
+ * capture (`captureResumeProgressThenResult`): the app quit before its own SECOND capture ever
+ * ran. Fixed once, here, shared by every capture function — `undefined`/unset now genuinely means
+ * "never quit on its own", matching what every one of these functions' own docstrings already
+ * claimed.
+ */
+async function quitAfterConfiguredDelay(clock: Clock): Promise<void> {
+  const raw = process.env.SEEYA_APP_QUIT_AFTER_MS;
+  if (raw === undefined) {
+    return;
+  }
+  const quitAfterMs = Number(raw);
+  if (Number.isFinite(quitAfterMs)) {
+    await clock.sleep(quitAfterMs);
+    app.quit();
+  }
+}
+
+/**
  * `screenshotPath`/`quitAfterMs` back a single verification hook (undocumented, internal, unset
  * in every normal run): write one real `webContents.capturePage()` PNG shortly after load, then
  * optionally quit — the exact "instrumentação só do spike" pattern
@@ -255,11 +279,7 @@ async function captureVerificationScreenshot(
   const image = await window.webContents.capturePage();
   const { writeFile } = await import('node:fs/promises');
   await writeFile(screenshotPath, image.toPNG());
-  const quitAfterMs = Number(process.env.SEEYA_APP_QUIT_AFTER_MS ?? '');
-  if (Number.isFinite(quitAfterMs)) {
-    await clock.sleep(quitAfterMs);
-    app.quit();
-  }
+  await quitAfterConfiguredDelay(clock);
 }
 
 /**
@@ -294,11 +314,7 @@ async function captureLiveThemeToggleVerification(
   await clock.sleep(500);
   const after = await window.webContents.capturePage();
   await writeFile(afterPath, after.toPNG());
-  const quitAfterMs = Number(process.env.SEEYA_APP_QUIT_AFTER_MS ?? '');
-  if (Number.isFinite(quitAfterMs)) {
-    await clock.sleep(quitAfterMs);
-    app.quit();
-  }
+  await quitAfterConfiguredDelay(clock);
 }
 
 /**
@@ -328,11 +344,40 @@ async function captureSettingsCloseVerification(
   );
   const closed = await window.webContents.capturePage();
   await writeFile(closedPath, closed.toPNG());
-  const quitAfterMs = Number(process.env.SEEYA_APP_QUIT_AFTER_MS ?? '');
-  if (Number.isFinite(quitAfterMs)) {
-    await clock.sleep(quitAfterMs);
-    app.quit();
-  }
+  await quitAfterConfiguredDelay(clock);
+}
+
+/**
+ * V2-T66: the Today tab's own resume progress/result, from the SAME `SEEYA_APP_AUTO_RESUME_ALL`
+ * click sequence registered elsewhere in `createWindow` — this function only owns the TWO
+ * screenshots, same same-window shape as `captureLiveThemeToggleVerification`/
+ * `captureSettingsCloseVerification` above (their own docstrings explain why a before/after pair
+ * needs one window rather than two separate processes; here it is "mid-resume" vs. "after it
+ * finished" instead of a toggle). `progressPath` lands shortly after the click sequence has
+ * clicked "Resume selected" and switched back to the Today tab (`ResumeProgress`'s own "Resuming 1
+ * of N: ..." line, while the stand-in process is still inside its own fast-failure grace window);
+ * `resultPath` lands well after that grace window (`FAST_FAILURE_GRACE_MS`, 5s) has elapsed, once
+ * `useToday.ts#resumeSelected`'s own refetch has applied the finished `ResumeResult`.
+ */
+async function captureResumeProgressThenResult(
+  window: BrowserWindow,
+  clock: Clock,
+  progressPath: string,
+  resultPath: string,
+): Promise<void> {
+  const { writeFile } = await import('node:fs/promises');
+  // The click sequence's own last step (switching back to Today) lands at ~2400ms from load
+  // (500 + 300 + 300 + 300 + 500 + 500, this file's own `SEEYA_APP_AUTO_RESUME_ALL` block) — this
+  // waits a little past that before the first capture.
+  await clock.sleep(3000);
+  const progress = await window.webContents.capturePage();
+  await writeFile(progressPath, progress.toPNG());
+  // FAST_FAILURE_GRACE_MS (5s) counted from the resume click (~1100ms from load), plus the
+  // `getTodayPanel` refetch `useToday.ts#resumeSelected` awaits once the grace resolves.
+  await clock.sleep(5500);
+  const result = await window.webContents.capturePage();
+  await writeFile(resultPath, result.toPNG());
+  await quitAfterConfiguredDelay(clock);
 }
 
 /**
@@ -624,6 +669,26 @@ function createWindow(clock: Clock): BrowserWindow {
       offscreen: process.env.SEEYA_APP_OFFSCREEN === '1',
     },
   });
+  // SEEYA_APP_DEBUG_CONSOLE (V2-T66): same "instrumentação só do spike" class as every other
+  // `SEEYA_APP_*` flag in this file — forwards the renderer's own `console.*`/an uncaught
+  // exception/a failed navigation to THIS process's stdout, for an agent with no DevTools window
+  // to open reading a real error back. Found two real production defects with this during V2-T66's
+  // own verification (a CSS module missing a class `EmptyState.tsx` referenced; the renderer-side
+  // half of the `app.quit()` race `quitAfterConfiguredDelay`'s own docstring explains) — neither
+  // printed anything without it, since a renderer-side uncaught exception otherwise only ever
+  // reaches an open DevTools console this process never has. Never set by `npm run app` or the
+  // README.
+  if (process.env.SEEYA_APP_DEBUG_CONSOLE === '1') {
+    window.webContents.on('console-message', (_event, _level, message, line, sourceId) => {
+      console.log('[renderer]', message, sourceId, line);
+    });
+    window.webContents.on('render-process-gone', (_event, details) => {
+      console.log('[renderer-gone]', JSON.stringify(details));
+    });
+    window.webContents.on('did-fail-load', (_event, code, desc) => {
+      console.log('[did-fail-load]', code, desc);
+    });
+  }
   void window.loadFile(path.join(HERE, 'index.html'));
   wireDevToolsShortcut(window);
 
@@ -633,9 +698,23 @@ function createWindow(clock: Clock): BrowserWindow {
   // `captureLiveThemeToggleVerification`'s own two-screenshot flow — see that function's own
   // docstring for why this is the one capture that needs a second path at all.
   const themeToggleAfterPath = process.env.SEEYA_APP_THEME_TOGGLE_AFTER_SCREENSHOT_PATH;
+  // SEEYA_APP_RESUME_RESULT_SCREENSHOT_PATH (V2-T66): combined with `SEEYA_APP_SCREENSHOT_PATH`
+  // AND `SEEYA_APP_AUTO_RESUME_ALL`, replaces the plain one-shot capture below with
+  // `captureResumeProgressThenResult`'s own two-screenshot flow (that function's own docstring has
+  // the timing). Checked in THIS same `if`/`else if` chain, not a separate standalone
+  // registration — a bug found during this task's own verification: a second, independent
+  // `did-finish-load` listener calling the plain `captureVerificationScreenshot` (this function's
+  // own `else if` below) fired ALONGSIDE a standalone one for this flag, racing to write the SAME
+  // `screenshotPath` and, once `quitAfterConfiguredDelay`'s own bug was fixed, still redundantly
+  // re-quitting the app after its own unrelated capture.
+  const resumeResultPath = process.env.SEEYA_APP_RESUME_RESULT_SCREENSHOT_PATH;
   if (screenshotPath !== undefined && themeToggleAfterPath !== undefined) {
     window.webContents.once('did-finish-load', () => {
       void captureLiveThemeToggleVerification(window, clock, screenshotPath, themeToggleAfterPath);
+    });
+  } else if (screenshotPath !== undefined && resumeResultPath !== undefined) {
+    window.webContents.once('did-finish-load', () => {
+      void captureResumeProgressThenResult(window, clock, screenshotPath, resumeResultPath);
     });
   } else if (screenshotPath !== undefined) {
     window.webContents.once('did-finish-load', () => {
@@ -741,21 +820,45 @@ function createWindow(clock: Clock): BrowserWindow {
     });
   }
   // SEEYA_APP_AUTO_RESUME_ALL: same "instrumentação só do spike" class as the two above — checks
-  // every checkbox the "Today" panel rendered (renderer.ts's own startup `refreshTodayPanel`
-  // already populated it by the time `did-finish-load` fires) and clicks "Resume selected", so an
-  // agent with no keyboard/mouse of its own can prove V2-T4's own aceite: a tab opens labeled with
-  // the handoff's name for a session whose plan fits, and the fallback dialog appears with the
-  // right text for one whose plan doesn't (`resume/tab-session-resumer.ts`'s own size check runs
-  // before any tab opens, so the dialog can show up well inside this file's screenshot window).
-  // Never set by `npm run app` or the README.
+  // every session checkbox the Today tab rendered (opens the tab first — it's a page pane like
+  // Projects/Sessions, not shown by default) and clicks "Resume selected", so an agent with no
+  // keyboard/mouse of its own can prove V2-T4's own aceite: a tab opens labeled with the handoff's
+  // name for a session whose plan fits, and the fallback dialog appears with the right text for
+  // one whose plan doesn't (`resume/tab-session-resumer.ts`'s own size check runs before any tab
+  // opens, so the dialog can show up well inside this file's screenshot window). Never set by
+  // `npm run app` or the README.
+  //
+  // V2-T66: the Today tab is a real, controlled Preact component now
+  // (`renderer/features/today/Today.tsx`) — `.click()` on each checkbox (not `cb.checked = true`
+  // directly, which a controlled input's own next render would simply overwrite back, since
+  // nothing fired the `onChange` that actually updates `useToday`'s own selection state) is what
+  // makes this a real click as far as Preact's own event delegation is concerned. The button is
+  // `#today-resume-selected-button` now (`SelectionFooter.tsx`), not the bare first `<button>`
+  // inside the old `#today-panel` anchor.
   if (process.env.SEEYA_APP_AUTO_RESUME_ALL === '1') {
     window.webContents.once('did-finish-load', () => {
       void clock
         .sleep(500)
         .then(() =>
+          window.webContents.executeJavaScript("document.getElementById('today-card')?.click();"),
+        )
+        .then(() => clock.sleep(300))
+        .then(() =>
           window.webContents.executeJavaScript(
-            "document.querySelectorAll('.today-session-checkbox').forEach((cb) => { cb.checked = true; }); " +
-              "document.querySelector('#today-panel button')?.click();",
+            'document.querySelectorAll("input[id^=\'today-session-\']")' +
+              '.forEach((cb) => { if (!cb.checked) { cb.click(); } });',
+          ),
+        )
+        // Separate step, own sleep — same "give Preact's own state update a turn to flush before
+        // the next step reads it" discipline `SEEYA_APP_AUTO_OPEN_SHELL_TAB` above already needs:
+        // checking a checkbox only updates `useToday`'s own selection state asynchronously, and
+        // the "Resume selected" button reads THAT state for its own `disabled` attribute — a
+        // click fired in the same script as the checkbox clicks above would still land on a
+        // button Preact had not yet re-rendered as enabled.
+        .then(() => clock.sleep(300))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('today-resume-selected-button')?.click();",
           ),
         )
         .then(() => clock.sleep(300))
@@ -766,6 +869,44 @@ function createWindow(clock: Clock): BrowserWindow {
           // one automated run. A no-op when no dialog is open (optional chaining).
           window.webContents.executeJavaScript(
             "document.getElementById('fallback-dialog-skip')?.click();",
+          ),
+        )
+        .then(() => clock.sleep(500))
+        .then(() =>
+          // V2-T66: a successful resume opens a new terminal tab and switches to it the moment the
+          // pty spawns (`useTabStrip.ts`'s own `onResumeTabOpened` handler) — well before this
+          // attempt's own `resumeSelected` call even resolves. Switching back to the Today tab here
+          // is what lets a `SEEYA_APP_SCREENSHOT_PATH` capture (at whatever bucket it uses) actually
+          // see the progress line/result section this flag exists to prove, instead of whatever
+          // terminal pane the window switched to on its own.
+          window.webContents.executeJavaScript(
+            '[...document.querySelectorAll(\'[role="tab"]\')]' +
+              ".find((el) => el.textContent?.includes('Today'))?.click();",
+          ),
+        );
+    });
+  }
+  // SEEYA_APP_AUTO_OPEN_TODAY_TAB (V2-T66): same "instrumentação só do spike" class as the above —
+  // clicks the real Today card, so an agent with no mouse of its own can prove the Today tab
+  // itself (`renderer/features/today/Today.tsx`) renders its real session cards (the three named
+  // states, the directory-change notice with its "Resume in" selector) without also driving a
+  // resume attempt the way `SEEYA_APP_AUTO_RESUME_ALL` above does. Never set by `npm run app` or
+  // the README.
+  if (process.env.SEEYA_APP_AUTO_OPEN_TODAY_TAB === '1') {
+    window.webContents.once('did-finish-load', () => {
+      void clock
+        .sleep(500)
+        .then(() =>
+          window.webContents.executeJavaScript("document.getElementById('today-card')?.click();"),
+        )
+        .then(() => clock.sleep(200))
+        .then(() =>
+          // `.Today_scroll` (not an id — this is the one CSS module class name this file reaches
+          // for directly, predictable because `scripts/build.mjs`'s own esbuild CSS-modules
+          // plugin names classes `<Component>_<class>`, never a content hash): scrolls past the
+          // first card so a fixture with three cards fits one screenshot without a taller window.
+          window.webContents.executeJavaScript(
+            "document.querySelector('.Today_scroll')?.scrollTo({ top: 420 });",
           ),
         );
     });
@@ -1448,6 +1589,11 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // (`build-constants.d.ts`'s own docstring has why this is never `app.getVersion()`), never
   // pushed: a running window's own installed version cannot change under it until relaunched.
   ipcMain.handle(CHANNELS.getAppVersion, (): string => __SEEYA_APP_VERSION__);
+  // V2-T66 PO review, item 2: `context.homeDir` (never `os.homedir()` read fresh here or in the
+  // renderer) — it already carries `SEEYA_APP_HOME_OVERRIDE` when a verification run set one, so
+  // the `~`-abbreviation a verification screenshot proves is against the SAME home the fixture
+  // itself was built under, not the real machine's.
+  ipcMain.handle(CHANNELS.getHomeDir, (): string => context.homeDir);
 
   // V2-T62 (D-051): the window's effective theme — "system" has a live counterpart
   // (`getTerminalFontConfig` above deliberately does not, its own docstring explains why), so
@@ -1574,9 +1720,17 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // was found (nothing to build a history for).
   //
   // V2-T16: `maxBriefingScanDays` is read fresh from `config.json` every time this panel is
-  // opened, never a value cached from window startup — same discipline `getSettingsPanel` below
+  // rebuilt, never a value cached from window startup — same discipline `getSettingsPanel` below
   // already follows.
-  ipcMain.handle(CHANNELS.getTodayPanel, async (): Promise<TodayPanelResponse> => {
+  //
+  // V2-T66: extracted out of the `getTodayPanel` handler (its only caller before this task) so
+  // `endDayRun` below can also rebuild and PUSH a fresh value once a real end-day run finishes —
+  // the Today tab is a real component now (`renderer/features/today/Today.tsx`), mounted once for
+  // the life of the window and driven entirely by `onTodayUpdate`/its own mount-time fetch, with
+  // no imperative `refreshTodayPanel()` escape hatch left for a sibling dialog to call into it
+  // (unlike the deleted `renderer/legacy/today-panel-view.ts`, which `renderer/legacy/
+  // end-day-dialog-view.ts` used to call directly after "Run end-day now" resolved).
+  async function buildFreshTodayPanelData(): Promise<TodayPanelResponse> {
     const config = await context.storage.readConfig();
     const lookup = await findPendingBriefing(
       context.storage,
@@ -1607,11 +1761,15 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
     const liveSessionIds = buildLiveSessionIndex(latestSidebarRows);
     const cwdHistoryBySessionId = new Map(cwdHistoryEntries);
     // V2-T18 item 2: cached for the refresh tick below (refreshTodayPanelLiveness) — the lookup
-    // and cwd history just built here stay valid until the next getTodayPanel call; only
-    // liveness needs to be fresh every tick.
+    // and cwd history just built here stay valid until the next rebuild; only liveness needs to be
+    // fresh every tick.
     latestTodayPanelInputs = { lookup, cwdHistoryBySessionId };
     return buildTodayPanelData(lookup, cwdHistoryBySessionId, liveSessionIds);
-  });
+  }
+
+  ipcMain.handle(CHANNELS.getTodayPanel, (): Promise<TodayPanelResponse> =>
+    buildFreshTodayPanelData(),
+  );
 
   // V2-T4 items 1/2/3: "Resume selected" — the same resumeSessions the CLI's start-day-command.ts
   // calls, with a TabSessionResumer instead of ClaudeSessionResumer and a dialog-backed
@@ -1660,6 +1818,14 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
         },
       );
 
+      // PO review of V2-T66 (2026-09-xx): the sidebar's own "Today" card reads the SAME
+      // `todayUpdate` channel (useSidebar.ts) as the Today tab itself — pushing the freshly
+      // resumed state here, right after resumeSessions resolves, is what keeps the sidebar's
+      // count in sync with the tab's own result at the same instant, instead of leaving it stale
+      // until the next ambient refresh tick (up to REFRESH_INTERVAL_MS away). Same pattern as
+      // `endDayRun` above.
+      window.webContents.send(CHANNELS.todayUpdate, await buildFreshTodayPanelData());
+
       return buildResumeSummary(result, resolveLabel);
     },
   );
@@ -1697,10 +1863,15 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // V2-T5a item 4: "Run end-day now" — the real run (dryRun: false), notified through the SAME
   // Notifier/buildEndDayNotice seeya end-day uses (composition/index.ts#buildAppContext wires the
   // real adapter, D-020). The status panel picks up whatever this run wrote/terminated on its own
-  // next tick (runRefreshLoop below, at most REFRESH_INTERVAL_MS away — no separate push needed);
-  // the "Today" panel is refreshed explicitly by the renderer right after this resolves
-  // (renderer.ts#handleEndDayRunClicked), the same "refresh after a write" shape
-  // handleResumeSelected already has for the resume flow.
+  // next tick (runRefreshLoop below, at most REFRESH_INTERVAL_MS away — no separate push needed).
+  //
+  // V2-T66: the "Today" panel is now refreshed and PUSHED from here, not fetched explicitly by the
+  // renderer after this resolves — `renderer/legacy/end-day-dialog-view.ts` used to call
+  // `today-panel-view.ts#refreshTodayPanel()` for that (the deleted DOM-at-hand panel's own
+  // imperative refresh), but Today is a real, independently-mounted component now
+  // (`renderer/features/today/Today.tsx`) with no reference a sibling dialog could call into —
+  // `CHANNELS.todayUpdate`, the same push every ambient refresh tick already uses, is the only
+  // channel left that reaches it.
   ipcMain.handle(CHANNELS.endDayRun, async (): Promise<EndDayRunResponse> => {
     if (endDayRunInProgress) {
       throw new Error('an end-day run is already in progress');
@@ -1728,7 +1899,9 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
       }
       // V2-T16: fresh read, same reasoning as `endDayPreview` above.
       const config = await context.storage.readConfig();
-      return { reportText: formatEndDayReport(result, config) };
+      const report = formatEndDayReport(result, config);
+      window.webContents.send(CHANNELS.todayUpdate, await buildFreshTodayPanelData());
+      return { reportText: report };
     } finally {
       endDayRunInProgress = false;
     }

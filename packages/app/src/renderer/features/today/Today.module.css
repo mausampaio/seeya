@@ -1,0 +1,17 @@
+/* V2-T66 — the Today tab's own root. `renderer/legacy/legacy.css`'s own `.page-pane` (the ancestor
+ * `#page-today` already has) is `overflow-y: auto` with its own padding — `height: 100%` here fills
+ * exactly that content box, so the INNER `.scroll` below is what actually scrolls, and the fixed
+ * `SelectionFooter` stays below it, never scrolled away, without this component needing to touch
+ * `.page-pane` itself (shared by Projects/Sessions too, D-052's "componente não toca o DOM/CSS de
+ * fora da sua própria região"). */
+.today {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}

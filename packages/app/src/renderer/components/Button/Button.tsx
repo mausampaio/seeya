@@ -58,6 +58,12 @@ export interface ButtonProps {
    * hard requirement here; the trade-off is a permanent small gutter for the handful of buttons
    * that opt in at all, which is cheaper than a width that jumps the instant someone clicks. */
   readonly loading?: boolean;
+  /** D-052 (V2-T66, same shape as `Switch.tsx`'s own `disabledReason`) — `docs/INTERFACE.md` §
+   * 3's own "desabilitado sem seleção, com o motivo" (Today's "Resume selected"): a line under the
+   * button, shown only while `disabled` and NOT `loading` (D-024: a button mid-command and a
+   * button that's simply unavailable are different facts, so a reason never shows next to a
+   * spinner). Omitted, nothing renders — every pre-existing `Button` is unaffected. */
+  readonly disabledReason?: string | undefined;
   readonly hidden?: boolean;
   readonly className?: string;
   /** V2-T64: a native tooltip for when the visible label is already a shortened form of a longer
@@ -83,7 +89,9 @@ export function Button(props: ButtonProps): JSX.Element {
     ),
     props.className,
   );
-  return (
+  const disabled = props.disabled === true || props.loading === true;
+  const loading = props.loading === true;
+  const button = (
     <button
       // Conditional spread, not `ref={props.buttonRef}` directly — see `IconButton.tsx`'s own
       // identical comment (`exactOptionalPropertyTypes` treats "present, valued `undefined`"
@@ -92,7 +100,7 @@ export function Button(props: ButtonProps): JSX.Element {
       id={props.id}
       type={props.type ?? 'button'}
       class={className}
-      disabled={props.disabled === true || props.loading === true}
+      disabled={disabled}
       aria-busy={props.loading === true ? 'true' : undefined}
       hidden={props.hidden}
       title={props.title}
@@ -115,5 +123,21 @@ export function Button(props: ButtonProps): JSX.Element {
         {props.children}
       </Text>
     </button>
+  );
+  if (!disabled || loading || props.disabledReason === undefined) {
+    return button;
+  }
+  // Only reached while disabled, NOT loading, with a reason to show (the docstring's own "a
+  // button mid-command and a button that's simply unavailable are different facts") — a sibling
+  // `Text`, never a child of `<button>` (a `<p>` inside a `<button>` is invalid HTML and would
+  // also pollute the button's own accessible name, the same reasoning `TextField.tsx`'s own
+  // `trailing` comment already gives for a different component).
+  return (
+    <>
+      {button}
+      <Text as="p" variant="caption" tone="secondary" className={cx(styles, 'disabledReason')}>
+        {props.disabledReason}
+      </Text>
+    </>
   );
 }

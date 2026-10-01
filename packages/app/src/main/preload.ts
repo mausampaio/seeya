@@ -204,6 +204,10 @@ export interface SeeyaApi {
   pickDirectory(): Promise<PickDirectoryResponse>;
   /** V2-T65: Settings' own General section — `app.getVersion()`, fetched once when it mounts. */
   getAppVersion(): Promise<string>;
+  /** V2-T66 PO review, item 2: this window's own effective home directory (`AppContext.homeDir`),
+   * fetched once — used to abbreviate a `cwd` as `~` for display
+   * (`sidebar/directory-label.ts#collapseHomeDirectory`), never to resolve a real path. */
+  getHomeDir(): Promise<string>;
 }
 
 /**
@@ -329,6 +333,7 @@ const api: SeeyaApi = {
   toggleFavoriteProject: (request) => ipcRenderer.invoke(CHANNELS.toggleFavoriteProject, request),
   pickDirectory: () => ipcRenderer.invoke(CHANNELS.pickDirectory),
   getAppVersion: () => ipcRenderer.invoke(CHANNELS.getAppVersion),
+  getHomeDir: () => ipcRenderer.invoke(CHANNELS.getHomeDir),
 };
 
 contextBridge.exposeInMainWorld('seeya', api);

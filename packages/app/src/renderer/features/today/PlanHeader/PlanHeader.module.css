@@ -1,0 +1,7 @@
+/* V2-T66 — the Today tab's own title block (`docs/INTERFACE.md` § 3). */
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--seeya-space-1);
+  margin-bottom: var(--seeya-space-4);
+}

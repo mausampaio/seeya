@@ -3,8 +3,9 @@
  * "estado de trabalho vira prop do componente"): a small rotating arc, same stroke language as
  * `Icon`'s own outline set (`currentColor`, rounded linecap, drawn on the 24-unit grid) so it
  * never reads as a foreign widget next to an icon or a line of text. `Button`/`IconButton`/
- * `Switch` are the only callers — this component itself has no opinion on WHERE it sits, that's
- * each caller's own layout.
+ * `Switch` were the first callers; Today's own `ResumeProgress` (V2-T66) is the first that isn't a
+ * control's own loading slot — this component itself has no opinion on WHERE it sits, that's each
+ * caller's own layout.
  *
  * `prefers-reduced-motion` needs no handling here: `renderer/tokens.css`'s own global rule already
  * forces every animation's `animation-duration`/`animation-iteration-count` down to effectively

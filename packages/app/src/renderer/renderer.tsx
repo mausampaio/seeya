@@ -3,15 +3,22 @@
  * had grown to 1407 lines and every region's DOM wiring at once — absorbing the V2-T51 goal). Its
  * only job now: mount the window's Preact tree (`App.tsx`) into `#root`, then wire every LEGACY
  * region's own module (D-052/V2-T75: everything under `renderer/legacy/` — dialogs, the tab
- * strip, the Today/Projects/Sessions page panes, theme), in the order each one's own data
- * dependency requires. The lateral (`renderer/features/sidebar/`) and Settings
- * (`renderer/features/settings/`, V2-T65) need none of this wiring any more — both are real
- * components now, mounted as part of `<App/>` itself, driven by their own hooks subscribing
+ * strip, the Projects/Sessions page panes, theme), in the order each one's own data dependency
+ * requires. The lateral (`renderer/features/sidebar/`), Settings (`renderer/features/settings/`,
+ * V2-T65) and the Today tab (`renderer/features/today/`, V2-T66) need none of this wiring any
+ * more — all are real components now, mounted as part of `<App/>` itself, driven by their own
+ * hooks subscribing
  * straight to the IPC client (Settings' own autostart switch replaces the last "Cuidados:
  * autostart continua... até a V2-T65" exception D-052 had carved out here). Excluded from
  * `packages/app/src`'s coverage floor with everything else that cannot run without a display —
  * every module this file wires is unit-tested (the pure ones) or is itself excluded for the same
  * "cannot run headless" reason (the DOM-wiring ones).
+ *
+ * V2-T66: `wireTodayIncomingEvents`/`refreshTodayPanel` (`renderer/legacy/today-panel-view.ts`,
+ * apagado by this task) are gone from here — the Today tab is a real component now
+ * (`renderer/features/today/Today.tsx`), driven by its own `useToday` hook subscribing straight to
+ * the IPC client, the same "needs none of this wiring any more" shape this docstring already
+ * describes above for the lateral/Settings.
  */
 import { render } from 'preact';
 import { AppShell } from './App.js';
@@ -27,7 +34,6 @@ import {
   offerDaemonOwnershipTransitionIfNeeded,
   wireDaemonOwnershipTransitionDialog,
 } from './legacy/daemon-ownership-transition-view.js';
-import { refreshTodayPanel, wireTodayIncomingEvents } from './legacy/today-panel-view.js';
 import { wireProjectPanel } from './legacy/project-panel-view.js';
 import './ipc/client.js';
 
@@ -76,11 +82,9 @@ async function main(): Promise<void> {
   wireFallbackDialog();
   wireEndDayDialog();
   wireDaemonOwnershipTransitionDialog();
-  wireTodayIncomingEvents();
   registerActiveTerminalFocuser(focusActiveTabTerminal);
   wireDialogFocusReturn();
   wireProjectPanel();
-  await refreshTodayPanel();
   // V2-T13 item 5: after every other piece of the window is already wired and usable — the
   // ownership-transition question never blocks tabs/sidebar/settings from working.
   await offerDaemonOwnershipTransitionIfNeeded();

@@ -1,30 +1,38 @@
 /**
  * The base info box (V2-T62, D-051 — `docs/INTERFACE.md` item 1's "caixa informativa", e.g. the
- * cwd-history note inside a Today card, `docs/INTERFACE.md` § 3, or End day's cost-ceiling note,
- * § 6). `tone` defaults to `neutral` — most info boxes in this window are plain context, not a
- * warning or an error.
+ * cwd-history note inside a Today session card, `docs/INTERFACE.md` § 3, or End day's cost-ceiling
+ * note, § 6). `tone` defaults to `neutral` — most info boxes in this window are plain context, not
+ * a warning or an error. A plain container like `Surface` — it never wraps `children` in a `Text`
+ * of its own, since a caller's content can be more than one line (`CwdChangeNotice`'s own note +
+ * explanation + a `Select`); each piece of text inside still goes through `Text` at the CALL site
+ * (D-052 item 7), this component only sets the tone's own background/text colour.
  *
  * @example
- * <InfoBox tone="warning">This session changed directory since it last ran.</InfoBox>
+ * <InfoBox tone="info">
+ *   <Text as="p" variant="body-sm">This session changed directory since it last ran.</Text>
+ * </InfoBox>
  *
- * Relocated from `ui/` by D-052 (V2-T75) — still no production caller (confirmed by grep before
- * moving it), still styled by `renderer/legacy/components.css`'s own `.seeya-info-box*` global
- * classes (not a CSS module yet), and its own `InfoBoxTone` predates the shared `Tone`
- * (`renderer/components/props.ts`) the maintainer's later complement introduced — narrower on
- * purpose today (no `brand`/`success` reading naturally as "info box tones"), but the task that
- * first puts this component on screen should reconsider unifying the two rather than let a second
- * tone vocabulary drift from the shared one.
+ * Brought to the CSS-module/render-tested pattern by V2-T66 (D-052, Q-102) — first production
+ * caller is Today's own `CwdChangeNotice` (`docs/INTERFACE.md` § 3). `tone` is now the SHARED
+ * `Tone` (`renderer/components/props.ts`) rather than its own narrower vocabulary — the maintainer's
+ * own complement already names `neutral`/`info`/`warning`/`error` as roles an info box can carry,
+ * and `brand`/`success` cost nothing extra to support once this component has a real `.module.css`
+ * mapping every tone to a token, the same shape `Chip`'s own `.soft.*` rules already use.
  */
 import type { ComponentChildren, JSX } from 'preact';
-
-export type InfoBoxTone = 'neutral' | 'info' | 'warning' | 'error';
+import styles from './InfoBox.module.css';
+import { cx, mergeClassName } from '../css-class.js';
+import type { Tone } from '../props.js';
 
 export interface InfoBoxProps {
-  readonly tone?: InfoBoxTone;
+  readonly tone?: Tone;
+  readonly className?: string;
   readonly children: ComponentChildren;
 }
 
 export function InfoBox(props: InfoBoxProps): JSX.Element {
   const tone = props.tone ?? 'neutral';
-  return <div class={`seeya-info-box seeya-info-box--${tone}`}>{props.children}</div>;
+  return (
+    <div class={mergeClassName(cx(styles, 'infoBox', tone), props.className)}>{props.children}</div>
+  );
 }

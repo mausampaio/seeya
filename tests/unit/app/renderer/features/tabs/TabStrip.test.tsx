@@ -20,13 +20,15 @@ describe('TabStrip (V2-T64)', () => {
 
   it('renders the ids the rest of the window still relies on, plus the given leading content', () => {
     const { container, getByText } = render(<TabStrip leading={<span>toggle</span>} />);
+    // `today-panel` dropped from this list (V2-T66): `#page-today` now holds `<Today/>`, a real
+    // component with its own CSS, not the bare anchor `renderer/legacy/today-panel-view.ts` used
+    // to fill by hand.
     for (const id of [
       'new-tab-button',
       'new-tab-popover',
       'settings-button',
       'terminal-host',
       'page-today',
-      'today-panel',
       'page-projects',
       'projects-list',
       'page-sessions',

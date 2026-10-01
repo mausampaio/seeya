@@ -23,6 +23,14 @@
   opacity: 0.6;
 }
 
+/* V2-T66 — `Button.tsx`'s own `disabledReason` docstring: a sibling line under the button, never
+ * a child of it. Margin-top only (never a surrounding flex/stack of its own) — the one sibling
+ * element this component ever renders beside the `<button>` itself. */
+.disabledReason {
+  display: block;
+  margin: var(--seeya-space-1) 0 0;
+}
+
 .fullWidth {
   display: flex;
   width: 100%;

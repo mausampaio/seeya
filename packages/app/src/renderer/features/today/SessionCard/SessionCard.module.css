@@ -1,0 +1,37 @@
+/* V2-T66 — one session card (`docs/INTERFACE.md` § 3). `Surface`'s own `padding`/`radius` give the
+ * card shape; this file only adds what the primitive has no opinion on. */
+.card {
+  width: 100%;
+}
+
+/* `Checkbox`'s own container is `display: inline-flex` (fits a short label) — a session card's own
+ * label spans the FULL card width, so this makes the whole row the clickable target `SessionCard`'s
+ * own docstring describes, not just as wide as the text happens to be. */
+.checkbox {
+  display: flex;
+  width: 100%;
+}
+
+.body {
+  min-width: 0;
+  flex: 1;
+}
+
+.nameRow {
+  min-width: 0;
+  flex: 1;
+}
+
+.name {
+  min-width: 0;
+}
+
+/* Vertically centers the checkmark against the body's own first line of text — the same optical
+ * alignment `Checkbox.module.css`'s own `.input` margin gives the real checkbox in the other two
+ * states, so all three states' leading glyph sits at the same height. */
+.statusIcon {
+  flex-shrink: 0;
+  display: inline-flex;
+  margin-top: 1px;
+  color: var(--seeya-success-text);
+}

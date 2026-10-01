@@ -17,6 +17,7 @@
  */
 import type { PendingBriefingLookup } from '@seeya-ai/engine/application/find-pending-briefing.js';
 import type { CwdHistoryEntry } from '@seeya-ai/engine/application/cwd-history.js';
+import { computeDisplaySessionIds } from '@seeya-ai/engine/application/session-id-display.js';
 import type { Day, Handoff } from '@seeya-ai/engine/core/types.js';
 import { MESSAGES } from '../text/messages.js';
 import type { LiveSessionInfo } from '../sidebar/sidebar-data.js';
@@ -59,6 +60,12 @@ export function offersResumeCheckbox(status: TodayResumeStatus): boolean {
 
 export interface TodaySessionRow {
   readonly sessionId: string;
+  /** V2-T66 — the same short id every other session listing in this window already shows
+   * (`@seeya-ai/engine/application/session-id-display.js#computeDisplaySessionIds`, the glossary's
+   * own "id curto ao lado do nome, sempre"), computed fresh over the one batch this panel ever
+   * shows at once: the day's own handoffs (`buildTodayPanelData` below) — never the sidebar's own
+   * batch, which can hold a completely different set of sessions. */
+  readonly displaySessionId: string;
   readonly name: string;
   readonly cwd: string;
   /**
@@ -101,6 +108,14 @@ export type TodayPanelData =
       readonly day: Day;
       readonly daysAgo: number;
       readonly rows: readonly TodaySessionRow[];
+      /**
+       * V2-T66 — the Today tab's own context line ("quando foi capturado e quantas sessões",
+       * `docs/INTERFACE.md` § 3): the LATEST `capturedAt` across the day's own handoffs, read as
+       * "when capture finished" for the whole batch rather than inventing a per-session instant
+       * the line has no room for. `null` only for the type-safety edge a real `found: true` lookup
+       * never produces (an empty `handoffs` array, D-025 — never a fabricated instant).
+       */
+      readonly capturedAt: Date | null;
     };
 
 /** A `model` handoff's own first plan line — `tomorrowPlan` before `pendingItems` (a session with
@@ -137,9 +152,11 @@ function buildRow(
   resumedSessionIds: ReadonlySet<string>,
   cwdHistoryBySessionId: ReadonlyMap<string, readonly CwdHistoryEntry[]>,
   liveSessionIds: ReadonlyMap<string, LiveSessionInfo>,
+  displaySessionId: string,
 ): TodaySessionRow {
   return {
     sessionId: handoff.sessionId,
+    displaySessionId,
     name: handoff.name,
     cwd: handoff.cwd,
     firstPlanLine: firstPlanLine(handoff),
@@ -150,6 +167,18 @@ function buildRow(
     // invented one.
     cwdHistory: cwdHistoryBySessionId.get(handoff.sessionId) ?? [],
   };
+}
+
+/** V2-T66 — the latest `capturedAt` across `handoffs` (D-019: `new Date(value)` WITH an argument
+ * is a deterministic transform over already-read instants, never a read of "now" — allowed outside
+ * `adapters/clock/`). `null` only for the empty-array edge no real `found: true` lookup produces
+ * (D-025: never a fabricated instant). */
+function latestCapturedAt(handoffs: readonly Handoff[]): Date | null {
+  return handoffs.reduce<Date | null>(
+    (latest, handoff) =>
+      latest === null || handoff.capturedAt > latest ? handoff.capturedAt : latest,
+    null,
+  );
 }
 
 /**
@@ -166,12 +195,29 @@ export function buildTodayPanelData(
   if (!lookup.found) {
     return { kind: 'noBriefing', message: MESSAGES.todayNoBriefing(lookup.daysSearched) };
   }
+  const { handoffs } = lookup.briefing;
+  // V2-T66 — scoped to THIS batch alone (`computeDisplaySessionIds`'s own docstring on why: a
+  // short id is only ever unique within the listing it's shown in), never the sidebar's own batch.
+  const displayIdsBySessionId = computeDisplaySessionIds(
+    handoffs.map((handoff) => handoff.sessionId),
+  );
   return {
     kind: 'pending',
     day: lookup.briefing.day,
     daysAgo: lookup.daysAgo,
-    rows: lookup.briefing.handoffs.map((handoff) =>
-      buildRow(handoff, lookup.resumedSessionIds, cwdHistoryBySessionId, liveSessionIds),
+    capturedAt: latestCapturedAt(handoffs),
+    rows: handoffs.map((handoff) =>
+      buildRow(
+        handoff,
+        lookup.resumedSessionIds,
+        cwdHistoryBySessionId,
+        liveSessionIds,
+        // Defensive fallback (D-025): every real `sessionId` in this same batch is a key in the
+        // map `computeDisplaySessionIds` just built FROM that batch — this only ever triggers for
+        // a malformed id sharing every character with another up to the full UUID length, the
+        // same edge case that function's own docstring already documents.
+        displayIdsBySessionId.get(handoff.sessionId) ?? handoff.sessionId,
+      ),
     ),
   };
 }
@@ -269,4 +315,43 @@ export function refreshTodayPanelLiveness(
     return null;
   }
   return buildTodayPanelData(inputs.lookup, inputs.cwdHistoryBySessionId, liveSessionIds);
+}
+
+/**
+ * V2-T66 — the "Resume in" selector's own implicit default (`docs/INTERFACE.md` § 3's own "o mais
+ * recente por padrão"): the most recent EXISTING directory in `history`, or `undefined` when none
+ * exists (D-025 — never a guess). Shared by `renderer/features/today/CwdChangeNotice` (what the
+ * `Select` shows when nobody has touched it) and `useToday.ts#resumeSelected` (what actually gets
+ * submitted for a session nobody touched the selector for) — the same single source of truth
+ * `today-panel-view.ts`'s own `renderResumeInSelect` used to be for both at once, now split across
+ * two call sites that must agree (D-041: never re-derived differently in either place).
+ *
+ * @example
+ * defaultResumeInCwd([
+ *   { cwd: 'C:\\old', firstDay: '2026-08-14', lastDay: '2026-08-14', exists: false },
+ *   { cwd: 'C:\\new', firstDay: '2026-08-16', lastDay: '2026-08-16', exists: true },
+ * ]); // 'C:\\new'
+ */
+export function defaultResumeInCwd(history: readonly CwdHistoryEntry[]): string | undefined {
+  return history.filter((entry) => entry.exists).at(-1)?.cwd;
+}
+
+/**
+ * V2-T66 — the sessionIds from `rows` a "Resume selected" click should actually submit: still
+ * offering the checkbox (`offersResumeCheckbox`) AND present in `selected`. A session that stopped
+ * offering one since it was checked (it just started running on a later tick) is silently excluded
+ * rather than submitted — `useToday.ts`'s own docstring on why this never needs the legacy DOM
+ * panel's snapshot/restore dance: selection lives as hook state, untouched by a `data` refresh, so
+ * this filter is the only pruning a stale entry ever needs.
+ *
+ * @example
+ * resumableSelection(rows, new Set(['a', 'b'])); // ['a'] if 'b' is already runningNow
+ */
+export function resumableSelection(
+  rows: readonly TodaySessionRow[],
+  selected: ReadonlySet<string>,
+): readonly string[] {
+  return rows
+    .filter((row) => offersResumeCheckbox(row.resumeStatus) && selected.has(row.sessionId))
+    .map((row) => row.sessionId);
 }

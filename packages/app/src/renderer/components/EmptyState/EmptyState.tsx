@@ -7,26 +7,34 @@
  * @example
  * <EmptyState title="Nothing to resume" description="Every session from today is already open." />
  *
- * Relocated from `ui/` by D-052 (V2-T75) — still no production caller (confirmed by grep before
- * moving it) and still styled by `renderer/legacy/components.css`'s own `.seeya-empty-state*`
- * global classes, not a CSS module yet; left for the region task that first puts it on screen.
+ * Brought to the CSS-module/render-tested pattern by V2-T66 (D-052, Q-102) — first production
+ * caller is Today's own "no pending briefing" state (`docs/INTERFACE.md` § 3's own "estado vazio
+ * com o texto de hoje").
  */
 import type { ComponentChildren, JSX } from 'preact';
+import styles from './EmptyState.module.css';
+import { cx, mergeClassName } from '../css-class.js';
+import { Text } from '../Text/index.js';
 
 export interface EmptyStateProps {
   readonly title: string;
   readonly description?: string;
   readonly action?: ComponentChildren;
+  readonly className?: string;
 }
 
 export function EmptyState(props: EmptyStateProps): JSX.Element {
   return (
-    <div class="seeya-empty-state">
-      <p class="seeya-empty-state-title">{props.title}</p>
+    <div class={mergeClassName(cx(styles, 'emptyState'), props.className)}>
+      <Text as="p" variant="body-lg" weight={600} className={cx(styles, 'title')}>
+        {props.title}
+      </Text>
       {props.description !== undefined && (
-        <p class="seeya-empty-state-description">{props.description}</p>
+        <Text as="p" variant="body-sm" tone="secondary" className={cx(styles, 'description')}>
+          {props.description}
+        </Text>
       )}
-      {props.action !== undefined && <div class="seeya-empty-state-action">{props.action}</div>}
+      {props.action !== undefined && <div class={cx(styles, 'action')}>{props.action}</div>}
     </div>
   );
 }
