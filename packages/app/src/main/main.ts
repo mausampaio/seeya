@@ -43,6 +43,7 @@ import type {
   SaveSettingRequest,
   SaveSettingResponse,
   AutostartAvailabilityUpdateEvent,
+  AutostartAvailabilityResponse,
   AutostartControlRequest,
   AutostartControlResponse,
   DaemonOwnershipTransitionOfferResponse,
@@ -256,6 +257,45 @@ async function captureVerificationScreenshot(
 }
 
 /**
+ * V2-T65: the one capture this window supports two screenshots from, WITHOUT a restart in
+ * between — every other `SEEYA_APP_*` flag that needs a "before"/"after" pair instead launches
+ * TWO separate processes (the V2-T75-terminal-resize task's own before/after reproduction).
+ * `docs/INTERFACE.md`'s own aceite for this task needs the opposite: Settings' own `Theme`
+ * segmented control has to apply LIVE, in the SAME running window — a second process could only
+ * ever prove two DIFFERENT windows agree, never that one window changed without reopening.
+ *
+ * Opens Settings (General is the default section), captures BEFORE, clicks the `Dark` segment
+ * (the real `saveSetting` round trip `main/main.ts`'s own handler now pushes `themeUpdate` from,
+ * this task's own production fix), waits for the live repaint, captures AFTER — both screenshots
+ * show the SAME dialog, same General section, same installed version, proving both "General in
+ * each theme" and "the switch applies without a restart" in one pass.
+ */
+async function captureLiveThemeToggleVerification(
+  window: BrowserWindow,
+  clock: Clock,
+  beforePath: string,
+  afterPath: string,
+): Promise<void> {
+  const { writeFile } = await import('node:fs/promises');
+  await clock.sleep(2500);
+  await window.webContents.executeJavaScript("document.getElementById('settings-button').click();");
+  await clock.sleep(500);
+  const before = await window.webContents.capturePage();
+  await writeFile(beforePath, before.toPNG());
+  await window.webContents.executeJavaScript(
+    "document.getElementById('settings-theme-option-dark').click();",
+  );
+  await clock.sleep(500);
+  const after = await window.webContents.capturePage();
+  await writeFile(afterPath, after.toPNG());
+  const quitAfterMs = Number(process.env.SEEYA_APP_QUIT_AFTER_MS ?? '');
+  if (Number.isFinite(quitAfterMs)) {
+    await clock.sleep(quitAfterMs);
+    app.quit();
+  }
+}
+
+/**
  * V2-T17 item 4: opt-in instrumentation for the "time until the session list is on screen"
  * measurement (`docs/DESEMPENHO.md`). Writes the wall-clock instant (via the injected `Clock`,
  * D-019 — `process.hrtime`/`Date.now()` are banned outside `adapters/clock/` by
@@ -322,7 +362,16 @@ function createWindow(clock: Clock): BrowserWindow {
   void window.loadFile(path.join(HERE, 'index.html'));
 
   const screenshotPath = process.env.SEEYA_APP_SCREENSHOT_PATH;
-  if (screenshotPath !== undefined) {
+  // SEEYA_APP_THEME_TOGGLE_AFTER_SCREENSHOT_PATH (V2-T65): when set ALONGSIDE
+  // SEEYA_APP_SCREENSHOT_PATH, replaces the one-shot capture above with
+  // `captureLiveThemeToggleVerification`'s own two-screenshot flow — see that function's own
+  // docstring for why this is the one capture that needs a second path at all.
+  const themeToggleAfterPath = process.env.SEEYA_APP_THEME_TOGGLE_AFTER_SCREENSHOT_PATH;
+  if (screenshotPath !== undefined && themeToggleAfterPath !== undefined) {
+    window.webContents.once('did-finish-load', () => {
+      void captureLiveThemeToggleVerification(window, clock, screenshotPath, themeToggleAfterPath);
+    });
+  } else if (screenshotPath !== undefined) {
     window.webContents.once('did-finish-load', () => {
       void captureVerificationScreenshot(window, clock, screenshotPath);
     });
@@ -466,15 +515,21 @@ function createWindow(clock: Clock): BrowserWindow {
     });
   }
   // SEEYA_APP_AUTO_EDIT_SETTINGS: same "instrumentação só do spike" class as the five above —
-  // opens the real Settings dialog (V2-T14), saves a valid `endOfDayTime` value first (proving
-  // items 1 and 3 together: that row's own origin flips from "seeya default" to "set in
-  // config.json", and the faixa de horário in the sidebar updates immediately — no restart of the
-  // window or the daemon) and only THEN tries an invalid `relevanceHours` value (proving item 2's
-  // refusal: the row's own error text stays put, nothing is written). The invalid attempt has to
-  // come LAST — a successful save re-renders every row (so no OTHER row's `origin` goes stale next
-  // to the one that changed, this file's own `saveSetting` handler docstring), which would wipe an
-  // earlier row's error text right back off screen before the screenshot below ever fires. Never
-  // set by `npm run app` or the README.
+  // opens the real Settings dialog (V2-T14; redesigned by V2-T65 into sections that save on blur,
+  // docs/INTERFACE.md § 8), navigates to Schedule, and types an invalid `endOfDayTime` value —
+  // proving item 2's refusal: the error appears on the field's own line, naming the rejected value
+  // (AGENTS.md's own "a mensagem inclui o valor que causou o erro"), nothing is written.
+  //
+  // `dispatchEvent(new FocusEvent('blur'))`, never `.blur()` — measured difference, V2-T65's own
+  // verification: `.blur()` updates `document.activeElement` but never fires a 'blur'/'focusout'
+  // EVENT at all when `SEEYA_APP_OFFSCREEN` is set (this offscreen `BrowserWindow` never holds real
+  // page focus to begin with, confirmed with a throwaway `addEventListener('blur', ...)` probe that
+  // never fired); `TextField.tsx`'s own `onBlur` prop is wired to the React/Preact 'blur' EVENT, so
+  // a person tabbing away (which dispatches a real event) saves correctly, but this offscreen-only
+  // script needs to dispatch the event itself. The trailing `clock.sleep(2000)` gives the
+  // `saveSetting` round trip (renderer → main → zod validation → back) and its own re-render real
+  // wall-clock time to land before the screenshot above fires. Never set by `npm run app` or the
+  // README.
   if (process.env.SEEYA_APP_AUTO_EDIT_SETTINGS === '1') {
     window.webContents.once('did-finish-load', () => {
       void clock
@@ -484,22 +539,22 @@ function createWindow(clock: Clock): BrowserWindow {
             "document.getElementById('settings-button').click();",
           ),
         )
-        .then(() => clock.sleep(500))
+        .then(() => clock.sleep(400))
         .then(() =>
           window.webContents.executeJavaScript(
-            'const validRow = document.querySelector(\'.settings-row[data-key="endOfDayTime"]\'); ' +
-              "validRow.querySelector('.settings-row-input').value = '09:15'; " +
-              "validRow.querySelector('.settings-row-save').click();",
+            "document.getElementById('settings-nav-schedule').click();",
           ),
         )
         .then(() => clock.sleep(300))
         .then(() =>
           window.webContents.executeJavaScript(
-            'const invalidRow = document.querySelector(\'.settings-row[data-key="relevanceHours"]\'); ' +
-              "invalidRow.querySelector('.settings-row-input').value = '-5'; " +
-              "invalidRow.querySelector('.settings-row-save').click();",
+            "const invalidInput = document.getElementById('endOfDayTime'); " +
+              "invalidInput.value = 'not-a-time'; " +
+              "invalidInput.dispatchEvent(new Event('input', { bubbles: true })); " +
+              "invalidInput.dispatchEvent(new FocusEvent('blur'));",
           ),
-        );
+        )
+        .then(() => clock.sleep(2000));
     });
   }
   // SEEYA_APP_AUTO_OPEN_OTHER_SESSIONS_DIR: same "instrumentação só do spike" class as the six
@@ -1029,6 +1084,11 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
     (): TerminalFontConfigResponse => context.initialTerminalFontOptions,
   );
 
+  // V2-T65: Settings' own General section — `app.getVersion()`, read fresh each call (cheap,
+  // in-process) but never pushed: a running window's own installed version cannot change under
+  // it until relaunched.
+  ipcMain.handle(CHANNELS.getAppVersion, (): string => app.getVersion());
+
   // V2-T62 (D-051): the window's effective theme — "system" has a live counterpart
   // (`getTerminalFontConfig` above deliberately does not, its own docstring explains why), so
   // `Config.theme` is read FRESH here, never cached on `AppContext` the way V2-T16 already
@@ -1397,6 +1457,16 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
       // this response field was written to prevent in the FIRST place, before the Settings dialog
       // moved to `renderer/legacy/`.
       window.webContents.send(CHANNELS.scheduleUpdate, scheduleEvent);
+      // V2-T65 (PO review, 2026-10-01 — "troca de tema só vale depois de fechar e abrir o app"):
+      // a `theme` save used to rely on `nativeTheme.on('updated', ...)` to ever push
+      // `themeUpdate` — which only fires on an OS-level light/dark change, never on this save. The
+      // window's own `data-theme`/terminal colours (`renderer/legacy/theme-view.ts#wireTheme`)
+      // are driven ONLY by that push, so picking Light/Dark/System in Settings silently did
+      // nothing until the next relaunch. Reusing the SAME resolve-and-maybe-push function the
+      // native-theme listener already calls, right here, is what makes a save apply live — it
+      // already no-ops when the effective theme didn't actually change (e.g. System picked on a
+      // machine whose OS is already light), so this costs nothing on every OTHER field's save.
+      await resolveAndSendEffectiveTheme();
       return {
         ok: true,
         rows: buildSettingsRows(updated),
@@ -1440,6 +1510,18 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
         ),
       };
     },
+  );
+
+  // V2-T65: Settings' own General section — fetched once when it mounts. Answers from the
+  // ambient-tick cache ONLY, never a direct `context.autostart.status()` call of its own
+  // (`CHANNELS.getAutostartAvailability`'s own docstring: that call measured up to ~6s cold).
+  // `{ kind: 'unknown' }` before the first tick has run yet (D-025 — the switch shows "cannot
+  // verify" rather than guessing enabled/disabled) — the very next `autostartAvailabilityUpdate`
+  // push (within `REFRESH_INTERVAL_MS`) corrects it.
+  ipcMain.handle(CHANNELS.getAutostartAvailability, (): AutostartAvailabilityResponse =>
+    autostartCache === null
+      ? { kind: 'unknown' }
+      : resolveAutostartControlAvailability(context.daemonOwner, autostartCache.status),
   );
 
   // V2-T13 item 5 (D-045 item 1): fetched once at startup — see `renderer.ts`'s own `main()`.

@@ -43,6 +43,7 @@ import type {
   SaveSettingRequest,
   SaveSettingResponse,
   AutostartAvailabilityUpdateEvent,
+  AutostartAvailabilityResponse,
   AutostartControlRequest,
   AutostartControlResponse,
   DaemonOwnershipTransitionOfferResponse,
@@ -140,6 +141,9 @@ export interface SeeyaApi {
   ): () => void;
   /** V2-T13 item 4: "Enable autostart"/"Disable autostart". */
   autostartControl(request: AutostartControlRequest): Promise<AutostartControlResponse>;
+  /** V2-T65: Settings' own General section — fetched once when it mounts, see
+   * `CHANNELS.getAutostartAvailability`'s own docstring. */
+  getAutostartAvailability(): Promise<AutostartAvailabilityResponse>;
   /** V2-T13 item 5: the ownership-transition dialog's own data, fetched once at startup. */
   getDaemonOwnershipTransitionOffer(): Promise<DaemonOwnershipTransitionOfferResponse>;
   /** V2-T13 item 5: the person's answer to the ownership-transition dialog. */
@@ -198,6 +202,8 @@ export interface SeeyaApi {
   /** V2-T64: the New tab popover's "Browse…" button — the native OS folder picker, run in the
    * main process (`main/directory-picker-ipc.ts`). */
   pickDirectory(): Promise<PickDirectoryResponse>;
+  /** V2-T65: Settings' own General section — `app.getVersion()`, fetched once when it mounts. */
+  getAppVersion(): Promise<string>;
 }
 
 /**
@@ -275,6 +281,7 @@ const api: SeeyaApi = {
   onAutostartAvailabilityUpdate: (listener) =>
     subscribe(CHANNELS.autostartAvailabilityUpdate, listener),
   autostartControl: (request) => ipcRenderer.invoke(CHANNELS.autostartControl, request),
+  getAutostartAvailability: () => ipcRenderer.invoke(CHANNELS.getAutostartAvailability),
   getDaemonOwnershipTransitionOffer: () =>
     ipcRenderer.invoke(CHANNELS.getDaemonOwnershipTransitionOffer),
   answerDaemonOwnershipTransition: (request) =>
@@ -321,6 +328,7 @@ const api: SeeyaApi = {
   onThemeUpdate: (listener) => subscribe(CHANNELS.themeUpdate, listener),
   toggleFavoriteProject: (request) => ipcRenderer.invoke(CHANNELS.toggleFavoriteProject, request),
   pickDirectory: () => ipcRenderer.invoke(CHANNELS.pickDirectory),
+  getAppVersion: () => ipcRenderer.invoke(CHANNELS.getAppVersion),
 };
 
 contextBridge.exposeInMainWorld('seeya', api);

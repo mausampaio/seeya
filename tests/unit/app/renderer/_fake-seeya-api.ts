@@ -61,6 +61,11 @@ export function createFakeSeeyaApi(overrides: Partial<SeeyaApi> = {}): SeeyaApi 
     saveSetting: neverCalled('saveSetting'),
     onAutostartAvailabilityUpdate: vi.fn(noopUnsubscribe),
     autostartControl: neverCalled('autostartControl'),
+    // V2-T65: `useSettings` calls these unconditionally on mount (`SettingsDialog` is mounted for
+    // the life of the window, same "fetchInitial seeds state" reasoning `getScheduleStrip` above
+    // already needs) — real resolving values, not `neverCalled`.
+    getAutostartAvailability: vi.fn(() => Promise.resolve({ kind: 'unknown' as const })),
+    getAppVersion: vi.fn(() => Promise.resolve('0.0.0-test')),
     getDaemonOwnershipTransitionOffer: neverCalled('getDaemonOwnershipTransitionOffer'),
     answerDaemonOwnershipTransition: neverCalled('answerDaemonOwnershipTransition'),
     onProjectsUpdate: vi.fn(noopUnsubscribe),
