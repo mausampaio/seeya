@@ -15,14 +15,31 @@
 import type { ComponentChildren, JSX, RefObject, TargetedMouseEvent } from 'preact';
 import styles from './IconButton.module.css';
 import { cx, mergeClassName } from '../css-class.js';
+import { Spinner } from '../Spinner/index.js';
 import type { ButtonVariant } from '../Button/Button.js';
 import type { Size } from '../props.js';
+
+/** `size`'s own spinner diameter — `Button.tsx`'s own identical table, repeated here (never
+ * imported from there) because the two components' `Size` steps mean different pixel targets: an
+ * `IconButton` IS its icon, an `IconButton`'s `sm`/`md`/`lg` are 24/32/40px square boxes, nothing
+ * like `Button`'s own padding-driven sizes. */
+const SPINNER_SIZE_BY_SIZE: Record<Size, number> = {
+  sm: 14,
+  md: 16,
+  lg: 18,
+};
 
 export interface IconButtonProps {
   readonly id?: string;
   readonly variant?: ButtonVariant;
   readonly size?: Size;
   readonly disabled?: boolean;
+  /** D-052, maintainer's own complement (V2-T65-estado-na-tela item 2) — same contract as
+   * `Button.tsx`'s own `loading` (its docstring has the full reasoning). An `IconButton`'s own box
+   * is ALREADY a fixed `width`/`height` per `size` (`IconButton.module.css`), so unlike `Button`
+   * there is no separate reserved slot to add here: the spinner simply replaces the icon in the
+   * SAME box, which is already as width-stable as a prop can get. */
+  readonly loading?: boolean;
   readonly hidden?: boolean;
   readonly className?: string;
   readonly onClick?: (event: TargetedMouseEvent<HTMLButtonElement>) => void;
@@ -50,12 +67,17 @@ export function IconButton(props: IconButtonProps): JSX.Element {
       id={props.id}
       type="button"
       class={className}
-      disabled={props.disabled}
+      disabled={props.disabled === true || props.loading === true}
+      aria-busy={props.loading === true ? 'true' : undefined}
       hidden={props.hidden}
       aria-label={props['aria-label']}
       onClick={props.onClick}
     >
-      {props.children}
+      {props.loading === true ? (
+        <Spinner size={SPINNER_SIZE_BY_SIZE[props.size ?? 'md']} />
+      ) : (
+        props.children
+      )}
     </button>
   );
 }

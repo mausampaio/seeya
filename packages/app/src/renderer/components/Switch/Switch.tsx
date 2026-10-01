@@ -23,12 +23,22 @@ import type { ComponentChildren, JSX } from 'preact';
 import styles from './Switch.module.css';
 import { cx, mergeClassName } from '../css-class.js';
 import { Text } from '../Text/index.js';
+import { Spinner } from '../Spinner/index.js';
+
+const SPINNER_SIZE_PX = 14;
 
 export interface SwitchProps {
   readonly id: string;
   readonly label: ComponentChildren;
   readonly checked: boolean;
   readonly disabled?: boolean;
+  /** D-052, maintainer's own complement (V2-T65-estado-na-tela item 2) — same contract as
+   * `Button.tsx`'s own `loading` (its docstring has the full reasoning, including why the slot is
+   * reserved on both `true` AND `false` rather than only while actually loading). Forces the
+   * switch disabled regardless of `disabled`/`disabledReason` — a switch mid-command and a switch
+   * that's simply unavailable are different facts (D-024), so `loading` never reads
+   * `disabledReason` underneath it. */
+  readonly loading?: boolean;
   /** docs/INTERFACE.md § 8's own "indisponível com o motivo" — shown under the label, only while
    * `disabled` (D-024: pairing them in props would let a caller pass a reason for an enabled
    * switch, a combination nothing in this design ever means). */
@@ -38,10 +48,11 @@ export interface SwitchProps {
 }
 
 export function Switch(props: SwitchProps): JSX.Element {
-  const disabled = props.disabled === true;
+  const loading = props.loading === true;
+  const disabled = props.disabled === true || loading;
   return (
     <div class={mergeClassName(cx(styles, 'field'), props.className)}>
-      <label class={cx(styles, 'row')} for={props.id}>
+      <label class={cx(styles, 'row')} for={props.id} aria-busy={loading ? 'true' : undefined}>
         <input
           id={props.id}
           type="checkbox"
@@ -54,8 +65,18 @@ export function Switch(props: SwitchProps): JSX.Element {
         <Text as="span" variant="body-sm" weight={500} tone="secondary">
           {props.label}
         </Text>
+        {props.loading !== undefined && (
+          // Always mounted once this prop is in play, only `visibility` toggles — same "never
+          // resize at the exact moment loading starts" reasoning as `Button.tsx`'s own slot.
+          <span
+            class={cx(styles, 'spinnerSlot', !loading && 'spinnerSlotHidden')}
+            aria-hidden="true"
+          >
+            <Spinner size={SPINNER_SIZE_PX} />
+          </span>
+        )}
       </label>
-      {disabled && props.disabledReason !== undefined && (
+      {!loading && disabled && props.disabledReason !== undefined && (
         <Text as="p" variant="caption" tone="secondary" className={cx(styles, 'reason')}>
           {props.disabledReason}
         </Text>

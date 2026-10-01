@@ -13,7 +13,16 @@ import type { ComponentChildren, JSX, RefObject, TargetedMouseEvent } from 'prea
 import styles from './Button.module.css';
 import { cx, mergeClassName } from '../css-class.js';
 import { Text, type TextVariant } from '../Text/index.js';
+import { Spinner } from '../Spinner/index.js';
 import type { Size } from '../props.js';
+
+/** `size`'s own spinner diameter — close to the text's own cap height at each step, never a fixed
+ * number that would look oversized next to `sm` or cramped next to `lg`. */
+const SPINNER_SIZE_BY_SIZE: Record<Size, number> = {
+  sm: 14,
+  md: 16,
+  lg: 18,
+};
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost';
 
@@ -36,6 +45,19 @@ export interface ButtonProps {
   readonly fullWidth?: boolean;
   readonly type?: 'button' | 'submit';
   readonly disabled?: boolean;
+  /** D-052, maintainer's own complement (V2-T65-estado-na-tela item 2): "estado de trabalho vira
+   * prop do componente, não lógica espalhada" — an in-flight action (Skip, Snooze, the daemon
+   * button, …) sets this instead of each caller inventing its own disabled-plus-spinner markup.
+   * **Omitted (the default), a `Button` behaves exactly as before this prop existed** — no reserved
+   * spinner gutter, no width change, ever — only a caller that explicitly passes `true`/`false`
+   * opts into the reserved slot below, so every pre-existing `Button` in this app is byte-for-byte
+   * unaffected. `true`: disables the button, sets `aria-busy="true"`, and shows a `Spinner` to the
+   * LEFT of the label in a slot that's already reserved the instant this prop is anything but
+   * `undefined` — reserving it on BOTH `true` and `false` is what keeps the button's own width
+   * stable across the loading transition itself ("mantém a largura, sem pular o layout"), the one
+   * hard requirement here; the trade-off is a permanent small gutter for the handful of buttons
+   * that opt in at all, which is cheaper than a width that jumps the instant someone clicks. */
+  readonly loading?: boolean;
   readonly hidden?: boolean;
   readonly className?: string;
   /** V2-T64: a native tooltip for when the visible label is already a shortened form of a longer
@@ -70,11 +92,25 @@ export function Button(props: ButtonProps): JSX.Element {
       id={props.id}
       type={props.type ?? 'button'}
       class={className}
-      disabled={props.disabled}
+      disabled={props.disabled === true || props.loading === true}
+      aria-busy={props.loading === true ? 'true' : undefined}
       hidden={props.hidden}
       title={props.title}
       onClick={props.onClick}
     >
+      {props.loading !== undefined && (
+        // The `Spinner` is always MOUNTED once this prop is in play (never conditionally added),
+        // just toggled between `visible`/`hidden` — a slot whose box only appears while loading
+        // would itself change the button's width at the exact moment loading starts, the opposite
+        // of what this prop exists for. `visibility` (not `display`) is what keeps the box's own
+        // footprint in the layout while painting nothing.
+        <span
+          class={cx(styles, 'spinnerSlot', props.loading !== true && 'spinnerSlotHidden')}
+          aria-hidden="true"
+        >
+          <Spinner size={SPINNER_SIZE_BY_SIZE[props.size ?? 'md']} />
+        </span>
+      )}
       <Text as="span" variant={TEXT_VARIANT_BY_SIZE[props.size ?? 'md']} weight={500}>
         {props.children}
       </Text>

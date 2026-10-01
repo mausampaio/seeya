@@ -1,0 +1,15 @@
+/* D-052 (V2-T65-estado-na-tela). `renderer/tokens.css`'s own global `prefers-reduced-motion` rule
+ * already clamps `animation-duration`/`animation-iteration-count` for every element, this one
+ * included — no local media query needed here. */
+.spinner {
+  animation: seeya-spinner-rotate 0.8s linear infinite;
+}
+
+@keyframes seeya-spinner-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
