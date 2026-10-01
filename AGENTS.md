@@ -608,7 +608,13 @@ como parte do próprio clique) e `SEEYA_APP_AUTO_VERIFY_DIALOG_FOCUS_RETURN_PATH
 mantenedor da V2-T55, correção 3: abre e fecha o diálogo real de **Settings…** — combinada com
 `SEEYA_APP_AUTO_OPEN_SHELL_TAB=1`, que já abre uma aba real antes — e grava, no arquivo indicado,
 se o foco voltou para o terminal da aba ativa; uma captura de tela não mostraria estado de foco
-nenhum, então esta grava o fato em vez de uma imagem) —
+nenhum, então esta grava o fato em vez de uma imagem), `SEEYA_APP_AUTO_NARROW_SIDEBAR` (aceite do
+mantenedor da V2-T75: mesma técnica de `SEEYA_APP_AUTO_RESIZE_SIDEBAR`, com delta negativo, para
+provar que um nome de sessão longo trunca com reticências — nunca rolagem horizontal escondida —
+com a lateral perto do `MIN_SIDEBAR_WIDTH`) e `SEEYA_APP_AUTO_OPEN_SNOOZE_MENU` (aceite do
+mantenedor da V2-T75: clica o botão real `#schedule-strip-snooze-button`, para provar o `Menu` de
+verdade — `role="menu"`, `+15m`/`+30m`/`+1h` — aberto sobre o rodapé; só faz algo quando a agenda
+já oferece Snooze, o mesmo "o botão simplesmente não existe" que uma pessoa encontraria) —
 mesma categoria de `SEEYA_DAEMON_CHILD`
 acima (nunca vão para disco, ninguém digita), mas nenhuma delas é lida por `npm run app` nem
 documentada no `README.md`: existem só para um agente sem tela/teclado próprios provar a janela

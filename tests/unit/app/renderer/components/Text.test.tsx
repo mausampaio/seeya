@@ -24,6 +24,17 @@ describe('Text (D-052, V2-T75 item 7 — identity § 4.4)', () => {
     expect((container.firstElementChild as HTMLElement).tagName).toBe('P');
   });
 
+  // PO review (2026-10-01): `Section`'s own heading needs a real `<h2>` for accessibility
+  // (`getByRole('heading', ...)`) — `TextElement` grew the four heading tags for this.
+  it('renders as a heading element via `as`, for a real accessible heading role', () => {
+    const { getByRole } = render(
+      <Text as="h2" variant="caption">
+        Favorites
+      </Text>,
+    );
+    expect(getByRole('heading', { name: 'Favorites' }).tagName).toBe('H2');
+  });
+
   it('applies the requested tone', () => {
     const { container } = render(
       <Text variant="caption" tone="tertiary">

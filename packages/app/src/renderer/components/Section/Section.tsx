@@ -12,6 +12,7 @@
 import type { ComponentChildren, JSX } from 'preact';
 import styles from './Section.module.css';
 import { cx, mergeClassName } from '../css-class.js';
+import { Text } from '../Text/index.js';
 
 export interface SectionProps {
   readonly title: string;
@@ -25,7 +26,12 @@ export function Section(props: SectionProps): JSX.Element {
   return (
     <section id={props.id} class={mergeClassName(cx(styles, 'section'), props.className)}>
       <div class={cx(styles, 'header')}>
-        <h2 class={cx(styles, 'title')}>{props.title}</h2>
+        {/* D-052 item 7 (PO review, 2026-10-01): "rótulos de seção... em caption" — identity
+         * § 4.4's own 12/16/weight-500 triple, the same three numbers this heading hardcoded
+         * before `Text` existed. */}
+        <Text as="h2" variant="caption" tone="tertiary" truncate className={cx(styles, 'title')}>
+          {props.title}
+        </Text>
         {props.action}
       </div>
       <div class={cx(styles, 'body')}>{props.children}</div>

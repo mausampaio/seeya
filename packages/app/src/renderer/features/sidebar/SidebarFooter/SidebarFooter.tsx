@@ -104,6 +104,7 @@ export function SidebarFooter(): JSX.Element {
               {schedule.canSnooze && (
                 <GridItem span={1}>
                   <Button
+                    id="schedule-strip-snooze-button"
                     variant="secondary"
                     size="sm"
                     fullWidth

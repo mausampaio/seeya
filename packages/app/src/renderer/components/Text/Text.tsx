@@ -46,7 +46,7 @@ export type TextTone = 'primary' | 'secondary' | 'tertiary';
  * prop would accept `450`, which no variant in this design system has ever meant anything by. */
 export type TextWeight = 400 | 500 | 600;
 
-export type TextElement = 'span' | 'p' | 'div' | 'label';
+export type TextElement = 'span' | 'p' | 'div' | 'label' | 'h1' | 'h2' | 'h3' | 'h4';
 
 export interface TextProps {
   readonly variant: TextVariant;

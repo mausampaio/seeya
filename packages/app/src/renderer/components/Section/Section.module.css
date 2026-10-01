@@ -1,9 +1,13 @@
-/* D-052 (V2-T75). identity § 4.4's `caption` size (12/16px, weight 500) for the heading — the
- * V2-T63 aceite's own item 4 ("FAVORITES/RECENT sem uppercase, 12px peso 500"). */
+/* D-052 (V2-T75). identity § 4.4's `caption` variant (12/16px, weight 500) for the heading — the
+ * V2-T63 aceite's own item 4 ("FAVORITES/RECENT sem uppercase, 12px peso 500"), now via `Text`
+ * (D-052 item 7, PO review 2026-10-01) rather than a hardcoded triple here. `min-width: 0`
+ * throughout is what lets `.title` actually ellipsize instead of pushing `.action` (the `+` button)
+ * off the lateral's own right edge in a narrowed sidebar. */
 .section {
   display: flex;
   flex-direction: column;
   gap: var(--seeya-space-1);
+  min-width: 0;
 }
 
 .header {
@@ -11,13 +15,13 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--seeya-space-2);
+  min-width: 0;
 }
 
 .title {
+  flex: 1;
+  min-width: 0;
   margin: 0;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--seeya-text-tertiary);
 }
 
 .body {

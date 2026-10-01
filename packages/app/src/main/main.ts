@@ -523,6 +523,54 @@ function createWindow(clock: Clock): BrowserWindow {
         );
     });
   }
+  // SEEYA_APP_AUTO_NARROW_SIDEBAR: PO review (V2-T75, 2026-10-01) — same real pointer-drag
+  // technique as SEEYA_APP_AUTO_RESIZE_SIDEBAR above, with a NEGATIVE delta, for a verification
+  // screenshot proving a long session name truncates with an ellipsis (never a hidden horizontal
+  // scrollbar) once the lateral is narrowed close to MIN_SIDEBAR_WIDTH. Never set by `npm run app`
+  // or the README.
+  if (process.env.SEEYA_APP_AUTO_NARROW_SIDEBAR === '1') {
+    window.webContents.once('did-finish-load', () => {
+      void clock
+        .sleep(600)
+        .then(() => window.webContents.executeJavaScript(dismissDaemonOwnershipTransitionScript))
+        .then(() => clock.sleep(600))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            '(() => { ' +
+              "const handle = document.getElementById('sidebar-resize-handle'); " +
+              'if (!handle) { return; } ' +
+              'const rect = handle.getBoundingClientRect(); ' +
+              'const startX = rect.left + rect.width / 2; ' +
+              'const targetX = startX - 100; ' +
+              "handle.dispatchEvent(new PointerEvent('pointerdown', " +
+              '{ clientX: startX, clientY: rect.top, bubbles: true, pointerId: 1 })); ' +
+              "window.dispatchEvent(new PointerEvent('pointermove', " +
+              '{ clientX: targetX, clientY: rect.top, bubbles: true, pointerId: 1 })); ' +
+              "window.dispatchEvent(new PointerEvent('pointerup', " +
+              '{ clientX: targetX, clientY: rect.top, bubbles: true, pointerId: 1 })); ' +
+              '})();',
+          ),
+        );
+    });
+  }
+  // SEEYA_APP_AUTO_OPEN_SNOOZE_MENU: PO review (V2-T75, 2026-10-01) — clicks the real Snooze
+  // trigger button (`#schedule-strip-snooze-button`), for a verification screenshot of the real
+  // Menu (role="menu", +15m/+30m/+1h) open over the footer. Only does anything when the schedule
+  // actually offers Snooze right now (the button simply doesn't exist otherwise, same as a human
+  // would find). Never set by `npm run app` or the README.
+  if (process.env.SEEYA_APP_AUTO_OPEN_SNOOZE_MENU === '1') {
+    window.webContents.once('did-finish-load', () => {
+      void clock
+        .sleep(600)
+        .then(() => window.webContents.executeJavaScript(dismissDaemonOwnershipTransitionScript))
+        .then(() => clock.sleep(600))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('schedule-strip-snooze-button')?.click();",
+          ),
+        );
+    });
+  }
   if (process.env.SEEYA_APP_AUTO_OPEN_OTHER_SESSIONS_DIR === '1') {
     window.webContents.once('did-finish-load', () => {
       void clock

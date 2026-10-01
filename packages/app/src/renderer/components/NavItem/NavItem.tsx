@@ -13,6 +13,7 @@
 import type { ComponentChildren, JSX } from 'preact';
 import styles from './NavItem.module.css';
 import { cx, mergeClassName } from '../css-class.js';
+import { Text } from '../Text/index.js';
 
 export interface NavItemProps {
   readonly icon: ComponentChildren;
@@ -38,7 +39,18 @@ export function NavItem(props: NavItemProps): JSX.Element {
       <span class={cx(styles, 'icon')} aria-hidden="true">
         {props.icon}
       </span>
-      <span class={cx(styles, 'label')}>{props.label}</span>
+      {/* D-052 item 7 (PO review, 2026-10-01): "itens... de navegação... em body-sm; peso 500 nos
+       * itens de navegação" — identity § 4.4's 14/20 triple, `active` only overriding the
+       * default weight the way `Text`'s own `weight` prop is meant to be used. */}
+      <Text
+        as="span"
+        variant="body-sm"
+        truncate
+        className={cx(styles, 'label')}
+        {...(active ? { weight: 500 as const } : {})}
+      >
+        {props.label}
+      </Text>
       {props.trailing !== undefined && <span class={cx(styles, 'trailing')}>{props.trailing}</span>}
     </button>
   );
