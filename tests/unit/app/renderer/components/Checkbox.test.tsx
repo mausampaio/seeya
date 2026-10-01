@@ -15,7 +15,7 @@ describe('Checkbox (D-052, V2-T66)', () => {
     expect((getByRole('checkbox') as HTMLInputElement).checked).toBe(true);
   });
 
-  it('carries value through to the native input (today-panel-view.ts\'s own DOM-read shape)', () => {
+  it("carries value through to the native input (today-panel-view.ts's own DOM-read shape)", () => {
     const { getByRole } = render(
       <Checkbox id="session-1" label="alpha" checked={false} value="session-1" />,
     );

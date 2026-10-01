@@ -85,10 +85,10 @@ describe('useToday (D-052, V2-T66)', () => {
     window.seeya = createFakeSeeyaApi({ getTodayPanel: () => Promise.resolve(pendingData()) });
     const { result } = renderHook(() => useToday());
 
-    act(() => result.current.toggleSession('a', true));
+    void act(() => result.current.toggleSession('a', true));
     expect(result.current.selectedSessionIds.has('a')).toBe(true);
 
-    act(() => result.current.toggleSession('a', false));
+    void act(() => result.current.toggleSession('a', false));
     expect(result.current.selectedSessionIds.has('a')).toBe(false);
   });
 
@@ -96,7 +96,7 @@ describe('useToday (D-052, V2-T66)', () => {
     window.seeya = createFakeSeeyaApi({ getTodayPanel: () => Promise.resolve(pendingData()) });
     const { result } = renderHook(() => useToday());
 
-    act(() => result.current.setChosenCwd('a', '/new-dir'));
+    void act(() => result.current.setChosenCwd('a', '/new-dir'));
     expect(result.current.chosenCwdBySessionId.get('a')).toBe('/new-dir');
   });
 
@@ -104,9 +104,9 @@ describe('useToday (D-052, V2-T66)', () => {
     window.seeya = createFakeSeeyaApi({ getTodayPanel: () => Promise.resolve(pendingData()) });
     const { result } = renderHook(() => useToday());
 
-    act(() => result.current.toggleSession('a', true));
+    void act(() => result.current.toggleSession('a', true));
     expect(result.current.selectedSessionIds.size).toBe(1);
-    act(() => result.current.clearSelection());
+    void act(() => result.current.clearSelection());
     expect(result.current.selectedSessionIds.size).toBe(0);
   });
 
@@ -130,7 +130,7 @@ describe('useToday (D-052, V2-T66)', () => {
       await Promise.resolve();
     });
 
-    act(() => result.current.toggleSession('a', true));
+    void act(() => result.current.toggleSession('a', true));
     expect(result.current.selectedCount).toBe(0);
   });
 
@@ -169,7 +169,7 @@ describe('useToday (D-052, V2-T66)', () => {
         await Promise.resolve();
       });
 
-      act(() => result.current.resumeSelected());
+      void act(() => result.current.resumeSelected());
       expect(resumeSelected).not.toHaveBeenCalled();
     });
 
@@ -184,7 +184,7 @@ describe('useToday (D-052, V2-T66)', () => {
         await Promise.resolve();
       });
 
-      act(() => {
+      void act(() => {
         result.current.toggleSession('a', true);
         result.current.setChosenCwd('a', '/chosen');
       });
@@ -216,12 +216,12 @@ describe('useToday (D-052, V2-T66)', () => {
       await act(async () => {
         await Promise.resolve();
       });
-      act(() => result.current.toggleSession('a', true));
+      void act(() => result.current.toggleSession('a', true));
 
-      act(() => result.current.resumeSelected());
+      void act(() => result.current.resumeSelected());
       expect(result.current.resuming).toBe(true);
 
-      act(() => result.current.resumeSelected());
+      void act(() => result.current.resumeSelected());
       expect(resumeSelected).toHaveBeenCalledTimes(1);
 
       await act(async () => {
@@ -244,7 +244,7 @@ describe('useToday (D-052, V2-T66)', () => {
       await act(async () => {
         await Promise.resolve();
       });
-      act(() => result.current.toggleSession('a', true));
+      void act(() => result.current.toggleSession('a', true));
 
       await act(async () => {
         result.current.resumeSelected();
@@ -269,7 +269,7 @@ describe('useToday (D-052, V2-T66)', () => {
     });
     const { result } = renderHook(() => useToday());
 
-    act(() => pushProgress?.({ index: 1, total: 2, name: 'alpha' }));
+    void act(() => pushProgress?.({ index: 1, total: 2, name: 'alpha' }));
     expect(result.current.progress).toEqual({ index: 1, total: 2, name: 'alpha' });
   });
 });

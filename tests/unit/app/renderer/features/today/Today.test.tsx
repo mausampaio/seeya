@@ -40,7 +40,8 @@ const PENDING_DATA: TodayPanelData = {
 describe('Today (D-052, V2-T66)', () => {
   it('shows the empty state when there is no pending briefing', async () => {
     window.seeya = createFakeSeeyaApi({
-      getTodayPanel: () => Promise.resolve({ kind: 'noBriefing', message: 'Nothing captured yet.' }),
+      getTodayPanel: () =>
+        Promise.resolve({ kind: 'noBriefing', message: 'Nothing captured yet.' }),
     });
     const { getByText } = render(<Today />);
     await waitFor(() => expect(getByText('Nothing captured yet.')).not.toBeNull());
@@ -106,7 +107,10 @@ describe('Today (D-052, V2-T66)', () => {
         }),
     );
     window.seeya = createFakeSeeyaApi({
-      getTodayPanel: vi.fn().mockResolvedValueOnce(PENDING_DATA).mockResolvedValueOnce(PENDING_DATA),
+      getTodayPanel: vi
+        .fn()
+        .mockResolvedValueOnce(PENDING_DATA)
+        .mockResolvedValueOnce(PENDING_DATA),
       resumeSelected,
     });
     const { getByRole, getByText } = render(<Today />);
@@ -119,13 +123,17 @@ describe('Today (D-052, V2-T66)', () => {
       sessionIds: ['a'],
       chosenCwdBySessionId: {},
     });
-    expect((getByRole('button', { name: 'Resume selected' }) as HTMLButtonElement).getAttribute(
-      'aria-busy',
-    )).toBe('true');
+    expect(
+      (getByRole('button', { name: 'Resume selected' }) as HTMLButtonElement).getAttribute(
+        'aria-busy',
+      ),
+    ).toBe('true');
 
     await act(async () => {
       resolveResume?.({
-        resumed: [{ kind: 'resumed', sessionId: 'a', name: 'payments-webhooks', cwd: '/code/payments' }],
+        resumed: [
+          { kind: 'resumed', sessionId: 'a', name: 'payments-webhooks', cwd: '/code/payments' },
+        ],
         skipped: [],
         invalidFallbackAnswers: [],
         remaining: [],
@@ -154,7 +162,7 @@ describe('Today (D-052, V2-T66)', () => {
     fireEvent.click(getByRole('checkbox'));
     fireEvent.click(getByRole('button', { name: 'Resume selected' }));
 
-    act(() => pushProgress?.({ index: 1, total: 1, name: 'payments-webhooks' }));
+    void act(() => pushProgress?.({ index: 1, total: 1, name: 'payments-webhooks' }));
 
     expect(getByText('Resuming 1 of 1: payments-webhooks...')).not.toBeNull();
   });

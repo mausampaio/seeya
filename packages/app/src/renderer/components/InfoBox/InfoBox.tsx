@@ -33,8 +33,6 @@ export interface InfoBoxProps {
 export function InfoBox(props: InfoBoxProps): JSX.Element {
   const tone = props.tone ?? 'neutral';
   return (
-    <div class={mergeClassName(cx(styles, 'infoBox', tone), props.className)}>
-      {props.children}
-    </div>
+    <div class={mergeClassName(cx(styles, 'infoBox', tone), props.className)}>{props.children}</div>
   );
 }

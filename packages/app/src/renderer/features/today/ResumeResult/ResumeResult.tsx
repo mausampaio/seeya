@@ -97,7 +97,10 @@ export function ResumeResult(props: ResumeResultProps): JSX.Element {
             note: session.reason,
           }))}
         />
-        <SummarySection heading={MESSAGES.todaySummaryRemainingHeading} sessions={result.remaining} />
+        <SummarySection
+          heading={MESSAGES.todaySummaryRemainingHeading}
+          sessions={result.remaining}
+        />
         {result.stoppedEarly !== false && (
           <Text as="p" variant="body-sm" tone="secondary">
             {MESSAGES.todaySummaryStoppedEarly(
