@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MESSAGES } from '../../../../packages/app/src/text/messages.js';
+import { formatPlanAge, MESSAGES } from '../../../../packages/app/src/text/messages.js';
 
 describe('MESSAGES', () => {
   it('every plain string is non-empty (concentrated, but never accidentally blank)', () => {
@@ -50,6 +50,37 @@ describe('MESSAGES', () => {
     expect(MESSAGES.otherSessionsDirectoryRowLabel('/code/unrelated', 3)).toBe(
       '/code/unrelated (3 sessions)',
     );
+  });
+
+  // PO review of V2-T66, third round: "(0 days ago)" read as a literal defect, and daysAgo === 1
+  // silently had no suffix at all — fixed to "(today)"/"(1 day ago)" singular/"(N days ago)".
+  describe('formatPlanAge', () => {
+    it('is "today" for daysAgo 0', () => {
+      expect(formatPlanAge(0)).toBe('today');
+    });
+
+    it('is singular "1 day ago" for daysAgo 1', () => {
+      expect(formatPlanAge(1)).toBe('1 day ago');
+    });
+
+    it('is plural "N days ago" for daysAgo 2 and beyond', () => {
+      expect(formatPlanAge(2)).toBe('2 days ago');
+      expect(formatPlanAge(21)).toBe('21 days ago');
+    });
+  });
+
+  describe('todayPlanTitle', () => {
+    it('reads "Plan for <day> (today)" for daysAgo 0', () => {
+      expect(MESSAGES.todayPlanTitle('2026-10-01', 0)).toBe('Plan for 2026-10-01 (today)');
+    });
+
+    it('reads "Plan for <day> (1 day ago)" for daysAgo 1', () => {
+      expect(MESSAGES.todayPlanTitle('2026-09-30', 1)).toBe('Plan for 2026-09-30 (1 day ago)');
+    });
+
+    it('reads "Plan for <day> (N days ago)" for daysAgo 2 and beyond', () => {
+      expect(MESSAGES.todayPlanTitle('2026-09-20', 2)).toBe('Plan for 2026-09-20 (2 days ago)');
+    });
   });
 
   it('todaySummaryResumedWithoutPlanNote wraps the bare fact in a sentence, distinct from the fallback note', () => {

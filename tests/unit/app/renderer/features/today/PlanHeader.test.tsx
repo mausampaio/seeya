@@ -15,12 +15,22 @@ describe('PlanHeader (D-052, V2-T66)', () => {
         sessionCount={3}
       />,
     );
-    expect(getByText('Plan for 2026-09-30')).not.toBeNull();
+    expect(getByText('Plan for 2026-09-30 (1 day ago)')).not.toBeNull();
     expect(getByText(/3 sessions/)).not.toBeNull();
     expect(getByText(/Captured/)).not.toBeNull();
   });
 
-  it('shows "(N days ago)" in the title when daysAgo is not 1', () => {
+  // PO review of V2-T66, third round: "(0 days ago)" read as a literal defect — see
+  // `MESSAGES.todayPlanTitle`/`formatPlanAge` (text/messages.ts) for the fix and the full set of
+  // 0/1/2 cases; this component-level test only needs to prove the title actually renders it.
+  it('shows "(today)" in the title when daysAgo is 0', () => {
+    const { getByText } = render(
+      <PlanHeader day="2026-10-01" daysAgo={0} capturedAt={null} sessionCount={1} />,
+    );
+    expect(getByText('Plan for 2026-10-01 (today)')).not.toBeNull();
+  });
+
+  it('shows "(N days ago)" in the title when daysAgo is 2 or more', () => {
     const { getByText } = render(
       <PlanHeader day="2026-09-20" daysAgo={10} capturedAt={null} sessionCount={1} />,
     );
