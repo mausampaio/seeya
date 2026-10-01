@@ -56,13 +56,7 @@ export function TodayCard(props: TodayCardProps): JSX.Element {
           </span>
         )}
       </div>
-      <Text
-        as="div"
-        variant="caption"
-        tone="secondary"
-        truncate
-        className={cx(styles, 'subtitle')}
-      >
+      <Text as="div" variant="caption" tone="secondary" truncate className={cx(styles, 'subtitle')}>
         {subtitle}
       </Text>
     </button>
