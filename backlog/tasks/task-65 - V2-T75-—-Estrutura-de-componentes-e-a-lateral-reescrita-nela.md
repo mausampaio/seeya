@@ -4,7 +4,7 @@ title: V2-T75 — Estrutura de componentes e a lateral reescrita nela
 status: Review
 assignee: []
 created_date: '2026-09-30 21:21'
-updated_date: '2026-10-01 13:21'
+updated_date: '2026-10-01 14:02'
 labels: []
 milestone: m-2
 dependencies: []
@@ -468,5 +468,77 @@ author: PO
 created: 2026-10-01 13:21
 ---
 Revisão do PO em 2026-10-01 (defeito de produção achado pelo mantenedor: terminal desenhado errado depois de recolher/expandir a lateral com outra aba ativa; pior em PowerShell e bash/WSL). Causa confirmada por reprodução real: fit de terminal escondido mandava 2x1 ao pty. Correção: decisão pura de resize (escondido/inválido/igual não envia), fit adiado durante a transição da lateral, fit ao voltar à aba. Antes: 30 resizes, 9x5 durante o esconderijo, terminal corrompido; depois: nenhum resize com a aba escondida, terminal correto (capturas conferidas pelo PO). Mesclado, portão do zero verde (3241 testes), também sem identidade global do git. Nota: o agente usou git stash para gerar o 'antes' — a pilha de stash é compartilhada entre worktrees; ficou vazia.
+---
+
+author: agente
+created: 2026-10-01 14:02
+---
+Maintainer acceptance (docs/INTERFACE.md section 1, 'Tres estados visuais na linha de projeto',
+already on main at 7711626). New branch tarefa/V2-T75-linha-de-projeto from main, separate from
+the two previous branches (both already merged). Two commits.
+
+ProjectRow (Favorites and Recent) had no hover, and a project whose own tab was the ACTIVE one
+got no extra highlight beyond the plain open-tab card -- unlike All projects/Sessions, which
+already get the active-item highlight via NavItem. Implemented as three states, all props/CSS
+classes (not ad hoc), reusing NavItem's own mechanism (same tokens, same specificity strategy,
+explicitly cited in the comments) rather than duplicating it:
+
+1. Hover -- '.row:hover' (--seeya-surface-hover), mirroring NavItem.module.css's own
+'.navItem:hover' token AND specificity exactly (class + pseudo-class, 0,2,0) -- hovering a row
+that is also open/active still shows feedback, the same precedence NavItem already has between
+its own :hover and .active.
+2. Open tab (renamed from '.rowActive' to '.rowOpenHere', since 'active' now means something more
+specific) -- unchanged surface-subtle card, badge === 'openHere'.
+3. Active tab (new) -- '.rowActiveTab' (--seeya-brand-soft), 'por cima do cartao': declared after
+'.rowOpenHere' so same-specificity source-order resolves which background wins, and
+'.rowActiveTab .nameText' (mirroring NavItem's own '.active .label') for the name's
+--seeya-brand-text colour.
+
+New prop ProjectRowProps.activeTab (optional, same defensive default as NavItem's own active?),
+computed in state/sidebar-summary.ts#hasActiveTabSession -- a session's matchedTabId equal to the
+CURRENTLY active tab, distinct from badge === 'openHere' (matched to ANY tab). Threaded through
+useSidebar.ts/FavoritesSection.tsx/RecentSection.tsx.
+
+Tests: nine rendered ProjectRow cases (open-card-without-active-class,
+active-applies-both-classes-plus-nameText, activeTab-never-applied-without-an-open-badge, the
+existing five unchanged), plus a CSS-text regression test for the hover rule (see below), nine
+new sidebar-summary.ts cases for hasActiveTabSession (true/false by tab id, false when
+activeTabId is null), and the two FavoritesSection/RecentSection fixtures updated for the new
+required field.
+
+Hover proof: happy-dom never applies real :hover pseudo-class matching for a synthetic
+fireEvent.mouseOver (confirmed empirically while writing the test -- computed background-color
+is unchanged before/after), so a rendered-DOM test can't prove it meaningfully; added a test that
+reads the actual CSS module file text and asserts the '.row:hover' rule exists with the same
+token NavItem uses, instead. For the SCREENSHOT, a synthetic DOM MouseEvent would have had the
+identical limitation in a real browser engine too (:hover is driven by the renderer's own input
+pipeline tracking real cursor position, never by a DOM event the page fires at itself) -- so I
+added a small verification-only flag, SEEYA_APP_AUTO_HOVER_FIRST_FAVORITE, that calls
+webContents.sendInputEvent({ type: 'mouseMove', ... }), the one Electron API that injects input
+at the native level a real mouse would. It worked cleanly in a real screenshot, so the hover
+state did NOT need the test-only fallback after all -- both forms of proof exist regardless.
+
+Also added SEEYA_APP_AUTO_SWITCH_TO_ALL_PROJECTS (clicks 'All projects' a moment after
+SEEYA_APP_AUTO_OPEN_SHELL_TAB's own tab opens) to produce the 'open but not active' example for
+real, rather than assuming it from a single-tab window where the shell is trivially always the
+active one.
+
+Screenshots (same disposable --user-data-dir technique as every previous round, real compiled
+app, real spawned pty matched to a fixture session by real pid):
+- v2t75-projectrow-favorite-active.png -- 'Payments webhooks' (Favorites), its own session
+matching the currently active shell tab: visibly brand-soft/purple-tinted row, 'open here' text
+and the project name itself in brand-text colour.
+- v2t75-projectrow-recent-open-not-active.png -- 'Billing reconciliation' (Recent), its own
+session matching a tab that is open but NOT the active one (the active tab is the Projects page,
+clicked away via the new flag): plain surface-subtle grey card, 'open here' badge, but visibly
+NOT the purple/brand-soft tint the first screenshot shows -- the two states read as genuinely
+different colours side by side.
+- v2t75-projectrow-hover.png -- the long-named favorite with no open session, hovered via
+sendInputEvent: the plain surface-hover grey highlight, distinct from both the above.
+
+Process: packages/*/dist deleted before every npm run verificar run (green, 337 test files, 3249
+tests passed); protocol-handler.json hash and both seeya/seeya-dev registry keys confirmed
+unchanged before and after every capture in this round; no stray Electron processes left
+running. Leaving the task in Review.
 ---
 <!-- COMMENTS:END -->
