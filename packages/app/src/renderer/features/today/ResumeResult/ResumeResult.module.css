@@ -1,0 +1,12 @@
+/* V2-T66 — the resume result, shown above the cards (`docs/INTERFACE.md` § 3). */
+.result {
+  margin-bottom: var(--seeya-space-4);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--seeya-space-1);
+  margin: 0;
+  padding-left: var(--seeya-space-4);
+}

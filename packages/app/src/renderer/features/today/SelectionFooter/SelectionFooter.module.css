@@ -1,0 +1,8 @@
+/* V2-T66 — the Today tab's own fixed selection footer (`docs/INTERFACE.md` § 3). Rendered as a
+ * sibling AFTER `Today.module.css`'s own scrollable region, not inside it (`Today.tsx`'s own flex
+ * column) — that is what keeps it "fixo" (always on screen, never scrolled away) without resorting
+ * to `position: sticky`/`fixed`, which would need this component to know about an ancestor it has
+ * no reason to. */
+.footer {
+  flex-shrink: 0;
+}

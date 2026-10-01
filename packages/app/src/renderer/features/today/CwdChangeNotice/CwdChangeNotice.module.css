@@ -1,0 +1,5 @@
+/* V2-T66 — the only thing this component's own CSS needs: a little breathing room from whatever
+ * sits above it inside the session card (`SessionCard.module.css` never reaches into here). */
+.notice {
+  margin-top: var(--seeya-space-1);
+}

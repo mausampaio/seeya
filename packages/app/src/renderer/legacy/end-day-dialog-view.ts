@@ -2,11 +2,16 @@
  * The "End day…" preview/progress/result dialog (V2-T5a — split out of the former single-file
  * `renderer.ts` by V2-T62/D-051). Excluded from `packages/app/src`'s coverage floor with
  * everything else in `electron/` (it cannot run without a display).
+ *
+ * V2-T66: no longer calls `today-panel-view.ts#refreshTodayPanel()` after "Run end-day now"
+ * resolves — that module is apagado by this task (the Today tab is a real, independently-mounted
+ * component now, `renderer/features/today/Today.tsx`). `main/main.ts#CHANNELS.endDayRun`'s own
+ * handler pushes a fresh `todayUpdate` itself once the run finishes, the same push `<Today/>`'s own
+ * `useToday` hook already subscribes to for the ambient refresh tick.
  */
 import { MESSAGES } from '../../text/messages.js';
 import { reduceEndDayPanel, type EndDayPanelState } from '../../state/end-day-panel.js';
 import type { EndDayPreviewResponse } from '../../ipc/channels.js';
-import { refreshTodayPanel } from './today-panel-view.js';
 
 /**
  * V2-T5a items 1/4: the "End day…" button and its preview-as-confirmation/progress/result dialog
@@ -116,10 +121,10 @@ function handleEndDayCancelOrClose(): void {
  * "Run end-day now" clicked (V2-T5a item 4): runs the real `endDay`, one at a time — this
  * function only proceeds from `preview` (the button is hidden in every other state, and the
  * reducer itself refuses `runClicked` from anywhere else, so a stray second call is a no-op even
- * if it somehow fired). Refreshes the "Today" panel once the run resolves — the freshly-written
- * handoffs/briefing are what tomorrow's `start-day` will find; the status panel picks up the same
- * write on its own next ambient refresh tick (`main.ts`'s own `runRefreshLoop`, at most
- * `REFRESH_INTERVAL_MS` away), no separate push needed here.
+ * if it somehow fired). The status panel picks up the same write on its own next ambient refresh
+ * tick (`main.ts`'s own `runRefreshLoop`, at most `REFRESH_INTERVAL_MS` away); the Today tab picks
+ * it up from `main.ts#CHANNELS.endDayRun`'s own `todayUpdate` push (V2-T66) — neither needs a
+ * refresh call from here any more.
  */
 async function handleEndDayRunClicked(): Promise<void> {
   if (endDayState.kind !== 'preview') {
@@ -133,7 +138,6 @@ async function handleEndDayRunClicked(): Promise<void> {
     reportText: response.reportText,
   });
   renderEndDayDialog();
-  await refreshTodayPanel();
 }
 
 /** Wired once, at startup — also wires `onEndDayProgress`, the end-day-specific slice of what

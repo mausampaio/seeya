@@ -7,13 +7,18 @@
  * BOTH kinds of pane through one function), so splitting them across two components here would
  * only recreate the coupling with extra prop-drilling.
  *
- * **What's still static, unmoved markup inside `#terminal-host`.** The Today/Projects/Sessions
- * page panes (`#page-today`/`#page-projects`/`#page-sessions` and everything inside each) are NOT
- * this task's region (`docs/INTERFACE.md` §§ 3–5 are separate, later tasks) — same ids, same
- * nesting, unchanged, so `renderer/legacy/today-panel-view.ts`/`projects-list-view.tsx`/
- * `session-search-view.ts`/`other-sessions-dir-dialog-view.ts` keep working exactly as before.
- * Only `hidden` is new: it is now computed from `activeId`, the same single source of truth every
- * other pane in this component uses, instead of each page tab button toggling it by hand.
+ * **What's still static, unmoved markup inside `#terminal-host`.** The Projects/Sessions page
+ * panes (`#page-projects`/`#page-sessions` and everything inside each) are NOT this task's region
+ * (`docs/INTERFACE.md` §§ 4–5 are separate, later tasks) — same ids, same nesting, unchanged, so
+ * `renderer/legacy/projects-list-view.tsx`/`session-search-view.ts`/
+ * `other-sessions-dir-dialog-view.ts` keep working exactly as before. Only `hidden` is new: it is
+ * now computed from `activeId`, the same single source of truth every other pane in this component
+ * uses, instead of each page tab button toggling it by hand.
+ *
+ * `#page-today` (V2-T66, `docs/INTERFACE.md` § 3) is the one exception: its content is now
+ * `<Today/>` (`renderer/features/today/`), a real component, replacing the `#today-panel` anchor
+ * `renderer/legacy/today-panel-view.ts` used to fill by hand (apagado by that task) — same `id`,
+ * same position in the tree, so nothing else in this file changes.
  *
  * **Settings** (`docs/INTERFACE.md` § 2 item 2) is an `IconButton` with a gear icon and
  * `aria-label`; its click opens `renderer/features/settings/SettingsDialog` (V2-T65) via
@@ -41,6 +46,7 @@ import { NewTabPopover } from './NewTabPopover/index.js';
 import { useTabStrip } from './useTabStrip.js';
 import { watchSidebarWidthTransition } from './sidebar-transition-watcher.js';
 import { MESSAGES } from '../../../text/messages.js';
+import { Today } from '../today/index.js';
 
 export interface TabStripProps {
   /** `App.tsx`'s own sidebar-reopen button — rendered as the first element of this component's
@@ -157,7 +163,7 @@ export function TabStrip(props: TabStripProps): JSX.Element {
       />
       <div id="terminal-host" ref={terminalHostRef}>
         <div id="page-today" class="page-pane" hidden={data.activeId !== 'page-today'}>
-          <div id="today-panel"></div>
+          <Today />
         </div>
         <div id="page-projects" class="page-pane" hidden={data.activeId !== 'page-projects'}>
           <h2>Projects</h2>

@@ -1333,9 +1333,17 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // was found (nothing to build a history for).
   //
   // V2-T16: `maxBriefingScanDays` is read fresh from `config.json` every time this panel is
-  // opened, never a value cached from window startup — same discipline `getSettingsPanel` below
+  // rebuilt, never a value cached from window startup — same discipline `getSettingsPanel` below
   // already follows.
-  ipcMain.handle(CHANNELS.getTodayPanel, async (): Promise<TodayPanelResponse> => {
+  //
+  // V2-T66: extracted out of the `getTodayPanel` handler (its only caller before this task) so
+  // `endDayRun` below can also rebuild and PUSH a fresh value once a real end-day run finishes —
+  // the Today tab is a real component now (`renderer/features/today/Today.tsx`), mounted once for
+  // the life of the window and driven entirely by `onTodayUpdate`/its own mount-time fetch, with
+  // no imperative `refreshTodayPanel()` escape hatch left for a sibling dialog to call into it
+  // (unlike the deleted `renderer/legacy/today-panel-view.ts`, which `renderer/legacy/
+  // end-day-dialog-view.ts` used to call directly after "Run end-day now" resolved).
+  async function buildFreshTodayPanelData(): Promise<TodayPanelResponse> {
     const config = await context.storage.readConfig();
     const lookup = await findPendingBriefing(
       context.storage,
@@ -1366,11 +1374,15 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
     const liveSessionIds = buildLiveSessionIndex(latestSidebarRows);
     const cwdHistoryBySessionId = new Map(cwdHistoryEntries);
     // V2-T18 item 2: cached for the refresh tick below (refreshTodayPanelLiveness) — the lookup
-    // and cwd history just built here stay valid until the next getTodayPanel call; only
-    // liveness needs to be fresh every tick.
+    // and cwd history just built here stay valid until the next rebuild; only liveness needs to be
+    // fresh every tick.
     latestTodayPanelInputs = { lookup, cwdHistoryBySessionId };
     return buildTodayPanelData(lookup, cwdHistoryBySessionId, liveSessionIds);
-  });
+  }
+
+  ipcMain.handle(CHANNELS.getTodayPanel, (): Promise<TodayPanelResponse> =>
+    buildFreshTodayPanelData(),
+  );
 
   // V2-T4 items 1/2/3: "Resume selected" — the same resumeSessions the CLI's start-day-command.ts
   // calls, with a TabSessionResumer instead of ClaudeSessionResumer and a dialog-backed
@@ -1456,10 +1468,15 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // V2-T5a item 4: "Run end-day now" — the real run (dryRun: false), notified through the SAME
   // Notifier/buildEndDayNotice seeya end-day uses (composition/index.ts#buildAppContext wires the
   // real adapter, D-020). The status panel picks up whatever this run wrote/terminated on its own
-  // next tick (runRefreshLoop below, at most REFRESH_INTERVAL_MS away — no separate push needed);
-  // the "Today" panel is refreshed explicitly by the renderer right after this resolves
-  // (renderer.ts#handleEndDayRunClicked), the same "refresh after a write" shape
-  // handleResumeSelected already has for the resume flow.
+  // next tick (runRefreshLoop below, at most REFRESH_INTERVAL_MS away — no separate push needed).
+  //
+  // V2-T66: the "Today" panel is now refreshed and PUSHED from here, not fetched explicitly by the
+  // renderer after this resolves — `renderer/legacy/end-day-dialog-view.ts` used to call
+  // `today-panel-view.ts#refreshTodayPanel()` for that (the deleted DOM-at-hand panel's own
+  // imperative refresh), but Today is a real, independently-mounted component now
+  // (`renderer/features/today/Today.tsx`) with no reference a sibling dialog could call into —
+  // `CHANNELS.todayUpdate`, the same push every ambient refresh tick already uses, is the only
+  // channel left that reaches it.
   ipcMain.handle(CHANNELS.endDayRun, async (): Promise<EndDayRunResponse> => {
     if (endDayRunInProgress) {
       throw new Error('an end-day run is already in progress');
@@ -1487,7 +1504,9 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
       }
       // V2-T16: fresh read, same reasoning as `endDayPreview` above.
       const config = await context.storage.readConfig();
-      return { reportText: formatEndDayReport(result, config) };
+      const report = formatEndDayReport(result, config);
+      window.webContents.send(CHANNELS.todayUpdate, await buildFreshTodayPanelData());
+      return { reportText: report };
     } finally {
       endDayRunInProgress = false;
     }

@@ -1,0 +1,7 @@
+/* V2-T66 — a plain, horizontal row above the cards (`docs/INTERFACE.md` § 3). */
+.progress {
+  display: flex;
+  align-items: center;
+  gap: var(--seeya-space-2);
+  margin-bottom: var(--seeya-space-4);
+}
