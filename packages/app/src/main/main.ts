@@ -296,6 +296,40 @@ async function captureLiveThemeToggleVerification(
 }
 
 /**
+ * Maintainer-found defect, V2-T65-estado-na-tela item 1: `SettingsDialog`'s own `<dialog>` used to
+ * stay visually painted — and clickable-through — after a real `Done` click, until some UNRELATED
+ * state change forced a re-render (`SettingsDialog.module.css`'s own `.dialog` setting `display`
+ * unconditionally, which always wins over the UA stylesheet's own `dialog:not([open]) { display:
+ * none }` regardless of specificity). Same two-screenshot, same-window shape as
+ * `captureLiveThemeToggleVerification` above (its own docstring explains why a before/after pair
+ * needs to share one window rather than two separate processes) — here the "after" state is
+ * "closed", proven by a screenshot taken the instant after `Done`, with NOTHING else in between.
+ */
+async function captureSettingsCloseVerification(
+  window: BrowserWindow,
+  clock: Clock,
+  openPath: string,
+  closedPath: string,
+): Promise<void> {
+  const { writeFile } = await import('node:fs/promises');
+  await clock.sleep(2500);
+  await window.webContents.executeJavaScript("document.getElementById('settings-button').click();");
+  await clock.sleep(500);
+  const open = await window.webContents.capturePage();
+  await writeFile(openPath, open.toPNG());
+  await window.webContents.executeJavaScript(
+    "document.getElementById('settings-dialog-done').click();",
+  );
+  const closed = await window.webContents.capturePage();
+  await writeFile(closedPath, closed.toPNG());
+  const quitAfterMs = Number(process.env.SEEYA_APP_QUIT_AFTER_MS ?? '');
+  if (Number.isFinite(quitAfterMs)) {
+    await clock.sleep(quitAfterMs);
+    app.quit();
+  }
+}
+
+/**
  * V2-T17 item 4: opt-in instrumentation for the "time until the session list is on screen"
  * measurement (`docs/DESEMPENHO.md`). Writes the wall-clock instant (via the injected `Clock`,
  * D-019 — `process.hrtime`/`Date.now()` are banned outside `adapters/clock/` by
@@ -601,6 +635,45 @@ function createWindow(clock: Clock): BrowserWindow {
           ),
         )
         .then(() => clock.sleep(2000));
+    });
+  }
+  // SEEYA_APP_AUTO_CLICK_SKIP_TODAY (maintainer-found defect, V2-T65-estado-na-tela item 2): clicks
+  // the real "Skip today" button in the faixa de horário, for an agent with no mouse of its own to
+  // prove the fix — before this round, `onSkip` fired `skipToday` and threw the response away, so
+  // the button stayed exactly as it was (not disabled, no spinner) until some UNRELATED re-render
+  // caught up; a screenshot taken right after this click, with NOTHING else happening in between,
+  // is the proof: the button must already read disabled/busy in that single frame, never waiting
+  // for a second interaction or the next ambient `scheduleUpdate` push. The 2000ms sleep before
+  // clicking gives `useSidebarFooter`'s own `getScheduleStrip` fetch time to land first — this
+  // button simply doesn't exist in the DOM (`schedule.canSkip`) until that resolves. Never set by
+  // `npm run app` or the README.
+  if (process.env.SEEYA_APP_AUTO_CLICK_SKIP_TODAY === '1') {
+    window.webContents.once('did-finish-load', () => {
+      void clock
+        .sleep(2000)
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('schedule-strip-skip-button')?.click();",
+          ),
+        );
+    });
+  }
+  // SEEYA_APP_SETTINGS_CLOSE_AFTER_SCREENSHOT_PATH (maintainer-found defect,
+  // V2-T65-estado-na-tela item 1): combined with `SEEYA_APP_SCREENSHOT_PATH`, captures the real
+  // Settings dialog OPEN (same as `captureLiveThemeToggleVerification`'s own "before" shot), clicks
+  // the real `Done` button, and captures AGAIN immediately — no other interaction in between, which
+  // is exactly the scenario the maintainer found broken: before this round, `SettingsDialog.module
+  // .css`'s own `.dialog` set `display: flex` unconditionally, so the dialog stayed PAINTED (and
+  // clickable-through, having already left the top layer via `.close()`) until some unrelated
+  // re-render forced Preact to repaint. The "after" screenshot proves the opposite now: the dialog
+  // is gone from the very next frame, nothing else needed. Same two-screenshot shape as
+  // `captureLiveThemeToggleVerification` (this file's own docstring on that function explains why
+  // this task needs a same-window before/after instead of two separate processes) — reusing that
+  // function's own short sleeps rather than inventing a third timing scheme.
+  const settingsCloseAfterPath = process.env.SEEYA_APP_SETTINGS_CLOSE_AFTER_SCREENSHOT_PATH;
+  if (screenshotPath !== undefined && settingsCloseAfterPath !== undefined) {
+    window.webContents.once('did-finish-load', () => {
+      void captureSettingsCloseVerification(window, clock, screenshotPath, settingsCloseAfterPath);
     });
   }
   // SEEYA_APP_AUTO_OPEN_OTHER_SESSIONS_DIR: same "instrumentação só do spike" class as the six

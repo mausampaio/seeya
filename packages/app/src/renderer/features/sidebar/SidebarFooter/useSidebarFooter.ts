@@ -8,9 +8,8 @@
  * (`state/daemon-control-panel.ts#reduceDaemonControl`) — only the DOM-touching half moves into a
  * hook, never the decision itself.
  */
-import { useCallback, useEffect, useReducer } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState, useReducer } from 'preact/hooks';
 import { getSeeyaApi } from '../../../ipc/client.js';
-import { useIpcSubscription } from '../../../hooks/useIpcSubscription.js';
 import type { ScheduleUpdateEvent } from '../../../../ipc/channels.js';
 import {
   reduceDaemonControl,
@@ -29,8 +28,15 @@ const INITIAL_DAEMON_CONTROL_STATE: DaemonControlState = {
   availability: { kind: 'unknown' },
 };
 
+/** Which of the footer's own two schedule actions is in flight — `null` when neither is, D-024
+ * (never two separate booleans that could both read `true` at once: the two actions both rewrite
+ * the SAME `estado.json`, so this hook only ever lets one run at a time, see `onSnooze`/`onSkip`
+ * below). */
+export type ScheduleActionPending = 'snooze' | 'skip' | null;
+
 export interface SidebarFooterControls {
   readonly schedule: ScheduleUpdateEvent;
+  readonly scheduleActionPending: ScheduleActionPending;
   readonly onSnooze: (minutes: 15 | 30 | 60) => void;
   readonly onSkip: () => void;
   readonly daemon: DaemonControlState;
@@ -39,17 +45,30 @@ export interface SidebarFooterControls {
 
 export function useSidebarFooter(): SidebarFooterControls {
   const api = getSeeyaApi();
-  // Wrapped in an arrow function — see `useSidebar.ts`'s own comment on the identical fix.
-  //
-  // V2-T75 PO review (2026-10-01, round 3), production defect: `getScheduleStrip` is new in this
-  // round, added specifically so the schedule line doesn't sit on `NO_SCHEDULE_YET` for up to two
-  // refresh intervals after open — same "fetchInitial seeds state, push drives updates" fix as
-  // `useSidebar.ts`'s own `projects`/`today`, see `useIpcSubscription`'s own docstring.
-  const schedule = useIpcSubscription<ScheduleUpdateEvent>(
-    (listener) => api.onScheduleUpdate(listener),
-    NO_SCHEDULE_YET,
-    () => api.getScheduleStrip(),
-  );
+  const [schedule, setSchedule] = useState<ScheduleUpdateEvent>(NO_SCHEDULE_YET);
+  const [scheduleActionPending, setScheduleActionPending] = useState<ScheduleActionPending>(null);
+  // Bug fix (maintainer-found, V2-T65-estado-na-tela item 2): this used to be a plain
+  // `useIpcSubscription` call, which only exposes the push-driven VALUE, never a way to apply a
+  // RESULT back into it — `onSnooze`/`onSkip` below need exactly that (their own `snoozeToday`/
+  // `skipToday` IPC calls already return the freshly recomputed strip, `ipc/channels.ts`'s own
+  // docstring on both channels says so — the bug was that nothing ever used the answer, same shape
+  // as the `void api.getProjectsPanel();` defect `useIpcSubscription`'s own docstring already
+  // documents, just on a MUTATING call this time instead of a read). Managed here instead, with
+  // the identical "push always wins over a late-resolving fetch" guard (`receivedPushRef`) that
+  // hook already has — `fetchInitial`'s one-time seed on mount is the only piece reused by name.
+  const receivedPushRef = useRef(false);
+  useEffect(() => {
+    const unsubscribe = api.onScheduleUpdate((event) => {
+      receivedPushRef.current = true;
+      setSchedule(event);
+    });
+    void api.getScheduleStrip().then((result) => {
+      if (!receivedPushRef.current) {
+        setSchedule(result);
+      }
+    });
+    return unsubscribe;
+  }, [api]);
   const [daemon, dispatch] = useReducer(reduceDaemonControl, INITIAL_DAEMON_CONTROL_STATE);
 
   // A plain `useEffect`, not `useIpcSubscription`: that hook mirrors a channel into `useState`,
@@ -77,15 +96,37 @@ export function useSidebarFooter(): SidebarFooterControls {
     });
   }, [api]);
 
+  // Bug fix (maintainer-found, V2-T65-estado-na-tela item 2): both actions used to fire the IPC
+  // call and throw the response away (`void api.snoozeToday(...)`/`void api.skipToday()`) — the
+  // maintainer clicked Skip and nothing happened until an UNRELATED re-render (or up to
+  // `REFRESH_INTERVAL_MS` for the next ambient `scheduleUpdate` push) made the footer catch up.
+  // `snoozeToday`/`skipToday` already return the freshly recomputed strip for exactly this reason
+  // (`ipc/channels.ts`'s own docstring on both channels) — `setSchedule(response)` is the one-line
+  // fix, `scheduleActionPending` is the "estado de trabalho" the maintainer's own follow-up asked
+  // for as a `Button`'s own `loading` prop, never a second, separate spinner mechanism.
   const onSnooze = useCallback(
     (minutes: 15 | 30 | 60) => {
-      void api.snoozeToday({ minutes });
+      if (scheduleActionPending !== null) {
+        return;
+      }
+      setScheduleActionPending('snooze');
+      void api.snoozeToday({ minutes }).then((response) => {
+        setSchedule(response);
+        setScheduleActionPending(null);
+      });
     },
-    [api],
+    [api, scheduleActionPending],
   );
   const onSkip = useCallback(() => {
-    void api.skipToday();
-  }, [api]);
+    if (scheduleActionPending !== null) {
+      return;
+    }
+    setScheduleActionPending('skip');
+    void api.skipToday().then((response) => {
+      setSchedule(response);
+      setScheduleActionPending(null);
+    });
+  }, [api, scheduleActionPending]);
 
   const onDaemonControlClicked = useCallback(() => {
     if (
@@ -105,5 +146,12 @@ export function useSidebarFooter(): SidebarFooterControls {
     });
   }, [api, daemon]);
 
-  return { schedule, onSnooze, onSkip, daemon, onDaemonControlClicked };
+  return {
+    schedule,
+    scheduleActionPending,
+    onSnooze,
+    onSkip,
+    daemon,
+    onDaemonControlClicked,
+  };
 }

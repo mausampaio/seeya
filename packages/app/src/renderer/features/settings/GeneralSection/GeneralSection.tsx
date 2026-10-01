@@ -104,6 +104,7 @@ export function GeneralSection(props: GeneralSectionProps): JSX.Element {
           label={MESSAGES.settingsAutostartLabel}
           checked={autostartChecked(autostart.availability)}
           disabled={autostartDisabled}
+          loading={autostart.kind === 'running'}
           disabledReason={autostartDisabledReason(autostart)}
           onChange={props.onAutostartToggle}
         />

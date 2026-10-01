@@ -134,4 +134,72 @@ describe('SidebarFooter (D-052, V2-T75)', () => {
     fireEvent.click(getByRole('menuitem', { name: '+30m' }));
     expect(snoozeToday).toHaveBeenCalledWith({ minutes: 30 });
   });
+
+  /**
+   * Regression test (maintainer-found, V2-T65-estado-na-tela item 2): clicking Skip used to do
+   * nothing visible at all — the button stayed exactly as it was until some unrelated re-render
+   * (or the next ambient push) caught up. This test never pushes a `scheduleUpdate` event — if the
+   * button still goes disabled/`aria-busy` the instant it's clicked, that is the fix (the
+   * component-level `loading` prop, driven by `useSidebarFooter`'s own `scheduleActionPending`),
+   * not a push this test deliberately withholds.
+   */
+  it('clicking Skip today immediately disables it and sets aria-busy, with no push involved', () => {
+    const skipToday = vi.fn(() => new Promise<never>(() => {}));
+    window.seeya = createFakeSeeyaApi({
+      onScheduleUpdate: (listener) => {
+        listener({ primary: 'End of day', secondary: 'in 2 h', canSnooze: false, canSkip: true });
+        return () => {};
+      },
+      skipToday,
+    });
+    const { getByRole } = render(<SidebarFooter />);
+    const skipButton = getByRole('button', { name: 'Skip today' }) as HTMLButtonElement;
+    expect(skipButton.disabled).toBe(false);
+
+    fireEvent.click(skipButton);
+
+    expect(skipButton.disabled).toBe(true);
+    expect(skipButton.getAttribute('aria-busy')).toBe('true');
+  });
+
+  /**
+   * Regression test (maintainer's own follow-up, item 2's own "qualquer outra ação demorada"):
+   * before this fix the daemon `IconButton` was only ever disabled for `unknown` availability —
+   * nothing stopped a second click from firing `daemonControl` again while the first command was
+   * still running.
+   */
+  it('the daemon button disables itself and sets aria-busy for the DURATION of the command', async () => {
+    let resolveDaemonControl:
+      | ((value: { resultText: string; availability: DaemonControlAvailability }) => void)
+      | undefined;
+    const daemonControl = vi.fn(
+      () =>
+        new Promise<{ resultText: string; availability: DaemonControlAvailability }>((resolve) => {
+          resolveDaemonControl = resolve;
+        }),
+    );
+    window.seeya = createFakeSeeyaApi({
+      onDaemonAvailabilityUpdate: (listener) => {
+        listener({ kind: 'start' });
+        return () => {};
+      },
+      daemonControl,
+    });
+    const { getByRole } = render(<SidebarFooter />);
+    const button = getByRole('button', { name: 'Start daemon' }) as HTMLButtonElement;
+    expect(button.disabled).toBe(false);
+
+    fireEvent.click(button);
+    expect(button.disabled).toBe(true);
+    expect(button.getAttribute('aria-busy')).toBe('true');
+
+    await act(async () => {
+      resolveDaemonControl?.({
+        resultText: 'Daemon started.',
+        availability: { kind: 'stop', pid: 1 },
+      });
+      await Promise.resolve();
+    });
+    expect(button.getAttribute('aria-busy')).toBeNull();
+  });
 });
