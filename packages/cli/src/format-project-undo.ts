@@ -17,7 +17,7 @@ import type {
   ConfirmDeleteAdoptedCopy,
   RevertAdoptionResult,
 } from '@seeya-ai/engine/application/project-revert-adoption.js';
-import { parseReadOnlyOpenConfirmation } from './format-project-adopt.js';
+import { parseReadOnlyOpenConfirmation } from './format-project-open.js';
 
 function formatInvalidIdLine(projectId: string): string {
   return (
