@@ -20,6 +20,8 @@ describe('CwdChangeNotice (D-052, V2-T66)', () => {
         chosenCwd={undefined}
         disabled={false}
         onChooseCwd={() => {}}
+        homeDir="/home/<usuario>"
+        platformHint="posix"
       />,
     );
     expect(getByText(/in \/new since 2026-08-16/)).not.toBeNull();
@@ -34,6 +36,8 @@ describe('CwdChangeNotice (D-052, V2-T66)', () => {
         chosenCwd={undefined}
         disabled={false}
         onChooseCwd={() => {}}
+        homeDir="/home/<usuario>"
+        platformHint="posix"
       />,
     );
     expect((getByLabelText('Resume in') as HTMLSelectElement).value).toBe('/new');
@@ -51,6 +55,8 @@ describe('CwdChangeNotice (D-052, V2-T66)', () => {
         chosenCwd="/first"
         disabled={false}
         onChooseCwd={() => {}}
+        homeDir="/home/<usuario>"
+        platformHint="posix"
       />,
     );
     expect((getByLabelText('Resume in') as HTMLSelectElement).value).toBe('/first');
@@ -69,6 +75,8 @@ describe('CwdChangeNotice (D-052, V2-T66)', () => {
         chosenCwd={undefined}
         disabled={false}
         onChooseCwd={onChooseCwd}
+        homeDir="/home/<usuario>"
+        platformHint="posix"
       />,
     );
     fireEvent.change(getByLabelText('Resume in'), { target: { value: '/first' } });
@@ -87,6 +95,8 @@ describe('CwdChangeNotice (D-052, V2-T66)', () => {
         chosenCwd={undefined}
         disabled={false}
         onChooseCwd={() => {}}
+        homeDir="/home/<usuario>"
+        platformHint="posix"
       />,
     );
     expect(queryByLabelText('Resume in')).toBeNull();
@@ -100,8 +110,65 @@ describe('CwdChangeNotice (D-052, V2-T66)', () => {
         chosenCwd={undefined}
         disabled
         onChooseCwd={() => {}}
+        homeDir="/home/<usuario>"
+        platformHint="posix"
       />,
     );
     expect((getByLabelText('Resume in') as HTMLSelectElement).disabled).toBe(true);
+  });
+});
+
+describe('CwdChangeNotice — directory display (PO review of V2-T66, item 2)', () => {
+  const UNDER_HOME_HISTORY: readonly CwdHistoryEntry[] = [
+    {
+      cwd: '/home/<usuario>/old-project',
+      firstDay: '2026-08-14',
+      lastDay: '2026-08-14',
+      exists: false,
+    },
+    {
+      cwd: '/home/<usuario>/new-project',
+      firstDay: '2026-08-16',
+      lastDay: '2026-08-16',
+      exists: true,
+    },
+  ];
+
+  it('abbreviates every cwd in the sentence to ~, with the full sentence in title', () => {
+    const { getByText } = render(
+      <CwdChangeNotice
+        sessionId="s1"
+        history={UNDER_HOME_HISTORY}
+        chosenCwd={undefined}
+        disabled={false}
+        onChooseCwd={() => {}}
+        homeDir="/home/<usuario>"
+        platformHint="posix"
+      />,
+    );
+    const sentence = getByText(/in ~\/new-project since 2026-08-16/);
+    expect(sentence.getAttribute('title')).toBe(
+      'ran in /home/<usuario>/old-project (no longer exists) until 2026-08-14; ' +
+        'in /home/<usuario>/new-project since 2026-08-16',
+    );
+  });
+
+  it('abbreviates the "Resume in" option labels, keeping the real path as the submitted value', () => {
+    const { getByLabelText } = render(
+      <CwdChangeNotice
+        sessionId="s1"
+        history={UNDER_HOME_HISTORY}
+        chosenCwd={undefined}
+        disabled={false}
+        onChooseCwd={() => {}}
+        homeDir="/home/<usuario>"
+        platformHint="posix"
+      />,
+    );
+    const select = getByLabelText('Resume in') as HTMLSelectElement;
+    expect(select.value).toBe('/home/<usuario>/new-project');
+    const option = select.querySelector('option') as HTMLOptionElement;
+    expect(option.textContent).toBe('~/new-project');
+    expect(option.getAttribute('title')).toBe('/home/<usuario>/new-project');
   });
 });

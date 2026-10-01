@@ -21,6 +21,11 @@ import { Text } from '../Text/index.js';
 export interface SelectOption {
   readonly value: string;
   readonly label: string;
+  /** The full, unabbreviated text for this option — set only where `label` is itself already
+   * shortened for display (V2-T66 PO review, item 2: a "Resume in" option's `label` is a `cwd`
+   * abbreviated to `~`/end-truncated; `title` keeps the real path a hover can still reveal, same
+   * discipline `sidebar/directory-label.ts` already documents for a row's own `title`). */
+  readonly title?: string;
 }
 
 export interface SelectProps {
@@ -53,7 +58,7 @@ export function Select(props: SelectProps): JSX.Element {
         onChange={(event) => props.onChange?.((event.target as HTMLSelectElement).value)}
       >
         {props.options.map((option) => (
-          <option key={option.value} value={option.value}>
+          <option key={option.value} value={option.value} title={option.title}>
             {option.label}
           </option>
         ))}

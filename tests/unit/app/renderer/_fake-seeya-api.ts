@@ -66,6 +66,10 @@ export function createFakeSeeyaApi(overrides: Partial<SeeyaApi> = {}): SeeyaApi 
     // already needs) — real resolving values, not `neverCalled`.
     getAutostartAvailability: vi.fn(() => Promise.resolve({ kind: 'unknown' as const })),
     getAppVersion: vi.fn(() => Promise.resolve('0.0.0-test')),
+    // V2-T66 PO review, item 2: `useToday` calls this unconditionally on mount (same
+    // "fetchInitial seeds state" reasoning as `getScheduleStrip`/`getAppVersion` above) — a real
+    // resolving value, not `neverCalled`.
+    getHomeDir: vi.fn(() => Promise.resolve('/home/<usuario>')),
     getDaemonOwnershipTransitionOffer: neverCalled('getDaemonOwnershipTransitionOffer'),
     answerDaemonOwnershipTransition: neverCalled('answerDaemonOwnershipTransition'),
     onProjectsUpdate: vi.fn(noopUnsubscribe),

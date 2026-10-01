@@ -76,6 +76,8 @@ export function Today(): JSX.Element {
                   chosenCwd={controls.chosenCwdBySessionId.get(row.sessionId)}
                   onToggle={controls.toggleSession}
                   onChooseCwd={controls.setChosenCwd}
+                  homeDir={controls.homeDir}
+                  platformHint={controls.platformHint}
                 />
               ))}
             </Stack>

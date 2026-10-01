@@ -241,6 +241,13 @@ export const CHANNELS = {
    * `app.getVersion()`, fetched once when the section first mounts; no push counterpart, a
    * running window's own version never changes until relaunched. */
   getAppVersion: 'seeya:get-app-version',
+  /** Renderer → main: the effective home directory this window resolved at startup — `AppContext`'s
+   * own `homeDir` (V2-T66 PO review, item 2), which is `os.homedir()` on a normal run but the
+   * `SEEYA_APP_HOME_OVERRIDE` value during verification — never read directly as `os.homedir()` in
+   * the renderer, which would disagree with it under that override. Used only to abbreviate a
+   * `cwd` as `~` for display (`sidebar/directory-label.ts#collapseHomeDirectory`); fetched once,
+   * a running window's own home directory never changes. */
+  getHomeDir: 'seeya:get-home-dir',
 } as const;
 
 export interface CreateTabRequest {

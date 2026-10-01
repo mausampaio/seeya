@@ -10,10 +10,11 @@
  *
  * @example
  * <CwdChangeNotice sessionId="s1" history={row.cwdHistory} chosenCwd={undefined}
- *   disabled={false} onChooseCwd={setChosenCwd} />
+ *   disabled={false} onChooseCwd={setChosenCwd} homeDir={homeDir} platformHint={platformHint} />
  */
 import type { JSX } from 'preact';
 import type { CwdHistoryEntry } from '@seeya-ai/engine/application/cwd-history.js';
+import type { PathPlatformHint } from '@seeya-ai/engine/core/cwd-normalization.js';
 import styles from './CwdChangeNotice.module.css';
 import { cx } from '../../../components/css-class.js';
 import { InfoBox } from '../../../components/InfoBox/index.js';
@@ -21,6 +22,7 @@ import { Text } from '../../../components/Text/index.js';
 import { Select } from '../../../components/Select/index.js';
 import { MESSAGES } from '../../../../text/messages.js';
 import { defaultResumeInCwd } from '../../../../state/today-panel.js';
+import { formatDirectoryPathForDisplay } from '../../../../sidebar/directory-label.js';
 
 export interface CwdChangeNoticeProps {
   readonly sessionId: string;
@@ -32,15 +34,27 @@ export interface CwdChangeNoticeProps {
   readonly chosenCwd: string | undefined;
   readonly disabled: boolean;
   readonly onChooseCwd: (sessionId: string, cwd: string) => void;
+  /** PO review of V2-T66, item 2 — the person's own home directory and the platform it was read
+   * on, so every `cwd` this notice shows (the sentence, each "Resume in" option) can be
+   * abbreviated to `~`/end-shortened instead of a long absolute path. */
+  readonly homeDir: string;
+  readonly platformHint: PathPlatformHint;
 }
 
 export function CwdChangeNotice(props: CwdChangeNoticeProps): JSX.Element {
+  const format = (cwd: string): string =>
+    formatDirectoryPathForDisplay(cwd, props.homeDir, props.platformHint);
   const existing = props.history.filter((entry) => entry.exists);
   const selected = props.chosenCwd ?? defaultResumeInCwd(props.history) ?? '';
+  // The sentence shown is built from the SAME history, with each entry's `cwd` replaced by its
+  // display form — `MESSAGES.todayCwdHistoryNote` itself is untouched, it just formats whatever
+  // `cwd` string each entry carries. The full, unabbreviated sentence goes in `title` (D-025's own
+  // "never lost", `shortenDirectoryPath`'s own precedent), a hover away.
+  const displayHistory = props.history.map((entry) => ({ ...entry, cwd: format(entry.cwd) }));
   return (
     <InfoBox tone="info" className={cx(styles, 'notice')}>
-      <Text as="p" variant="body-sm">
-        {MESSAGES.todayCwdHistoryNote(props.history)}
+      <Text as="p" variant="body-sm" title={MESSAGES.todayCwdHistoryNote(props.history)}>
+        {MESSAGES.todayCwdHistoryNote(displayHistory)}
       </Text>
       <Text as="p" variant="body-sm">
         {MESSAGES.todayCwdHistoryExplanation}
@@ -55,7 +69,11 @@ export function CwdChangeNotice(props: CwdChangeNoticeProps): JSX.Element {
           value={selected}
           monospace
           disabled={props.disabled}
-          options={existing.map((entry) => ({ value: entry.cwd, label: entry.cwd }))}
+          options={existing.map((entry) => ({
+            value: entry.cwd,
+            label: format(entry.cwd),
+            title: entry.cwd,
+          }))}
           onChange={(cwd) => props.onChooseCwd(props.sessionId, cwd)}
         />
       )}

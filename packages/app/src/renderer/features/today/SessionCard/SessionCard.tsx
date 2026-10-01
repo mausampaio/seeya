@@ -17,9 +17,11 @@
  * @example
  * <SessionCard row={row} checked={selected.has(row.sessionId)} disabled={resuming}
  *   chosenCwd={chosenCwdBySessionId.get(row.sessionId)}
- *   onToggle={toggleSession} onChooseCwd={setChosenCwd} />
+ *   onToggle={toggleSession} onChooseCwd={setChosenCwd}
+ *   homeDir={homeDir} platformHint={platformHint} />
  */
 import type { ComponentChildren, JSX } from 'preact';
+import type { PathPlatformHint } from '@seeya-ai/engine/core/cwd-normalization.js';
 import styles from './SessionCard.module.css';
 import { cx } from '../../../components/css-class.js';
 import { Surface } from '../../../components/Surface/index.js';
@@ -30,6 +32,7 @@ import { Checkbox } from '../../../components/Checkbox/index.js';
 import { CheckIcon } from '../../../components/Icon/index.js';
 import { MESSAGES } from '../../../../text/messages.js';
 import type { TodaySessionRow } from '../../../../state/today-panel.js';
+import { formatDirectoryPathForDisplay } from '../../../../sidebar/directory-label.js';
 import { CwdChangeNotice } from '../CwdChangeNotice/index.js';
 
 export interface SessionCardProps {
@@ -39,6 +42,10 @@ export interface SessionCardProps {
   readonly chosenCwd: string | undefined;
   readonly onToggle: (sessionId: string, checked: boolean) => void;
   readonly onChooseCwd: (sessionId: string, cwd: string) => void;
+  /** PO review of V2-T66, item 2 — threaded down to this card's own directory line and, when
+   * there's one, to `CwdChangeNotice` (sentence + "Resume in" options). */
+  readonly homeDir: string;
+  readonly platformHint: PathPlatformHint;
 }
 
 /** The content shared by all three states — name + id, directory, plan line, and the directory-
@@ -49,6 +56,8 @@ function SessionCardBody(props: {
   readonly disabled: boolean;
   readonly chosenCwd: string | undefined;
   readonly onChooseCwd: (sessionId: string, cwd: string) => void;
+  readonly homeDir: string;
+  readonly platformHint: PathPlatformHint;
   readonly trailing?: ComponentChildren;
 }): JSX.Element {
   const { row } = props;
@@ -65,8 +74,10 @@ function SessionCardBody(props: {
         </Stack>
         {props.trailing}
       </Stack>
-      <Text as="p" variant="code" tone="secondary" truncate>
-        {row.cwd}
+      {/* PO review of V2-T66, item 2: `~`-abbreviated and end-shortened for display, the full raw
+       * path kept in `title` — same discipline as `sidebar/directory-label.ts`'s own row. */}
+      <Text as="p" variant="code" tone="secondary" truncate title={row.cwd}>
+        {formatDirectoryPathForDisplay(row.cwd, props.homeDir, props.platformHint)}
       </Text>
       <Text as="p" variant="body-sm" tone={row.firstPlanLine === null ? 'tertiary' : 'secondary'}>
         {row.firstPlanLine ?? MESSAGES.todayNoPlanRecorded}
@@ -78,6 +89,8 @@ function SessionCardBody(props: {
           chosenCwd={props.chosenCwd}
           disabled={props.disabled}
           onChooseCwd={props.onChooseCwd}
+          homeDir={props.homeDir}
+          platformHint={props.platformHint}
         />
       )}
     </Stack>
@@ -99,6 +112,8 @@ export function SessionCard(props: SessionCardProps): JSX.Element {
             disabled={props.disabled}
             chosenCwd={props.chosenCwd}
             onChooseCwd={props.onChooseCwd}
+            homeDir={props.homeDir}
+            platformHint={props.platformHint}
             trailing={
               <Chip tone="success" variant="soft" size="sm">
                 {MESSAGES.todayRunningNowChip}
@@ -125,6 +140,8 @@ export function SessionCard(props: SessionCardProps): JSX.Element {
             disabled={props.disabled}
             chosenCwd={props.chosenCwd}
             onChooseCwd={props.onChooseCwd}
+            homeDir={props.homeDir}
+            platformHint={props.platformHint}
             trailing={
               row.resumeStatus.kind === 'resumedEarlier' ? (
                 <Chip tone="neutral" variant="outline" size="sm">

@@ -29,6 +29,8 @@ describe('SessionCard (D-052, V2-T66) — neverResumed', () => {
         chosenCwd={undefined}
         onToggle={() => {}}
         onChooseCwd={() => {}}
+        homeDir="/home/<usuario>"
+        platformHint="posix"
       />,
     );
     expect(getByText('payments-webhooks')).not.toBeNull();
@@ -46,6 +48,8 @@ describe('SessionCard (D-052, V2-T66) — neverResumed', () => {
         chosenCwd={undefined}
         onToggle={() => {}}
         onChooseCwd={() => {}}
+        homeDir="/home/<usuario>"
+        platformHint="posix"
       />,
     );
     expect(getByText('no plan recorded')).not.toBeNull();
@@ -60,6 +64,8 @@ describe('SessionCard (D-052, V2-T66) — neverResumed', () => {
         chosenCwd={undefined}
         onToggle={() => {}}
         onChooseCwd={() => {}}
+        homeDir="/home/<usuario>"
+        platformHint="posix"
       />,
     );
     expect((getByRole('checkbox') as HTMLInputElement).checked).toBe(false);
@@ -77,6 +83,8 @@ describe('SessionCard (D-052, V2-T66) — neverResumed', () => {
         chosenCwd={undefined}
         onToggle={onToggle}
         onChooseCwd={() => {}}
+        homeDir="/home/<usuario>"
+        platformHint="posix"
       />,
     );
     fireEvent.click(getByRole('checkbox'));
@@ -93,6 +101,8 @@ describe('SessionCard (D-052, V2-T66) — neverResumed', () => {
         chosenCwd={undefined}
         onToggle={onToggle}
         onChooseCwd={() => {}}
+        homeDir="/home/<usuario>"
+        platformHint="posix"
       />,
     );
     fireEvent.click(getByText('Finish the retry queue'));
@@ -108,6 +118,8 @@ describe('SessionCard (D-052, V2-T66) — neverResumed', () => {
         chosenCwd={undefined}
         onToggle={() => {}}
         onChooseCwd={() => {}}
+        homeDir="/home/<usuario>"
+        platformHint="posix"
       />,
     );
     expect((getByRole('checkbox') as HTMLInputElement).disabled).toBe(true);
@@ -128,6 +140,8 @@ describe('SessionCard (D-052, V2-T66) — neverResumed', () => {
         chosenCwd={undefined}
         onToggle={() => {}}
         onChooseCwd={() => {}}
+        homeDir="/home/<usuario>"
+        platformHint="posix"
       />,
     );
     expect(getByText(/Claude Code keeps memory/)).not.toBeNull();
@@ -146,6 +160,8 @@ describe('SessionCard (D-052, V2-T66) — neverResumed', () => {
         chosenCwd={undefined}
         onToggle={() => {}}
         onChooseCwd={() => {}}
+        homeDir="/home/<usuario>"
+        platformHint="posix"
       />,
     );
     expect(queryByText(/Claude Code keeps memory/)).toBeNull();
@@ -162,6 +178,8 @@ describe('SessionCard — resumedEarlier', () => {
         chosenCwd={undefined}
         onToggle={() => {}}
         onChooseCwd={() => {}}
+        homeDir="/home/<usuario>"
+        platformHint="posix"
       />,
     );
     expect(getByRole('checkbox')).not.toBeNull();
@@ -179,6 +197,8 @@ describe('SessionCard — runningNow', () => {
         chosenCwd={undefined}
         onToggle={() => {}}
         onChooseCwd={() => {}}
+        homeDir="/home/<usuario>"
+        platformHint="posix"
       />,
     );
     expect(queryByRole('checkbox')).toBeNull();
@@ -194,9 +214,30 @@ describe('SessionCard — runningNow', () => {
         chosenCwd={undefined}
         onToggle={() => {}}
         onChooseCwd={() => {}}
+        homeDir="/home/<usuario>"
+        platformHint="posix"
       />,
     );
     expect(getByText('payments-webhooks')).not.toBeNull();
     expect(getByText('/code/payments')).not.toBeNull();
+  });
+});
+
+describe('SessionCard — directory display (PO review of V2-T66, item 2)', () => {
+  it('abbreviates a cwd under the home directory to ~, keeping the full path in title', () => {
+    const { getByText } = render(
+      <SessionCard
+        row={row({ cwd: '/home/<usuario>/code/payments' })}
+        checked={false}
+        disabled={false}
+        chosenCwd={undefined}
+        onToggle={() => {}}
+        onChooseCwd={() => {}}
+        homeDir="/home/<usuario>"
+        platformHint="posix"
+      />,
+    );
+    const cwdText = getByText('~/code/payments');
+    expect(cwdText.getAttribute('title')).toBe('/home/<usuario>/code/payments');
   });
 });
