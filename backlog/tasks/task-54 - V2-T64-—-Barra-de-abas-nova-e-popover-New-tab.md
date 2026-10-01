@@ -4,7 +4,7 @@ title: V2-T64 — Barra de abas nova e popover New tab
 status: Review
 assignee: []
 created_date: '2026-09-30 10:34'
-updated_date: '2026-10-01 04:02'
+updated_date: '2026-10-01 04:11'
 labels: []
 milestone: m-2
 dependencies:
@@ -240,5 +240,11 @@ Correção pós-revisão do PO (4 itens), mesma branch, commit 4a43b2a:
 4. Rótulo de aba exited concatenava "shell exited (code 1)" — TabStripEntry agora carrega exitedText separado do label ("exited (1)", sem a palavra "code"), renderizado por TabStripItem em span próprio com --seeya-text-tertiary; a opacidade de "exited" não cobre mais o sufixo nem o botão de fechar.
 
 Duas capturas novas (claro com a barra, escuro com o popover), caminhos no scratchpad da sessão. Registro/protocol-handler.json reais conferidos idênticos antes e depois. npm run verificar (packages/*/dist apagados antes) verde. Segue em Review.
+---
+
+author: PO
+created: 2026-10-01 04:11
+---
+Revisão do PO em 2026-10-01: duas rodadas de captura conferidas. Rodada 1: barra de abas como feature (TabStrip, TabStripItem, TerminalPane por ref, NewTabButton, NewTabPopover), ícones por tipo (campo kind no evento de aba retomada), Settings no canto, popover com claude/codex/Shell/Other…, recentes derivados das sessões; legado de abas apagado; defeito real achado pela captura (Settings sobrescrito por texto). Rodada 2: «/+ viraram ícones, Settings com 20 px, controle segmentado em largura total, 'shell · exited (1)'. Mesclado, portão do zero (dist apagados) verde, 3197 testes, também sem identidade global do git. Falta o aceite do mantenedor com o instalador.
 ---
 <!-- COMMENTS:END -->
