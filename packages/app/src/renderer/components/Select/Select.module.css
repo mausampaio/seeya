@@ -1,0 +1,41 @@
+/* V2-T66 (D-052, Q-102) — replaces the global `.seeya-field*` classes (`renderer/legacy/
+ * components.css`, removed by this task now that nothing references them directly any more),
+ * scoped to this component alone. Label typography now comes from `Text` (D-052 item 7) — this
+ * file only positions/colours/spaces the `<select>` itself. */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--seeya-space-1);
+}
+
+.labelRow label,
+.labelRow {
+  cursor: pointer;
+}
+
+/* Exception to "font-size only through Text" (D-052 item 7): a native `<select>` cannot have a
+ * `Text` CHILD deciding its own typography — `TextField.module.css`'s own `.input` comment has the
+ * same reasoning, same `body-sm` number. */
+.select {
+  font-family: var(--seeya-font-sans);
+  font-size: 14px;
+  color: var(--seeya-text);
+  background: var(--seeya-surface);
+  border: 1px solid var(--seeya-border-control);
+  border-radius: var(--seeya-radius-sm);
+  padding: var(--seeya-space-2) var(--seeya-space-3);
+}
+
+.select.monospace {
+  font-family: var(--seeya-font-mono);
+}
+
+.select:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.select:focus-visible {
+  outline: 2px solid var(--seeya-focus-ring);
+  outline-offset: 2px;
+}

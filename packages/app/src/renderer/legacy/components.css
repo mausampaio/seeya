@@ -1,8 +1,7 @@
 /*
  * V2-T62 (D-051): baseline, token-driven styles for the LEGACY `renderer/legacy/**` screens' own
- * base components — `seeya-field*`/`seeya-checkbox`/`seeya-segmented-control`/`seeya-dialog`/
- * `seeya-table-row`/`seeya-info-box`/`seeya-empty-state`. `legacy.css` keeps styling the current
- * LEGACY screens by id/class exactly as before.
+ * base components — `seeya-segmented-control`/`seeya-dialog`/`seeya-table-row`. `legacy.css` keeps
+ * styling the current LEGACY screens by id/class exactly as before.
  *
  * D-052 (V2-T75): `.seeya-button*`/`.seeya-status-pill*` are REMOVED from this file — `Button`/
  * `IconButton`/`Chip` (`renderer/components/`) have their own CSS modules now, and nothing under
@@ -14,56 +13,13 @@
  * `.seeya-dialog*`/`.seeya-dialog-title` rules stay (every `renderer/legacy/dialogs-shell.tsx`
  * dialog still depends on them, § 9's own later task), minus the typography `Dialog.tsx`'s own
  * `Text` now owns (D-052 item 7).
+ *
+ * V2-T66: `.seeya-field*`/`.seeya-checkbox`/`.seeya-info-box*`/`.seeya-empty-state*` removed the
+ * same way — `Select`/`Checkbox`/`InfoBox`/`EmptyState` (`renderer/components/`) all have their
+ * own CSS modules now, confirmed unused directly under `renderer/legacy/` by grep before deleting
+ * them here (same "hadn't been given a real CSS module yet" reasoning as the button/status-pill
+ * removal above).
  */
-
-.seeya-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--seeya-space-1);
-  margin-bottom: var(--seeya-space-3);
-}
-
-.seeya-field-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--seeya-text-secondary);
-}
-
-.seeya-field-input,
-.seeya-field-select {
-  font-family: var(--seeya-font-sans);
-  font-size: 14px;
-  color: var(--seeya-text);
-  background: var(--seeya-surface);
-  border: 1px solid var(--seeya-border-control);
-  border-radius: var(--seeya-radius-sm);
-  padding: var(--seeya-space-2) var(--seeya-space-3);
-}
-
-.seeya-field-hint {
-  font-family: var(--seeya-font-mono);
-  font-size: 12px;
-  color: var(--seeya-text-tertiary);
-  margin: 0;
-}
-
-.seeya-field-error {
-  font-size: 12px;
-  color: var(--seeya-error-text);
-  margin: 0;
-}
-
-/* V2-T65: `.seeya-switch` dropped — `Switch` (`renderer/components/Switch/`) has its own CSS
- * module now, a real toggle track/thumb this global rule never gave it (Q-102, brought to the
- * pattern). `.seeya-checkbox` stays here: `Checkbox` is still unconverted. */
-.seeya-checkbox {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--seeya-space-2);
-  font-size: 14px;
-  color: var(--seeya-text);
-  cursor: pointer;
-}
 
 .seeya-segmented-control {
   display: inline-flex;
@@ -161,51 +117,3 @@
   color: var(--seeya-text);
 }
 
-.seeya-info-box {
-  border-radius: var(--seeya-radius-md);
-  padding: var(--seeya-space-3);
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-.seeya-info-box--neutral {
-  background: var(--seeya-surface-subtle);
-  color: var(--seeya-text-secondary);
-}
-
-.seeya-info-box--info {
-  background: var(--seeya-info-bg);
-  color: var(--seeya-info-text);
-}
-
-.seeya-info-box--warning {
-  background: var(--seeya-warning-bg);
-  color: var(--seeya-warning-text);
-}
-
-.seeya-info-box--error {
-  background: var(--seeya-error-bg);
-  color: var(--seeya-error-text);
-}
-
-.seeya-empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--seeya-space-2);
-  padding: var(--seeya-space-8);
-  text-align: center;
-  color: var(--seeya-text-secondary);
-}
-
-.seeya-empty-state-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--seeya-text);
-  margin: 0;
-}
-
-.seeya-empty-state-description {
-  font-size: 14px;
-  margin: 0;
-}

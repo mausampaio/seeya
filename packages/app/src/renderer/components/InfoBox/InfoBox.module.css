@@ -1,0 +1,41 @@
+/* V2-T66 (D-052, Q-102) — replaces the global `.seeya-info-box*` classes (`renderer/legacy/
+ * components.css`, removed by this task now that nothing references them directly any more).
+ * Token mapping per tone mirrors `Chip.module.css`'s own `.soft.*` rules exactly (a tinted
+ * background, the tone's own text colour) — the same six values, the same tokens. */
+.infoBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--seeya-space-2);
+  border-radius: var(--seeya-radius-md);
+  padding: var(--seeya-space-3);
+}
+
+.neutral {
+  background: var(--seeya-surface-subtle);
+  color: var(--seeya-text-secondary);
+}
+
+.brand {
+  background: var(--seeya-brand-soft);
+  color: var(--seeya-brand-text);
+}
+
+.success {
+  background: var(--seeya-success-bg);
+  color: var(--seeya-success-text);
+}
+
+.info {
+  background: var(--seeya-info-bg);
+  color: var(--seeya-info-text);
+}
+
+.warning {
+  background: var(--seeya-warning-bg);
+  color: var(--seeya-warning-text);
+}
+
+.error {
+  background: var(--seeya-error-bg);
+  color: var(--seeya-error-text);
+}

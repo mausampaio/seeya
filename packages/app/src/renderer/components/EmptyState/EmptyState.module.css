@@ -1,0 +1,20 @@
+/* V2-T66 (D-052, Q-102) — replaces the global `.seeya-empty-state*` classes (`renderer/legacy/
+ * components.css`, removed by this task now that nothing references them directly any more).
+ * Typography moved onto `Text` (D-052 item 7) — this file only positions/colours/spaces things. */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--seeya-space-2);
+  padding: var(--seeya-space-8);
+  text-align: center;
+  color: var(--seeya-text-secondary);
+}
+
+.title {
+  color: var(--seeya-text);
+}
+
+.action {
+  margin-top: var(--seeya-space-2);
+}
