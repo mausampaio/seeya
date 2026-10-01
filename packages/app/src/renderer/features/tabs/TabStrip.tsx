@@ -39,6 +39,7 @@ import { TerminalPane } from './TerminalPane/index.js';
 import { NewTabButton } from './NewTabButton/index.js';
 import { NewTabPopover } from './NewTabPopover/index.js';
 import { useTabStrip } from './useTabStrip.js';
+import { watchSidebarWidthTransition } from './sidebar-transition-watcher.js';
 import { MESSAGES } from '../../../text/messages.js';
 
 export interface TabStripProps {
@@ -70,13 +71,33 @@ export function TabStrip(props: TabStripProps): JSX.Element {
   // cancels and reschedules it, so as long as the transition keeps producing a notification every
   // frame, the callback never fires; it only runs once a frame passes with no new notification
   // behind it, which is exactly "right after resizing settles".
+  //
+  // Maintainer diagnosis (2026-10-02): that rAF debounce alone wasn't enough to stop a REAL defect
+  // — `fitAll()` still fit EVERY handle, including a hidden terminal's, and a resize notification
+  // can arrive (and get debounced-through) before the transition visually finishes, sending the
+  // pty an intermediate, not-yet-final size. Two independent fixes, together: `TerminalPane`'s own
+  // `fit()` now refuses to measure/resize a hidden terminal at all (`state/terminal-resize.ts`),
+  // and `watchSidebarWidthTransition` below makes the observer skip calling `fitAll()` entirely
+  // while the sidebar's own width transition is still in flight, deferring to the SAME `fitAll()`
+  // once `transitionend` (or its fallback) fires — "sem reajustes intermediários enviados ao pty".
   useEffect(() => {
     const host = terminalHostRef.current;
     if (host === null) {
       return;
     }
     let scheduledFrame: number | null = null;
+    function runFitAll(): void {
+      if (scheduledFrame !== null) {
+        cancelAnimationFrame(scheduledFrame);
+        scheduledFrame = null;
+      }
+      data.fitAll();
+    }
+    const watcher = watchSidebarWidthTransition({ onSettled: runFitAll });
     const observer = new ResizeObserver(() => {
+      if (watcher.isTransitioning()) {
+        return;
+      }
       if (scheduledFrame !== null) {
         cancelAnimationFrame(scheduledFrame);
       }
@@ -90,6 +111,7 @@ export function TabStrip(props: TabStripProps): JSX.Element {
       if (scheduledFrame !== null) {
         cancelAnimationFrame(scheduledFrame);
       }
+      watcher.dispose();
       observer.disconnect();
     };
   }, []);
