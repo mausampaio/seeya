@@ -167,6 +167,18 @@ autostart (vai para Settings).
   desabilitado).
 - Substitui o modal de sessões por diretório e a busca por id da lateral.
 
+## 5a. Retomar sessão de projeto (V2-T77)
+
+Pedido do mantenedor em 2026-10-01, depois de a máquina reiniciar no meio de uma sessão aberta por
+`open`: voltar a uma sessão antiga **do projeto** passa pelo mesmo fluxo do `open` — toma o lock,
+reinstala os ganchos, gera o `CLAUDE.md`, restaura o `seeya.json`, pergunta sobre mudanças pendentes
+— e só troca "sessão nova" por `claude --resume <id>`. Onde aparece: a linha de cada projeto na aba
+Projects mostra as sessões recentes dele com **Resume**; na aba Sessions, o **Resume** de uma sessão
+que pertence a um projeto usa este fluxo (sessão sem projeto continua com a retomada simples). CLI:
+`seeya project open <id> --resume <sessão>` (id ou prefixo, como a busca da V2-T55). Limite medido
+(Q-069): as regras de trabalho do `--append-system-prompt` não chegam a uma sessão retomada; o
+`CLAUDE.md` gerado (D-050), que puxa o `AGENTS.md`, é relido.
+
 ## 6. End day
 
 1. **Prévia** (não chama o modelo, como hoje): lista `Will be captured · N` com nome, diretório,
