@@ -68,6 +68,33 @@ describe('Button (D-052, V2-T75)', () => {
     expect(classesOf(getByRole('button'))).toContain('extra');
   });
 
+  describe('disabledReason (D-052, V2-T66)', () => {
+    it('shown as a sibling line while disabled, NOT loading, with a reason given', () => {
+      const { queryByText } = render(
+        <Button disabled disabledReason="Select at least one session.">
+          Resume selected
+        </Button>,
+      );
+      expect(queryByText('Select at least one session.')).not.toBeNull();
+    });
+
+    it('never shown for an ENABLED button', () => {
+      const { queryByText } = render(
+        <Button disabledReason="Select at least one session.">Resume selected</Button>,
+      );
+      expect(queryByText('Select at least one session.')).toBeNull();
+    });
+
+    it('never shown while loading, even if disabled and a reason is given', () => {
+      const { queryByText } = render(
+        <Button disabled loading disabledReason="Select at least one session.">
+          Resume selected
+        </Button>,
+      );
+      expect(queryByText('Select at least one session.')).toBeNull();
+    });
+  });
+
   describe('loading (D-052, maintainer complement, V2-T65-estado-na-tela item 2)', () => {
     it('omitted: no spinner slot at all, exactly as before this prop existed', () => {
       const { getByRole, container } = render(<Button>Skip today</Button>);

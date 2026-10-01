@@ -41,6 +41,13 @@ export const MESSAGES = {
     'resumed.',
   todayPlanTitle: (day: string, daysAgo: number): string =>
     daysAgo === 1 ? `Plan for ${day}` : `Plan for ${day} (${daysAgo} days ago)`,
+  // V2-T66, `docs/INTERFACE.md` § 3's own "uma linha de contexto: quando foi capturado e quantas
+  // sessões" — `capturedAt` is `state/today-panel.ts#TodayPanelData`'s own latest-across-the-day
+  // instant (`null` only for the empty-batch edge no real lookup produces, D-025).
+  todayContextLine: (capturedAt: Date | null, sessionCount: number): string => {
+    const sessions = `${sessionCount} ${sessionCount === 1 ? 'session' : 'sessions'}`;
+    return capturedAt === null ? sessions : `Captured ${capturedAt.toLocaleString()} · ${sessions}`;
+  },
   // V2-T63 — the lateral's own Today card (state/today-panel.ts#buildTodayCardSummary).
   // Correction (real-window screenshot review): two lines now — "Today" + the pill is the first
   // (`todayCardHeading`), "Plan for <day>"/"Nothing to resume" is the second. `dayLabel` already
@@ -50,10 +57,11 @@ export const MESSAGES = {
   todayCardPlanFor: (dayLabel: string): string => `Plan for ${dayLabel}`,
   todayCardNothingToResume: 'Nothing to resume',
   todayCardResumeCount: (count: number): string => `${count} to resume`,
-  // V2-T9 item 4: replaces the old todayAlreadyResumed — the checkbox rule now depends on
-  // liveness, not just resumed.json (state/today-panel.ts#TodayResumeStatus).
-  todayRunningNow: 'running now',
-  todayResumedEarlier: 'resumed earlier, not running now',
+  // V2-T66, `docs/INTERFACE.md` § 3's own exact chip wording for the two non-`neverResumed`
+  // states — replaces the old `todayRunningNow`/`todayResumedEarlier` inline-text fragments the
+  // DOM-at-hand panel used (`renderer/legacy/today-panel-view.ts`, apagado by this task).
+  todayResumedEarlierChip: 'Resumed earlier · closed',
+  todayRunningNowChip: 'Running now · open in a tab',
   todayNoPlanRecorded: 'no plan recorded',
 
   // V2-T9 item 2 — the directory-changed note and the "Resume in" selector
@@ -84,12 +92,17 @@ export const MESSAGES = {
   todayResumeSelected: 'Resume selected',
   todayResumeProgress: (index: number, total: number, name: string): string =>
     `Resuming ${index} of ${total}: ${name}...`,
-  todayNothingSelected: 'Nothing selected — nothing resumed.',
-  // V2-T21 item 2 — shown instead of a silently-empty "Resume selected" click when every row in
-  // today's plan is already `runningNow` (`state/today-panel.ts#hasResumableSession`). The
-  // measured defect: with nothing to check, the button sat there doing nothing, and the
-  // mantenedor read that as the app having broken rather than nothing being left to resume.
+  // V2-T21 item 2 — shown as `Button.disabledReason` instead of a silently-empty "Resume selected"
+  // click when every row in today's plan is already `runningNow`
+  // (`state/today-panel.ts#hasResumableSession`). The measured defect: with nothing to check, the
+  // button sat there doing nothing, and the mantenedor read that as the app having broken rather
+  // than nothing being left to resume.
   todayAllSessionsRunning: "All of today's planned sessions are already open — nothing to resume.",
+  // V2-T66, `docs/INTERFACE.md` § 3's own selection footer ("N selected", "Clear selection",
+  // "Resume selected (desabilitado sem seleção, com o motivo)").
+  todaySelectionCount: (count: number): string => `${count} selected`,
+  todayClearSelection: 'Clear selection',
+  todaySelectNoneReason: 'Select at least one session to resume.',
 
   // V2-T4 item 3 — the fallback confirmation dialog (S5-T9's "warn BEFORE, and ask", as a dialog
   // instead of the CLI's readline question). `reasonText` itself comes from

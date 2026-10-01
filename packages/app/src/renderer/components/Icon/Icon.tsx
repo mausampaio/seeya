@@ -262,6 +262,14 @@ export function CloseIcon(props: IconProps = {}): JSX.Element {
   return outlineIcon([<path d="M6 6l12 12M18 6L6 18" />], props);
 }
 
+/** Today's own "ícone de concluído" for a `runningNow` session card (V2-T66,
+ * `docs/INTERFACE.md` § 3 — "sem caixa, com ícone de concluído") — a plain checkmark, never a
+ * filled circle/badge shape that could be mistaken for `StopIcon`'s own filled square at a
+ * glance. */
+export function CheckIcon(props: IconProps = {}): JSX.Element {
+  return outlineIcon([<path d="M5 12.5l4.5 4.5L19 7.5" />], props);
+}
+
 /** Settings' own "Capture" section nav row (V2-T65, `docs/INTERFACE.md` § 8). PO review: the
  * first attempt here (`SlidersIcon`) reused `SettingsIcon`'s own three-line/three-dot path with
  * only the coordinates nudged — close enough to read as the SAME icon as General right above it
