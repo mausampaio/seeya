@@ -58,16 +58,23 @@ const POSIX_ONLY_SOURCE = [
 ];
 
 /**
- * V2-T2 (docs/PLANO-DE-ENTREGA.md, item 5): `packages/app/src/electron/**` is the main-process
- * entry, preload script and renderer bootstrap — Electron's own wiring, which cannot run without
- * a display the way `packages/cli/src/index.ts` cannot run without a real terminal invocation
- * (both are thin, both are excluded from `coverage.include` entirely rather than carrying a floor
- * they cannot clear in CI). Everything WITH logic (the tab model, session↔pid matching, state
- * assembly, the pty and IPC ports) lives outside `electron/` on purpose, in plain modules
- * `coverage.include` still reaches — see PRODUCTION_DIRECTORY_THRESHOLDS's own
- * `packages/app/src/**` entry below for the floor those modules carry.
+ * D-052 (V2-T75, replacing V2-T2's own `electron/**`): `packages/app/src/main/**` is the
+ * main-process entry and preload script — Electron's own wiring, which cannot run without a
+ * display the way `packages/cli/src/index.ts` cannot run without a real terminal invocation (both
+ * are thin, both are excluded from `coverage.include` entirely rather than carrying a floor they
+ * cannot clear in CI). `packages/app/src/renderer/legacy/**` joins it for the same reason — the
+ * DOM-wiring screens not yet rewritten as real components (D-052's own "código antigo... fica
+ * numa pasta marcada como legado"), same "cannot run headless" shape the old `electron/*-view.ts`
+ * modules already had. Everything WITH logic (the tab model, session↔pid matching, state
+ * assembly, the pty and IPC ports, and now the renderer's own design system/features) lives
+ * outside `main/`/`renderer/legacy/` on purpose, in plain modules `coverage.include` still reaches
+ * — see PRODUCTION_DIRECTORY_THRESHOLDS's own `packages/app/src/**` entry below for the floor
+ * those modules carry.
  */
-const APP_ELECTRON_SOURCE = ['packages/app/src/electron/**'];
+const APP_MAIN_AND_LEGACY_SOURCE = [
+  'packages/app/src/main/**',
+  'packages/app/src/renderer/legacy/**',
+];
 
 /**
  * V2-T2: `packages/app/src/pty/node-pty-adapter.ts` is a two-line pass-through to `node-pty`'s
@@ -251,9 +258,10 @@ const PRODUCTION_DIRECTORY_THRESHOLDS = {
   'packages/cli/src/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
   // V2-T2: one glob for the whole @seeya-ai/app package, same shape as packages/cli/src's own
   // entry above (app has no internal layer subdirectory the way packages/engine/src does either).
-  // packages/app/src/electron/** carries no floor of its own — it's excluded from
-  // coverage.include below entirely, same mechanism packages/cli/src/index.ts already uses (thin
-  // wiring that cannot run headless), not a second entry in this object.
+  // packages/app/src/main/**/packages/app/src/renderer/legacy/** (D-052, V2-T75) carry no floor
+  // of their own — excluded from coverage.include below entirely, same mechanism
+  // packages/cli/src/index.ts already uses (thin wiring that cannot run headless), not a second
+  // entry in this object.
   'packages/app/src/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
   'packages/engine/src/adapters/autostart/**': {
     statements: 80,
@@ -381,9 +389,10 @@ export default defineConfig({
   // `tsconfig` override — it resolves each file's OWN nearest `tsconfig.json` for JSX settings
   // instead, the same walk-up `tsc`/typescript-eslint's `projectService` already do. Every `.tsx`
   // in this repo already sits under a tsconfig that sets `"jsx": "react-jsx"` and
-  // `"jsxImportSource": "preact"` (`packages/app/tsconfig.json` for `src/ui/**`,
-  // `tsconfig.app-ui.json` for the same directory's own tests) — confirmed by running a component
-  // test with NO vitest-level JSX config at all and reading the correct Preact vnode back.
+  // `"jsxImportSource": "preact"` (`packages/app/tsconfig.json` for the whole package,
+  // `packages/app/src/renderer/tsconfig.json`/`tests/unit/app/renderer/tsconfig.json` for the
+  // renderer tree and its own tests, D-052) — confirmed by running a component test with NO
+  // vitest-level JSX config at all and reading the correct Preact vnode back.
   test: {
     ...ENGINE_ALIAS_DEPS_INLINE,
     passWithNoTests: true,
@@ -400,22 +409,22 @@ export default defineConfig({
         'packages/engine/src/**/*.ts',
         'packages/cli/src/**/*.ts',
         'packages/app/src/**/*.ts',
-        // V2-T62 (D-051): the Preact base components (`src/ui/**`) and the window skeleton
-        // (`src/electron/app-shell.tsx` and its sub-components) — the `.ts` glob above never
-        // matches `.tsx`.
+        // V2-T62 (D-051), D-052/V2-T75: the Preact design system (`src/renderer/components/**`),
+        // the features built on it (`src/renderer/features/**`) and the window root
+        // (`src/renderer/App.tsx`) — the `.ts` glob above never matches `.tsx`.
         'packages/app/src/**/*.tsx',
       ],
       exclude:
         process.platform === 'win32'
           ? [
               'packages/cli/src/index.ts',
-              ...APP_ELECTRON_SOURCE,
+              ...APP_MAIN_AND_LEGACY_SOURCE,
               ...APP_NODE_PTY_ADAPTER_SOURCE,
               ...POSIX_ONLY_SOURCE,
             ]
           : [
               'packages/cli/src/index.ts',
-              ...APP_ELECTRON_SOURCE,
+              ...APP_MAIN_AND_LEGACY_SOURCE,
               ...APP_NODE_PTY_ADAPTER_SOURCE,
               ...WINDOWS_ONLY_SOURCE,
             ],
@@ -426,7 +435,14 @@ export default defineConfig({
         ...ENGINE_ALIAS,
         test: {
           name: 'unit',
-          include: ['tests/unit/**/*.test.ts'],
+          // D-052/V2-T75: "**/*.test.tsx" joins the plain-`.ts` glob — the renderer design
+          // system's component tests render real JSX via `@testing-library/preact`. Each such
+          // file opts into a DOM environment with its own `// @vitest-environment happy-dom`
+          // docblock (vitest's own per-file override) rather than a project-wide `environment`
+          // setting, so every OTHER unit test (pure `core`/`application`/`state` logic, the large
+          // majority) keeps running in vitest's default `node` environment, with no happy-dom
+          // globals it doesn't need.
+          include: ['tests/unit/**/*.test.ts', 'tests/unit/**/*.test.tsx'],
         },
       },
       {

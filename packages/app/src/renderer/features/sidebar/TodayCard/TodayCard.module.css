@@ -1,0 +1,46 @@
+/* D-052 (V2-T75). */
+.card {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+  border: 1px solid var(--seeya-border);
+  border-radius: var(--seeya-radius-sm);
+  background: var(--seeya-surface-subtle);
+  color: var(--seeya-text);
+  padding: var(--seeya-space-2);
+  cursor: pointer;
+  font-family: var(--seeya-font-sans);
+}
+
+.active {
+  border-color: var(--seeya-brand);
+  background: var(--seeya-brand-soft);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--seeya-space-1);
+}
+
+.icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+}
+
+.title {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.pill {
+  margin-left: auto;
+}
+
+.subtitle {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--seeya-text-secondary);
+}

@@ -22,7 +22,13 @@ import * as esbuild from 'esbuild';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = path.resolve(packageRoot, '..', '..');
-const srcElectron = path.join(packageRoot, 'src', 'electron');
+// D-052 (V2-T75): main.ts/preload.ts moved from src/electron to src/main (the Electron
+// main-process side); the renderer bootstrap, the Preact tree and every asset it links moved to
+// src/renderer. The OUTPUT directory name (dist/electron/) is unchanged on purpose — nothing
+// outside this script names the source layout (package.json's "main", electron-builder.yml),
+// so there is no reason to churn it too.
+const srcMain = path.join(packageRoot, 'src', 'main');
+const srcRenderer = path.join(packageRoot, 'src', 'renderer');
 const outElectron = path.join(packageRoot, 'dist', 'electron');
 
 // V2-T11 item 2: kept in sync by hand with composition/window-icon.ts's own constant of the same
@@ -39,7 +45,7 @@ async function bundle() {
   // `electron`/`node-pty` external — both ship native bindings esbuild cannot bundle, and
   // `electron` is provided by the Electron runtime itself at launch.
   await esbuild.build({
-    entryPoints: [path.join(srcElectron, 'main.ts')],
+    entryPoints: [path.join(srcMain, 'main.ts')],
     outfile: path.join(outElectron, 'main.js'),
     bundle: true,
     platform: 'node',
@@ -53,7 +59,7 @@ async function bundle() {
   // preload under a sandboxed BrowserWindow is a newer, narrower Electron feature this task has
   // no reason to depend on for a skeleton. `electron` external, same reason as main.
   await esbuild.build({
-    entryPoints: [path.join(srcElectron, 'preload.ts')],
+    entryPoints: [path.join(srcMain, 'preload.ts')],
     outfile: path.join(outElectron, 'preload.cjs'),
     bundle: true,
     platform: 'node',
@@ -68,9 +74,18 @@ async function bundle() {
   // `preact/jsx-runtime`, never `preact/compat` (D-051's own "sem a camada de compatibilidade com
   // React") — the same setting `tsconfig.json` and the root `vitest.config.ts` repeat for `tsc -b`
   // and the unit tests, so all three tools agree on what a bare `<div/>` compiles to.
+  // D-052 (V2-T75): `outdir` (not `outfile`) + `entryNames: '[name]'` — esbuild's own native CSS
+  // Modules support (measured directly, no plugin: a `*.module.css` import through a bundled
+  // entry produces a scoped JS class-name map AND a sibling `.css` file, but ONLY when the build
+  // writes to a directory, not a single `outfile`) needs somewhere to put the bundled
+  // `renderer.css` this task's design system now imports. `entryNames` keeps the JS output named
+  // `renderer.js` (esbuild's outdir default is the entry file's own basename, and the entry file
+  // is named `renderer.tsx` for exactly this reason — matching `index.html`'s own `<script src>`
+  // without a second rename here).
   await esbuild.build({
-    entryPoints: [path.join(srcElectron, 'renderer.ts')],
-    outfile: path.join(outElectron, 'renderer.js'),
+    entryPoints: [path.join(srcRenderer, 'renderer.tsx')],
+    outdir: outElectron,
+    entryNames: '[name]',
     bundle: true,
     platform: 'browser',
     format: 'esm',
@@ -79,16 +94,25 @@ async function bundle() {
     jsxImportSource: 'preact',
   });
 
-  cpSync(path.join(srcElectron, 'index.html'), path.join(outElectron, 'index.html'));
-  cpSync(path.join(srcElectron, 'index.css'), path.join(outElectron, 'index.css'));
+  cpSync(path.join(srcRenderer, 'index.html'), path.join(outElectron, 'index.html'));
+  // D-052 (V2-T75): the not-yet-rewritten screens' own layout — `renderer/legacy/legacy.css`
+  // (formerly `electron/index.css`) — still copied to the same OUTPUT name, `index.css`: nothing
+  // outside this script names the source file, and index.html's own `<link>` still points at
+  // `index.css`.
+  cpSync(path.join(srcRenderer, 'legacy', 'legacy.css'), path.join(outElectron, 'index.css'));
   // V2-T62 (D-051): the design tokens (both themes, spacing, radius, shadow, motion) — a separate
   // file from index.css so the two responsibilities (values vs. how they're applied) stay apart,
   // same split design/IDENTIDADE_VISUAL.md § 5.4 already documents as its own fenced block.
-  cpSync(path.join(srcElectron, 'tokens.css'), path.join(outElectron, 'tokens.css'));
-  // V2-T62 (D-051): baseline styles for `src/ui/`'s own components — see that file's own comment
-  // for why it's separate from both `tokens.css` (values only) and `index.css` (the current
-  // screens' own layout, untouched by this task).
-  cpSync(path.join(srcElectron, 'components.css'), path.join(outElectron, 'components.css'));
+  cpSync(path.join(srcRenderer, 'tokens.css'), path.join(outElectron, 'tokens.css'));
+  // V2-T62 (D-051): baseline styles for the LEGACY screens' own components
+  // (`renderer/legacy/components.css`, formerly `electron/components.css`) — see that file's own
+  // comment for why it's separate from both `tokens.css` (values only) and `index.css` (the
+  // legacy screens' own layout). The design system's OWN components (`renderer/components/**`)
+  // no longer use this file — each has its own CSS module now (D-052).
+  cpSync(
+    path.join(srcRenderer, 'legacy', 'components.css'),
+    path.join(outElectron, 'components.css'),
+  );
   // V2-T3: the embedded Nerd Font (`assets/fonts/`, packaged alongside its own SIL OFL 1.1
   // license file) — index.css's own @font-face rule loads it by this same relative path,
   // `fonts/<file>`, next to index.html in dist/electron/.

@@ -1,0 +1,224 @@
+/*
+ * Design tokens (V2-T62, D-051) — the exact values of `design/IDENTIDADE_VISUAL.md`, as CSS
+ * custom properties. This file only ever DECLARES values; `index.css` (and every screen after it)
+ * APPLIES them. Keeping the split means a token can be audited against the identity doc in one
+ * place, instead of the same hex/px repeated wherever it happens to be used.
+ *
+ * `:root` is the LIGHT theme (identity § 5.1) — `color-scheme: light` matches. `[data-theme='dark']`
+ * (identity § 5.2) is the only other selector that redefines the semantic tokens below; nothing in
+ * this file reads `prefers-color-scheme` directly — `theme/resolve-theme.ts#resolveEffectiveTheme`
+ * decides the effective theme (from `Config.theme` plus the OS's live signal, forwarded by
+ * `electron/main.ts`'s own `nativeTheme` subscription) and `electron/renderer.ts` sets
+ * `data-theme` on `<html>` accordingly — so "system" still resolves through the same one selector
+ * "light"/"dark" already use, never a second code path.
+ */
+:root {
+  color-scheme: light;
+
+  --seeya-logo: #6f6ce3;
+
+  --seeya-brand: #615ef5;
+  --seeya-brand-hover: #4f46d8;
+  --seeya-brand-active: #413aad;
+  --seeya-brand-soft: #eceaff;
+  --seeya-brand-text: #4f46d8;
+  --seeya-on-brand: #ffffff;
+
+  --seeya-background: #fcfcfd;
+  --seeya-surface: #ffffff;
+  --seeya-surface-subtle: #f7f7f8;
+  --seeya-surface-hover: #efeff1;
+  /* D-052 (V2-T75): `identidade` § 3.3 names `neutral-0` (`#ffffff`) as "Superfície elevada
+   * clara" — the same value `--seeya-surface` already uses in this theme, since white IS the
+   * lightest/most elevated surface here. Added so `Surface`'s own `elevation`-adjacent `variant`
+   * prop has a real value on BOTH themes (the dark theme already defines this token, V2-T62). */
+  --seeya-surface-elevated: #ffffff;
+
+  --seeya-text: #121214;
+  --seeya-text-secondary: #565661;
+  --seeya-text-tertiary: #747480;
+
+  --seeya-border: #dddde1;
+  --seeya-border-strong: #c7c7cd;
+  --seeya-border-control: #747480;
+  --seeya-focus-ring: rgb(97 94 245 / 35%);
+  --seeya-overlay: rgb(18 18 20 / 55%);
+
+  /*
+   * Semantic colours (identity § 3.4) — base/fundo/texto per role, light-theme values. Base is
+   * for an icon, border or fill; TEXT is a darker step of the same hue kept ≥4.5:1 (identity's
+   * own measurement), never the base colour set as text.
+   */
+  --seeya-success-base: #16a36a;
+  --seeya-success-bg: #eaf8f1;
+  --seeya-success-text: #028051;
+  --seeya-info-base: #3578e5;
+  --seeya-info-bg: #edf4ff;
+  --seeya-info-text: #286bd7;
+  --seeya-warning-base: #d98a17;
+  --seeya-warning-bg: #fff6e5;
+  --seeya-warning-text: #a16400;
+  --seeya-error-base: #dc4c4c;
+  --seeya-error-bg: #fff0f0;
+  --seeya-error-text: #ca3b3e;
+
+  /* Spacing (identity § 6.1) — the 4px grid, named by its own pixel value so a reader never needs
+   * to look up "space-3" to know what it means. */
+  --seeya-space-1: 4px;
+  --seeya-space-2: 8px;
+  --seeya-space-3: 12px;
+  --seeya-space-4: 16px;
+  --seeya-space-6: 24px;
+  --seeya-space-8: 32px;
+  --seeya-space-12: 48px;
+  --seeya-space-16: 64px;
+  --seeya-space-24: 96px;
+
+  /* Radii (identity § 6.2). */
+  --seeya-radius-sm: 6px;
+  --seeya-radius-md: 10px;
+  --seeya-radius-lg: 14px;
+  --seeya-radius-xl: 20px;
+  --seeya-radius-full: 9999px;
+
+  /* Shadows (identity § 6.3) — light-theme values, for overlays only (menus, popovers, dialogs),
+   * never a permanent resting shadow. */
+  --seeya-shadow-popover: 0 12px 32px rgb(18 18 20 / 12%);
+  --seeya-shadow-dialog: 0 24px 64px rgb(18 18 20 / 18%);
+
+  /* Movement (identity § 6.5). `prefers-reduced-motion` is handled once, globally, below —
+   * individual rules that use these durations never need their own media query. */
+  --seeya-motion-micro: 150ms;
+  --seeya-motion-panel: 200ms;
+  --seeya-motion-easing: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* Typography (identity § 4.1/4.2) — Geist Sans for interface text, Geist Mono for commands,
+   * paths, IDs and other technical text OUTSIDE the terminal (the terminal keeps
+   * `Config.terminalFontFamily`, identity § 4.2's own exception — see the @font-face block below). */
+  --seeya-font-sans:
+    'Geist', 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    sans-serif;
+  --seeya-font-mono: 'Geist Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --seeya-brand: #817cf8;
+  --seeya-brand-hover: #9389fb;
+  --seeya-brand-active: #a7a3ff;
+  --seeya-brand-soft: #25214e;
+  --seeya-brand-text: #a7a3ff;
+  --seeya-on-brand: #121214;
+
+  --seeya-background: #0d0d10;
+  --seeya-surface: #18181d;
+  --seeya-surface-subtle: #202026;
+  --seeya-surface-elevated: #27272e;
+  --seeya-surface-hover: #303038;
+
+  --seeya-text: #f7f7f8;
+  --seeya-text-secondary: #a6a6b0;
+  --seeya-text-tertiary: #81818c;
+
+  --seeya-border: #303038;
+  --seeya-border-strong: #45454f;
+  --seeya-border-control: #747480;
+  --seeya-focus-ring: rgb(147 137 251 / 45%);
+  --seeya-overlay: rgb(0 0 0 / 72%);
+
+  /* Semantic colours, dark-theme values (identity § 3.4's "Fundo dark"/"Texto sobre dark"). */
+  --seeya-success-base: #16a36a;
+  --seeya-success-bg: #102b21;
+  --seeya-success-text: #16a36a;
+  --seeya-info-base: #3578e5;
+  --seeya-info-bg: #13243d;
+  --seeya-info-text: #4588f6;
+  --seeya-warning-base: #d98a17;
+  --seeya-warning-bg: #33240e;
+  --seeya-warning-text: #d98a17;
+  --seeya-error-base: #dc4c4c;
+  --seeya-error-bg: #351717;
+  --seeya-error-text: #e65554;
+
+  /* Reduce sombra, reforce borda no tema dark (identity § 6.3). */
+  --seeya-shadow-popover: 0 12px 32px rgb(0 0 0 / 28%);
+  --seeya-shadow-dialog: 0 24px 64px rgb(0 0 0 / 36%);
+}
+
+/* `--seeya-logo` is intentionally absent from [data-theme='dark'] above — the symbol keeps the
+ * same colour in both themes (identity § 2.9), so it lives only in `:root` and both themes read
+ * the same value through normal CSS inheritance. */
+
+/*
+ * Geist Sans / Geist Mono (V2-T62, D-051) — packaged locally, never loaded from the network (the
+ * app has to work offline, same requirement `FiraCodeNerdFontMono-Regular.ttf` already meets for
+ * the terminal, `packages/app/assets/fonts/FiraCodeNerdFontMono-Regular.ttf`). Four Geist Sans
+ * weights (400/500/600/700 — identity § 4.3's own scale) and one Geist Mono weight (400 — the
+ * only one the typographic scale uses outside the terminal, identity § 4.4's `code` style).
+ * Origin: `github.com/vercel/geist-font` (the project both families ship from), licensed under the
+ * SIL Open Font License 1.1 — `packages/app/assets/fonts/geist/OFL.txt`, copied alongside these
+ * files by `scripts/build.mjs`'s existing recursive `assets/fonts` copy.
+ */
+@font-face {
+  font-family: 'Geist';
+  src: url('fonts/geist/Geist-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist';
+  src: url('fonts/geist/Geist-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist';
+  src: url('fonts/geist/Geist-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist';
+  src: url('fonts/geist/Geist-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('fonts/geist/GeistMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/*
+ * `prefers-reduced-motion` (identity § 6.5 and § 8: "animações não devem ser essenciais") —
+ * handled ONCE, globally, rather than in every rule that declares a transition/animation. Any
+ * future rule using `--seeya-motion-*` automatically respects this without its own media query.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Focus is always visible (identity § 8: "nunca depender apenas de mudança de cor") — one rule for
+ * every focusable element in the window, so a future component never has to redeclare it. */
+:focus-visible {
+  outline: 2px solid var(--seeya-focus-ring);
+  outline-offset: 2px;
+}

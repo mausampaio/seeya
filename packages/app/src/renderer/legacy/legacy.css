@@ -1,0 +1,479 @@
+/*
+ * V2-T3: the interface's embedded Nerd Font, guaranteed available regardless of what the person
+ * has installed (config-schema.ts#TERMINAL_FONT_FAMILY_DEFAULT's own docstring explains why this
+ * @font-face declaration — not the system font lookup — is what makes the default stack's first
+ * entry a guarantee). FiraCode Nerd Font Mono, Regular weight only, nerd-fonts v3.5.1, SIL OFL
+ * 1.1 (license file alongside the font in packages/app/assets/fonts/, copied into dist/electron/
+ * by scripts/build.mjs).
+ */
+@font-face {
+  font-family: 'FiraCode Nerd Font Mono';
+  src: url('fonts/FiraCodeNerdFontMono-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  /* V2-T62 (D-051): tokens, both themes — `tokens.css`'s own `:root`/`[data-theme='dark']`. */
+  background: var(--seeya-background);
+  color: var(--seeya-text);
+  font-family: var(--seeya-font-sans);
+  /* V2-T30/V2-T48 item 6: "a janela nunca deve ter barra de rolagem própria" — every region that
+   * needs to scroll its own content already sets its own `overflow-y: auto` (#sidebar,
+   * #end-day-dialog-report, #settings-rows); the DOCUMENT itself never should, even for the one
+   * frame a terminal might render oversized before its own resize observer corrects it
+   * (renderer.ts#wireWindowResize's own docstring). */
+  overflow: hidden;
+}
+
+#app {
+  display: flex;
+  height: 100vh;
+}
+
+/* V2-T30 item 1: one block per project — name, lock line, "Open", its own sessions. */
+.project-block {
+  border: 1px solid var(--seeya-border);
+  border-radius: var(--seeya-radius-sm);
+  padding: 6px;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+
+.project-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.project-block-header strong {
+  overflow-wrap: anywhere;
+}
+
+.project-open-button {
+  flex: none;
+  font-size: 11px;
+}
+
+.project-lock-text {
+  font-size: 11px;
+  color: var(--seeya-text-secondary);
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+}
+
+.project-block ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+}
+
+.project-block li {
+  padding: 2px 0;
+}
+
+.project-block li.matched {
+  color: var(--seeya-success-text);
+}
+
+#projects-panel-empty,
+#other-sessions-empty {
+  font-size: 12px;
+  color: var(--seeya-text-secondary);
+}
+
+#other-sessions-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+}
+
+#other-sessions-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--seeya-border);
+}
+
+/* PO acceptance of V2-T55, correction 1 (2026-09-25): a long, unbroken path (no whitespace for
+ * the browser to wrap at) forced this row past the sidebar's own width — same class of bug V2-T48
+ * item 2 already fixed once for the autostart line, below. `min-width: 0` lets this flex item
+ * actually shrink instead of insisting on its content's natural (unwrapped) width; `shortenDirectoryPath`
+ * (`sidebar/directory-label.ts`) already keeps the STRING itself short, this is the backstop for
+ * whatever it doesn't cover (a very narrow window, an unusual font). */
+.other-sessions-dir-row {
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.session-action-row {
+  overflow-wrap: anywhere;
+}
+
+.session-id-copy {
+  font-size: 11px;
+}
+
+.session-last-activity {
+  color: var(--seeya-text-secondary);
+}
+
+.adopt-button {
+  flex: none;
+  font-size: 11px;
+}
+
+#project-open-result-text {
+  font-size: 11px;
+  color: var(--seeya-text-secondary);
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+}
+
+#main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+#toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-bottom: 1px solid var(--seeya-border);
+}
+
+#new-tab-button {
+  width: 28px;
+  height: 28px;
+}
+
+/* Maintainer acceptance, 2026-09-25: the discoverable sidebar toggle — same size as the other
+ * toolbar buttons, always visible (open or collapsed), to the left of "+". The 20px side-strip
+ * toggle (#sidebar-collapse-toggle above) stays as a secondary shortcut, not replaced. */
+#sidebar-toggle-button {
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+}
+
+#new-tab-button,
+#sidebar-toggle-button {
+  padding: 0;
+}
+
+#tab-strip {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+/* V2-T63 (`docs/INTERFACE.md` § 2): "Settings fica no canto direito da barra" — `#tab-strip` above
+ * takes all the room between the left-side buttons and this one (`flex: 1`), so this always sits
+ * at the far right regardless of how many tabs are open. */
+#settings-button {
+  flex: none;
+  margin-left: auto;
+  font-size: 13px;
+}
+
+.tab-button[aria-current='true'] {
+  font-weight: bold;
+}
+
+.tab-close {
+  margin-left: 4px;
+}
+
+#command-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border-bottom: 1px solid var(--seeya-border);
+  background: var(--seeya-surface-subtle);
+}
+
+/* V2-T3 review: an ID selector (#command-bar above) is MORE specific than the browser's own
+ * default UA rule for the `hidden` attribute ([hidden] { display: none }), so `display: flex`
+ * was winning and the bar stayed visible after Cancel/submit set `hidden = true`
+ * (renderer.ts's own wireCommandBar) — the maintainer saw this on macOS: the bar stayed on
+ * screen with a tab already open. `#command-bar[hidden]` is an ID + attribute selector, strictly
+ * more specific than the plain ID rule above, so this wins regardless of source order. */
+#command-bar[hidden] {
+  display: none;
+}
+
+#command-bar label {
+  display: flex;
+  flex-direction: column;
+  font-size: 11px;
+  color: var(--seeya-text-secondary);
+  gap: 2px;
+}
+
+#command-bar input {
+  min-width: 220px;
+}
+
+#session-list,
+#today-panel ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+}
+
+/* V2-T4 item 1: the "Today" panel — same list styling as #session-list, plus room for the
+ * "Resume selected" button and the progress/result lines below it. */
+#today-panel li {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--seeya-border);
+}
+
+#today-panel p {
+  font-size: 12px;
+  margin: 4px 0;
+}
+
+#today-panel button {
+  margin-top: 6px;
+}
+
+#session-list li {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--seeya-border);
+}
+
+#session-list li.matched {
+  color: var(--seeya-success-text);
+}
+
+/* V2-T63 item 1: the faixa de horário lives in `#sidebar-footer` now — the status panel it used
+ * to sit below is gone from the lateral entirely (this file's own `app-shell.tsx` docstring). */
+#terminal-host {
+  flex: 1;
+  position: relative;
+}
+
+.terminal-pane,
+.page-pane {
+  position: absolute;
+  inset: 0;
+}
+
+.terminal-pane[hidden],
+.page-pane[hidden] {
+  display: none;
+}
+
+/* V2-T63: a page tab's own content (Today/Projects/Sessions) — unlike a terminal pane (xterm
+ * paints its own scrollback), this is ordinary DOM content, so it needs its own scroll/padding. */
+.page-pane {
+  overflow-y: auto;
+  padding: var(--seeya-space-4);
+  box-sizing: border-box;
+}
+
+/* V2-T4 item 3: the fallback confirmation dialog (S5-T9's "warn BEFORE, and ask", as a real
+ * <dialog> instead of the CLI's readline question) — showModal() gives it the native backdrop and
+ * Escape-to-cancel behavior `fallback-dialog-view.ts`'s own "cancel" listener turns into a "skip"
+ * answer. V2-T62 (D-051): border/background/colour/padding/shadow/backdrop now come from
+ * `.seeya-dialog` (`components.css`, `ui/dialog.tsx`) — this id rule keeps only the size this
+ * dialog's own content needs, which `.seeya-dialog` deliberately leaves to each caller. */
+#fallback-dialog {
+  max-width: 480px;
+}
+
+#fallback-dialog h3 {
+  margin: 0 0 8px;
+}
+
+#fallback-dialog p {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+#fallback-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* V2-T5a items 1/4: the "End day..." preview-as-confirmation/progress/result dialog — same
+ * shape as #fallback-dialog above (native <dialog>, showModal()), wider to fit
+ * formatEndDayReport's own multi-line report text. V2-T62 (D-051): see #fallback-dialog's own
+ * comment above — base dialog styling now comes from `.seeya-dialog`. */
+#end-day-dialog {
+  max-width: 640px;
+  width: 90vw;
+}
+
+#end-day-dialog h3 {
+  margin: 0 0 8px;
+}
+
+#end-day-dialog-report {
+  max-height: 50vh;
+  overflow-y: auto;
+  font-size: 12px;
+  white-space: pre-wrap;
+  background: var(--seeya-surface-subtle);
+  border: 1px solid var(--seeya-border);
+  border-radius: var(--seeya-radius-sm);
+  padding: 8px;
+}
+
+#end-day-dialog-cost,
+#end-day-dialog-progress {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+#end-day-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* V2-T14: the Settings dialog — same shape as #end-day-dialog above (native <dialog>,
+ * showModal()), scrollable for sixteen rows without growing past the window. V2-T62 (D-051): see
+ * #fallback-dialog's own comment above — base dialog styling now comes from `.seeya-dialog`. */
+#settings-dialog {
+  max-width: 640px;
+  width: 90vw;
+  max-height: 85vh;
+}
+
+#settings-dialog h3 {
+  margin: 0 0 8px;
+}
+
+#settings-dialog-daemon-note {
+  font-size: 12px;
+  color: var(--seeya-text-secondary);
+  margin: 0 0 12px;
+}
+
+#settings-rows {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.settings-row {
+  border-top: 1px solid var(--seeya-border);
+  padding: 8px 0;
+}
+
+.settings-row:first-child {
+  border-top: none;
+}
+
+.settings-row-name {
+  display: block;
+  font-size: 13px;
+  font-family: var(--seeya-font-mono);
+}
+
+.settings-row-description {
+  font-size: 12px;
+  margin: 0 0 4px;
+}
+
+.settings-row-origin {
+  font-size: 11px;
+  color: var(--seeya-text-secondary);
+  margin-right: 8px;
+}
+
+.settings-row-input {
+  width: 55%;
+}
+
+.settings-row-error {
+  font-size: 12px;
+  color: var(--seeya-error-text);
+  margin: 4px 0 0;
+}
+
+#settings-project-policy-heading {
+  font-size: 12px;
+  font-weight: normal;
+  color: var(--seeya-text-secondary);
+  margin: 12px 0 4px;
+}
+
+#settings-project-policy-lines p {
+  font-size: 12px;
+  font-family: var(--seeya-font-mono);
+  margin: 0 0 2px;
+}
+
+#settings-dialog-close {
+  margin-top: 12px;
+}
+
+/* V2-T30: the five project dialogs (new project, project-lock confirmation, adopt picker, adopt
+ * launch/commit confirmation, adopt result) all share the same shape as #fallback-dialog above —
+ * one class instead of repeating the six declarations five more times. V2-T62 (D-051): base
+ * dialog styling now comes from `.seeya-dialog` (see #fallback-dialog's own comment above); this
+ * class keeps only the size these six dialogs share. */
+.project-dialog {
+  max-width: 480px;
+}
+
+.project-dialog h3 {
+  margin: 0 0 8px;
+}
+
+.project-dialog p,
+.project-dialog label {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.project-dialog input[type='text'],
+.project-dialog select {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 4px 0 12px;
+}
+
+.project-dialog-error {
+  font-size: 12px;
+  color: var(--seeya-error-text);
+  margin: 0 0 8px;
+}
+
+.project-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+#adopt-launch-confirm-lines p,
+#adopt-commit-confirm-lines p,
+#leftover-changes-confirm-lines p {
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  margin: 0 0 6px;
+}

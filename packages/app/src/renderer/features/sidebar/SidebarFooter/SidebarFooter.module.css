@@ -1,0 +1,79 @@
+/* D-052 (V2-T75). PO review (defect 1): the footer used to be a raw `.footer { padding-top }`
+ * block with NO horizontal padding — "End of day…"/"End day…"/the daemon pill/autostart touched
+ * both edges of the lateral while the header/content had the usual `--seeya-space-2` gutter. The
+ * fix moves padding and vertical gap onto the typed primitives (`Surface padding="sm"` +
+ * `Stack gap="sm"` in `SidebarFooter.tsx`), the SAME token `Sidebar.module.css#content` already
+ * uses — this class is left with only what no primitive expresses: the divider line above the
+ * footer. */
+.footerDivider {
+  border-top: 1px solid var(--seeya-border);
+}
+
+.scheduleText {
+  font-size: 11px;
+  margin: 0;
+  color: var(--seeya-text-secondary);
+}
+
+.scheduleActions {
+  display: flex;
+  gap: var(--seeya-space-1);
+}
+
+.scheduleActions > * {
+  flex: 1;
+  font-size: 11px;
+}
+
+/* `docs/INTERFACE.md` § 1 item 7's own "fundo sólido do estado" — radius-md (10px, a card/button
+ * radius, identity § 6.2), never radius-full: this reads as a status row, not a chip. */
+.daemonPill {
+  display: flex;
+  align-items: center;
+  gap: var(--seeya-space-2);
+  width: 100%;
+  min-height: 32px;
+  padding: var(--seeya-space-2) var(--seeya-space-2);
+  border-radius: var(--seeya-radius-md);
+  box-sizing: border-box;
+}
+
+.daemonPillNeutral {
+  background: var(--seeya-surface-hover);
+  color: var(--seeya-text);
+}
+
+.daemonPillSuccess {
+  background: var(--seeya-success-bg);
+  color: var(--seeya-success-text);
+}
+
+.daemonDot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* V2-T63 item 7's own defect: "Daemon running com fonte pequena demais" — `body-sm` (14px), peso
+ * 500 (identity § 4.4), not the old 12px. */
+.daemonLabel {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.daemonResult {
+  font-size: 11px;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.autostartResult {
+  font-size: 11px;
+  margin: 0;
+  white-space: pre-wrap;
+}

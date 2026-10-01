@@ -1,0 +1,25 @@
+/* D-052 (V2-T75). `gap` between rows is what fixes the V2-T63 aceite's own "All projects e Sessions
+ * colados um no outro" — the rows themselves had a `gap` for their OWN internal content, but
+ * nothing separated one row from the next. */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--seeya-space-1);
+}
+
+/* V2-T72 item 2 — hidden until `renderer/legacy/projects-list-view.tsx` has something to show;
+ * that legacy module still owns 100% of this heading/list's content (unchanged by this task) —
+ * this component only ever renders the stable anchor it appends into. */
+.ignoredHeading {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--seeya-text-tertiary);
+  margin: var(--seeya-space-3) 0 var(--seeya-space-1);
+}
+
+.ignoredList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+}

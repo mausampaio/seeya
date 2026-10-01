@@ -3,25 +3,27 @@
   // (not just a tsconfig.build.json) — on purpose. typescript-eslint's projectService
   // auto-discovers the nearest "tsconfig.json" walking up from each linted file; engine/cli have
   // none so their files fall through to the root tsconfig.json (the one whole-repo program,
-  // ES2023-only lib). packages/app/src/electron/** (the renderer bootstrap and preload) touches
-  // real DOM globals (`document`, `window`, `HTMLElement` — @xterm/xterm's own API surface needs
-  // them too) that ES2023 alone doesn't declare; adding "DOM"/"DOM.Iterable" to the ROOT
-  // tsconfig.json's lib would apply browser globals to every engine/cli file too, for no reason
-  // any of them needs. This file is the narrower fix: only packages/app/src gets DOM types, found
-  // by ESLint automatically (nearest tsconfig.json wins) and used as the one project reference
-  // `npm run build` (`tsc -b tsconfig.build.json`) compiles.
+  // ES2023-only lib). packages/app/src/main/** (D-052: window, IPC, preload) and
+  // packages/app/src/renderer/** (the Preact design system, features and legacy screens) touch
+  // real DOM/Electron globals (`document`, `window`, `HTMLElement` — @xterm/xterm's own API
+  // surface needs them too) that ES2023 alone doesn't declare; adding "DOM"/"DOM.Iterable" to the
+  // ROOT tsconfig.json's lib would apply browser globals to every engine/cli file too, for no
+  // reason any of them needs. This file is the narrower fix: the WHOLE package gets DOM types,
+  // found by ESLint automatically (nearest tsconfig.json wins) and used as the one project
+  // reference `npm run build` (`tsc -b tsconfig.build.json`) compiles.
   //
-  // The root tsconfig.json's own "exclude" (see that file) drops packages/app/src/electron from
-  // the FLAT `tsc -p tsconfig.json --noEmit` program precisely so that check never needs DOM
-  // either — this file is the only program that ever type-checks electron/**.
-  // V2-T62 (D-051): "jsx"/"jsxImportSource" compile `.tsx` (`src/ui/**`, `src/electron/app-shell.tsx`
-  // and its own sub-components) through `preact/jsx-runtime` — never `preact/compat` (D-051's own
-  // "sem a camada de compatibilidade com React"). The repo's OTHER program that also type-checks
-  // `src/ui/**` (`tsconfig.app-ui.json`, at the repo root — see that file's own comment for why a
-  // second program exists at all) repeats these same two settings, since the two programs cover
-  // different, non-overlapping file sets (this one is `src` only, that one is `src/ui` plus its
-  // own tests) but the SAME two directories' `.tsx` files need to agree on what a bare `<div/>`
-  // compiles to regardless of which program is checking it at the moment.
+  // The root tsconfig.json's own "exclude" (see that file) drops packages/app/src/main and
+  // packages/app/src/renderer from the FLAT `tsc -p tsconfig.json --noEmit` program precisely so
+  // that check never needs DOM either — this file is the only program that ever type-checks
+  // main/** (renderer/** ALSO gets its own leaf tsconfig.json, `packages/app/src/renderer/tsconfig.json`,
+  // for ESLint's nearest-file walk and for its own narrow `tsc --noEmit` step — see that file's
+  // own comment for why a second, narrower program exists for it too).
+  // V2-T62 (D-051): "jsx"/"jsxImportSource" compile every `.tsx` under `src/` through
+  // `preact/jsx-runtime` — never `preact/compat` (D-051's own "sem a camada de compatibilidade com
+  // React"). `packages/app/src/renderer/tsconfig.json` repeats these same two settings, since the
+  // two programs cover different, non-overlapping file sets (this one is `src` only, that one is
+  // `src/renderer` plus its own tests) but the SAME directory's `.tsx` files need to agree on what
+  // a bare `<div/>` compiles to regardless of which program is checking it at the moment.
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2023", "DOM", "DOM.Iterable"],

@@ -116,12 +116,29 @@ V2-T2 moveu seis módulos por essa regra: `daemon-state.ts` (→ `scheduler/`, p
 
 **Dois guards de `eslint.config.js` fecham as duas dependências nativas da interface**, com a
 mesma técnica de inversão de ônus que já protege `spawn` (D-038) e o relógio (D-019): `electron`
-só é importável em `packages/app/src/electron/**` (a fiação que não roda sem tela — também o único
-trecho de `packages/app/src` fora do piso de cobertura de 80%, `vitest.config.ts`); `node-pty` só
-em `packages/app/src/pty/**`, atrás da porta `PtySpawner` (`pty/pty-port.ts`) que o resto do
-pacote depende — uma aba **é** um processo que o seeya lança, e a regra de "invisível por padrão"
-(D-038) vale para ela: o ConPTY não abre janela própria (medido no spike M), e a guarda garante que
-ninguém contorna o padrão.
+só é importável em `packages/app/src/main/**` (D-052, V2-T75 — o processo principal: janela, IPC,
+preload; junto com `packages/app/src/renderer/legacy/**`, também fora do piso de cobertura de 80%,
+`vitest.config.ts`, por não rodar sem tela) — `packages/app/src/renderer/components/**` e
+`renderer/features/**` (o design system e as regiões já reescritas) ficam DENTRO do piso, já que
+seus testes renderizam de verdade com `@testing-library/preact`/`happy-dom`, sem precisar de
+Electron; `node-pty` só em `packages/app/src/pty/**`, atrás da porta `PtySpawner`
+(`pty/pty-port.ts`) que o resto do pacote depende — uma aba **é** um processo que o seeya lança, e
+a regra de "invisível por padrão" (D-038) vale para ela: o ConPTY não abre janela própria (medido
+no spike M), e a guarda garante que ninguém contorna o padrão.
+
+**A estrutura interna de `packages/app/src` (D-052, V2-T75).** `main/` é o processo principal
+(antes `electron/`); `renderer/` é tudo que roda no processo do renderer — `App.tsx` (a raiz),
+`components/` (o design system: um componente por pasta, CSS module + teste real + `index.ts`),
+`features/<região>/` (uma pasta por região da janela já reescrita — a lateral,
+`features/sidebar/`, é a primeira — com o componente da região, o(s) hook(s) com a lógica, o CSS
+dela, e subpastas para os componentes internos), `hooks/` (hooks compartilhados, como
+`useIpcSubscription`), `ipc/` (o cliente tipado da ponte com o processo principal), e `legacy/`
+(o que ainda não foi reescrito na estrutura acima — dialogs, as páginas Today/Projects/Sessions
+atuais, a barra de abas — sem mudança de comportamento; sai dali quando a tarefa da região dele
+chegar). `composition/`, `tabs/`, `sidebar/`, `state/`, `pty/`, `ipc/` (o de nível de pacote,
+compartilhado entre `main/` e `renderer/ipc/`), `text/` e `theme/` continuam como módulos
+transversais no nível do pacote, fora de `main/`/`renderer/` — nenhum deles é específico de um
+processo só.
 
 ## Portas (interfaces do núcleo)
 

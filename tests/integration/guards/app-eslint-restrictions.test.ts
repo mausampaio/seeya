@@ -17,7 +17,7 @@ const GUARD_NAME = 'app-eslint';
  * Shortcut for a fixture path in this file, isolated in packages/app/src/<subdir>/_guard-app-eslint/.
  * NOT built with `guardFixturePath`/`srcRootForLayer` (those two only know the engine's per-layer
  * scan and the two flat package roots, `cli`/`app` themselves — neither models a subdirectory
- * INSIDE the app package the way this file needs, e.g. `electron/`, `pty/`, `tabs/`): built
+ * INSIDE the app package the way this file needs, e.g. `main/`, `pty/`, `tabs/`): built
  * directly against `APP_SRC_ROOT` instead.
  */
 function fixture(subdir: string, fileName: string): string {
@@ -25,12 +25,13 @@ function fixture(subdir: string, fileName: string): string {
 }
 
 /**
- * V2-T2 (docs/PLANO-DE-ENTREGA.md, item 5): proves eslint.config.js's two app-specific
- * inversion-of-onus rules really reject — `electron` importable only from
- * packages/app/src/electron/**, `node-pty` only from packages/app/src/pty/** — same D-038-style
- * "the exception is declared at the call site, not forgotten in silence" this project already
- * uses for `spawn` (see eslint-restrictions.test.ts's own second describe block). Each test writes
- * a fixture in the real tree, runs the real eslint, and deletes it in `afterEach`.
+ * V2-T2 (docs/PLANO-DE-ENTREGA.md, item 5), updated by D-052/V2-T75 for the `electron/` → `main/`
+ * rename: proves eslint.config.js's two app-specific inversion-of-onus rules really reject —
+ * `electron` importable only from packages/app/src/main/**, `node-pty` only from
+ * packages/app/src/pty/** — same D-038-style "the exception is declared at the call site, not
+ * forgotten in silence" this project already uses for `spawn` (see eslint-restrictions.test.ts's
+ * own second describe block). Each test writes a fixture in the real tree, runs the real eslint,
+ * and deletes it in `afterEach`.
  */
 describe('guard: eslint restricts electron/node-pty to their own directories inside packages/app/src', () => {
   const created: string[] = [];
@@ -46,7 +47,7 @@ describe('guard: eslint restricts electron/node-pty to their own directories ins
   });
 
   it(
-    'rejects electron imported outside packages/app/src/electron/**, with a message pointing at electron/',
+    'rejects electron imported outside packages/app/src/main/**, with a message pointing at main/',
     () => {
       const filePath = writeTempFile(
         fixture('tabs', 'violation-test-electron.ts'),
@@ -58,7 +59,7 @@ describe('guard: eslint restricts electron/node-pty to their own directories ins
 
       expect(result.exitCode, result.output).not.toBe(0);
       expect(result.output).toContain('no-restricted-imports');
-      expect(result.output).toContain('packages/app/src/electron/**');
+      expect(result.output).toContain('packages/app/src/main/**');
     },
     TEST_TIMEOUT_MS,
   );
@@ -82,10 +83,10 @@ describe('guard: eslint restricts electron/node-pty to their own directories ins
   );
 
   it(
-    'rejects node-pty imported inside packages/app/src/electron/** too (electron/ is exempt from the electron ban, not the node-pty one)',
+    'rejects node-pty imported inside packages/app/src/main/** too (main/ is exempt from the electron ban, not the node-pty one)',
     () => {
       const filePath = writeTempFile(
-        fixture('electron', 'violation-test-node-pty-from-electron.ts'),
+        fixture('main', 'violation-test-node-pty-from-main.ts'),
         "import * as pty from 'node-pty';\nexport const spawnFn = pty.spawn;\n",
       );
       created.push(filePath);
@@ -144,11 +145,11 @@ describe('guard: eslint restricts electron/node-pty to their own directories ins
   );
 
   it(
-    'approves the real packages/app/src/electron files importing electron (control against the real files)',
+    'approves the real packages/app/src/main files importing electron (control against the real files)',
     () => {
       const result = runEslint(
-        ['packages/app/src/electron/main.ts', 'packages/app/src/electron/preload.ts'].map(
-          (relativePath) => path.join(PROJECT_ROOT, relativePath),
+        ['packages/app/src/main/main.ts', 'packages/app/src/main/preload.ts'].map((relativePath) =>
+          path.join(PROJECT_ROOT, relativePath),
         ),
       );
 

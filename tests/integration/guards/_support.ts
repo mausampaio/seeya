@@ -121,6 +121,20 @@ function describeTimeout(result: SpawnSyncReturns<string>, budgetMs: number): st
  * mechanism itself with a fake command and a small budget, without waiting out the real 30s
  * budget on every suite run.
  */
+/**
+ * V2-T75: measured, not assumed. `spawnSync`'s own default `maxBuffer` is 1 MiB (1_048_576
+ * bytes) — `runDependencyCruiserOnFullTree`'s JSON output crossed that line the moment this
+ * task's new files (the renderer design system + the lateral feature) joined the production tree
+ * dependency-cruiser walks: measured directly on this machine, 1_053_184 bytes, ~4.6 KiB over the
+ * default. Past that line, `spawnSync` truncates stdout AND sends `SIGTERM` to the child — which
+ * reads exactly like a timeout (`status: null`) but ISN'T one (the process exits in ~2.5s, far
+ * under `CHILD_PROCESS_BUDGET_MS`), so `describeTimeout`'s own `ETIMEDOUT` check never fires and
+ * the failure looks like "dependency-cruiser produced invalid JSON" instead of naming the real
+ * cause. 20 MiB is generous headroom against the measured ~1.05 MiB, not a number picked to just
+ * clear today's tree — the whole point is not needing to touch this again for a long time.
+ */
+const CHILD_PROCESS_MAX_BUFFER_BYTES = 20 * 1024 * 1024;
+
 function run(
   args: readonly string[],
   options?: { cwd?: string; timeoutMs?: number },
@@ -131,6 +145,7 @@ function run(
     encoding: 'utf8',
     shell: false,
     timeout: timeoutMs,
+    maxBuffer: CHILD_PROCESS_MAX_BUFFER_BYTES,
   });
   return {
     exitCode: result.status,

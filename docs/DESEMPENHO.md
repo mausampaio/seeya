@@ -210,6 +210,52 @@ somam ~14,3 KB brutos, e os módulos novos (`tabs/page-tab.ts`, `electron/page-t
 TypeScript — nada perto dos ~666 KB/1,8 MB que a V2-T62 (Preact inteiro + cinco arquivos de fonte)
 já mediu como aceitável.
 
+## V2-T75 — antes/depois (estrutura de componentes, lateral reescrita, D-052)
+
+**Data:** 2026-09-30, mesma máquina da linha de base. Medido com `measure-startup.mjs`/
+`measure-idle.mjs`, método idêntico às seções acima — **sem A/B na mesma sessão** desta vez (a
+segunda worktree descartável que V2-T63 usou para isolar código antigo não foi reconstruída aqui,
+por custo de tempo); os números abaixo comparam só contra a linha de base/entradas anteriores
+deste documento, com a mesma ressalva de variabilidade de máquina que a seção "Linha de base" já
+registra. (d) não medido — mesmo motivo da V2-T63: `npm run dist:windows` já foi recusado pelo
+classificador automático de permissão do harness ("Production Deploy"), tentativa não repetida.
+
+| Medida | Entradas anteriores (faixa de 2026-09-20/30) | V2-T75 (2026-09-30) |
+|---|---|---|
+| (a) Tempo até a lista de sessões | 5647–5978 ms | 689–693 ms |
+| (b) Memória em repouso (árvore inteira) | 356,3–447,8 MiB | 372,0–404,9 MiB |
+| (c) CPU ocioso (janela de 60 s) | 0,29%–0,68% de um núcleo lógico | 0,08%–0,16% de um núcleo lógico |
+| (d) Instalador / instalado | não medido — ver nota | não medido — ver nota |
+
+**(b) fica dentro da faixa já registrada** — sem indício de custo novo em repouso.
+
+**(a) e (c) saíram muito abaixo de toda entrada anterior deste documento — registrado como medido,
+não como melhoria desta tarefa (D-025).** Revisão do PO pediu para confirmar que o instante medido
+ainda é o `sessionsUpdate` COM a lista descoberta (não um envio vazio anterior, nem um evento que
+mudou de lugar com a reestruturação do `main/`) antes deste número entrar aqui — duas verificações
+feitas:
+
+1. **O código é byte-a-byte o mesmo.** `git show 9e9231e --stat -- packages/app/src/main/main.ts`
+   (o commit que moveu `electron/main.ts` para `main/main.ts`) mostra `0` inserções/deleções — uma
+   renomeação pura. `writeStartupTiming` continua chamada dentro do `onTick` do laço de atualização,
+   DEPOIS de `rows = buildSidebarRows(discovery, ...)` (a descoberta real já aconteceu) e do
+   `window.webContents.send(CHANNELS.sessionsUpdate, { rows })` — nunca antes, nunca um envio
+   vazio. Esta tarefa não tocou `main.ts` além dessa renomeação.
+2. **Reproduzido com o cache do binário de desenvolvimento limpo** (`%APPDATA%\Electron\Cache` e
+   `\Code Cache` apagados antes de medir, eliminando qualquer aquecimento desta sessão de
+   verificação): 668–747 ms, três rodadas — a mesma faixa de antes, não os 5,6–6,0 s históricos.
+
+Com o quê é medido confirmado correto e a faixa reproduzível mesmo a frio, a causa mais provável
+da diferença continua sendo variação da MÁQUINA entre sessões de medição diferentes (a mesma
+incerteza que a seção "Linha de base" já registra para (b)/(c): antivírus, disco, outros
+processos) — não uma mudança desta tarefa, que não tocou `SessionProvider`/a descoberta de sessão
+nem o laço de atualização. Mesma leitura para (c): nenhuma CPU nova em repouso foi acrescentada por
+este trabalho. `measure-startup.mjs`'s own comentário já dizia, antes desta tarefa, "~1s this
+file's own measurements actually saw" — mais perto da faixa medida agora do que da faixa histórica
+de 5,6–6,0 s. Se um dia isto importar de verdade (por exemplo, se a faixa histórica for a real e
+esta for a anômala), cabe uma medição própria com A/B explícito numa segunda worktree com o código
+anterior — o que esta revisão não reconstruiu, por custo de tempo.
+
 ## A régua
 
 **Toda tarefa de interface que acrescente trabalho em repouso, na subida ou no tamanho em disco

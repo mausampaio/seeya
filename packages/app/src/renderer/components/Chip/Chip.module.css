@@ -1,0 +1,127 @@
+/* D-052 (V2-T75): replaces `StatusPill`/the old global `.seeya-status-pill*` classes — content is
+ * always centered (`display: inline-flex` + `align-items`/`justify-content: center`), the fix for
+ * the V2-T63 aceite's own "chip `1 running` com o texto fora do centro". `line-height: 1` removes
+ * the font's own ascent/descent asymmetry, the other half of that same defect: a pill sized around
+ * a text line taller than the glyphs it actually draws reads as "text sits high in the pill" even
+ * when every flex alignment rule is already correct. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--seeya-space-1);
+  border-radius: var(--seeya-radius-full);
+  font-family: var(--seeya-font-sans);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Sizes. */
+.sm {
+  padding: 2px var(--seeya-space-2);
+  font-size: 11px;
+}
+
+.md {
+  padding: 3px var(--seeya-space-2);
+  font-size: 12px;
+}
+
+.lg {
+  padding: var(--seeya-space-1) var(--seeya-space-3);
+  font-size: 13px;
+}
+
+/* Variant `soft` (the default — a tinted background, the old status-pill's own look) per tone. */
+.soft.neutral {
+  background: var(--seeya-surface-subtle);
+  color: var(--seeya-text-secondary);
+}
+
+.soft.brand {
+  background: var(--seeya-brand-soft);
+  color: var(--seeya-brand-text);
+}
+
+.soft.success {
+  background: var(--seeya-success-bg);
+  color: var(--seeya-success-text);
+}
+
+.soft.info {
+  background: var(--seeya-info-bg);
+  color: var(--seeya-info-text);
+}
+
+.soft.warning {
+  background: var(--seeya-warning-bg);
+  color: var(--seeya-warning-text);
+}
+
+.soft.error {
+  background: var(--seeya-error-bg);
+  color: var(--seeya-error-text);
+}
+
+/* Variant `solid` — a full-strength background, `on-brand`-style text (D-052's own SidebarFooter
+ * daemon pill: "fundo sólido do estado", the V2-T63 aceite's third correction round). */
+.solid.neutral {
+  background: var(--seeya-surface-hover);
+  color: var(--seeya-text);
+}
+
+.solid.brand {
+  background: var(--seeya-brand);
+  color: var(--seeya-on-brand);
+}
+
+.solid.success {
+  background: var(--seeya-success-base);
+  color: var(--seeya-on-brand);
+}
+
+.solid.info {
+  background: var(--seeya-info-base);
+  color: var(--seeya-on-brand);
+}
+
+.solid.warning {
+  background: var(--seeya-warning-base);
+  color: var(--seeya-on-brand);
+}
+
+.solid.error {
+  background: var(--seeya-error-base);
+  color: var(--seeya-on-brand);
+}
+
+/* Variant `outline` — a 1px border in the tone's own colour, transparent background (the counter
+ * next to a nav row: present, but never competing with the row's own hover/active background). */
+.outline {
+  background: transparent;
+  border: 1px solid currentColor;
+}
+
+.outline.neutral {
+  color: var(--seeya-text-secondary);
+}
+
+.outline.brand {
+  color: var(--seeya-brand-text);
+}
+
+.outline.success {
+  color: var(--seeya-success-text);
+}
+
+.outline.info {
+  color: var(--seeya-info-text);
+}
+
+.outline.warning {
+  color: var(--seeya-warning-text);
+}
+
+.outline.error {
+  color: var(--seeya-error-text);
+}
