@@ -11,8 +11,11 @@ afterEach(cleanup);
 const PENDING_DATA: TodayPanelData = {
   kind: 'pending',
   day: '2026-09-30',
-  // `daysAgo: 1` is `MESSAGES.todayPlanTitle`'s own unremarkable case (Q-026, the morning after)
-  // — the plain "Plan for <day>" title, with no "(N days ago)" suffix.
+  // `daysAgo: 1` — PO review of V2-T66, third round: the title now always carries an age suffix,
+  // "Plan for <day> (1 day ago)" singular here (`MESSAGES.todayPlanTitle`/`formatPlanAge`,
+  // text/messages.ts). This is a DIFFERENT, app-only wording from `seeya start-day`'s own CLI
+  // title (`core/consolidated-plan.ts#renderTitle`, Q-026), which still omits the suffix for
+  // daysAgo === 1 by deliberate design — the two were never shared code.
   daysAgo: 1,
   capturedAt: new Date('2026-09-30T21:00:00.000Z'),
   rows: [
@@ -51,7 +54,7 @@ describe('Today (D-052, V2-T66)', () => {
     window.seeya = createFakeSeeyaApi({ getTodayPanel: () => Promise.resolve(PENDING_DATA) });
     const { getByText, getByRole } = render(<Today />);
 
-    await waitFor(() => expect(getByText('Plan for 2026-09-30')).not.toBeNull());
+    await waitFor(() => expect(getByText('Plan for 2026-09-30 (1 day ago)')).not.toBeNull());
     expect(getByText('payments-webhooks')).not.toBeNull();
     expect(getByText('auth-hardening')).not.toBeNull();
     expect(getByText('Running now · open in a tab')).not.toBeNull();
@@ -113,7 +116,7 @@ describe('Today (D-052, V2-T66)', () => {
         .mockResolvedValueOnce(PENDING_DATA),
       resumeSelected,
     });
-    const { getByRole, getByText } = render(<Today />);
+    const { getByRole, getByText, container } = render(<Today />);
     await waitFor(() => expect(getByRole('checkbox')).not.toBeNull());
     fireEvent.click(getByRole('checkbox'));
 
@@ -144,7 +147,10 @@ describe('Today (D-052, V2-T66)', () => {
     });
 
     await waitFor(() => expect(getByText('Resumed')).not.toBeNull());
-    expect(getByText('payments-webhooks (/code/payments)')).not.toBeNull();
+    // The cwd now lives in its own nested `<span>` (for its own `title`, PO review of V2-T66,
+    // third round, item 2) — split across elements, so `<li>.textContent` proves the full line
+    // instead of `getByText`, which can't match text broken up that way.
+    expect(container.querySelector('li')?.textContent).toBe('payments-webhooks (/code/payments)');
   });
 
   it('shows resume progress while a resumeSelected call is in flight', async () => {
@@ -208,13 +214,14 @@ describe('Today (D-052, V2-T66)', () => {
         },
         resumeSelected,
       });
-      const { getByRole, getByText } = render(<Today />);
+      const { getByRole, getByText, container } = render(<Today />);
       await waitFor(() => expect(getByRole('checkbox')).not.toBeNull());
       fireEvent.click(getByRole('checkbox'));
       fireEvent.click(getByRole('button', { name: 'Resume selected' }));
 
       await waitFor(() => expect(getByText('Resumed')).not.toBeNull());
-      expect(getByText('payments-webhooks (/code/payments)')).not.toBeNull();
+      // See the earlier test's own comment: the cwd's nested `<span>` splits this line's text.
+      expect(container.querySelector('li')?.textContent).toBe('payments-webhooks (/code/payments)');
       expect(getByText('Nothing captured yet.')).not.toBeNull();
     },
   );

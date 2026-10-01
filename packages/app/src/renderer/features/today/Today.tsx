@@ -55,7 +55,13 @@ export function Today(): JSX.Element {
     <div class={cx(styles, 'today')}>
       <div class={cx(styles, 'scroll')}>
         <ResumeProgress progress={controls.progress} />
-        {controls.result !== null && <ResumeResult result={controls.result} />}
+        {controls.result !== null && (
+          <ResumeResult
+            result={controls.result}
+            homeDir={controls.homeDir}
+            platformHint={controls.platformHint}
+          />
+        )}
         {data.kind === 'noBriefing' ? (
           <EmptyState title={MESSAGES.todayCardNothingToResume} description={data.message} />
         ) : (

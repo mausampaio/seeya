@@ -9,15 +9,17 @@
  * `null` renders nothing — `Today.tsx` only mounts this once `useToday`'s own `result` is set.
  *
  * @example
- * <ResumeResult result={response} />
+ * <ResumeResult result={response} homeDir={homeDir} platformHint={platformHint} />
  */
 import type { JSX } from 'preact';
+import type { PathPlatformHint } from '@seeya-ai/engine/core/cwd-normalization.js';
 import styles from './ResumeResult.module.css';
 import { cx } from '../../../components/css-class.js';
 import { Surface } from '../../../components/Surface/index.js';
 import { Stack } from '../../../components/Stack/index.js';
 import { Text } from '../../../components/Text/index.js';
 import { MESSAGES } from '../../../../text/messages.js';
+import { formatDirectoryPathForDisplay } from '../../../../sidebar/directory-label.js';
 import type { ResumeSummaryOutcome, ResumeSummaryResponse } from '../../../../ipc/channels.js';
 
 /** V2-T7: the resumed section's own note per `ResumeOutcome`'s three forms — same text
@@ -40,10 +42,19 @@ interface SummarySession {
 
 /** One labeled list of `name (cwd)` lines, `null` when `sessions` is empty — an empty section
  * never renders as a bare heading with nothing under it (same as the legacy function it replaces).
+ *
+ * PO review of V2-T66, third round, item 2: `cwd` used to go straight into the line's own string
+ * interpolation — the one raw, absolute `cwd` left in the Today tab once the card/notice/selector
+ * were fixed (this is what "Resumed" showed in `today-resume-result-sync-dark.png`). Each `cwd`
+ * now goes through the SAME `formatDirectoryPathForDisplay` those three already use, in a `<span>`
+ * of its own so the full raw path still has somewhere to live (its own `title`) without `title`-ing
+ * the whole line (which would also cover `name`/`note`).
  */
 function SummarySection(props: {
   readonly heading: string;
   readonly sessions: readonly SummarySession[];
+  readonly homeDir: string;
+  readonly platformHint: PathPlatformHint;
 }): JSX.Element | null {
   if (props.sessions.length === 0) {
     return null;
@@ -57,9 +68,11 @@ function SummarySection(props: {
         {props.sessions.map((session) => (
           <li key={session.sessionId}>
             <Text as="span" variant="body-sm">
-              {session.note === undefined
-                ? `${session.name} (${session.cwd})`
-                : `${session.name} (${session.cwd}) — ${session.note}`}
+              {session.name} (
+              <span title={session.cwd}>
+                {formatDirectoryPathForDisplay(session.cwd, props.homeDir, props.platformHint)}
+              </span>
+              ){session.note === undefined ? '' : ` — ${session.note}`}
             </Text>
           </li>
         ))}
@@ -70,10 +83,12 @@ function SummarySection(props: {
 
 export interface ResumeResultProps {
   readonly result: ResumeSummaryResponse;
+  readonly homeDir: string;
+  readonly platformHint: PathPlatformHint;
 }
 
 export function ResumeResult(props: ResumeResultProps): JSX.Element {
-  const { result } = props;
+  const { result, homeDir, platformHint } = props;
   return (
     <Surface padding="md" className={cx(styles, 'result')}>
       <Stack gap="md">
@@ -85,10 +100,14 @@ export function ResumeResult(props: ResumeResultProps): JSX.Element {
             cwd: outcome.cwd,
             note: resumeOutcomeNote(outcome),
           }))}
+          homeDir={homeDir}
+          platformHint={platformHint}
         />
         <SummarySection
           heading={MESSAGES.todaySummarySkippedHeading}
           sessions={result.skipped.map((session) => ({ ...session, note: session.reasonText }))}
+          homeDir={homeDir}
+          platformHint={platformHint}
         />
         <SummarySection
           heading={MESSAGES.todaySummaryInvalidHeading}
@@ -96,10 +115,14 @@ export function ResumeResult(props: ResumeResultProps): JSX.Element {
             ...session,
             note: session.reason,
           }))}
+          homeDir={homeDir}
+          platformHint={platformHint}
         />
         <SummarySection
           heading={MESSAGES.todaySummaryRemainingHeading}
           sessions={result.remaining}
+          homeDir={homeDir}
+          platformHint={platformHint}
         />
         {result.stoppedEarly !== false && (
           <Text as="p" variant="body-sm" tone="secondary">
