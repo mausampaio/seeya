@@ -4,7 +4,7 @@ title: V2-T75 — Estrutura de componentes e a lateral reescrita nela
 status: Review
 assignee: []
 created_date: '2026-09-30 21:21'
-updated_date: '2026-10-01 14:02'
+updated_date: '2026-10-01 14:11'
 labels: []
 milestone: m-2
 dependencies: []
@@ -540,5 +540,11 @@ Process: packages/*/dist deleted before every npm run verificar run (green, 337 
 tests passed); protocol-handler.json hash and both seeya/seeya-dev registry keys confirmed
 unchanged before and after every capture in this round; no stray Electron processes left
 running. Leaving the task in Review.
+---
+
+author: PO
+created: 2026-10-01 14:11
+---
+Revisão do PO em 2026-10-01: três estados da linha de projeto (hover, aba aberta, aba ativa) conferidos nas capturas — ativo em roxo suave com nome na cor da marca, aberto-não-ativo em cartão cinza, hover em cinza leve por evento de mouse nativo. Reaproveita o mecanismo do NavItem. Mesclado, portão do zero verde (3249 testes), também sem identidade global do git.
 ---
 <!-- COMMENTS:END -->
