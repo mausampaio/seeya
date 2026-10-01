@@ -145,7 +145,7 @@ export async function revertCommitSequence(
   if (!diff.ran) {
     throw new Error(`git diff failed in workspace at "${root}": ${diff.reason}`);
   }
-  // V2-T34 hotfix (PO review, 2026-09-25): same lock-holder authorization `index.ts#commitAll`
+  // V2-T34 hotfix (PO review, 2026-09-25): same lock-holder authorization `commit.ts#commitAll`
   // already has — a revert's own final commit is exactly the kind of "seeya committing while
   // holding the project's own lock" this fix targets.
   const commit = await runGit(root, ['commit', '-m', message], {

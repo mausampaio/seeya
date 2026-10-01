@@ -1379,7 +1379,7 @@ export interface WorkspaceRepository {
    * `installCommitMsgHook` above already has, for the identical reason: the content embeds this
    * machine's current, absolute `seeya` path, which only `open` can know is fresh. Never
    * committed — the workspace's own `.gitignore` excludes every project's own `.claude/` directory
-   * (`adapters/workspace/index.ts`'s own gitignore reassertion, extended to cover this).
+   * (`adapters/workspace/commit.ts`'s own gitignore reassertion, extended to cover this).
    */
   installHarnessHook(root: string, projectId: string, settingsJsonContent: string): Promise<void>;
 
@@ -1398,7 +1398,7 @@ export interface WorkspaceRepository {
    * D-050/V2-T61: (over)writes `<root>/<projectId>/CLAUDE.md` — always overwrites, same "seeya's
    * own generated text" discipline `installHarnessHook` above already has. Never committed — the
    * workspace's own `.gitignore` excludes every project's own `CLAUDE.md`
-   * (`adapters/workspace/index.ts`'s own `IGNORED_WORKSPACE_PATTERNS`), so a fresh, ungenerated
+   * (`adapters/workspace/commit.ts`'s own `IGNORED_WORKSPACE_PATTERNS`), so a fresh, ungenerated
    * project's file never becomes part of the workspace's own history by accident. Only ever called
    * after `isClaudeMdVersioned` reported false (`ensureGeneratedClaudeMdInstalled`'s own gate) —
    * this method doesn't re-check on its own, the same "caller already knows" contract this

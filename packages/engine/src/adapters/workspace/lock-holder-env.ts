@@ -3,7 +3,7 @@
  * across the `git commit` process boundary (V2-T34 hotfix, PO review 2026-09-25) — same naming
  * convention `adapters/process/daemon-launch.ts#DAEMON_CHILD_ENV_VAR` already established for a
  * seeya-internal marker: the constant lives next to whoever WRITES the real environment
- * (`buildLockHolderEnv`, called from `index.ts#commitAll`/`revert.ts#revertCommitSequence` when
+ * (`buildLockHolderEnv`, called from `commit.ts#commitAll`/`revert.ts#revertCommitSequence` when
  * committing while holding the project's own lock), and the composition root that reads it back
  * for `seeya project verify-commit` (`packages/cli/src/composition.ts#buildVerifyCommitDeps`)
  * imports the same names by its public subpath, never redeclaring the strings.

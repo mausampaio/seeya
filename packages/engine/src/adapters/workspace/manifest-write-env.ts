@@ -3,7 +3,7 @@
  * OWN intentional writes to a project's `seeya.json` (V2-T73 item 1) — same naming/placement
  * convention `adapters/workspace/lock-holder-env.ts` already established for
  * `SEEYA_LOCK_HOLDER_PID`/`SEEYA_LOCK_HOLDER_PROC_START`: the constant lives next to whoever WRITES
- * the real environment (`buildManifestWriteEnv`, called from `index.ts#commitAll`), and the
+ * the real environment (`buildManifestWriteEnv`, called from `commit.ts#commitAll`), and the
  * composition root that reads it back for `seeya project verify-commit`
  * (`packages/cli/src/composition.ts#buildVerifyCommitDeps`) imports the same name by its public
  * subpath, never redeclaring the string.

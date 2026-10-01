@@ -552,11 +552,11 @@ export function buildVerifyCommitDeps(): VerifyCommitDeps {
     lockFileName: PROJECT_LOCK_FILE_NAME,
     currentSessionId: readCurrentSessionId(),
     // V2-T34 hotfix (PO review, 2026-09-25): `SEEYA_LOCK_HOLDER_PID`/`SEEYA_LOCK_HOLDER_PROC_START`
-    // — set by `adapters/workspace/index.ts#commitAll`/`revert.ts#revertCommitSequence` on the
+    // — set by `adapters/workspace/commit.ts#commitAll`/`revert.ts#revertCommitSequence` on the
     // `git commit` this hook is running inside of, only when `seeya` itself made that commit while
     // holding the touched project's own lock.
     currentProcess: readLockHolderProcess(process.env),
-    // V2-T73 item 1: `SEEYA_MANIFEST_WRITE_AUTHORIZED` — set by `adapters/workspace/index.ts
+    // V2-T73 item 1: `SEEYA_MANIFEST_WRITE_AUTHORIZED` — set by `adapters/workspace/commit.ts
     // #commitAll` only on the `git commit` this hook is running inside of, when `seeya` itself made
     // that commit as one of its own four intentional writes to the project's `seeya.json`.
     manifestWriteAuthorized: readManifestWriteAuthorized(process.env),
