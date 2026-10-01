@@ -7,11 +7,13 @@
  * @example
  * <TextField id="new-project-id-input" label="Project id" value={id} onInput={setId} />
  *
- * Relocated from `ui/` by D-052 (V2-T75) — still no production caller (confirmed by grep before
- * moving it) and still styled by `renderer/legacy/components.css`'s own `.seeya-field*` global
- * classes, not a CSS module yet; left for the region task that first puts it on screen.
+ * Brought to the CSS-module/render-tested pattern by V2-T64 (D-052, Q-102 — relocated from `ui/`
+ * by V2-T75 without a reshape, since it had no production caller yet; the New tab popover's own
+ * `Directory`/`Other…` fields are its first callers).
  */
 import type { JSX } from 'preact';
+import styles from './TextField.module.css';
+import { cx } from '../css-class.js';
 
 export interface TextFieldProps {
   readonly id: string;
@@ -26,21 +28,21 @@ export interface TextFieldProps {
 
 export function TextField(props: TextFieldProps): JSX.Element {
   return (
-    <div class="seeya-field">
-      <label class="seeya-field-label" for={props.id}>
+    <div class={cx(styles, 'field')}>
+      <label class={cx(styles, 'label')} for={props.id}>
         {props.label}
       </label>
       <input
         id={props.id}
         type="text"
-        class="seeya-field-input"
+        class={cx(styles, 'input')}
         value={props.value}
         placeholder={props.placeholder}
         disabled={props.disabled}
         onInput={(event) => props.onInput?.((event.target as HTMLInputElement).value)}
       />
-      {props.hint !== undefined && <p class="seeya-field-hint">{props.hint}</p>}
-      {props.error !== undefined && <p class="seeya-field-error">{props.error}</p>}
+      {props.hint !== undefined && <p class={cx(styles, 'hint')}>{props.hint}</p>}
+      {props.error !== undefined && <p class={cx(styles, 'error')}>{props.error}</p>}
     </div>
   );
 }

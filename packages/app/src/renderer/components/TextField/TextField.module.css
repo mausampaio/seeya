@@ -1,0 +1,43 @@
+/* D-052 (V2-T75 left this unstyled, Q-102; V2-T64 brings it to the pattern) — same visual result
+ * the global `.seeya-field*` classes already gave (`renderer/legacy/components.css`), now scoped
+ * to this component alone. `Select` (not touched by this task, still no production caller) keeps
+ * using the global classes directly — nothing here removes those. */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--seeya-space-1);
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--seeya-text-secondary);
+}
+
+.input {
+  font-family: var(--seeya-font-sans);
+  font-size: 14px;
+  color: var(--seeya-text);
+  background: var(--seeya-surface);
+  border: 1px solid var(--seeya-border-control);
+  border-radius: var(--seeya-radius-sm);
+  padding: var(--seeya-space-2) var(--seeya-space-3);
+}
+
+.input:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.hint {
+  font-family: var(--seeya-font-mono);
+  font-size: 12px;
+  color: var(--seeya-text-tertiary);
+  margin: 0;
+}
+
+.error {
+  font-size: 12px;
+  color: var(--seeya-error-text);
+  margin: 0;
+}
