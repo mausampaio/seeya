@@ -370,6 +370,52 @@ function createWindow(clock: Clock): BrowserWindow {
         });
     });
   }
+  // SEEYA_APP_AUTO_SWITCH_TO_ALL_PROJECTS: V2-T75-linha-de-projeto's own before/after proof —
+  // clicks the "All projects" nav link (`#all-projects-link`) a moment after a shell tab opens
+  // (combine with `SEEYA_APP_AUTO_OPEN_SHELL_TAB=1`), so a project's own open tab can be proven
+  // `openHere` WITHOUT also being the active tab — the shell tab stays alive (its pty keeps
+  // running, its own session evidence keeps matching), it just isn't the one on screen any more.
+  // Never set by `npm run app` or the README.
+  if (process.env.SEEYA_APP_AUTO_SWITCH_TO_ALL_PROJECTS === '1') {
+    window.webContents.once('did-finish-load', () => {
+      void clock
+        .sleep(1200) // after SEEYA_APP_AUTO_OPEN_SHELL_TAB's own three steps have settled
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('all-projects-link')?.click();",
+          ),
+        );
+    });
+  }
+  // SEEYA_APP_AUTO_HOVER_FIRST_FAVORITE: V2-T75-linha-de-projeto's own before/after proof for the
+  // row's own `:hover` state — `executeJavaScript` can measure where the first Favorites row sits,
+  // but dispatching a synthetic DOM `MouseEvent` from inside the page never makes a real browser
+  // engine match `:hover` (confirmed: that's driven by the renderer's own input pipeline tracking
+  // real cursor position, not by any DOM event a page can fire at itself). `webContents
+  // .sendInputEvent` is the one Electron API that injects input at that same native level a real
+  // mouse would — this is the only flag in this file that calls it. Never set by `npm run app` or
+  // the README.
+  if (process.env.SEEYA_APP_AUTO_HOVER_FIRST_FAVORITE === '1') {
+    window.webContents.once('did-finish-load', () => {
+      void clock
+        .sleep(1000)
+        .then(
+          () =>
+            window.webContents.executeJavaScript(
+              "(() => { const el = document.querySelector('#favorites-section li'); " +
+                'if (!el) { return null; } ' +
+                'const rect = el.getBoundingClientRect(); ' +
+                'return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }; })();',
+            ) as Promise<{ x: number; y: number } | null>,
+        )
+        .then((point) => {
+          if (point === null) {
+            return;
+          }
+          window.webContents.sendInputEvent({ type: 'mouseMove', x: point.x, y: point.y });
+        });
+    });
+  }
   // SEEYA_APP_AUTO_RESUME_ALL: same "instrumentação só do spike" class as the two above — checks
   // every checkbox the "Today" panel rendered (renderer.ts's own startup `refreshTodayPanel`
   // already populated it by the time `did-finish-load` fires) and clicks "Resume selected", so an
