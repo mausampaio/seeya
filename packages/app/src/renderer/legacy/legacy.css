@@ -148,87 +148,16 @@ body {
   min-width: 0;
 }
 
-#toolbar {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px;
-  border-bottom: 1px solid var(--seeya-border);
-}
-
-#new-tab-button {
-  width: 28px;
-  height: 28px;
-}
-
-/* Maintainer acceptance, 2026-09-25: the discoverable sidebar toggle — same size as the other
- * toolbar buttons, always visible (open or collapsed), to the left of "+". The 20px side-strip
- * toggle (#sidebar-collapse-toggle above) stays as a secondary shortcut, not replaced. */
+/* Maintainer acceptance, 2026-09-25: the discoverable sidebar toggle — always visible (open or
+ * collapsed), to the left of the tab strip's own "+" (`renderer/features/tabs/TabStrip.module.css`
+ * styles the toolbar row itself since V2-T64; this id is still App.tsx's own, unmoved by that
+ * task). The 20px side-strip toggle (#sidebar-collapse-toggle above) stays as a secondary
+ * shortcut, not replaced. */
 #sidebar-toggle-button {
   width: 28px;
   height: 28px;
   font-size: 14px;
-}
-
-#new-tab-button,
-#sidebar-toggle-button {
   padding: 0;
-}
-
-#tab-strip {
-  display: flex;
-  gap: 4px;
-  flex: 1;
-  min-width: 0;
-  overflow-x: auto;
-}
-
-/* V2-T63 (`docs/INTERFACE.md` § 2): "Settings fica no canto direito da barra" — `#tab-strip` above
- * takes all the room between the left-side buttons and this one (`flex: 1`), so this always sits
- * at the far right regardless of how many tabs are open. */
-#settings-button {
-  flex: none;
-  margin-left: auto;
-  font-size: 13px;
-}
-
-.tab-button[aria-current='true'] {
-  font-weight: bold;
-}
-
-.tab-close {
-  margin-left: 4px;
-}
-
-#command-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px;
-  border-bottom: 1px solid var(--seeya-border);
-  background: var(--seeya-surface-subtle);
-}
-
-/* V2-T3 review: an ID selector (#command-bar above) is MORE specific than the browser's own
- * default UA rule for the `hidden` attribute ([hidden] { display: none }), so `display: flex`
- * was winning and the bar stayed visible after Cancel/submit set `hidden = true`
- * (renderer.ts's own wireCommandBar) — the maintainer saw this on macOS: the bar stayed on
- * screen with a tab already open. `#command-bar[hidden]` is an ID + attribute selector, strictly
- * more specific than the plain ID rule above, so this wins regardless of source order. */
-#command-bar[hidden] {
-  display: none;
-}
-
-#command-bar label {
-  display: flex;
-  flex-direction: column;
-  font-size: 11px;
-  color: var(--seeya-text-secondary);
-  gap: 2px;
-}
-
-#command-bar input {
-  min-width: 220px;
 }
 
 #session-list,
@@ -271,13 +200,13 @@ body {
   position: relative;
 }
 
-.terminal-pane,
+/* V2-T64: `.terminal-pane` is gone from here — `renderer/features/tabs/TerminalPane/
+ * TerminalPane.module.css` has the equivalent rule for the new component's own pane now. */
 .page-pane {
   position: absolute;
   inset: 0;
 }
 
-.terminal-pane[hidden],
 .page-pane[hidden] {
   display: none;
 }

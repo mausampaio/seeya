@@ -16,6 +16,7 @@
 .active {
   background: var(--seeya-brand-soft);
   color: var(--seeya-brand-text);
+  font-weight: 500;
 }
 
 /* The label still reads the exited suffix (`state/tab-strip.ts#terminalTabLabel`) — dimming on

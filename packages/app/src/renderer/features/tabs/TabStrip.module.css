@@ -1,0 +1,21 @@
+/* D-052/V2-T64. Replaces `renderer/legacy/legacy.css`'s own `#toolbar`/`#tab-strip`/
+ * `#settings-button` rules (apagadas by this task alongside the markup they styled). */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--seeya-space-1);
+  padding: var(--seeya-space-1);
+  border-bottom: 1px solid var(--seeya-border);
+}
+
+/* `flex: 1` is what keeps Settings pinned to the far right of the row regardless of how many tabs
+ * are open (`docs/INTERFACE.md` § 2's own "Settings fica no canto direito da barra") — it is the
+ * only flexible child between the fixed-size "+" on the left and Settings on the right. */
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--seeya-space-1);
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+}

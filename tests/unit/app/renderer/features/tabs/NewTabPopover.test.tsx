@@ -88,15 +88,14 @@ describe('NewTabPopover (V2-T64)', () => {
   });
 
   it('Browse… leaves the field untouched when the picker is cancelled', async () => {
-    window.seeya = createFakeSeeyaApi({
-      pickDirectory: vi.fn(() => Promise.resolve({ canceled: true as const })),
-    });
+    const pickDirectory = vi.fn(() => Promise.resolve({ canceled: true as const }));
+    window.seeya = createFakeSeeyaApi({ pickDirectory });
     const { getByRole, getByLabelText } = render(
       <Harness open onClose={() => {}} onOpenTab={() => {}} />,
     );
     fireEvent.input(getByLabelText('Directory'), { target: { value: '/already/typed' } });
     fireEvent.click(getByRole('button', { name: 'Browse…' }));
-    await waitFor(() => expect(window.seeya.pickDirectory).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(pickDirectory).toHaveBeenCalledTimes(1));
     expect((getByLabelText('Directory') as HTMLInputElement).value).toBe('/already/typed');
   });
 

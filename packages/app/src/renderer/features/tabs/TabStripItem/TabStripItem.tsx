@@ -51,8 +51,9 @@ export function TabStripItem(props: TabStripItemProps): JSX.Element {
     <div class={cx(styles, 'item', entry.active && 'active', entry.exited && 'exited')}>
       <button
         type="button"
+        role="tab"
         class={cx(styles, 'select')}
-        aria-current={entry.active}
+        aria-selected={entry.active}
         onClick={() => props.onSelect(entry.id)}
       >
         <span class={cx(styles, 'icon')} aria-hidden="true">

@@ -31,11 +31,11 @@ describe('TabStripItem (V2-T64)', () => {
     expect(onClose).toHaveBeenCalledWith('tab-1');
   });
 
-  it('marks the active entry with aria-current and its own class', () => {
+  it('marks the active entry with aria-selected and its own class', () => {
     const { getByRole, container } = render(
       <TabStripItem entry={entry({ active: true })} onSelect={() => {}} onClose={() => {}} />,
     );
-    expect(getByRole('button', { name: 'claude' }).getAttribute('aria-current')).toBe('true');
+    expect(getByRole('tab', { name: 'claude' }).getAttribute('aria-selected')).toBe('true');
     expect(classesOf(container.firstElementChild)).toContain(styles.active);
   });
 

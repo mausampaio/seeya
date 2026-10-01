@@ -2,13 +2,13 @@
  * V2-T62 (D-051): applies the window's effective theme (`'light' | 'dark'`, resolved by
  * `electron/main.ts` from `Config.theme` plus the OS's live signal — never decided here) to the
  * two things that read it: the `data-theme` attribute `tokens.css` keys off, and every open
- * terminal's own colours (`tabs-view.ts#setActiveTerminalTheme`, which also updates any tab
- * mounted AFTER this point with the same theme — `docs/INTERFACE.md` princípio 1: "o terminal
- * segue o tema").
+ * terminal's own colours (`features/tabs/terminal-theme-registry.ts#setActiveTerminalTheme`,
+ * moved out of the deleted `tabs-view.ts` by V2-T64 — still updates any tab mounted AFTER this
+ * point with the same theme, `docs/INTERFACE.md` princípio 1: "o terminal segue o tema").
  */
 import { resolveTerminalTheme } from '../../state/terminal-theme.js';
 import type { ThemeUpdateEvent } from '../../ipc/channels.js';
-import { setActiveTerminalTheme } from './tabs-view.js';
+import { setActiveTerminalTheme } from '../features/tabs/index.js';
 
 // `Window.seeya` is declared once, globally, by `renderer.ts` (the module every other view file
 // here is imported from) — every file in this program shares that one augmentation.

@@ -21,13 +21,7 @@ import {
   wireDialogFocusReturn,
 } from './legacy/dialog-focus-return.js';
 import { wireTheme } from './legacy/theme-view.js';
-import {
-  focusActiveTabTerminal,
-  setTerminalFontConfig,
-  wireCommandBar,
-  wireTabIncomingEvents,
-  wireWindowResize,
-} from './legacy/tabs-view.js';
+import { focusActiveTabTerminal } from './features/tabs/index.js';
 import { wireFallbackDialog } from './legacy/fallback-dialog-view.js';
 import { wireEndDayDialog } from './legacy/end-day-dialog-view.js';
 import { wireAutostartControl } from './legacy/autostart-control-view.js';
@@ -63,10 +57,12 @@ function suppressInitialFocusRing(): void {
 }
 
 /**
- * Fetches `terminalFontConfig`/the theme before wiring anything that could open a tab (the
- * command bar's submit handler, and `SEEYA_APP_AUTO_OPEN_SHELL_TAB`'s own simulated click) — see
- * `legacy/tabs-view.ts`'s own `terminalFontConfig`/`activeTerminalTheme` docstrings for why
- * `mountTerminalTab` never needs a fallback value for either.
+ * Resolves the theme before anything else — `renderer/features/tabs/terminal-theme-registry.ts
+ * #currentActiveTerminalTheme` (read by `TerminalPane` at mount) defaults to the dark theme until
+ * this resolves, so the window's own real theme is in place before a person could possibly open a
+ * tab (V2-T64: the tab strip's own font config/IPC wiring now lives inside `<TabStrip/>` itself,
+ * mounted synchronously by the `render()` call below — no separate `wireTabIncomingEvents`/
+ * `wireCommandBar`-style calls needed here any more).
  */
 async function main(): Promise<void> {
   suppressInitialFocusRing();
@@ -79,11 +75,7 @@ async function main(): Promise<void> {
   // owning component instance for `useState`/`useEffect` to attach to.
   render(<AppShell />, document.getElementById('root') as HTMLElement);
 
-  setTerminalFontConfig(await window.seeya.getTerminalFontConfig());
   await wireTheme();
-  wireTabIncomingEvents();
-  wireWindowResize();
-  wireCommandBar();
   wireFallbackDialog();
   wireEndDayDialog();
   wireAutostartControl();
