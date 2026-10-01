@@ -1,9 +1,11 @@
-/* D-052 (V2-T75). */
-.footer {
-  display: flex;
-  flex-direction: column;
-  gap: var(--seeya-space-2);
-  padding-top: var(--seeya-space-2);
+/* D-052 (V2-T75). PO review (defect 1): the footer used to be a raw `.footer { padding-top }`
+ * block with NO horizontal padding — "End of day…"/"End day…"/the daemon pill/autostart touched
+ * both edges of the lateral while the header/content had the usual `--seeya-space-2` gutter. The
+ * fix moves padding and vertical gap onto the typed primitives (`Surface padding="sm"` +
+ * `Stack gap="sm"` in `SidebarFooter.tsx`), the SAME token `Sidebar.module.css#content` already
+ * uses — this class is left with only what no primitive expresses: the divider line above the
+ * footer. */
+.footerDivider {
   border-top: 1px solid var(--seeya-border);
 }
 

@@ -15,6 +15,8 @@
 import type { JSX } from 'preact';
 import styles from './SidebarFooter.module.css';
 import { cx, mergeClassName } from '../../../components/css-class.js';
+import { Surface } from '../../../components/Surface/index.js';
+import { Stack } from '../../../components/Stack/index.js';
 import { Button } from '../../../components/Button/index.js';
 import { IconButton } from '../../../components/IconButton/index.js';
 import { PlayIcon, StopIcon } from '../../../components/Icon/index.js';
@@ -45,66 +47,68 @@ export function SidebarFooter(): JSX.Element {
     : MESSAGES.daemonControlStartAction;
 
   return (
-    <div class={cx(styles, 'footer')}>
-      <div>
-        <p class={cx(styles, 'scheduleText')}>{schedule.text}</p>
-        {(schedule.canSnooze || schedule.canSkip) && (
-          <div class={cx(styles, 'scheduleActions')}>
-            {schedule.canSnooze && (
-              <select
-                aria-label={MESSAGES.scheduleStripSnoozeMenuLabel}
-                value=""
-                onChange={(event) => {
-                  const minutes = Number((event.target as HTMLSelectElement).value);
-                  (event.target as HTMLSelectElement).value = '';
-                  if (minutes === 15 || minutes === 30 || minutes === 60) {
-                    onSnooze(minutes);
-                  }
-                }}
-              >
-                <option value="" disabled hidden>
-                  {MESSAGES.scheduleStripSnoozeMenuLabel}
-                </option>
-                {SNOOZE_OPTIONS.map(([minutes, label]) => (
-                  <option key={minutes} value={minutes}>
-                    {label}
+    <Surface padding="sm" bordered={false} className={cx(styles, 'footerDivider')}>
+      <Stack gap="sm">
+        <div>
+          <p class={cx(styles, 'scheduleText')}>{schedule.text}</p>
+          {(schedule.canSnooze || schedule.canSkip) && (
+            <div class={cx(styles, 'scheduleActions')}>
+              {schedule.canSnooze && (
+                <select
+                  aria-label={MESSAGES.scheduleStripSnoozeMenuLabel}
+                  value=""
+                  onChange={(event) => {
+                    const minutes = Number((event.target as HTMLSelectElement).value);
+                    (event.target as HTMLSelectElement).value = '';
+                    if (minutes === 15 || minutes === 30 || minutes === 60) {
+                      onSnooze(minutes);
+                    }
+                  }}
+                >
+                  <option value="" disabled hidden>
+                    {MESSAGES.scheduleStripSnoozeMenuLabel}
                   </option>
-                ))}
-              </select>
-            )}
-            {schedule.canSkip && (
-              <Button variant="secondary" size="sm" onClick={onSkip}>
-                {MESSAGES.scheduleStripSkipToday}
-              </Button>
-            )}
-          </div>
-        )}
-      </div>
+                  {SNOOZE_OPTIONS.map(([minutes, label]) => (
+                    <option key={minutes} value={minutes}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {schedule.canSkip && (
+                <Button variant="secondary" size="sm" onClick={onSkip}>
+                  {MESSAGES.scheduleStripSkipToday}
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
 
-      <Button id="end-day-button" fullWidth>
-        {MESSAGES.endDayButton}
-      </Button>
+        <Button id="end-day-button" fullWidth>
+          {MESSAGES.endDayButton}
+        </Button>
 
-      <div class={daemonPillClassName}>
-        <span class={cx(styles, 'daemonDot')} aria-hidden="true" />
-        <span class={cx(styles, 'daemonLabel')}>{daemonLabel}</span>
-        <IconButton
-          id="daemon-control-button"
-          variant="ghost"
-          disabled={unknown}
-          aria-label={daemonButtonLabel}
-          onClick={onDaemonControlClicked}
-        >
-          {running ? <StopIcon /> : <PlayIcon />}
-        </IconButton>
-      </div>
-      {daemon.kind === 'result' && <p class={cx(styles, 'daemonResult')}>{daemon.resultText}</p>}
+        <div class={daemonPillClassName}>
+          <span class={cx(styles, 'daemonDot')} aria-hidden="true" />
+          <span class={cx(styles, 'daemonLabel')}>{daemonLabel}</span>
+          <IconButton
+            id="daemon-control-button"
+            variant="ghost"
+            disabled={unknown}
+            aria-label={daemonButtonLabel}
+            onClick={onDaemonControlClicked}
+          >
+            {running ? <StopIcon /> : <PlayIcon />}
+          </IconButton>
+        </div>
+        {daemon.kind === 'result' && <p class={cx(styles, 'daemonResult')}>{daemon.resultText}</p>}
 
-      {/* Legacy-owned anchors — see this component's own docstring. */}
-      <Button id="autostart-control-button" variant="secondary" hidden>
-        {MESSAGES.autostartControlEnable}
-      </Button>
-      <p id="autostart-control-result" class={cx(styles, 'autostartResult')} />
-    </div>
+        {/* Legacy-owned anchors — see this component's own docstring. */}
+        <Button id="autostart-control-button" variant="secondary" hidden>
+          {MESSAGES.autostartControlEnable}
+        </Button>
+        <p id="autostart-control-result" class={cx(styles, 'autostartResult')} />
+      </Stack>
+    </Surface>
   );
 }
