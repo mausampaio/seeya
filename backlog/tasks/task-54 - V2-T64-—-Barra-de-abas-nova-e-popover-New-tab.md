@@ -4,7 +4,7 @@ title: V2-T64 — Barra de abas nova e popover New tab
 status: Review
 assignee: []
 created_date: '2026-09-30 10:34'
-updated_date: '2026-10-01 03:41'
+updated_date: '2026-10-01 04:02'
 labels: []
 milestone: m-2
 dependencies:
@@ -222,3 +222,23 @@ como dependência de desenvolvimento do próprio pacote.
 
 Nenhuma nova.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: agente
+created: 2026-10-01 04:02
+---
+Correção pós-revisão do PO (4 itens), mesma branch, commit 4a43b2a:
+
+1. Botões "«"/"+" da barra eram glifo de texto/ícone pequeno demais — agora ChevronLeftIcon/ChevronRightIcon (novo) e PlusIcon a 24px, IconButton size="sm", igual ao "+" de Favorites. Removida a regra de legacy.css que sobrescrevia o tamanho por id-selector (mesma classe de bug que #new-tab-button/#settings-button já tinham).
+
+2. Ícone de Settings pequeno/apagado — agora 20px dentro de IconButton size="md". Confirmado por dump real de DOM/getComputedStyle (svg 20x20, cor = --seeya-text-secondary nos dois temas), não só por pixel de screenshot.
+
+3. SegmentedControl do popover sobrava vão à direita (inline-flex, shrink-to-content) — agora flex 100% largura, cada opção flex:1, alinhado com os campos de largura total abaixo.
+
+4. Rótulo de aba exited concatenava "shell exited (code 1)" — TabStripEntry agora carrega exitedText separado do label ("exited (1)", sem a palavra "code"), renderizado por TabStripItem em span próprio com --seeya-text-tertiary; a opacidade de "exited" não cobre mais o sufixo nem o botão de fechar.
+
+Duas capturas novas (claro com a barra, escuro com o popover), caminhos no scratchpad da sessão. Registro/protocol-handler.json reais conferidos idênticos antes e depois. npm run verificar (packages/*/dist apagados antes) verde. Segue em Review.
+---
+<!-- COMMENTS:END -->
