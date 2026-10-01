@@ -90,7 +90,9 @@ describe('useSidebarCollapse (D-052, V2-T75)', () => {
     collapseButton.focus();
     expect(document.activeElement).toBe(collapseButton);
 
-    void act(() => fireEvent.click(collapseButton));
+    void act(() => {
+      fireEvent.click(collapseButton);
+    });
 
     const expandButton = getByText('Expand');
     expect(document.activeElement).toBe(expandButton);
@@ -117,7 +119,9 @@ describe('useSidebarCollapse (D-052, V2-T75)', () => {
     input.focus();
     expect(document.activeElement).toBe(input);
 
-    void act(() => fireEvent.click(getByText('Shortcut')));
+    void act(() => {
+      fireEvent.click(getByText('Shortcut'));
+    });
 
     // The toggle really ran (the OTHER button is now the one in the DOM)...
     expect(getByText('Expand')).not.toBeNull();
