@@ -4,6 +4,7 @@ import { cleanup, render, waitFor } from '@testing-library/preact';
 import { createFakeSeeyaApi } from '../../_fake-seeya-api.js';
 import { TerminalPane } from '../../../../../../packages/app/src/renderer/features/tabs/TerminalPane/index.js';
 import type { TerminalHandle } from '../../../../../../packages/app/src/renderer/features/tabs/TerminalPane/index.js';
+import styles from '../../../../../../packages/app/src/renderer/features/tabs/TerminalPane/TerminalPane.module.css';
 import type {
   CreateTabRequest,
   CreateTabResponse,
@@ -49,6 +50,32 @@ describe('TerminalPane (V2-T64)', () => {
       />,
     );
     expect((container.firstElementChild as HTMLElement).hidden).toBe(false);
+  });
+
+  /**
+   * PO review (2026-10-01, docs/INTERFACE.md § 2's own terminal margin): `fitAddon` must measure
+   * the INNER `.surface` element, never the padded outer `.pane` — `clientWidth`/`clientHeight`
+   * include an element's own padding, so measuring `.pane` directly would make xterm fill the
+   * margin instead of staying inset from it. This asserts the two-level structure stays in place,
+   * not just that "a pane renders" — a regression here would silently remove the margin.
+   */
+  it('mounts xterm into an inner .surface element, nested inside the padded outer .pane', () => {
+    const { container } = render(
+      <TerminalPane
+        id="tab-1"
+        hidden={false}
+        fontFamily="monospace"
+        fontSize={14}
+        spawnRequest={null}
+        onRegister={() => {}}
+        onUnregister={() => {}}
+        onSpawned={() => {}}
+      />,
+    );
+    const pane = container.firstElementChild as HTMLElement;
+    expect(pane.className).toContain(styles.pane);
+    const surface = pane.firstElementChild as HTMLElement;
+    expect(surface.className).toContain(styles.surface);
   });
 
   it('registers a handle on mount and unregisters it on unmount', async () => {
