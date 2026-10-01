@@ -47,6 +47,10 @@ fechar do SO), **sem a barra de menu** do Electron ("File Edit View Window"), qu
 No macOS fica só o menu mínimo do app, com o menu Edit (sem ele, copiar e colar não funcionam
 nos campos de texto).
 
+**Um botão de recolher por vez** (aceite do mantenedor, 2026-10-01): com a lateral aberta, só o
+botão do cabeçalho da lateral aparece; com ela recolhida, só o botão de expandir no início da barra
+de abas. Os dois juntos na tela confundem.
+
 Continuam valendo: recolher a lateral (botão e `Ctrl+B`), redimensionar (180–480 px, padrão
 280, lembrado por máquina), foco devolvido ao terminal ao fechar um diálogo.
 
