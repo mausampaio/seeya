@@ -41,9 +41,27 @@ export interface IconProps {
 }
 
 const DEFAULT_SIZE = 16;
+const VIEW_BOX_SIZE = 24;
+
+/**
+ * PO review (defect 2, V2-T75): pixel-sampled a real screenshot of the sidebar's ghost
+ * `IconButton`s (`‹` collapse, `+` new project) and found the brightest pixel on the stroke
+ * blending to only ~30%/~40% coverage of `--seeya-text-secondary` against the surface in
+ * light/dark — not a wrong color (the token was already correct), a stroke too thin to read.
+ * `strokeWidth="1.75"` is a VIEWBOX-SPACE number — this docstring's own identity quote (§ 6.4)
+ * requires "traço arredondado entre 1,5 e 2px" as a RENDERED pixel measurement, but a fixed
+ * viewBox-space width scales down WITH the icon: at the `size=16` these buttons use, 1.75 of a
+ * 24-unit box renders as 1.75×(16/24) ≈ 1.17 actual px, well under the identity's own floor.
+ * Computing `strokeWidth` from the requested `size` keeps the RENDERED stroke at a constant
+ * `TARGET_STROKE_WIDTH_PX` (the middle of the identity's 1.5–2px range) no matter what `size` a
+ * caller asks for — this fixes every outline icon in the set, not just the two the PO sampled,
+ * since the mis-scaling was in the shared builder, not either call site.
+ */
+const TARGET_STROKE_WIDTH_PX = 2;
 
 function outlineIcon(paths: readonly JSX.Element[], props: IconProps = {}): JSX.Element {
   const size = props.size ?? DEFAULT_SIZE;
+  const strokeWidth = (TARGET_STROKE_WIDTH_PX * VIEW_BOX_SIZE) / size;
   return (
     <svg
       width={size}
@@ -51,7 +69,7 @@ function outlineIcon(paths: readonly JSX.Element[], props: IconProps = {}): JSX.
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.75"
+      strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
       class={props.class}

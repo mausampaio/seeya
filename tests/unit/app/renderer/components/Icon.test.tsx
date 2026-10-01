@@ -54,6 +54,27 @@ describe('outline icons (D-052, V2-T75 — real render; identity § 6.4)', () =>
     expect(sized.getAttribute('width')).toBe('24');
     expect(sized.getAttribute('height')).toBe('24');
   });
+
+  /**
+   * Regression test (PO review, defect 2, V2-T75): a real-screenshot pixel sample of the
+   * sidebar's `‹`/`+` ghost IconButtons (both `size=16`) found the stroke blending to only
+   * ~30%/~40% coverage of `--seeya-text-secondary` against the surface — the color was already
+   * right; a FIXED viewbox-space `strokeWidth` scales DOWN with a smaller `size`, landing well
+   * under the identity's own "traço entre 1,5 e 2px" floor (§ 6.4) at 16px. The fix keeps the
+   * RENDERED stroke width constant across sizes — this test fails before the fix (16px rendered
+   * ≈1.17px, 24px rendered =1.75px — not equal) and passes after it.
+   */
+  it('keeps the RENDERED stroke width constant across sizes (identity § 6.4, 1.5-2px)', () => {
+    const small = renderedSvg(<ChevronLeftIcon size={16} />);
+    const large = renderedSvg(<ChevronLeftIcon size={24} />);
+    const smallViewboxStroke = Number(small.getAttribute('strokeWidth'));
+    const largeViewboxStroke = Number(large.getAttribute('strokeWidth'));
+    const smallRenderedStroke = (smallViewboxStroke * 16) / 24;
+    const largeRenderedStroke = (largeViewboxStroke * 24) / 24;
+    expect(smallRenderedStroke).toBeCloseTo(largeRenderedStroke, 5);
+    expect(smallRenderedStroke).toBeGreaterThanOrEqual(1.5);
+    expect(smallRenderedStroke).toBeLessThanOrEqual(2);
+  });
 });
 
 describe('filled icons (D-052, V2-T75 — play/stop, never mixed with an outline version)', () => {

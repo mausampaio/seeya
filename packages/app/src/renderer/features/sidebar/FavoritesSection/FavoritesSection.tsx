@@ -86,7 +86,12 @@ export function FavoritesSection(props: FavoritesSectionProps): JSX.Element {
         // D-052's own "o que ainda não é reescrito... fica funcionando"), same passthrough-anchor
         // pattern `SidebarFooter`'s own `end-day-button`/`autostart-control-button` use.
         <IconButton id="new-project-button" size="sm" aria-label={MESSAGES.newProjectButton}>
-          <PlusIcon />
+          {/* PO review (defect 2, V2-T75): a 16px outline icon's own rendered stroke (even at the
+           * identity's own 2px ceiling, § 6.4) spans too few pixels for a diagonal/short line to
+           * read clearly once anti-aliased — pixel-sampled a real screenshot before and after:
+           * 20px (this button's own 24px box still fits it with 2px of margin each side) measurably
+           * darkened the sampled stroke pixels where a stroke-width-only change did not. */}
+          <PlusIcon size={24} />
         </IconButton>
       }
     >

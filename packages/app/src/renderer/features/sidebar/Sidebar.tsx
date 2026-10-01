@@ -63,7 +63,9 @@ export function Sidebar(props: SidebarProps): JSX.Element {
               aria-label="Collapse sidebar"
               onClick={props.onToggleCollapse}
             >
-              <ChevronLeftIcon />
+              {/* PO review (defect 2, V2-T75) — see FavoritesSection.tsx's own "new-project-button"
+               * comment for the measurement behind the 20px override. */}
+              <ChevronLeftIcon size={24} />
             </IconButton>
           </div>
           <div class={cx(styles, 'content')}>
