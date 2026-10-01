@@ -1,0 +1,146 @@
+/* D-052 (V2-T75), PO review (2026-10-01). `min-width: 0` throughout — the V2-T63 aceite's own "a
+ * lateral cortando o conteúdo à esquerda" defect. `.main`'s own `padding`/`gap` deliberately match
+ * `NavItem.module.css`'s own `.navItem` (`var(--seeya-space-2)` for both) — the fix for the PO's
+ * own "ícones desalinhados": Recent had no left padding at all, Favorites' gap was `space-1`, and
+ * `NavItem` used `space-2` for both, putting all three lists' leading icons in different columns
+ * in a real capture. Font sizing comes from `Text` (D-052 item 7) — nothing here sets
+ * `font-size`/`line-height`. */
+.row {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-radius: var(--seeya-radius-sm);
+}
+
+/* The project open in THIS window (PO review, 2026-10-01: "o projeto da aba ativa ganha fundo
+ * surface-subtle... como no protótipo") — same evidence (`badge === 'openHere'`) the lock status
+ * below already uses, now also a background on the whole row (including its indented sessions). */
+.rowActive {
+  background: var(--seeya-surface-subtle);
+}
+
+.main {
+  display: flex;
+  align-items: center;
+  gap: var(--seeya-space-2);
+  min-width: 0;
+  padding: var(--seeya-space-2);
+  box-sizing: border-box;
+}
+
+.icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  color: var(--seeya-text-tertiary);
+}
+
+.star {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+}
+
+.name {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--seeya-text);
+  cursor: pointer;
+  padding: 0;
+  font-family: var(--seeya-font-sans);
+}
+
+.lock {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.lockOpenHere {
+  color: var(--seeya-brand-text);
+}
+
+.lockLocked {
+  color: var(--seeya-warning-text);
+}
+
+/* PO review (2026-10-01): "open here na cor da marca... locked na cor de atenção" — `Text` itself
+ * always sets an explicit colour (`.tonePrimary`, a plain class selector, specificity 0,1,0); an
+ * element+class selector here (specificity 0,1,1) beats it deterministically no matter which
+ * stylesheet loads last, without touching `Text`'s own public contract (its `tone` prop is
+ * deliberately scoped to the typographic scale, never semantic status colours — see `Text.tsx`'s
+ * own docstring). */
+span.lockLabelOpenHere {
+  color: var(--seeya-brand-text);
+}
+
+span.lockLabelLocked {
+  color: var(--seeya-warning-text);
+}
+
+.sessions {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0 var(--seeya-space-2) var(--seeya-space-1) calc(20px + var(--seeya-space-2));
+  min-width: 0;
+}
+
+.sessionRow {
+  display: flex;
+  align-items: center;
+  gap: var(--seeya-space-1);
+  min-width: 0;
+  padding: 1px 0;
+}
+
+.sessionName {
+  flex: 1;
+  min-width: 0;
+}
+
+.sessionId {
+  flex: none;
+  font-family: var(--seeya-font-mono);
+}
+
+/* The state dot (PO review: "ponto de estado, tom pelo estado") — a plain filled circle, coloured
+ * via `currentColor` so this is the ONLY place that sets a size/shape, never a duplicated
+ * `background`/`border-radius` pair per tone. Each `.dotXxx` rule below only sets `color`, reusing
+ * the exact tone→token mapping `Chip.module.css`'s own `.outline.*` rules already use. */
+.dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.dotNeutral {
+  color: var(--seeya-text-secondary);
+}
+
+.dotBrand {
+  color: var(--seeya-brand-text);
+}
+
+.dotSuccess {
+  color: var(--seeya-success-text);
+}
+
+.dotInfo {
+  color: var(--seeya-info-text);
+}
+
+.dotWarning {
+  color: var(--seeya-warning-text);
+}
+
+.dotError {
+  color: var(--seeya-error-text);
+}

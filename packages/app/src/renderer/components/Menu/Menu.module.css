@@ -1,0 +1,31 @@
+/* D-052 (V2-T75), PO review (2026-10-01). `Popover.module.css`'s own padding/shadow/border already
+ * frame the box this list sits in (the same `--seeya-space-4` edge every other Popover content —
+ * `NewTabPopover`'s own form — already sits inside), so this file adds no padding of its own at
+ * the list level. Font sizing comes from `Text` (D-052 item 7) — nothing here sets
+ * `font-size`/`line-height`. */
+.menu {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 96px;
+}
+
+.item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  border-radius: var(--seeya-radius-sm);
+  padding: var(--seeya-space-2);
+  cursor: pointer;
+  color: var(--seeya-text);
+  box-sizing: border-box;
+}
+
+.item:hover {
+  background: var(--seeya-surface-hover);
+}

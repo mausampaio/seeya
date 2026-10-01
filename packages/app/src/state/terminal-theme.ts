@@ -1,12 +1,20 @@
 /**
- * The embedded terminal's colours (V2-T6 follow-up, maintainer's request 2026-09-17). Until a
- * settings screen exists for fonts and colours, one fixed theme per identity mode: a dark
- * blue-grey background instead of xterm.js's default pure black — pure black was measured by the
- * maintainer as tiring to read for a full day; the slight blue tint is the same direction most
- * dark editor themes take (VS Code's Dark+ sits at #1e1e1e, this one adds a hint of blue).
- * Foreground and selection are chosen to keep the harness TUIs' own colours readable on top of it.
- * Pure constant: no I/O, no DOM — `electron/renderer.ts` applies it in `new Terminal({...})` AND on
- * the pane element, so the two never disagree.
+ * The embedded terminal's colours (`docs/INTERFACE.md` princípio 1, "o terminal segue o tema").
+ *
+ * PO review (2026-10-01, V2-T75 acceptance): this module used to hardcode two full hex palettes
+ * (`TERMINAL_THEME_DARK`/`TERMINAL_THEME_LIGHT`), one of them a "dark blue-grey instead of pure
+ * black" the maintainer picked by hand back in V2-T6, before `tokens.css`'s own design-token
+ * system existed (V2-T62, D-051). Nothing kept that hex in sync with `--seeya-background` once
+ * the token system landed, so the terminal pane drifted to a visibly different shade (`#1b1f27`)
+ * than the window's own background (`--seeya-background`, `#18181d`/`#0d0d10` depending on which
+ * dark token it actually was) — a real-screenshot-caught defect, not a hypothetical one.
+ *
+ * `buildTerminalThemeFromTokens` below replaces both hardcoded palettes: it builds a
+ * `TerminalTheme` straight from CSS token VALUES the caller already resolved, so the terminal can
+ * never again drift from its own chrome — there is no second palette left to fall out of sync.
+ * This module stays pure (no I/O, no DOM) on purpose: `renderer/legacy/theme-view.ts`'s own
+ * `getComputedStyle` call is the only DOM access in this whole feature, which is what keeps this
+ * file trivially testable with made-up colour strings instead of a real window.
  */
 export interface TerminalTheme {
   readonly background: string;
@@ -15,30 +23,38 @@ export interface TerminalTheme {
   readonly selectionBackground: string;
 }
 
-export const TERMINAL_THEME_DARK: TerminalTheme = {
-  background: '#1b1f27',
-  foreground: '#d6dae0',
-  cursor: '#d6dae0',
-  selectionBackground: '#3a4a63',
-};
+/** The four `tokens.css` custom properties a terminal theme is built from — "fundo = fundo da
+ * aplicação, texto = texto primário" (PO review) is `background`/`text` below; `brandSoft` is the
+ * same soft-highlight token every other "selected" surface in this window already uses
+ * (`design/IDENTIDADE_VISUAL.md` § 3.4), not a new, terminal-only colour decision. */
+export interface TerminalThemeTokens {
+  readonly background: string;
+  readonly text: string;
+  readonly brandSoft: string;
+}
 
 /**
- * V2-T62 (D-051): "o terminal segue o tema" (`docs/INTERFACE.md` princípio 1) — the light
- * counterpart of `TERMINAL_THEME_DARK` above, built from the SAME light-theme tokens
- * `electron/tokens.css` declares (`--seeya-surface`/`--seeya-text`/`--seeya-brand-soft`,
- * `design/IDENTIDADE_VISUAL.md` § 5.1), so the terminal pane never looks like a foreign dark
- * rectangle dropped into an otherwise light window.
+ * @example
+ * buildTerminalThemeFromTokens({ background: '#18181d', text: '#f7f7f8', brandSoft: '#25214e' })
+ * // -> { background: '#18181d', foreground: '#f7f7f8', cursor: '#f7f7f8', selectionBackground: '#25214e' }
  */
-export const TERMINAL_THEME_LIGHT: TerminalTheme = {
-  background: '#ffffff',
-  foreground: '#121214',
-  cursor: '#121214',
-  selectionBackground: '#eceaff',
-};
-
-/** Picks the terminal theme that matches the window's own resolved theme
- * (`theme/resolve-theme.ts#resolveEffectiveTheme`) — the one decision point so a caller never has
- * to duplicate the light/dark branch itself. */
-export function resolveTerminalTheme(effectiveTheme: 'light' | 'dark'): TerminalTheme {
-  return effectiveTheme === 'dark' ? TERMINAL_THEME_DARK : TERMINAL_THEME_LIGHT;
+export function buildTerminalThemeFromTokens(tokens: TerminalThemeTokens): TerminalTheme {
+  return {
+    background: tokens.background,
+    foreground: tokens.text,
+    cursor: tokens.text,
+    selectionBackground: tokens.brandSoft,
+  };
 }
+
+/** Used only before the window's real theme round trip resolves — `terminal-theme-registry.ts`'s
+ * own docstring: "so a tab mounted before the theme round trip resolves still renders something
+ * coherent." A plain, reasonable dark fallback (the dark theme's own token values, inlined since
+ * this constant exists specifically for the moment before `getComputedStyle` has anything live to
+ * read) — never shown for more than the first paint in practice. */
+export const FALLBACK_TERMINAL_THEME: TerminalTheme = {
+  background: '#18181d',
+  foreground: '#f7f7f8',
+  cursor: '#f7f7f8',
+  selectionBackground: '#25214e',
+};

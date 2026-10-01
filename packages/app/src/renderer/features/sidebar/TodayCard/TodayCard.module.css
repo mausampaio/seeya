@@ -1,7 +1,11 @@
-/* D-052 (V2-T75). */
+/* D-052 (V2-T75). Font sizing comes from `Text` (D-052 item 7, PO review 2026-10-01) — nothing
+ * here sets `font-size`/`line-height`. `min-width: 0` throughout is what lets `.title`/`.subtitle`
+ * actually ellipsize in a narrowed sidebar instead of forcing this card wider than it has room
+ * for. */
 .card {
   display: block;
   width: 100%;
+  min-width: 0;
   box-sizing: border-box;
   text-align: left;
   border: 1px solid var(--seeya-border);
@@ -22,6 +26,7 @@
   display: flex;
   align-items: center;
   gap: var(--seeya-space-1);
+  min-width: 0;
 }
 
 .icon {
@@ -31,16 +36,16 @@
 }
 
 .title {
-  font-size: 12px;
-  font-weight: 500;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 .pill {
+  flex: none;
   margin-left: auto;
 }
 
 .subtitle {
   margin-top: 2px;
-  font-size: 11px;
-  color: var(--seeya-text-secondary);
+  min-width: 0;
 }

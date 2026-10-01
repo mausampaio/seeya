@@ -73,40 +73,60 @@ describe('SidebarFooter (D-052, V2-T75)', () => {
     expect(daemonControl).toHaveBeenCalledWith({ action: 'start' });
   });
 
-  it('renders the snooze menu and skip button only when the schedule allows them', () => {
+  it('shows the schedule primary/secondary row with the clock icon', () => {
     window.seeya = createFakeSeeyaApi({
       onScheduleUpdate: (listener) => {
-        listener({ text: 'End of day in 2 h', canSnooze: true, canSkip: true });
+        listener({ primary: 'End of day', secondary: 'in 2 h', canSnooze: false, canSkip: false });
+        return () => {};
+      },
+    });
+    const { getByText } = render(<SidebarFooter />);
+    expect(getByText('End of day')).not.toBeNull();
+    expect(getByText('in 2 h')).not.toBeNull();
+  });
+
+  it('renders the Snooze trigger and Skip button only when the schedule allows them', () => {
+    window.seeya = createFakeSeeyaApi({
+      onScheduleUpdate: (listener) => {
+        listener({ primary: 'End of day', secondary: 'in 2 h', canSnooze: true, canSkip: true });
         return () => {};
       },
     });
     const { getByRole, queryByRole } = render(<SidebarFooter />);
-    expect(getByRole('combobox')).not.toBeNull();
+    expect(getByRole('button', { name: /Snooze/ })).not.toBeNull();
     expect(getByRole('button', { name: 'Skip today' })).not.toBeNull();
 
     cleanup();
     window.seeya = createFakeSeeyaApi({
       onScheduleUpdate: (listener) => {
-        listener({ text: 'End of day: skipped today.', canSnooze: false, canSkip: false });
+        listener({
+          primary: 'End of day',
+          secondary: 'skipped today',
+          canSnooze: false,
+          canSkip: false,
+        });
         return () => {};
       },
     });
     const { queryByRole: queryDisabled } = render(<SidebarFooter />);
-    expect(queryDisabled('combobox')).toBeNull();
+    expect(queryDisabled('button', { name: /Snooze/ })).toBeNull();
     expect(queryByRole('button', { name: 'Skip today' })).toBeNull();
   });
 
-  it('choosing a snooze option calls onSnooze with that many minutes', () => {
-    const snoozeToday = vi.fn(() => Promise.resolve({ text: '', canSnooze: true, canSkip: true }));
+  it('choosing a snooze option from the menu calls onSnooze with that many minutes', () => {
+    const snoozeToday = vi.fn(() =>
+      Promise.resolve({ primary: '', secondary: '', canSnooze: true, canSkip: true }),
+    );
     window.seeya = createFakeSeeyaApi({
       onScheduleUpdate: (listener) => {
-        listener({ text: '', canSnooze: true, canSkip: true });
+        listener({ primary: '', secondary: '', canSnooze: true, canSkip: true });
         return () => {};
       },
       snoozeToday,
     });
     const { getByRole } = render(<SidebarFooter />);
-    fireEvent.change(getByRole('combobox'), { target: { value: '30' } });
+    fireEvent.click(getByRole('button', { name: /Snooze/ }));
+    fireEvent.click(getByRole('menuitem', { name: '+30m' }));
     expect(snoozeToday).toHaveBeenCalledWith({ minutes: 30 });
   });
 });

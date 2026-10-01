@@ -95,6 +95,13 @@ export const CHANNELS = {
    * faixa de horário's own data (`state/schedule-strip.ts#buildScheduleStripData`), computed from
    * the same `decideSchedule` the daemon itself polls. */
   scheduleUpdate: 'seeya:schedule-update',
+  /** Renderer → main: the faixa de horário's own data, fetched once at startup (V2-T75 PO review,
+   * round 3) — the same "fetch once for first paint, push for every refresh after" shape
+   * `getProjectsPanel`/`getTodayPanel` already establish, needed for the identical reason
+   * `getProjectsPanel`'s own docstring measured: the ambient refresh loop's first tick can race
+   * ahead of the renderer's own `onScheduleUpdate` registration, leaving the footer blank for up
+   * to `REFRESH_INTERVAL_MS * 2`. */
+  getScheduleStrip: 'seeya:get-schedule-strip',
   /** Renderer → main: one of the faixa's "Snooze +15m/+30m/+1h" buttons — runs
    * `@seeya-ai/engine/application/schedule-adjustments.js#snoozeToday` and returns the freshly
    * recomputed strip, so the faixa updates immediately rather than waiting for the next ambient
@@ -109,6 +116,9 @@ export const CHANNELS = {
    * `state/daemon-control-panel.ts#resolveDaemonControlAvailability` from the SAME
    * `checkLiveLock` the status panel's own daemon section already computes. */
   daemonAvailabilityUpdate: 'seeya:daemon-availability-update',
+  /** Renderer → main: the daemon pill's own availability, fetched once at startup (V2-T75 PO
+   * review, round 3) — same reasoning and same shape as `getScheduleStrip` above. */
+  getDaemonAvailability: 'seeya:get-daemon-availability',
   /** Renderer → main: "Start daemon"/"Stop daemon" (V2-T5b item 3) — `action` is decided by the
    * renderer's own `DaemonControlAvailability` at click time (`state/daemon-control-panel.ts`),
    * never re-derived in main.ts. */
@@ -445,6 +455,10 @@ export interface EndDayProgressUpdateEvent {
  * — the exact shape `state/schedule-strip.ts#buildScheduleStripData` produces (V2-T5b item 1). */
 export type ScheduleUpdateEvent = ScheduleStripData;
 
+/** `CHANNELS.getScheduleStrip`'s response — same shape as `ScheduleUpdateEvent`, fetched instead
+ * of pushed (V2-T75 PO review, round 3). */
+export type ScheduleStripResponse = ScheduleUpdateEvent;
+
 /** `CHANNELS.snoozeToday`'s payload — D-006's three named increments
  * (`@seeya-ai/engine/application/schedule-adjustments.js#SNOOZE_INCREMENTS`'s own values), never a
  * free-form number: the faixa only ever offers these three buttons. */
@@ -455,6 +469,10 @@ export interface SnoozeTodayRequest {
 /** `CHANNELS.daemonAvailabilityUpdate`'s payload — the exact shape
  * `state/daemon-control-panel.ts#resolveDaemonControlAvailability` produces. */
 export type DaemonAvailabilityUpdateEvent = DaemonControlAvailability;
+
+/** `CHANNELS.getDaemonAvailability`'s response — same shape as `DaemonAvailabilityUpdateEvent`,
+ * fetched instead of pushed (V2-T75 PO review, round 3). */
+export type DaemonAvailabilityResponse = DaemonAvailabilityUpdateEvent;
 
 /** `CHANNELS.daemonControl`'s payload. `action` is `'start'` when the button last showed "Start
  * daemon", `'stop'` otherwise — decided renderer-side from its own `DaemonControlAvailability`

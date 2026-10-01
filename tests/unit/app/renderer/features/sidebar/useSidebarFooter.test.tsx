@@ -4,6 +4,7 @@ import { act, cleanup, renderHook } from '@testing-library/preact';
 import { createFakeSeeyaApi } from '../../_fake-seeya-api.js';
 import { useSidebarFooter } from '../../../../../../packages/app/src/renderer/features/sidebar/SidebarFooter/useSidebarFooter.js';
 import type { DaemonControlAvailability } from '../../../../../../packages/app/src/state/daemon-control-panel.js';
+import type { ScheduleStripData } from '../../../../../../packages/app/src/state/schedule-strip.js';
 
 afterEach(cleanup);
 
@@ -11,12 +12,19 @@ describe('useSidebarFooter (D-052, V2-T75)', () => {
   it('starts with an empty schedule and unknown daemon availability', () => {
     window.seeya = createFakeSeeyaApi();
     const { result } = renderHook(() => useSidebarFooter());
-    expect(result.current.schedule).toEqual({ text: '', canSnooze: false, canSkip: false });
+    expect(result.current.schedule).toEqual({
+      primary: '',
+      secondary: '',
+      canSnooze: false,
+      canSkip: false,
+    });
     expect(result.current.daemon).toEqual({ kind: 'idle', availability: { kind: 'unknown' } });
   });
 
   it('onSnooze calls snoozeToday with the chosen increment', () => {
-    const snoozeToday = vi.fn(() => Promise.resolve({ text: '', canSnooze: true, canSkip: true }));
+    const snoozeToday = vi.fn(() =>
+      Promise.resolve({ primary: '', secondary: '', canSnooze: true, canSkip: true }),
+    );
     window.seeya = createFakeSeeyaApi({ snoozeToday });
     const { result } = renderHook(() => useSidebarFooter());
     void act(() => result.current.onSnooze(30));
@@ -24,7 +32,9 @@ describe('useSidebarFooter (D-052, V2-T75)', () => {
   });
 
   it('onSkip calls skipToday', () => {
-    const skipToday = vi.fn(() => Promise.resolve({ text: '', canSnooze: false, canSkip: false }));
+    const skipToday = vi.fn(() =>
+      Promise.resolve({ primary: '', secondary: '', canSnooze: false, canSkip: false }),
+    );
     window.seeya = createFakeSeeyaApi({ skipToday });
     const { result } = renderHook(() => useSidebarFooter());
     void act(() => result.current.onSkip());
@@ -32,7 +42,7 @@ describe('useSidebarFooter (D-052, V2-T75)', () => {
   });
 
   it('reflects a pushed schedule update', () => {
-    let push: ((event: { text: string; canSnooze: boolean; canSkip: boolean }) => void) | undefined;
+    let push: ((event: ScheduleStripData) => void) | undefined;
     window.seeya = createFakeSeeyaApi({
       onScheduleUpdate: (listener) => {
         push = listener;
@@ -41,9 +51,10 @@ describe('useSidebarFooter (D-052, V2-T75)', () => {
     });
     const { result } = renderHook(() => useSidebarFooter());
     void act(() => {
-      push?.({ text: 'End of day in 2 h 10 min', canSnooze: true, canSkip: true });
+      push?.({ primary: 'End of day', secondary: 'in 2 h 10 min', canSnooze: true, canSkip: true });
     });
-    expect(result.current.schedule.text).toBe('End of day in 2 h 10 min');
+    expect(result.current.schedule.primary).toBe('End of day');
+    expect(result.current.schedule.secondary).toBe('in 2 h 10 min');
   });
 
   it('reflects a pushed daemon availability update', () => {

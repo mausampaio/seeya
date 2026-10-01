@@ -61,9 +61,19 @@ function writeSpawnError(terminal: Terminal, error: unknown): void {
   terminal.write(`\x1b[31m${message}\x1b[0m\r\n`);
 }
 
-/** Mounts the `@xterm/xterm` instance into `container` and wires it to `props` — extracted out of
- * the effect body only to keep that effect under AGENTS.md's ~20-line guideline. */
-function mountTerminal(container: HTMLDivElement, props: TerminalPaneProps): () => void {
+/** Mounts the `@xterm/xterm` instance into `container` (the padded-out `.surface` inner element
+ * `fitAddon` measures) and wires it to `props` — extracted out of the effect body only to keep
+ * that effect under AGENTS.md's ~20-line guideline.
+ *
+ * `backgroundTarget` is the OUTER `.pane` element, not `container` — the margin this task added
+ * (`.module.css`'s own docstring) lives on `.pane`, as padding around `container`; painting the
+ * background there too, not just on `container`, is what makes that padding read as part of the
+ * terminal's own surface instead of a gap showing whatever sits behind the pane. */
+function mountTerminal(
+  container: HTMLDivElement,
+  backgroundTarget: HTMLElement,
+  props: TerminalPaneProps,
+): () => void {
   const api = getSeeyaApi();
   const terminal = new Terminal({
     convertEol: true,
@@ -76,7 +86,7 @@ function mountTerminal(container: HTMLDivElement, props: TerminalPaneProps): () 
   terminal.open(container);
   fitAddon.fit();
   registerTerminalForTheme(props.id, terminal, (color) => {
-    container.style.backgroundColor = color;
+    backgroundTarget.style.backgroundColor = color;
   });
   terminal.onData((data) => api.writeTab({ id: props.id, data }));
 
@@ -112,6 +122,7 @@ function mountTerminal(container: HTMLDivElement, props: TerminalPaneProps): () 
 
 export function TerminalPane(props: TerminalPaneProps): JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null);
+  const paneRef = useRef<HTMLDivElement>(null);
 
   // Mounts once: `props.id` is always a fresh id for the life of this component (a closed tab is
   // never reopened under the same id, `tabs/tab-model.ts`'s own docstring) — font/spawnRequest
@@ -119,11 +130,16 @@ export function TerminalPane(props: TerminalPaneProps): JSX.Element {
   // to.
   useEffect(() => {
     const container = containerRef.current;
-    if (container === null) {
+    const pane = paneRef.current;
+    if (container === null || pane === null) {
       return;
     }
-    return mountTerminal(container, props);
+    return mountTerminal(container, pane, props);
   }, []);
 
-  return <div ref={containerRef} hidden={props.hidden} class={cx(styles, 'pane')} />;
+  return (
+    <div ref={paneRef} hidden={props.hidden} class={cx(styles, 'pane')}>
+      <div ref={containerRef} class={cx(styles, 'surface')} />
+    </div>
+  );
 }

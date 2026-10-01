@@ -58,14 +58,40 @@ export function TabStrip(props: TabStripProps): JSX.Element {
   // V2-T30/V2-T48 item 6: a sidebar collapse/resize reflows `#terminal-host` without ever firing
   // `window`'s own `resize` event (that event only fires for the window's OUTER size) — a
   // `ResizeObserver` on the host itself is what the legacy file already measured as the fix.
+  //
+  // PO review (2026-10-01, docs/INTERFACE.md's own "o terminal reajusta ao fim... sem piscar nem
+  // ajustar a cada quadro de forma visível"): the sidebar's own 200ms open/collapse width
+  // transition (`Sidebar.module.css`) reflows this host on nearly every frame along the way, so
+  // calling `fitAll()` directly from the observer used to call it — and so xterm's own full-row
+  // `refresh()` — dozens of times inside that one transition, a visible flicker. Coalesced to
+  // `requestAnimationFrame` instead of a timer: D-019 bans `setTimeout`/`setInterval` outright
+  // (`eslint.config.js`'s own rule has no renderer exemption), and rAF turns out to debounce this
+  // correctly anyway — a resize notification arriving before the previously scheduled frame runs
+  // cancels and reschedules it, so as long as the transition keeps producing a notification every
+  // frame, the callback never fires; it only runs once a frame passes with no new notification
+  // behind it, which is exactly "right after resizing settles".
   useEffect(() => {
     const host = terminalHostRef.current;
     if (host === null) {
       return;
     }
-    const observer = new ResizeObserver(() => data.fitAll());
+    let scheduledFrame: number | null = null;
+    const observer = new ResizeObserver(() => {
+      if (scheduledFrame !== null) {
+        cancelAnimationFrame(scheduledFrame);
+      }
+      scheduledFrame = requestAnimationFrame(() => {
+        scheduledFrame = null;
+        data.fitAll();
+      });
+    });
     observer.observe(host);
-    return () => observer.disconnect();
+    return () => {
+      if (scheduledFrame !== null) {
+        cancelAnimationFrame(scheduledFrame);
+      }
+      observer.disconnect();
+    };
   }, []);
 
   return (

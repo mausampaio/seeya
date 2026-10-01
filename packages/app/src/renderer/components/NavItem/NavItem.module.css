@@ -5,7 +5,8 @@
  * this component's own defence against the OTHER aceite defect ("a lateral cortando o conteúdo à
  * esquerda") — a flex child's default `min-width: auto` is what lets an unbreakable long label
  * force the row (and the whole scrolling sidebar around it) wider than available space; `0` lets
- * `overflow-wrap`/`text-overflow` actually take effect instead. */
+ * `overflow-wrap`/`text-overflow` actually take effect instead. Text sizing comes from `Text`
+ * (D-052 item 7, PO review 2026-10-01) — this file sets no `font-size`/`line-height` any more. */
 .navItem {
   display: flex;
   align-items: center;
@@ -19,7 +20,6 @@
   background: transparent;
   color: var(--seeya-text);
   font-family: var(--seeya-font-sans);
-  font-size: 13px;
   text-align: left;
   cursor: pointer;
 }
@@ -31,7 +31,15 @@
 .active {
   background: var(--seeya-brand-soft);
   color: var(--seeya-brand-text);
-  font-weight: 500;
+}
+
+/* `Text`'s own `.tonePrimary` (D-052 item 7) sets an explicit `color` on `.label` itself, which
+ * always wins over the inherited `.active` colour above — a descendant selector of two classes
+ * (specificity 0,2,0) beats `Text`'s single-class selector (0,1,0) regardless of stylesheet order,
+ * same reasoning `ProjectRow.module.css`'s own `span.lockLabelXxx` comment gives. Weight is `Text`'s
+ * own `weight={500}` prop now (`NavItem.tsx`), never set here. */
+.active .label {
+  color: var(--seeya-brand-text);
 }
 
 .icon {
@@ -43,9 +51,6 @@
 .label {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .trailing {

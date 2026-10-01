@@ -1,78 +1,33 @@
 /**
  * D-052 (V2-T75): the lateral's own Favorites section (`docs/INTERFACE.md` § 1 item 3) — a real
  * component now, replacing the imperative rendering inside the deleted
- * `renderer/legacy/sidebar-favorites-view.tsx`. Star, name and the lock badge
- * (`openHere`/`locked`/none); a favorite open in THIS window also shows its own sessions,
- * indented — `state/sidebar-summary.ts#buildFavoriteProjectRows` already decided which.
+ * `renderer/legacy/sidebar-favorites-view.tsx`.
+ *
+ * PO review (2026-10-01): row rendering (star, name, active highlight, lock status, indented
+ * sessions) moved into the shared `ProjectRow` component (`renderer/features/sidebar/ProjectRow/`)
+ * — `RecentSection` renders the identical shape for its own rows now, differing only by the
+ * leading icon/action (`ProjectRow`'s own `leading` prop). This file is left with only what is
+ * actually specific to Favorites: the section heading/`+` action and which `leading` variant to
+ * pass.
  *
  * @example
- * <FavoritesSection rows={favorites} onOpenProject={openProject} onNewProject={openNewProjectDialog}/>
+ * <FavoritesSection rows={favorites} onOpenProject={openProject} onToggleFavorite={toggleFavorite}/>
  */
 import type { JSX } from 'preact';
 import styles from './FavoritesSection.module.css';
 import { cx } from '../../../components/css-class.js';
 import { Section } from '../../../components/Section/index.js';
 import { IconButton } from '../../../components/IconButton/index.js';
-import { Chip } from '../../../components/Chip/index.js';
-import { PlusIcon, StarIcon } from '../../../components/Icon/index.js';
+import { Text } from '../../../components/Text/index.js';
+import { PlusIcon } from '../../../components/Icon/index.js';
 import { MESSAGES } from '../../../../text/messages.js';
 import type { FavoriteProjectRow } from '../../../../state/sidebar-summary.js';
+import { ProjectRow } from '../ProjectRow/index.js';
 
 export interface FavoritesSectionProps {
   readonly rows: readonly FavoriteProjectRow[];
   readonly onOpenProject: (projectId: string) => void;
   readonly onToggleFavorite: (projectId: string, favorite: boolean) => void;
-}
-
-function FavoriteRow(props: {
-  readonly row: FavoriteProjectRow;
-  readonly onOpenProject: (projectId: string) => void;
-  readonly onToggleFavorite: (projectId: string, favorite: boolean) => void;
-}): JSX.Element {
-  const { row } = props;
-  return (
-    <li class={cx(styles, 'row')}>
-      <button
-        type="button"
-        class={cx(styles, 'star')}
-        aria-pressed="true"
-        aria-label={MESSAGES.sidebarFavoriteStarLabel(true, row.name)}
-        onClick={(event) => {
-          event.stopPropagation();
-          props.onToggleFavorite(row.projectId, false);
-        }}
-      >
-        <StarIcon filled />
-      </button>
-      <button
-        type="button"
-        class={cx(styles, 'name')}
-        onClick={() => props.onOpenProject(row.projectId)}
-      >
-        {row.name}
-      </button>
-      {row.badge !== 'none' && (
-        <Chip tone={row.badge === 'openHere' ? 'success' : 'warning'} size="sm">
-          {row.badge === 'openHere'
-            ? MESSAGES.sidebarFavoriteOpenHere
-            : MESSAGES.sidebarFavoriteLocked}
-        </Chip>
-      )}
-      {row.sessions.length > 0 && (
-        <ul class={cx(styles, 'sessions')}>
-          {row.sessions.map((session) => (
-            <li key={session.sessionId} class={cx(styles, 'sessionRow')}>
-              {MESSAGES.projectSessionRowLabel(
-                session.name,
-                session.displaySessionId,
-                session.stateLabel,
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </li>
-  );
 }
 
 export function FavoritesSection(props: FavoritesSectionProps): JSX.Element {
@@ -96,15 +51,20 @@ export function FavoritesSection(props: FavoritesSectionProps): JSX.Element {
       }
     >
       {props.rows.length === 0 ? (
-        <p class={cx(styles, 'empty')}>{MESSAGES.sidebarFavoritesEmpty}</p>
+        <Text as="p" variant="caption" tone="tertiary" className={cx(styles, 'empty')}>
+          {MESSAGES.sidebarFavoritesEmpty}
+        </Text>
       ) : (
         <ul class={cx(styles, 'list')}>
           {props.rows.map((row) => (
-            <FavoriteRow
+            <ProjectRow
               key={row.projectId}
-              row={row}
+              projectId={row.projectId}
+              name={row.name}
+              badge={row.badge}
+              sessions={row.sessions}
+              leading={{ kind: 'favoriteStar', onToggleFavorite: props.onToggleFavorite }}
               onOpenProject={props.onOpenProject}
-              onToggleFavorite={props.onToggleFavorite}
             />
           ))}
         </ul>

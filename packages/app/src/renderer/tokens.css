@@ -85,6 +85,11 @@
    * never a permanent resting shadow. */
   --seeya-shadow-popover: 0 12px 32px rgb(18 18 20 / 12%);
   --seeya-shadow-dialog: 0 24px 64px rgb(18 18 20 / 18%);
+  /* Identity § 6.3's own "Exceção: a lateral do aplicativo" (2026-10-01) — the ONE fixed panel
+   * that deliberately breaks "sombra só para sobreposição real": a soft, right-edge-only shadow
+   * (horizontal offset, tight blur, low opacity — nowhere near the popover's own spread/strength)
+   * so the lateral reads as a layer above the workspace, never a resting glow. */
+  --seeya-shadow-sidebar: 2px 0 8px rgb(18 18 20 / 8%);
 
   /* Movement (identity § 6.5). `prefers-reduced-motion` is handled once, globally, below —
    * individual rules that use these durations never need their own media query. */
@@ -144,6 +149,11 @@
   /* Reduce sombra, reforce borda no tema dark (identity § 6.3). */
   --seeya-shadow-popover: 0 12px 32px rgb(0 0 0 / 28%);
   --seeya-shadow-dialog: 0 24px 64px rgb(0 0 0 / 36%);
+  /* The sidebar's own exception (2026-10-01): "no tema dark, sombra ainda menor e borda
+   * reforçada" — a dark background already reads depth poorly from a soft shadow alone, so this
+   * theme leans on `--seeya-border-strong` (`Sidebar.module.css`) more than on this shadow, which
+   * only needs to be present, not prominent. */
+  --seeya-shadow-sidebar: 2px 0 6px rgb(0 0 0 / 20%);
 }
 
 /* `--seeya-logo` is intentionally absent from [data-theme='dark'] above — the symbol keeps the

@@ -7,6 +7,10 @@
   display: flex;
   background: var(--seeya-surface);
   border-right: 1px solid var(--seeya-border);
+  /* Identity § 6.3's own "Exceção: a lateral do aplicativo" (2026-10-01) — the lateral reads as a
+   * layer ABOVE the workspace, not flush with it. `--seeya-shadow-sidebar` is deliberately much
+   * softer than `--seeya-shadow-popover` (this token's own docstring in tokens.css). */
+  box-shadow: var(--seeya-shadow-sidebar);
   box-sizing: border-box;
   overflow: hidden;
   /* Respects `prefers-reduced-motion` for free — `tokens.css`'s own global override zeroes every
@@ -14,9 +18,17 @@
   transition: width var(--seeya-motion-panel) var(--seeya-motion-easing);
 }
 
+/* "No tema dark, sombra ainda menor e borda reforçada" (identity § 6.3) — `--seeya-border-strong`
+ * instead of the plain `--seeya-border` every other theme/surface combination here already uses,
+ * only for this one deliberate exception. */
+:global([data-theme='dark']) .sidebar {
+  border-right-color: var(--seeya-border-strong);
+}
+
 .collapsed {
   width: 0;
   border-right: none;
+  box-shadow: none;
 }
 
 /* V2-T30 item 2 / V2-T63 correction, preserved by this rewrite: collapsing hides `.main` entirely

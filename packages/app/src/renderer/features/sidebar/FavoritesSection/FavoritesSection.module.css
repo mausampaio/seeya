@@ -1,62 +1,15 @@
-/* D-052 (V2-T75). `min-width: 0` throughout — the V2-T63 aceite's own "a lateral cortando o
- * conteúdo à esquerda" defect (a flex child's default `min-width: auto` forcing an unbreakable
- * name wider than the available column). */
+/* D-052 (V2-T75). Row rendering (name/lock/sessions) moved to `ProjectRow.module.css` (PO review,
+ * 2026-10-01) — this file only owns the list container and the empty state. Font sizing comes from
+ * `Text` (D-052 item 7) — nothing here sets `font-size`/`line-height`. */
 .list {
   list-style: none;
   margin: 0;
   padding: 0;
-  font-size: 12px;
   display: flex;
   flex-direction: column;
   gap: var(--seeya-space-1);
 }
 
 .empty {
-  color: var(--seeya-text-tertiary);
-  font-size: 11px;
-}
-
-.row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--seeya-space-1);
-  min-width: 0;
-}
-
-.star {
-  display: flex;
-  align-items: center;
-  flex: none;
-  border: none;
-  background: transparent;
-  color: var(--seeya-text);
-  cursor: pointer;
-  padding: 0;
-}
-
-.name {
-  flex: 1;
-  min-width: 0;
-  text-align: left;
-  border: none;
-  background: transparent;
-  color: var(--seeya-text);
-  cursor: pointer;
-  overflow-wrap: anywhere;
-  padding: 0;
-  font-family: var(--seeya-font-sans);
-  font-size: 12px;
-}
-
-.sessions {
-  list-style: none;
-  margin: 2px 0 0 20px;
-  padding: 0;
-  width: 100%;
-}
-
-.sessionRow {
-  color: var(--seeya-text-secondary);
-  padding: 1px 0;
+  display: block;
 }

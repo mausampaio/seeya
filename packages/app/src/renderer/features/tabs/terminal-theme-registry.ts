@@ -10,7 +10,7 @@
  * back (which would be circular: `theme-view.ts` → here → nothing, keeps it one-directional).
  */
 import type { Terminal } from '@xterm/xterm';
-import { TERMINAL_THEME_DARK, type TerminalTheme } from '../../../state/terminal-theme.js';
+import { FALLBACK_TERMINAL_THEME, type TerminalTheme } from '../../../state/terminal-theme.js';
 
 interface RegisteredTerminal {
   readonly terminal: Terminal;
@@ -22,7 +22,7 @@ interface RegisteredTerminal {
 /** Defaults to the dark theme — this app's original, only theme before V2-T62 — so a tab mounted
  * before the theme round trip resolves still renders something coherent; `renderer.tsx#main`
  * always resolves the real theme before anyone can open a tab in practice. */
-let activeTheme: TerminalTheme = TERMINAL_THEME_DARK;
+let activeTheme: TerminalTheme = FALLBACK_TERMINAL_THEME;
 
 const registered = new Map<string, RegisteredTerminal>();
 

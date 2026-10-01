@@ -4,25 +4,49 @@
  * fix moves padding and vertical gap onto the typed primitives (`Surface padding="sm"` +
  * `Stack gap="sm"` in `SidebarFooter.tsx`), the SAME token `Sidebar.module.css#content` already
  * uses — this class is left with only what no primitive expresses: the divider line above the
- * footer. */
+ * footer. Font sizing throughout this file comes from `Text` (D-052 item 7, PO review 2026-10-01)
+ * — nothing here sets `font-size`/`line-height`. */
 .footerDivider {
   border-top: 1px solid var(--seeya-border);
 }
 
-.scheduleText {
-  font-size: 11px;
-  margin: 0;
-  color: var(--seeya-text-secondary);
-}
-
-.scheduleActions {
+/* PO review (2026-10-01), `docs/INTERFACE.md` § 1 item 7: the schedule line is now an icon row —
+ * clock, the primary fact (`primary`, flush left), the detail (`secondary`, flush right) — instead
+ * of one flat string. `min-width: 0` on both `Text` children (via their own className here, not
+ * `Text`'s own `.truncate`) is what lets `schedulePrimary` actually ellipsize instead of forcing
+ * `scheduleSecondary` off the edge of the lateral when both are long. */
+.scheduleRow {
   display: flex;
+  align-items: center;
   gap: var(--seeya-space-1);
+  min-width: 0;
 }
 
-.scheduleActions > * {
+.scheduleIcon {
+  flex: none;
+  color: var(--seeya-text-tertiary);
+}
+
+.schedulePrimary {
   flex: 1;
-  font-size: 11px;
+  min-width: 0;
+}
+
+.scheduleSecondary {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* Snooze/Skip side by side, EQUAL width — `Grid` (two columns, `SidebarFooter.tsx`'s own two
+ * `GridItem`s) is the layout primitive that guarantees this, never `flex: 1` declared here. */
+.scheduleActions {
+  margin-top: var(--seeya-space-1);
+}
+
+.snoozeTriggerContent {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 /* `docs/INTERFACE.md` § 1 item 7's own "fundo sólido do estado" — radius-md (10px, a card/button
@@ -56,24 +80,28 @@
   background: currentColor;
 }
 
-/* V2-T63 item 7's own defect: "Daemon running com fonte pequena demais" — `body-sm` (14px), peso
- * 500 (identity § 4.4), not the old 12px. */
 .daemonLabel {
   flex: 1;
   min-width: 0;
-  font-size: 14px;
-  font-weight: 500;
   overflow-wrap: anywhere;
 }
 
+/* These two are the one documented exception to "no raw font-size" in this file: their text is
+ * never a Preact child — `renderer/legacy/end-day-dialog-view.ts`/`autostart-control-view.ts` set
+ * `.textContent` on these exact ids directly (this component only renders the stable, empty
+ * anchor, see its own docstring) — so `Text` has nothing to wrap. The pixel values below match
+ * `Text`'s own `caption` variant exactly (identity § 4.4, 12/16), rather than the un-scaled 11px
+ * this used to be, so a legacy-filled result line still reads at a real scale step. */
 .daemonResult {
-  font-size: 11px;
   margin: 0;
+  font-size: 12px;
+  line-height: 16px;
   white-space: pre-wrap;
 }
 
 .autostartResult {
-  font-size: 11px;
   margin: 0;
+  font-size: 12px;
+  line-height: 16px;
   white-space: pre-wrap;
 }

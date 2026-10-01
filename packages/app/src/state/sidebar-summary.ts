@@ -18,17 +18,28 @@ import type { ProjectPanelRow } from './projects-panel.js';
  * matched to a tab in THIS window (`matchedTabId !== null`, the same evidence `sidebar-data.ts`
  * already computed), `locked` when the lock isn't simply "unlocked" and no session here is open,
  * `none` otherwise. The project open in this window ALSO carries its own sessions, indented
- * (`docs/INTERFACE.md`'s own "recuadas") — every other favorite carries an empty list. */
+ * (`docs/INTERFACE.md`'s own "recuadas") — every other favorite carries an empty list.
+ *
+ * PO review (2026-10-01): Recent rows now carry this exact same shape (`ProjectSidebarRow`
+ * below) — a project seen in Recent with no evidence of activity here before now read as a plain
+ * folder+name, with none of the active-highlight/lock/session facts Favorites already showed for
+ * the identical project. Both lists render through the same `ProjectRow` component
+ * (`renderer/features/sidebar/ProjectRow/`) off this one shape; only the leading icon/action
+ * differs between them. */
 export type FavoriteLockBadge = 'openHere' | 'locked' | 'none';
 
-export interface FavoriteProjectRow {
+/** The row shape `ProjectRow` renders, shared by Favorites and Recent — see this module's own
+ * docstring above for why Recent carries it too, since the PO review. */
+export interface ProjectSidebarRow {
   readonly projectId: string;
   readonly name: string;
   readonly badge: FavoriteLockBadge;
   readonly sessions: ProjectPanelRow['sessions'];
 }
 
-function resolveFavoriteLockBadge(project: ProjectPanelRow): FavoriteLockBadge {
+export type FavoriteProjectRow = ProjectSidebarRow;
+
+function resolveProjectLockBadge(project: ProjectPanelRow): FavoriteLockBadge {
   if (project.sessions.some((session) => session.matchedTabId !== null)) {
     return 'openHere';
   }
@@ -46,7 +57,7 @@ export function buildFavoriteProjectRows(
   return projects
     .filter((project) => project.favorite)
     .map((project) => {
-      const badge = resolveFavoriteLockBadge(project);
+      const badge = resolveProjectLockBadge(project);
       return {
         projectId: project.projectId,
         name: project.name,
@@ -56,9 +67,7 @@ export function buildFavoriteProjectRows(
     });
 }
 
-export interface RecentProjectRow {
-  readonly projectId: string;
-  readonly name: string;
+export interface RecentProjectRow extends ProjectSidebarRow {
   readonly lastActivity: Date;
 }
 
@@ -93,9 +102,17 @@ export function buildRecentProjectRows(
       continue;
     }
     const lastActivity = mostRecentSessionActivity(project);
-    if (lastActivity !== null) {
-      withActivity.push({ projectId: project.projectId, name: project.name, lastActivity });
+    if (lastActivity === null) {
+      continue;
     }
+    const badge = resolveProjectLockBadge(project);
+    withActivity.push({
+      projectId: project.projectId,
+      name: project.name,
+      lastActivity,
+      badge,
+      sessions: badge === 'openHere' ? project.sessions : [],
+    });
   }
   return withActivity
     .sort((a, b) => b.lastActivity.getTime() - a.lastActivity.getTime())

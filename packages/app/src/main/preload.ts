@@ -33,8 +33,10 @@ import type {
   EndDayRunResponse,
   EndDayProgressUpdateEvent,
   ScheduleUpdateEvent,
+  ScheduleStripResponse,
   SnoozeTodayRequest,
   DaemonAvailabilityUpdateEvent,
+  DaemonAvailabilityResponse,
   DaemonControlRequest,
   DaemonControlResponse,
   SettingsPanelResponse,
@@ -110,6 +112,9 @@ export interface SeeyaApi {
    * `onStatusUpdate`. D-052 (V2-T75): unsubscribe function, same reasoning as `onProjectsUpdate`
    * above. */
   onScheduleUpdate(listener: (event: ScheduleUpdateEvent) => void): () => void;
+  /** V2-T75 PO review (round 3): fetched once, at startup — see `CHANNELS.getScheduleStrip`'s own
+   * docstring. */
+  getScheduleStrip(): Promise<ScheduleStripResponse>;
   /** V2-T5b item 1: one of "Snooze +15m/+30m/+1h" — resolves with the freshly recomputed strip. */
   snoozeToday(request: SnoozeTodayRequest): Promise<ScheduleUpdateEvent>;
   /** V2-T5b item 1: "Skip today" — resolves with the freshly recomputed strip. */
@@ -117,6 +122,9 @@ export interface SeeyaApi {
   /** V2-T5b item 3: the daemon's own liveness, pushed on the same refresh tick. D-052 (V2-T75):
    * unsubscribe function, same reasoning as `onProjectsUpdate` above. */
   onDaemonAvailabilityUpdate(listener: (event: DaemonAvailabilityUpdateEvent) => void): () => void;
+  /** V2-T75 PO review (round 3): fetched once, at startup — see
+   * `CHANNELS.getDaemonAvailability`'s own docstring. */
+  getDaemonAvailability(): Promise<DaemonAvailabilityResponse>;
   /** V2-T5b item 3: "Start daemon"/"Stop daemon". */
   daemonControl(request: DaemonControlRequest): Promise<DaemonControlResponse>;
   /** V2-T14 item 1: the Settings dialog's own rows, re-fetched every time it opens. */
@@ -256,9 +264,11 @@ const api: SeeyaApi = {
     );
   },
   onScheduleUpdate: (listener) => subscribe(CHANNELS.scheduleUpdate, listener),
+  getScheduleStrip: () => ipcRenderer.invoke(CHANNELS.getScheduleStrip),
   snoozeToday: (request) => ipcRenderer.invoke(CHANNELS.snoozeToday, request),
   skipToday: () => ipcRenderer.invoke(CHANNELS.skipToday),
   onDaemonAvailabilityUpdate: (listener) => subscribe(CHANNELS.daemonAvailabilityUpdate, listener),
+  getDaemonAvailability: () => ipcRenderer.invoke(CHANNELS.getDaemonAvailability),
   daemonControl: (request) => ipcRenderer.invoke(CHANNELS.daemonControl, request),
   getSettingsPanel: () => ipcRenderer.invoke(CHANNELS.getSettingsPanel),
   saveSetting: (request) => ipcRenderer.invoke(CHANNELS.saveSetting, request),

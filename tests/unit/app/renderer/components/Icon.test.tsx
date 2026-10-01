@@ -5,10 +5,12 @@ import type { ComponentChildren } from 'preact';
 import {
   CalendarIcon,
   ChatBalloonIcon,
+  ChevronDownIcon,
   ChevronLeftIcon,
   ClockIcon,
   CloseIcon,
   FolderIcon,
+  LockIcon,
   PlayIcon,
   PlusIcon,
   SettingsIcon,
@@ -31,10 +33,12 @@ describe('outline icons (D-052, V2-T75 — real render; identity § 6.4)', () =>
     ChatBalloonIcon,
     PlusIcon,
     ChevronLeftIcon,
+    ChevronDownIcon,
     ClockIcon,
     SettingsIcon,
     TerminalIcon,
     CloseIcon,
+    LockIcon,
   ];
 
   it('every outline icon is drawn on the 24-unit grid with no fill and a rounded stroke', () => {

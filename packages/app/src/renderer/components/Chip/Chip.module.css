@@ -10,26 +10,33 @@
   justify-content: center;
   gap: var(--seeya-space-1);
   border-radius: var(--seeya-radius-full);
-  font-family: var(--seeya-font-sans);
-  font-weight: 500;
-  line-height: 1;
   white-space: nowrap;
 }
 
-/* Sizes. */
+/* D-052 item 7 (PO review, 2026-10-01): `Text` (`Chip.tsx`) now gives the font — `body-sm`, the
+ * "rótulo da pílula... em body-sm" category. Two deliberate overrides on top of `Text`'s own
+ * classes, both via an element+class selector (specificity 0,1,1, beating `Text`'s single-class
+ * selectors regardless of stylesheet order — see `ProjectRow.module.css`'s own `span.lockLabelXxx`
+ * comment for the mechanism): `line-height: 1` keeps this component's own already-fixed
+ * vertical-centering (this file's own comment above); `color: inherit` lets `.soft.success`/etc
+ * below keep deciding the colour, a SEMANTIC tone `Text`'s own `tone` prop is deliberately not
+ * scoped to (`Text.tsx`'s own docstring). */
+span.chipLabel {
+  line-height: 1;
+  color: inherit;
+}
+
+/* Sizes — padding only now; every size shares the same `body-sm` text (above). */
 .sm {
   padding: 2px var(--seeya-space-2);
-  font-size: 11px;
 }
 
 .md {
   padding: 3px var(--seeya-space-2);
-  font-size: 12px;
 }
 
 .lg {
   padding: var(--seeya-space-1) var(--seeya-space-3);
-  font-size: 13px;
 }
 
 /* Variant `soft` (the default — a tinted background, the old status-pill's own look) per tone. */

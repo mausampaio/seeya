@@ -71,26 +71,25 @@ export function useSidebar(): SidebarData {
   // `@typescript-eslint/unbound-method` flags a detached method reference on principle (it can't
   // see that `SeeyaApi`'s own implementation, `main/preload.ts`, never touches `this`); this is
   // the same fix at every call site in this file rather than reshaping the whole interface.
+  // V2-T75 PO review (2026-10-01, round 3), production defect: `getProjectsPanel`/`getTodayPanel`
+  // used to be called here and their return value thrown away, so this hook's state depended
+  // ENTIRELY on the ambient refresh loop's own push — which loses its first tick to the exact race
+  // `CHANNELS.getProjectsPanel`'s own docstring describes, leaving the real window showing "No
+  // favorites yet"/"All projects 0" for up to two refresh intervals after every open. Passing the
+  // invoke as `fetchInitial` seeds state from its answer as soon as it resolves instead
+  // (`useIpcSubscription`'s own docstring); the push above still drives every update after that —
+  // this fixes WHEN the first real value lands, never which value wins once both are in.
   const projects = useIpcSubscription<ProjectsPanelData>(
     (listener) => api.onProjectsUpdate(listener),
     AWAITING_FIRST_PROJECTS_PANEL,
+    () => api.getProjectsPanel(),
   );
   const today = useIpcSubscription<TodayPanelData>(
     (listener) => api.onTodayUpdate(listener),
     NO_BRIEFING_TODAY,
+    () => api.getTodayPanel(),
   );
   const activeTabId = useActiveTabId();
-
-  // First-paint fetch for both — each return value is discarded on purpose
-  // (`main/project-ipc.ts`'s own docstring: `getProjectsPanel`/`getTodayPanel` exist so the FIRST
-  // render doesn't wait for the ambient refresh tick); this hook's state is set only by the
-  // `onProjectsUpdate`/`onTodayUpdate` pushes above, so every consumer (this hook, the legacy
-  // Projects tab, the legacy Today tab) always agrees on one value, never two slightly different
-  // reads racing each other. Runs once, same reasoning as `useIpcSubscription`.
-  useEffect(() => {
-    void api.getProjectsPanel();
-    void api.getTodayPanel();
-  }, [api]);
 
   return {
     todayCard: buildTodayCardSummary(today),

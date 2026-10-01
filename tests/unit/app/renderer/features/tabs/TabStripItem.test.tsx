@@ -79,4 +79,27 @@ describe('TabStripItem (V2-T64)', () => {
     );
     expect(container.querySelector(`.${styles.exitedText}`)).toBeNull();
   });
+
+  /**
+   * PO review (2026-10-01, docs/INTERFACE.md § 2's own "hover distinto"): the suppression itself
+   * (`.item:hover:not(:has(.close:hover))`, `TabStripItem.module.css`) is a real CSS relational
+   * pseudo-class rule — happy-dom (this file's own environment) does not implement a real CSS
+   * cascade/`:has()` engine, so no unit test here can PROVE the visual outcome, the same honest
+   * limit every other hover/colour rule in this codebase already has (class-name presence is as
+   * far as a unit test goes; `TabStripItem.module.css`'s own test file never asserts a computed
+   * style either). What this test DOES prove: `.close` carries the exact class name the CSS
+   * selector depends on — a rename here without updating the CSS would silently break the
+   * suppression, and this is the only place that would catch it. The real visual proof is a
+   * screenshot from a real window with `:hover` forced via `CSS.forcePseudoState`
+   * (`docs/DESEMPENHO.md`-style "não entregue sem olhar"), not a unit test — documented in the
+   * TASK-65 comment for this change, since no CSS engine here can confirm it.
+   */
+  it('the close button carries the exact class name .item:hover:not(:has(.close:hover)) depends on', () => {
+    const { container } = render(
+      <TabStripItem entry={entry()} onSelect={() => {}} onClose={() => {}} />,
+    );
+    const close = container.querySelector(`.${styles.close}`);
+    expect(close).not.toBeNull();
+    expect(close?.tagName).toBe('BUTTON');
+  });
 });

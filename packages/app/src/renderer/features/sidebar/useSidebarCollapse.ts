@@ -10,7 +10,7 @@
  * @example
  * const { collapsed, toggle } = useSidebarCollapse();
  */
-import { useCallback, useEffect, useState } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import {
   encodeSidebarCollapsedPreference,
   parseSidebarCollapsedPreference,
@@ -57,6 +57,13 @@ export interface SidebarCollapseControls {
   readonly toggle: () => void;
 }
 
+/** The two buttons that ever toggle the lateral — `Sidebar.tsx`'s own header button and
+ * `App.tsx`'s toolbar reopen button. Only one of the two is ever mounted at a time since the PO
+ * review below (`docs/INTERFACE.md`'s own "Um botão de recolher por vez") — these ids are the only
+ * place either one needs naming for that correction's own focus handling. */
+const SIDEBAR_TOGGLE_BUTTON_ID = 'sidebar-collapse-toggle';
+const TOOLBAR_TOGGLE_BUTTON_ID = 'sidebar-toggle-button';
+
 /**
  * Restores the remembered state on mount and persists every toggle — click (the lateral's own
  * header button, or the toolbar's reopen button) or the `Ctrl+B` shortcut, all funnelled through
@@ -64,14 +71,40 @@ export interface SidebarCollapseControls {
  */
 export function useSidebarCollapse(): SidebarCollapseControls {
   const [collapsed, setCollapsed] = useState<boolean>(readSidebarCollapsedPreference);
+  // PO review (2026-10-01, "Um botão de recolher por vez"): `App.tsx` now mounts only ONE of the
+  // two toggle buttons at a time, so a click on whichever one currently has focus unmounts its
+  // OWN focused element the instant `collapsed` flips — without this, focus would silently drop
+  // to `<body>` instead of landing on the button that just appeared. Set synchronously inside
+  // `toggle` (before the state update), read and cleared by the effect below once the OTHER
+  // button has actually mounted.
+  const restoreFocusAfterToggle = useRef(false);
 
   const toggle = useCallback(() => {
+    const focusedId =
+      document.activeElement instanceof HTMLElement ? document.activeElement.id : '';
+    restoreFocusAfterToggle.current =
+      focusedId === SIDEBAR_TOGGLE_BUTTON_ID || focusedId === TOOLBAR_TOGGLE_BUTTON_ID;
     setCollapsed((current) => {
       const next = !current;
       writeSidebarCollapsedPreference(next);
       return next;
     });
   }, []);
+
+  // Runs AFTER Preact commits the new `collapsed` value to the DOM, so the button about to
+  // receive focus is guaranteed to already exist — never the Ctrl+B path (this effect only acts
+  // when `toggle` itself recorded that a toggle BUTTON, not the shortcut, had focus beforehand;
+  // grabbing focus for a shortcut that fired from wherever the person already was — a terminal is
+  // excluded even from firing `toggle` at all, see `handleKeydown` below — would be the window
+  // surprising them, not helping them).
+  useEffect(() => {
+    if (!restoreFocusAfterToggle.current) {
+      return;
+    }
+    restoreFocusAfterToggle.current = false;
+    const visibleButtonId = collapsed ? TOOLBAR_TOGGLE_BUTTON_ID : SIDEBAR_TOGGLE_BUTTON_ID;
+    document.getElementById(visibleButtonId)?.focus();
+  }, [collapsed]);
 
   useEffect(() => {
     function handleKeydown(event: KeyboardEvent): void {

@@ -28,21 +28,33 @@
   width: 100%;
 }
 
-/* Sizes (identity § 4.4's own type scale: body-sm/body-md, plus the padding that keeps each
- * size's own tap target readable). */
+/* Sizes — padding, PLUS font-size/line-height matching `Text`'s own body-sm/body-md/body-lg
+ * exactly (identity § 4.4). PO review (2026-10-01, round 2): `Text` (`Button.tsx`'s own
+ * `TEXT_VARIANT_BY_SIZE`) is the PRIMARY source for this button's own text — but two of this
+ * window's own real callers (`#end-day-button`, `#autostart-control-button`) are legacy-owned
+ * anchors whose content a plain `.ts` module overwrites with `button.textContent = …`
+ * (`renderer/legacy/end-day-dialog-view.ts`/`autostart-control-view.ts`), which REPLACES the
+ * `<Text>` span this component renders with a bare text node — losing `Text`'s own classes
+ * entirely. `font-size`/`line-height`/`font-weight` are inherited CSS properties, so repeating
+ * the identity's own numbers here (never a one-off value — same three variants, same pixels) is
+ * what keeps a legacy-overwritten button reading at the right size too, through inheritance
+ * alone, without this component needing to know those two buttons exist. */
 .sm {
   padding: var(--seeya-space-1) var(--seeya-space-3);
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 20px;
 }
 
 .md {
   padding: var(--seeya-space-2) var(--seeya-space-4);
-  font-size: 14px;
+  font-size: 16px;
+  line-height: 24px;
 }
 
 .lg {
   padding: var(--seeya-space-3) var(--seeya-space-6);
-  font-size: 16px;
+  font-size: 18px;
+  line-height: 28px;
 }
 
 /* Variants. */

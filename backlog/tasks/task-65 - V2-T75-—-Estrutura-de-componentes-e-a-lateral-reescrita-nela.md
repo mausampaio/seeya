@@ -4,7 +4,7 @@ title: V2-T75 — Estrutura de componentes e a lateral reescrita nela
 status: Review
 assignee: []
 created_date: '2026-09-30 21:21'
-updated_date: '2026-10-01 01:12'
+updated_date: '2026-10-01 11:16'
 labels: []
 milestone: m-2
 dependencies: []
@@ -241,5 +241,154 @@ author: PO
 created: 2026-10-01 01:12
 ---
 Revisão do PO em 2026-09-30: três rodadas de captura conferidas pelo PO. Rodada 1 trouxe a estrutura da D-052, o design system inicial e a lateral reescrita, mas com o rodapé sem padding, botões de ícone apagados e a captura clara tampada pelo diálogo de posse. Rodada 2 corrigiu rodapé (primitivas) e captura. Rodada 3 achou a causa real dos ícones minúsculos: o SVG flex encolhia para 10 px porque width/height de atributo não contam como tamanho; agora tamanho explícito em todos os ícones. Subida medida 0,7 s (contra 5,8 s histórico) confirmada como o mesmo instante medido, sem explicação nesta tarefa — registrado como medido, não como ganho. Mesclado, portão verde (3128 testes), também sem identidade global do git. Falta o aceite do mantenedor com o instalador.
+---
+
+author: agente
+created: 2026-10-01 10:26
+---
+CorreÃ§Ã£o do aceite do mantenedor sobre a lateral reescrita (branch `tarefa/V2-T75-agenda-e-terminal`), entregue em seis rodadas de mensagens do coordenador. `npm run verificar` verde (3223 testes, 0 violaÃ§Ãµes de dependÃªncia) na ponta do branch (commit 2261a97).
+
+**Rodada 1 â€” agenda e tema do terminal:**
+- Snooze virou `Button` + `ChevronDownIcon` abrindo um `Menu` novo (`renderer/components/Menu/`, construÃ­do sobre `Popover`) com +15m/+30m/+1h, setas/Enter/Esc e foco devolvido â€” nunca mais o `<select>` nativo sem estilo.
+- Snooze/Skip lado a lado com largura igual via `Grid`+`GridItem` (nunca `flex` avulso).
+- A linha da agenda virou Ã­cone de relÃ³gio + texto primÃ¡rio (peso 500) + texto secundÃ¡rio (terciÃ¡rio), para os seis estados de `ScheduleDecision` (`state/schedule-strip.ts` agora devolve `primary`/`secondary`, nÃ£o mais um `text` achatado).
+- O terminal (xterm) passou a derivar fundo/texto/seleÃ§Ã£o dos tokens do tema ativo em tempo real (`state/terminal-theme.ts#buildTerminalThemeFromTokens`), trocando ao vivo com o tema.
+
+**Rodada 2 â€” um botÃ£o de recolher por vez:** sÃ³ o botÃ£o do cabeÃ§alho (lateral aberta) ou o da barra de abas (recolhida) existe no DOM por vez; `Ctrl+B` continua funcionando; foco migra para o botÃ£o que aparece quando o que tinha foco some.
+
+**Rodada 3 â€” margem do terminal, hover da aba, transiÃ§Ã£o e sombra:**
+- Margem interna do terminal (16px laterais, 12px cima/baixo) via um wrapper externo com padding e uma superfÃ­cie interna sem padding, para o `fit` descontar a margem de verdade.
+- Hover distinto: aba inteira realÃ§a no hover da aba; `:hover` do `Ã—` suprime o realce da aba via `:not(:has(.close:hover))`, realÃ§ando sÃ³ o `Ã—`.
+- TransiÃ§Ã£o de largura da lateral (180-240ms, tokens de movimento); `ResizeObserver` do terminal debounced por `requestAnimationFrame` para reajustar sÃ³ ao fim da transiÃ§Ã£o, nunca a cada quadro.
+- Sombra na borda direita da lateral (token novo `--seeya-shadow-sidebar`), menor + borda reforÃ§ada no tema escuro.
+
+**Rodada 4 â€” tipografia, projeto ativo e truncamento:**
+- `Text` (`renderer/components/Text/`) e o unico lugar que decide tamanho/altura de linha/peso - variantes da escala da identidade (display...code). Migrado para dentro de `Section`, `NavItem`, `TodayCard`, `Chip`, `Button`, alem da lateral inteira. Lista completa de todo `font-size` que existia e para qual variante foi, abaixo.
+- Projeto aberto nesta janela ganha fundo `surface-subtle`; suas sessoes viram linha estruturada (ponto de estado colorido por tom, nome, id curto em mono) - nunca mais `nome [id] (estado)` entre colchetes/parenteses.
+- Toda linha da lateral tem `min-width: 0` nos filhos flex e trunca com reticencias; a lateral nunca rola na horizontal (`#sidebar .content`'s own `overflow-x: hidden`, preservado).
+
+**Rodada 5 - Recent e Favorites, mesmo componente:** extraido `ProjectRow` (`renderer/features/sidebar/ProjectRow/`), compartilhado por `FavoritesSection`/`RecentSection` - antes, Recent mostrava so pasta+nome, sem destaque/lock/sessoes mesmo para o projeto aberto nesta janela. `state/sidebar-summary.ts#RecentProjectRow` agora carrega o mesmo `badge`/`sessions` que `FavoriteProjectRow` ja tinha.
+
+**Rodada 6 - icones alinhados e separador:** `ProjectRow`/`NavItem` compartilham o mesmo padding/gap (`var(--seeya-space-2)` nos dois), corrigindo a coluna de icones que antes variava entre Recent (sem padding), Favorites (gap menor) e NavItem. Novo componente `Divider` (`renderer/components/Divider/`) separa o bloco Today/Favorites/Recent de All projects/Sessions.
+
+**Lista de `font-size` migrados (item da rodada 4):**
+- `FavoritesSection`/`RecentSection` (12/11px nomes e vazio) -> `ProjectRow`'s own `body-sm` (nomes) / `caption` (vazio, ids mono).
+- `NavItem` (13px) -> `body-sm`, peso 500 so quando `active`.
+- `Section` (12px, peso 500) -> `caption`, tom terciario.
+- `TodayCard` titulo (12px, peso 500) -> `body-sm` peso 500 (tratamento de item de navegacao); subtitulo (11px) -> `caption`, tom secundario.
+- `Chip` (11/12/13px por tamanho) -> `body-sm` peso 500, uniforme - os tres tamanhos agora variam so no padding.
+- `Button` (13/14/16px por tamanho) -> `body-sm`/`body-md`/`body-lg`, mapeados pela identidade.
+- `SidebarFooter` (11px na agenda/resultado do daemon/autostart) -> agenda em `caption`; resultado do daemon/autostart em 12/16px cru (excecao documentada: conteudo escrito por `textContent` do codigo legado, nunca um filho do Preact).
+- `NavList` (12px no cabecalho/lista de Ignored projects) -> mesma excecao documentada (conteudo 100% do `renderer/legacy/projects-list-view.tsx`), ajustado para bater exatamente com `caption` (12/16, antes faltava o `line-height`).
+
+**Limitacao encontrada nesta sessao - capturas de tela nao feitas.** Preparei uma fixture descartavel (`SEEYA_APP_HOME_OVERRIDE`, tres projetos, favoritos, lock simulado, `estado.json`/`config.json` para os seis estados da agenda) e dois flags novos de instrumentacao (`SEEYA_APP_AUTO_NARROW_SIDEBAR`, `SEEYA_APP_AUTO_OPEN_SNOOZE_MENU`, documentados no `AGENTS.md` e no proprio `main.ts`), mas descobri no meio da verificacao que esta propria maquina ja tinha uma instancia real do `seeya` (`npm run app`, checkout principal, nao este worktree) rodando ha mais de uma hora - toda tentativa de abrir uma segunda janela para a captura perdia a corrida do `app.requestSingleInstanceLock()` do Electron e saia em silencio (`exit 0`, nenhum log). Nao encerrei nem contornei essa instancia real (nao e minha para mexer), entao nao ha capturas desta rodada. Cada defeito listado acima tem teste de unidade/integracao cobrindo o comportamento renderizado (classes, texto, badge, truncamento) - a prova visual fica pendente de uma sessao sem esse conflito.
+
+Segue em Review.
+---
+
+author: agente
+created: 2026-10-01 10:27
+---
+Nota: o comentario anterior (#5) saiu com erro de codificacao de caracteres ao ser postado — desconsidere-o, o texto correto (mesmo conteudo, sem acentos para evitar o mesmo problema) esta no proximo comentario.
+---
+
+author: agente
+created: 2026-10-01 10:27
+---
+Correção do aceite do mantenedor sobre a lateral reescrita (branch `tarefa/V2-T75-agenda-e-terminal`), entregue em seis rodadas de mensagens do coordenador. `npm run verificar` verde (3223 testes, 0 violações de dependência) na ponta do branch (commit 2261a97).
+
+**Rodada 1 — agenda e tema do terminal:**
+- Snooze virou `Button` + `ChevronDownIcon` abrindo um `Menu` novo (`renderer/components/Menu/`, construído sobre `Popover`) com +15m/+30m/+1h, setas/Enter/Esc e foco devolvido — nunca mais o `<select>` nativo sem estilo.
+- Snooze/Skip lado a lado com largura igual via `Grid`+`GridItem` (nunca `flex` avulso).
+- A linha da agenda virou ícone de relógio + texto primário (peso 500) + texto secundário (terciário), para os seis estados de `ScheduleDecision` (`state/schedule-strip.ts` agora devolve `primary`/`secondary`, não mais um `text` achatado).
+- O terminal (xterm) passou a derivar fundo/texto/seleção dos tokens do tema ativo em tempo real (`state/terminal-theme.ts#buildTerminalThemeFromTokens`), trocando ao vivo com o tema.
+
+**Rodada 2 — um botão de recolher por vez:** só o botão do cabeçalho (lateral aberta) ou o da barra de abas (recolhida) existe no DOM por vez; `Ctrl+B` continua funcionando; foco migra para o botão que aparece quando o que tinha foco some.
+
+**Rodada 3 — margem do terminal, hover da aba, transição e sombra:**
+- Margem interna do terminal (16px laterais, 12px cima/baixo) via um wrapper externo com padding e uma superfície interna sem padding, para o `fit` descontar a margem de verdade.
+- Hover distinto: aba inteira realça no hover da aba; `:hover` do `×` suprime o realce da aba via `:not(:has(.close:hover))`, realçando só o `×`.
+- Transição de largura da lateral (180-240ms, tokens de movimento); `ResizeObserver` do terminal debounced por `requestAnimationFrame` para reajustar só ao fim da transição, nunca a cada quadro.
+- Sombra na borda direita da lateral (token novo `--seeya-shadow-sidebar`), menor + borda reforçada no tema escuro.
+
+**Rodada 4 — tipografia, projeto ativo e truncamento:**
+- `Text` (`renderer/components/Text/`) e o unico lugar que decide tamanho/altura de linha/peso - variantes da escala da identidade (display...code). Migrado para dentro de `Section`, `NavItem`, `TodayCard`, `Chip`, `Button`, alem da lateral inteira. Lista completa de todo `font-size` que existia e para qual variante foi, abaixo.
+- Projeto aberto nesta janela ganha fundo `surface-subtle`; suas sessoes viram linha estruturada (ponto de estado colorido por tom, nome, id curto em mono) - nunca mais `nome [id] (estado)` entre colchetes/parenteses.
+- Toda linha da lateral tem `min-width: 0` nos filhos flex e trunca com reticencias; a lateral nunca rola na horizontal (`#sidebar .content`'s own `overflow-x: hidden`, preservado).
+
+**Rodada 5 - Recent e Favorites, mesmo componente:** extraido `ProjectRow` (`renderer/features/sidebar/ProjectRow/`), compartilhado por `FavoritesSection`/`RecentSection` - antes, Recent mostrava so pasta+nome, sem destaque/lock/sessoes mesmo para o projeto aberto nesta janela. `state/sidebar-summary.ts#RecentProjectRow` agora carrega o mesmo `badge`/`sessions` que `FavoriteProjectRow` ja tinha.
+
+**Rodada 6 - icones alinhados e separador:** `ProjectRow`/`NavItem` compartilham o mesmo padding/gap (`var(--seeya-space-2)` nos dois), corrigindo a coluna de icones que antes variava entre Recent (sem padding), Favorites (gap menor) e NavItem. Novo componente `Divider` (`renderer/components/Divider/`) separa o bloco Today/Favorites/Recent de All projects/Sessions.
+
+**Lista de `font-size` migrados (item da rodada 4):**
+- `FavoritesSection`/`RecentSection` (12/11px nomes e vazio) -> `ProjectRow`'s own `body-sm` (nomes) / `caption` (vazio, ids mono).
+- `NavItem` (13px) -> `body-sm`, peso 500 so quando `active`.
+- `Section` (12px, peso 500) -> `caption`, tom terciario.
+- `TodayCard` titulo (12px, peso 500) -> `body-sm` peso 500 (tratamento de item de navegacao); subtitulo (11px) -> `caption`, tom secundario.
+- `Chip` (11/12/13px por tamanho) -> `body-sm` peso 500, uniforme - os tres tamanhos agora variam so no padding.
+- `Button` (13/14/16px por tamanho) -> `body-sm`/`body-md`/`body-lg`, mapeados pela identidade.
+- `SidebarFooter` (11px na agenda/resultado do daemon/autostart) -> agenda em `caption`; resultado do daemon/autostart em 12/16px cru (excecao documentada: conteudo escrito por `textContent` do codigo legado, nunca um filho do Preact).
+- `NavList` (12px no cabecalho/lista de Ignored projects) -> mesma excecao documentada (conteudo 100% do `renderer/legacy/projects-list-view.tsx`), ajustado para bater exatamente com `caption` (12/16, antes faltava o `line-height`).
+
+**Limitacao encontrada nesta sessao - capturas de tela nao feitas.** Preparei uma fixture descartavel (`SEEYA_APP_HOME_OVERRIDE`, tres projetos, favoritos, lock simulado, `estado.json`/`config.json` para os seis estados da agenda) e dois flags novos de instrumentacao (`SEEYA_APP_AUTO_NARROW_SIDEBAR`, `SEEYA_APP_AUTO_OPEN_SNOOZE_MENU`, documentados no `AGENTS.md` e no proprio `main.ts`), mas descobri no meio da verificacao que esta propria maquina ja tinha uma instancia real do `seeya` (`npm run app`, checkout principal, nao este worktree) rodando ha mais de uma hora - toda tentativa de abrir uma segunda janela para a captura perdia a corrida do `app.requestSingleInstanceLock()` do Electron e saia em silencio (`exit 0`, nenhum log). Nao encerrei nem contornei essa instancia real (nao e minha para mexer), entao nao ha capturas desta rodada. Cada defeito listado acima tem teste de unidade/integracao cobrindo o comportamento renderizado (classes, texto, badge, truncamento) - a prova visual fica pendente de uma sessao sem esse conflito.
+
+Segue em Review.
+---
+
+author: agente
+created: 2026-10-01 11:14
+---
+test short comment
+---
+
+author: agente
+created: 2026-10-01 11:15
+---
+test short comment 2
+---
+
+author: agente
+created: 2026-10-01 11:15
+---
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+---
+
+author: agente
+created: 2026-10-01 11:16
+---
+Capturas de tela feitas, usando a tecnica apontada (--user-data-dir descartavel + SEEYA_APP_HOME_OVERRIDE descartavel, ao lado da instancia real do mantenedor, sem tocar nela). Registro do Windows (HKCU\Software\Classes\seeya e seeya-dev) e o hash SHA-256 do protocol-handler.json real conferidos identicos antes e depois de toda a sessao de captura (E3D8A283D81E8FEEF088CBD050C06100CED744F976A2845DC1C3B842EA013072).
+
+Dez capturas, fixture descartavel (tres projetos, dois favoritos — um deles com nome longo, um locked via .seeya-lock simulado — um projeto em Recent via uma sessao fake em ~/.claude/sessions/+~/.claude/projects/, seis estados de agenda via config.json/estado.json). Caminhos no scratchpad da sessao:
+
+1. v2t75-screenshots/01-sidebar-light-waiting.png — tema claro, agenda em waiting (Snooze+Skip visiveis), Favorites com os dois favoritos (um truncado com reticencias, um com badge 'locked' laranja+icone de cadeado), Recent com 'Auth hardening' (projeto populado por evidencia real de sessao), divisor, All projects=3, Sessions=0 running — a regua dos 4 icones alinhados na mesma coluna (estrela, estrela, pasta, pasta, balao).
+2. v2t75-screenshots/02-sidebar-dark-waiting.png — mesmo estado, tema escuro.
+3. v2t75-screenshots/03-snooze-menu-open.png — o Menu real aberto (role=menu), +15m/+30m/+1h, sobre o rodape.
+4. v2t75-screenshots/04-schedule-leadtimewarning.png — 'End of day' / 'in 23 min'.
+5. v2t75-screenshots/05-schedule-duenow.png — 'End of day' / 'due now'.
+6. v2t75-screenshots/06-schedule-skipped.png — 'End of day' / 'skipped today', sem Snooze/Skip (canSnooze/canSkip falsos).
+7. v2t75-screenshots/07-terminal-light.png — aba shell real, fundo do terminal batendo com o fundo da janela (claro), margem interna visivel (16px laterais, 12px cima/baixo).
+8. v2t75-screenshots/08-terminal-dark.png — mesma aba, tema escuro, fundo/texto trocando ao vivo com o tema.
+9. v2t75-screenshots/09-narrow-sidebar.png — trunca com reticencias mesmo na largura padrao (nome de projeto propositalmente muito longo); o proprio arrasto sintetico de SEEYA_APP_AUTO_NARROW_SIDEBAR nao mudou a largura visivel nesta captura offscreen — registrado como limitacao da instrumentacao, nao investigado mais a fundo (mecanismo de arraste e anterior a esta tarefa).
+10. v2t75-screenshots/10-sidebar-collapsed.png — so o botao de reabrir da barra de abas ('>'), nenhum botao duplicado.
+
+Dois defeitos reais de producao achados e corrigidos durante a propria captura (nao eram desta tarefa originalmente, mas quebravam a prova visual que ela pede):
+
+1. A espera da captura de verificacao (captureVerificationScreenshot) nao esperava tempo suficiente para o PRIMEIRO push real de dados de projetos chegar ao renderer — o painel de Projects (useSidebar.ts) e atualizado so pelo push CHANNELS.projectsUpdate, nunca pelo retorno (descartado de proposito) do getProjectsPanel invocado no primeiro paint; o primeiro tick do laco ambiente dispara antes do listener estar registrado, entao o dado real so chega no SEGUNDO tick — e esse segundo tick, com tres projetos reais no fixture, levou mais que os 7000/11000ms que o bucket usesV2T55Instrumentation dava antes. Confirmado passo a passo com instrumentacao temporaria (removida antes do commit): toda funcao de render rodava com os dados CORRETOS (sem excecao nenhuma) muito antes dos 11s; o problema era so tempo de espera mesmo. Subi o bucket para 22000ms, medido como confiavel. commit bf298ed.
+
+2. SEEYA_APP_AUTO_TOGGLE_SIDEBAR clicava #sidebar-toggle-button, que o proprio fix do 'um botao por vez' desta tarefa tornou o botao de REABRIR da barra de abas — só existe no DOM quando a lateral JA esta recolhida. Clicar nele a partir do estado inicial (expandido) nao fazia nada, entao toda captura com esta flag mostrava a lateral ainda aberta. Corrigido para clicar #sidebar-collapse-toggle (o botao do cabecalho, que existe exatamente enquanto expandida). commit 5d2d125.
+
+npm run verificar verde de novo depois das duas correcoes (3223 testes). Commit final da branch: 5d2d125.
+---
+
+author: agente
+created: 2026-10-01 11:16
+---
+Nota: os dois comentarios curtos anteriores (#9, #10) foram testes de diagnostico do proprio CLI do backlog (aspas duplas dentro do texto quebram a passagem de argumento no PowerShell deste ambiente, visto na correcao do comentario #6/#7) - sem conteudo relevante, ignorar.
+---
+
+author: agente
+created: 2026-10-01 11:16
+---
+Correcao: eram tres comentarios de teste (#8, #9 e #10 - o terceiro e uma string repetida de x, usada para isolar o defeito de aspas), nao dois. Mesma observacao do comentario anterior: ignorar os tres, sem conteudo relevante para a tarefa.
 ---
 <!-- COMMENTS:END -->
