@@ -4,7 +4,7 @@ title: 'V2-T65 — Settings nova: seções, tema e autostart'
 status: To Do
 assignee: []
 created_date: '2026-09-30 10:34'
-updated_date: '2026-09-30 21:21'
+updated_date: '2026-10-01 13:37'
 labels: []
 milestone: m-2
 dependencies:
@@ -26,5 +26,11 @@ author: PO
 created: 2026-09-30 18:38
 ---
 2026-09-30, pedido do mantenedor: a seção General de Settings mostra, no fim, a versão instalada (seeya 0.1.0), em texto terciário selecionável — já em docs/INTERFACE.md seção 8.
+---
+
+author: PO
+created: 2026-10-01 13:37
+---
+2026-10-01, aceite do mantenedor: hoje a troca de tema só vale depois de fechar e abrir o app. A V2-T65 aplica a troca ao vivo — o controle de tema em Settings e o modo System acompanhando o SO — na janela inteira e no terminal, sem reiniciar.
 ---
 <!-- COMMENTS:END -->

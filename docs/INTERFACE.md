@@ -74,6 +74,10 @@ De cima para baixo:
    janela ganha fundo `surface-subtle` e mostra, recuadas, as sessões dele — ponto de estado, nome
    e id curto em mono, nunca o texto cru `nome [id] (estado)`. Linha longa trunca com
    reticências; a lateral nunca rola na horizontal.
+   Três estados visuais na linha de projeto, nos dois menus (aceite do mantenedor, 2026-10-01):
+   hover (realce leve, como os itens de navegação); projeto com aba aberta (o cartão
+   `surface-subtle` com as sessões); e projeto **da aba ativa** (o mesmo realce de item ativo dos
+   itens de navegação — fundo `primary-soft`, texto `primary-text`), por cima do cartão.
 4. **Recent:** até 5 projetos pela última atividade, sem repetir favoritos. Derivado, não gravado.
    Mesmo formato de linha de Favorites (destaque, lock, sessões recuadas), trocando só o ícone
    inicial (pasta, nunca favoritável daqui) e sem a ação de estrela. Um separador de 1 px (token de
