@@ -77,3 +77,27 @@ Registro do Windows (`HKCU\Software\Classes\seeya`/`seeya-dev`, ambos presentes 
 
 Q-103 registrada: `vitest` nunca detecta uma classe CSS ausente num `.module.css` (o default do `vitest.config.ts` para `test.css` mocka o import devolvendo o próprio nome da chave) — o defeito 1 acima só apareceu numa captura real. Decisão de ferramental, fora do escopo desta tarefa.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: Claude (agent)
+created: 2026-10-01 20:31
+---
+Revisão do PO, segunda rodada, mesma branch (tarefa/V2-T66-aba-today). Dois ajustes:
+
+1. Contador da lateral desatualizado. `packages/app/src/main/main.ts`'s own `CHANNELS.resumeSelected` handler agora empurra `buildFreshTodayPanelData()` pelo mesmo canal `todayUpdate` logo depois que `resumeSessions` resolve, antes de devolver a resposta do invoke — mesmo padrão que `endDayRun` já tinha. A aba e o cartão Today da lateral leem o MESMO push, então os dois atualizam no mesmo instante; `useToday.ts` deixou de fazer o próprio refetch redundante de `getTodayPanel`. Prova: `today-resume-result-sync-{light,dark}.png` — a aba diz "Nothing to resume" e o cartão da lateral diz "Today / Nothing to resume" ao mesmo tempo, na mesma captura.
+
+2. Caminhos longos e absolutos na aba. `sidebar/directory-label.ts` ganhou `collapseHomeDirectory` (abrevia o prefixo do diretório pessoal para `~`, comparação case-insensitive só no Windows, `platformHint` sempre por parâmetro — nunca `process.platform` lido aqui) e `formatDirectoryPathForDisplay` (compõe `collapseHomeDirectory` com o `shortenDirectoryPath` já existente). Testado em Windows e POSIX (`tests/unit/app/sidebar/directory-label.test.ts`). Canal IPC novo `getHomeDir` (`CHANNELS.getHomeDir`/`SeeyaApi#getHomeDir`) devolve `AppContext.homeDir` — nunca um `os.homedir()` cru no preload, que divergiria de `SEEYA_APP_HOME_OVERRIDE` numa verificação. `useToday.ts` busca isso uma vez; `SessionCard`/`CwdChangeNotice` formatam todo `cwd` que mostram (o próprio cartão, a frase do histórico, cada opção do seletor Resume in), sempre com o caminho completo no `title`. `Select` ganhou um `title` opcional por opção para o mesmo fim — o rótulo do seletor fica abreviado, o valor submetido continua o caminho real. Prova: `today-paths-{light,dark}.png`.
+
+Nomes mantidos exatamente como pedido: `collapseHomeDirectory`/`formatDirectoryPathForDisplay` em `sidebar/directory-label.ts`.
+
+Commits: `ca515ce` (fix 1) e `eecbfda` (fix 2), já na branch.
+
+Capturas novas (dois temas, `today-paths-*`/`today-resume-progress-*`/`today-resume-result-sync-*`), reais, via `node scripts/build.mjs` (nunca `--dev`), fixture descartável (`SEEYA_APP_HOME_OVERRIDE`, nunca o `~/.seeya`/`~/.claude` reais), sem registro do Windows nem `protocol-handler.json` tocados (V2-T57 cobre isso sempre que a variável está definida — conferido depois). `dist` apagado duas vezes (antes de cada rodada de `npm run verificar`), as duas rodadas verdes — 353 arquivos de teste, cobertura 95,71% statements / 95,9% lines, inalterada.
+
+Defeito encontrado e corrigido no PRÓPRIO script de captura (fora do código do produto, registrado aqui porque mudou o fixture): um `SEEYA_APP_SCREENSHOT_PATH` relativo resolvia contra o cwd do processo Electron (`packages/app`), não contra o cwd do script de captura — o `ENOENT` dali virava uma promise rejeitada nunca tratada, e a janela nunca chegava a `quitAfterConfiguredDelay`, ficando aberta indefinidamente. Corrigido usando sempre um caminho absoluto.
+
+Nada de `git stash` usado. Nenhuma recusa do sandbox contornada — o guard de termos locais recusou o primeiro commit por um caminho de home com o nome de usuário real desta máquina (maiúsculo e minúsculo) numa fixture de teste, sem eu perceber; corrigido trocando por `<usuario>`/`<USUARIO>`, a convenção já usada em `tests/unit/adapters/autostart/*.test.ts` e outros, não um afrouxamento do guard.
+---
+<!-- COMMENTS:END -->
