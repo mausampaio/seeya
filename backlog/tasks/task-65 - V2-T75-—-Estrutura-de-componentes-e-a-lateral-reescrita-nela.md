@@ -4,7 +4,7 @@ title: V2-T75 — Estrutura de componentes e a lateral reescrita nela
 status: Review
 assignee: []
 created_date: '2026-09-30 21:21'
-updated_date: '2026-10-01 10:27'
+updated_date: '2026-10-01 11:16'
 labels: []
 milestone: m-2
 dependencies: []
@@ -333,5 +333,56 @@ Correção do aceite do mantenedor sobre a lateral reescrita (branch `tarefa/V2-
 **Limitacao encontrada nesta sessao - capturas de tela nao feitas.** Preparei uma fixture descartavel (`SEEYA_APP_HOME_OVERRIDE`, tres projetos, favoritos, lock simulado, `estado.json`/`config.json` para os seis estados da agenda) e dois flags novos de instrumentacao (`SEEYA_APP_AUTO_NARROW_SIDEBAR`, `SEEYA_APP_AUTO_OPEN_SNOOZE_MENU`, documentados no `AGENTS.md` e no proprio `main.ts`), mas descobri no meio da verificacao que esta propria maquina ja tinha uma instancia real do `seeya` (`npm run app`, checkout principal, nao este worktree) rodando ha mais de uma hora - toda tentativa de abrir uma segunda janela para a captura perdia a corrida do `app.requestSingleInstanceLock()` do Electron e saia em silencio (`exit 0`, nenhum log). Nao encerrei nem contornei essa instancia real (nao e minha para mexer), entao nao ha capturas desta rodada. Cada defeito listado acima tem teste de unidade/integracao cobrindo o comportamento renderizado (classes, texto, badge, truncamento) - a prova visual fica pendente de uma sessao sem esse conflito.
 
 Segue em Review.
+---
+
+author: agente
+created: 2026-10-01 11:14
+---
+test short comment
+---
+
+author: agente
+created: 2026-10-01 11:15
+---
+test short comment 2
+---
+
+author: agente
+created: 2026-10-01 11:15
+---
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+---
+
+author: agente
+created: 2026-10-01 11:16
+---
+Capturas de tela feitas, usando a tecnica apontada (--user-data-dir descartavel + SEEYA_APP_HOME_OVERRIDE descartavel, ao lado da instancia real do mantenedor, sem tocar nela). Registro do Windows (HKCU\Software\Classes\seeya e seeya-dev) e o hash SHA-256 do protocol-handler.json real conferidos identicos antes e depois de toda a sessao de captura (E3D8A283D81E8FEEF088CBD050C06100CED744F976A2845DC1C3B842EA013072).
+
+Dez capturas, fixture descartavel (tres projetos, dois favoritos — um deles com nome longo, um locked via .seeya-lock simulado — um projeto em Recent via uma sessao fake em ~/.claude/sessions/+~/.claude/projects/, seis estados de agenda via config.json/estado.json). Caminhos no scratchpad da sessao:
+
+1. v2t75-screenshots/01-sidebar-light-waiting.png — tema claro, agenda em waiting (Snooze+Skip visiveis), Favorites com os dois favoritos (um truncado com reticencias, um com badge 'locked' laranja+icone de cadeado), Recent com 'Auth hardening' (projeto populado por evidencia real de sessao), divisor, All projects=3, Sessions=0 running — a regua dos 4 icones alinhados na mesma coluna (estrela, estrela, pasta, pasta, balao).
+2. v2t75-screenshots/02-sidebar-dark-waiting.png — mesmo estado, tema escuro.
+3. v2t75-screenshots/03-snooze-menu-open.png — o Menu real aberto (role=menu), +15m/+30m/+1h, sobre o rodape.
+4. v2t75-screenshots/04-schedule-leadtimewarning.png — 'End of day' / 'in 23 min'.
+5. v2t75-screenshots/05-schedule-duenow.png — 'End of day' / 'due now'.
+6. v2t75-screenshots/06-schedule-skipped.png — 'End of day' / 'skipped today', sem Snooze/Skip (canSnooze/canSkip falsos).
+7. v2t75-screenshots/07-terminal-light.png — aba shell real, fundo do terminal batendo com o fundo da janela (claro), margem interna visivel (16px laterais, 12px cima/baixo).
+8. v2t75-screenshots/08-terminal-dark.png — mesma aba, tema escuro, fundo/texto trocando ao vivo com o tema.
+9. v2t75-screenshots/09-narrow-sidebar.png — trunca com reticencias mesmo na largura padrao (nome de projeto propositalmente muito longo); o proprio arrasto sintetico de SEEYA_APP_AUTO_NARROW_SIDEBAR nao mudou a largura visivel nesta captura offscreen — registrado como limitacao da instrumentacao, nao investigado mais a fundo (mecanismo de arraste e anterior a esta tarefa).
+10. v2t75-screenshots/10-sidebar-collapsed.png — so o botao de reabrir da barra de abas ('>'), nenhum botao duplicado.
+
+Dois defeitos reais de producao achados e corrigidos durante a propria captura (nao eram desta tarefa originalmente, mas quebravam a prova visual que ela pede):
+
+1. A espera da captura de verificacao (captureVerificationScreenshot) nao esperava tempo suficiente para o PRIMEIRO push real de dados de projetos chegar ao renderer — o painel de Projects (useSidebar.ts) e atualizado so pelo push CHANNELS.projectsUpdate, nunca pelo retorno (descartado de proposito) do getProjectsPanel invocado no primeiro paint; o primeiro tick do laco ambiente dispara antes do listener estar registrado, entao o dado real so chega no SEGUNDO tick — e esse segundo tick, com tres projetos reais no fixture, levou mais que os 7000/11000ms que o bucket usesV2T55Instrumentation dava antes. Confirmado passo a passo com instrumentacao temporaria (removida antes do commit): toda funcao de render rodava com os dados CORRETOS (sem excecao nenhuma) muito antes dos 11s; o problema era so tempo de espera mesmo. Subi o bucket para 22000ms, medido como confiavel. commit bf298ed.
+
+2. SEEYA_APP_AUTO_TOGGLE_SIDEBAR clicava #sidebar-toggle-button, que o proprio fix do 'um botao por vez' desta tarefa tornou o botao de REABRIR da barra de abas — só existe no DOM quando a lateral JA esta recolhida. Clicar nele a partir do estado inicial (expandido) nao fazia nada, entao toda captura com esta flag mostrava a lateral ainda aberta. Corrigido para clicar #sidebar-collapse-toggle (o botao do cabecalho, que existe exatamente enquanto expandida). commit 5d2d125.
+
+npm run verificar verde de novo depois das duas correcoes (3223 testes). Commit final da branch: 5d2d125.
+---
+
+author: agente
+created: 2026-10-01 11:16
+---
+Nota: os dois comentarios curtos anteriores (#9, #10) foram testes de diagnostico do proprio CLI do backlog (aspas duplas dentro do texto quebram a passagem de argumento no PowerShell deste ambiente, visto na correcao do comentario #6/#7) - sem conteudo relevante, ignorar.
 ---
 <!-- COMMENTS:END -->
