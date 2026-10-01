@@ -37,9 +37,11 @@ describe('buildTodayPanelData', () => {
       kind: 'pending',
       day: '2026-08-16',
       daysAgo: 1,
+      capturedAt: new Date('2026-08-15T21:00:00.000Z'),
       rows: [
         {
           sessionId: 'session-1',
+          displaySessionId: 'session-',
           name: 'alpha',
           cwd: '/projects/alpha',
           firstPlanLine: 'ship it',
@@ -251,6 +253,49 @@ describe('buildTodayPanelData', () => {
     expect(data.kind === 'pending' && data.rows[0]?.firstPlanLine).toBeNull();
   });
 
+  describe('V2-T66 — displaySessionId and capturedAt', () => {
+    it('escalates to disambiguate two handoffs whose sessionId shares the first UUID group', () => {
+      const a = modelHandoff({ sessionId: '11111111-0000-4111-8111-111111111111' });
+      const b = modelHandoff({ sessionId: '11111111-9999-4111-8111-111111111111' });
+      const lookup: PendingBriefingLookup = {
+        found: true,
+        daysAgo: 0,
+        resumedSessionIds: new Set(),
+        briefing: { day: '2026-08-17', handoffs: [a, b], rejected: [] },
+      };
+
+      const data = buildTodayPanelData(lookup);
+
+      expect(data.kind === 'pending' && data.rows.map((row) => row.displaySessionId)).toEqual([
+        '11111111-0000',
+        '11111111-9999',
+      ]);
+    });
+
+    it("capturedAt is the LATEST capturedAt across the day's own handoffs", () => {
+      const earlier = modelHandoff({
+        sessionId: 'a',
+        capturedAt: new Date('2026-08-17T10:00:00.000Z'),
+      });
+      const later = modelHandoff({
+        sessionId: 'b',
+        capturedAt: new Date('2026-08-17T12:00:00.000Z'),
+      });
+      const lookup: PendingBriefingLookup = {
+        found: true,
+        daysAgo: 0,
+        resumedSessionIds: new Set(),
+        briefing: { day: '2026-08-17', handoffs: [earlier, later], rejected: [] },
+      };
+
+      const data = buildTodayPanelData(lookup);
+
+      expect(data.kind === 'pending' && data.capturedAt).toEqual(
+        new Date('2026-08-17T12:00:00.000Z'),
+      );
+    });
+  });
+
   it('firstPlanLine is null for a non-model handoff — no plan was ever generated (D-025)', () => {
     const handoff = modelHandoff({
       source: 'deterministic',
@@ -289,6 +334,7 @@ describe('hasResumableSession — V2-T21 item 2', () => {
   function row(overrides: Partial<TodaySessionRow> = {}): TodaySessionRow {
     return {
       sessionId: 'session-1',
+      displaySessionId: 'session-',
       name: 'alpha',
       cwd: '/projects/alpha',
       firstPlanLine: null,
@@ -396,9 +442,11 @@ describe('buildTodayCardSummary (V2-T63)', () => {
       kind: 'pending',
       day: '2026-08-16',
       daysAgo: 1,
+      capturedAt: new Date('2026-08-16T09:00:00.000Z'),
       rows: [
         {
           sessionId: 'a',
+          displaySessionId: 'a',
           name: 'alpha',
           cwd: '/a',
           firstPlanLine: null,
@@ -407,6 +455,7 @@ describe('buildTodayCardSummary (V2-T63)', () => {
         },
         {
           sessionId: 'b',
+          displaySessionId: 'b',
           name: 'beta',
           cwd: '/b',
           firstPlanLine: null,
