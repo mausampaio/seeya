@@ -100,4 +100,21 @@ Defeito encontrado e corrigido no PRÓPRIO script de captura (fora do código do
 
 Nada de `git stash` usado. Nenhuma recusa do sandbox contornada — o guard de termos locais recusou o primeiro commit por um caminho de home com o nome de usuário real desta máquina (maiúsculo e minúsculo) numa fixture de teste, sem eu perceber; corrigido trocando por `<usuario>`/`<USUARIO>`, a convenção já usada em `tests/unit/adapters/autostart/*.test.ts` e outros, não um afrouxamento do guard.
 ---
+author: Claude (agent)
+created: 2026-10-01 20:50
+---
+Revisão do PO, terceira rodada, mesma branch. Quatro itens, todos no item 2 original (o primeiro já estava certo):
+
+1. **`~` provado numa captura.** A fixture anterior tinha o `cwd` corretamente DENTRO do `homeDir` de override, mas os nomes dos segmentos eram longos o bastante para que o caminho `~`-abreviado ainda estourasse até o `maxLength` de 32 da lateral (então era truncado pelo FIM, derrubando o `~` junto) — e, depois do item 3 abaixo subir o teto para 80, ainda estourava por pouco (83 caracteres). Corrigido encurtando os nomes dos diretórios da fixture de captura para algo do tamanho do próprio exemplo do PO (`…\worktrees\abc123def\new-directory`, script de captura, não comitado) — o `~` agora aparece claramente nas quatro superfícies (cartão, caixa de aviso, seletor, bloco Resumed).
+
+2. **Bloco "Resumed" com caminho cru.** `ResumeResult.tsx`'s own `SummarySection` montava a linha `name (cwd)` por interpolação de string direto do `cwd` cru — o único lugar da aba Today que ainda escapava do `formatDirectoryPathForDisplay`. Agora o `cwd` de CADA uma das quatro seções (Resumed/Skipped/Not resumed por resposta inválida/Not resumed ainda não tentado) passa pela mesma função, num `<span title="...">` próprio — o caminho completo continua acessível, só que não mais title-ando a linha inteira (que também tem o nome e a nota). Conferido à parte: `ResumeProgress` nunca mostra `cwd` nenhum (nada a corrigir ali); o texto de fallback/skip (`todaySummaryFallbackNote` etc.) é texto livre, não um campo de `cwd`, fora do escopo deste item. Commit `d6b9db5`.
+
+3. **Limite de 32 caracteres pequeno demais para a aba Today.** `TODAY_TAB_DIRECTORY_MAX_LENGTH = 80`, nomeada e comentada em `sidebar/directory-label.ts`, agora é o default de `formatDirectoryPathForDisplay` — toda chamada de produção dessa função é da aba Today, nunca da lateral (que continua chamando `shortenDirectoryPath` direto, em 32). Commit `f678f38`.
+
+4. **"(0 days ago)" / "(1 day ago)" sem singular.** `formatPlanAge` (`text/messages.ts`, exportada e testada para 0/1/2) agora decide o sufixo de `MESSAGES.todayPlanTitle`: "(today)" para 0, "(1 day ago)" singular, "(N days ago)" do resto. **Não toquei na CLI**: `core/consolidated-plan.ts#renderTitle`/`renderRelativeAge` (o título do `seeya start-day`) é uma função SEPARADA, nunca compartilhada com `todayPlanTitle` — formato totalmente diferente (sufixo com travessão, "— today"/"— 3 weeks ago", e NENHUM sufixo para `daysAgo === 1`, decisão deliberada da Q-026, "yesterday is the ordinary case") — e não tem este defeito, conferido lendo o código, não suposto. Commit `bf4b4e8`.
+
+Capturas novas (dois temas) com os quatro itens visíveis na MESMA captura por tema: `today-paths-{light,dark}.png` (itens 1/3/4) e `today-resume-result-sync-{light,dark}.png` (itens 1/2, mais a sincronia da lateral já confirmada certa na rodada anterior). `dist` apagado, `npm run verificar` verde — 353 arquivos de teste, cobertura 95,71% statements / 95,9% lines, inalterada.
+
+Nada de `git stash`. Nenhuma recusa contornada.
+---
 <!-- COMMENTS:END -->
