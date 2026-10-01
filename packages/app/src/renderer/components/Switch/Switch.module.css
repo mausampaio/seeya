@@ -1,0 +1,71 @@
+/* V2-T65 (D-052, Q-102) — replaces the global `.seeya-switch` rule (`renderer/legacy/
+ * components.css`), which never gave a real toggle track/thumb (an unstyled checkbox with a gap
+ * before its label, confirmed by reading that rule before writing this one — "brought to the
+ * pattern" means a real visual now, not just a CSS module wrapping the same bare input). The track
+ * is drawn on the `<input>` itself (`appearance: none` + its own background/the `::before` thumb)
+ * rather than a sibling `<span>`, so there is exactly one interactive, checkable element — no
+ * second element to keep in sync with it. */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--seeya-space-1);
+}
+
+.row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--seeya-space-2);
+  cursor: pointer;
+}
+
+.input {
+  appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: 36px;
+  height: 20px;
+  margin: 0;
+  border-radius: var(--seeya-radius-full);
+  background: var(--seeya-border-strong);
+  cursor: pointer;
+  transition: background-color var(--seeya-motion-micro) var(--seeya-motion-easing);
+}
+
+.input::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--seeya-radius-full);
+  background: var(--seeya-on-brand);
+  transition: transform var(--seeya-motion-micro) var(--seeya-motion-easing);
+}
+
+.input:checked {
+  background: var(--seeya-brand);
+}
+
+.input:checked::before {
+  transform: translateX(16px);
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--seeya-focus-ring);
+  outline-offset: 2px;
+}
+
+.input:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.row:has(.input:disabled) {
+  cursor: not-allowed;
+}
+
+.reason {
+  /* Lines up under the label, not under the track — the same width the switch itself occupies. */
+  margin-left: calc(36px + var(--seeya-space-2));
+}

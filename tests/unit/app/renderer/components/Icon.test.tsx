@@ -9,11 +9,13 @@ import {
   ChevronLeftIcon,
   ClockIcon,
   CloseIcon,
+  CompassIcon,
   FolderIcon,
   LockIcon,
   PlayIcon,
   PlusIcon,
   SettingsIcon,
+  SlidersIcon,
   StarIcon,
   StopIcon,
   TerminalIcon,
@@ -39,6 +41,8 @@ describe('outline icons (D-052, V2-T75 — real render; identity § 6.4)', () =>
     TerminalIcon,
     CloseIcon,
     LockIcon,
+    SlidersIcon,
+    CompassIcon,
   ];
 
   it('every outline icon is drawn on the 24-unit grid with no fill and a rounded stroke', () => {

@@ -261,6 +261,29 @@ export function CloseIcon(props: IconProps = {}): JSX.Element {
   return outlineIcon([<path d="M6 6l12 12M18 6L6 18" />], props);
 }
 
+/** Settings' own "Capture" section nav row (V2-T65, `docs/INTERFACE.md` § 8) — three sliders,
+ * the conventional shape for adjustable parameters (budget, concurrency, retries). */
+export function SlidersIcon(props: IconProps = {}): JSX.Element {
+  return outlineIcon(
+    [
+      <path d="M5 6h7M16 6h3M5 12h3M12 12h7M5 18h11M20 18h0" />,
+      <circle cx="14" cy="6" r="2" />,
+      <circle cx="10" cy="12" r="2" />,
+      <circle cx="18" cy="18" r="2" />,
+    ],
+    props,
+  );
+}
+
+/** Settings' own "Discovery" section nav row (V2-T65, `docs/INTERFACE.md` § 8) — a compass,
+ * distinct from `FolderIcon` (already used for "All projects"/Projects elsewhere in this window). */
+export function CompassIcon(props: IconProps = {}): JSX.Element {
+  return outlineIcon(
+    [<circle cx="12" cy="12" r="8.5" />, <path d="M14.8 9.2l-2.1 5-5 2.1 2.1-5Z" />],
+    props,
+  );
+}
+
 /**
  * The imperative half of this module's own docstring — mounts `vnode` into `container`
  * (typically a freshly created, empty `<span>`) via Preact's own `render`, so a `.ts` view module
