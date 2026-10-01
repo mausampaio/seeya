@@ -4,7 +4,7 @@ title: V2-T75 — Estrutura de componentes e a lateral reescrita nela
 status: Review
 assignee: []
 created_date: '2026-09-30 21:21'
-updated_date: '2026-10-01 01:03'
+updated_date: '2026-10-01 01:12'
 labels: []
 milestone: m-2
 dependencies: []
@@ -235,5 +235,11 @@ Apliquei em outlineIcon, filledIcon e StarIcon (os tres construtores de svg em I
 Tambem corrigi o comentario desatualizado (falava em 20px, o codigo sempre usou 24px desde a primeira tentativa deste defeito).
 
 Bundle usado na captura final: packages/app/dist/electron/{main,renderer}.js de 2026-09-30 21:57 (recompilado com node scripts/build.mjs em packages/app logo antes da captura, sem nenhum codigo de diagnostico). npm run verificar verde. Caminho da captura: v2t75-icons-fixed-final.png (scratchpad da sessao, nao no repositorio). Registro/protocol-handler.json reais conferidos identicos antes e depois. Segue em Review.
+---
+
+author: PO
+created: 2026-10-01 01:12
+---
+Revisão do PO em 2026-09-30: três rodadas de captura conferidas pelo PO. Rodada 1 trouxe a estrutura da D-052, o design system inicial e a lateral reescrita, mas com o rodapé sem padding, botões de ícone apagados e a captura clara tampada pelo diálogo de posse. Rodada 2 corrigiu rodapé (primitivas) e captura. Rodada 3 achou a causa real dos ícones minúsculos: o SVG flex encolhia para 10 px porque width/height de atributo não contam como tamanho; agora tamanho explícito em todos os ícones. Subida medida 0,7 s (contra 5,8 s histórico) confirmada como o mesmo instante medido, sem explicação nesta tarefa — registrado como medido, não como ganho. Mesclado, portão verde (3128 testes), também sem identidade global do git. Falta o aceite do mantenedor com o instalador.
 ---
 <!-- COMMENTS:END -->
