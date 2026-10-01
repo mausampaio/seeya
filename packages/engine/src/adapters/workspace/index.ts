@@ -8,8 +8,18 @@
  * No constructor state at all — every method takes `root` explicitly (`core/ports.ts#
  * WorkspaceRepository`'s own docstring on why), so a single instance is safe to reuse across every
  * `seeya project` command a CLI invocation runs (`packages/cli/src/composition.ts`).
+ *
+ * V2-T76 (Q-101): this file had grown past AGENTS.md's ~500-line ceiling. Its git-mechanics-heavy
+ * methods are split by group of operation into sibling files — `revert.ts`/`audit.ts`/
+ * `manifest-restore.ts` already drew this line before this task; `project-manifest-files.ts`
+ * (manifest read/write), `commit.ts` (the commit lifecycle, including `.gitignore` upkeep) and
+ * `generated-files.ts` (the git hook/harness hook/`CLAUDE.md` seeya itself writes into a project)
+ * are the three new ones. This file keeps the class itself, the workspace's own init/identity
+ * lifecycle, a handful of small git queries with no sibling of their own yet, and a one-line
+ * delegate per extracted method — the public shape (`FsWorkspaceRepository`, importable from this
+ * exact path) doesn't change.
  */
-import { chmod, mkdir, readdir, readFile, rm, stat } from 'node:fs/promises';
+import { mkdir, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import type {
   ManifestRestoreOutcome,
@@ -21,21 +31,22 @@ import type {
 import type { AuditableCommit } from '../../core/project-audit.js';
 import type { ProjectManifest, ProjectSkeleton } from '../../core/types.js';
 import type { LockHolderProcess } from '../../core/lock-holder-process.js';
-import { PROJECT_MANIFEST_FILE_NAME } from '../../core/project-manifest-ownership.js';
 import { runGit } from '../git/run-git.js';
-import { buildLockHolderEnv } from './lock-holder-env.js';
-import { buildManifestWriteEnv } from './manifest-write-env.js';
-import { writeFileAtomic } from '../storage/atomic-write.js';
-import { resolveSchemaVersion } from '../storage/schema-version.js';
 import { isEnoent } from './fs-errors.js';
+import { SEEYA_IDENTITY_EMAIL, SEEYA_IDENTITY_NAME, commitAll as commitAllImpl } from './commit.js';
 import {
-  PROJECT_MANIFEST_SCHEMA_VERSION,
-  parseProjectManifestDocument,
-  serializeProjectManifestDocument,
-} from './project-manifest-schema.js';
-import { PROJECT_LOCK_FILE_NAME } from './project-lock.js';
-import { PROJECT_AUDIT_FILE_NAME } from './project-audit-marker.js';
-import { COMMIT_MSG_HOOK_FILE_NAME } from '../../core/workspace-hooks.js';
+  installCommitMsgHook as installCommitMsgHookImpl,
+  installGeneratedClaudeMd as installGeneratedClaudeMdImpl,
+  installHarnessHook as installHarnessHookImpl,
+  isClaudeMdVersioned as isClaudeMdVersionedImpl,
+} from './generated-files.js';
+import {
+  listProjects as listProjectsImpl,
+  projectExists as projectExistsImpl,
+  readProjectManifest as readProjectManifestImpl,
+  writeProjectManifest as writeProjectManifestImpl,
+  writeProjectSkeleton as writeProjectSkeletonImpl,
+} from './project-manifest-files.js';
 import { findCommitsAfter, findSessionCommits, revertCommitSequence } from './revert.js';
 import { listCommitsForAudit as listCommitsForAuditImpl } from './audit.js';
 import { restoreProjectManifestIfChanged as restoreProjectManifestIfChangedImpl } from './manifest-restore.js';
@@ -43,166 +54,6 @@ import { restoreProjectManifestIfChanged as restoreProjectManifestIfChangedImpl 
 export { FsProjectLock } from './project-lock.js';
 export { FsProjectAuditMarker } from './project-audit-marker.js';
 export { FsCommitMessageFile } from './commit-message-file.js';
-
-/** `seeya`'s own author/committer identity for every commit it makes in the workspace — never the
- * operator's real `git config user.*` (this file's own module comment; same technique
- * `tests/integration/git/_fixtures.ts#commitAt` uses for the identical reason). `.localhost` is an
- * RFC 6761 reserved suffix — deliberately not a real, ownable address (`scripts/
- * verificar-termos-locais.mjs`'s own reserved-domain exception documents why that matters for a
- * value that lives in versioned source, not just in a test fixture).
- *
- * `SEEYA_IDENTITY_NAME`/`SEEYA_IDENTITY_EMAIL` (V2-T58, D-047 emendment): the same two values,
- * named separately so `configureIdentity` below can write them into the repository's own LOCAL
- * git config too — "num lugar só" (the task's own words), rather than a second, independently
- * spelled `'seeya'`/`'seeya@localhost'` pair. */
-const SEEYA_IDENTITY_NAME = 'seeya';
-const SEEYA_IDENTITY_EMAIL = 'seeya@localhost';
-
-const COMMIT_IDENTITY_ENV: NodeJS.ProcessEnv = {
-  GIT_AUTHOR_NAME: SEEYA_IDENTITY_NAME,
-  GIT_AUTHOR_EMAIL: SEEYA_IDENTITY_EMAIL,
-  GIT_COMMITTER_NAME: SEEYA_IDENTITY_NAME,
-  GIT_COMMITTER_EMAIL: SEEYA_IDENTITY_EMAIL,
-};
-
-function manifestPath(root: string, projectId: string): string {
-  return path.join(root, projectId, PROJECT_MANIFEST_FILE_NAME);
-}
-
-const GITIGNORE_FILE_NAME = '.gitignore';
-
-/**
- * D-047 item 2: "o lock nunca é commitado: entra no `.gitignore` do espaço de trabalho, criado ou
- * atualizado pelo próprio seeya." Called at the start of every `commitAll`, not only once at
- * `initialize()` — a workspace created before this task never got the line, and `.gitignore`
- * without a leading/trailing slash on `PROJECT_LOCK_FILE_NAME` matches that name at ANY depth
- * (git's own pattern rule), so one line covers every project's own `.seeya-lock`, present or
- * future. Idempotent: a `.gitignore` that already has the line is left untouched (no rewrite, no
- * extra commit).
- */
-/** V2-T34 item 3: `.seeya-audit` (the audit marker, `adapters/workspace/project-audit-marker.ts`)
- * is device bookkeeping, not project content — same "never committed" discipline as the lock file
- * right above it, and reasserted the exact same way, at the exact same call site.
- *
- * `**\/.claude/` (V2-T34 item 2, PO review): the Claude Code project hook config
- * (`core/harness-hook-config.ts`), regenerated fresh by every `openProject` — same reasoning, but a
- * DIRECTORY pattern, not a bare name: a plain `.claude/settings.json` line here would only match at
- * the workspace ROOT (git anchors any pattern containing a `/` to the `.gitignore`'s own
- * directory), never inside `<projectId>/.claude/settings.json` one level down. Confirmed for real:
- * `git status --porcelain --ignored=matching` against a disposable fixture with this exact line
- * reported `<project>/.claude/` as `!!` (ignored). */
-const IGNORED_OPERATIONAL_FILE_NAMES: readonly string[] = [
-  PROJECT_LOCK_FILE_NAME,
-  PROJECT_AUDIT_FILE_NAME,
-];
-/** D-050/V2-T61: `CLAUDE.md` (bare, no slash — matches at any depth, the same rule
- * `PROJECT_LOCK_FILE_NAME` already relies on above, unlike `**\/.claude/`'s own directory-pattern
- * exception) — every project's own generated `CLAUDE.md` bridge is device/session bookkeeping the
- * same way the lock and audit marker are, never workspace content. A project whose `CLAUDE.md`
- * predates this task and is ALREADY tracked keeps being tracked regardless of this line — a
- * `.gitignore` pattern only stops git from adding a NEW, untracked file; it never un-tracks one git
- * already knows about (confirmed for real in `tests/integration/workspace/
- * fs-workspace-repository.test.ts`, same `git status --porcelain --ignored=matching` technique the
- * `.claude/` pattern above was confirmed with). */
-const IGNORED_WORKSPACE_PATTERNS: readonly string[] = [
-  ...IGNORED_OPERATIONAL_FILE_NAMES,
-  '**/.claude/',
-  'CLAUDE.md',
-];
-
-async function ensureWorkspaceGitignoreIgnoresProjectLock(root: string): Promise<void> {
-  const gitignorePath = path.join(root, GITIGNORE_FILE_NAME);
-  let current: string;
-  try {
-    current = await readFile(gitignorePath, 'utf8');
-  } catch (error) {
-    if (!isEnoent(error)) {
-      throw new Error(`reading ${gitignorePath} failed: ${String(error)}`);
-    }
-    current = '';
-  }
-  const lines = current.split('\n').map((line) => line.trim());
-  const missing = IGNORED_WORKSPACE_PATTERNS.filter((name) => !lines.includes(name));
-  if (missing.length === 0) {
-    return;
-  }
-  const withTrailingNewline =
-    current.length === 0 || current.endsWith('\n') ? current : `${current}\n`;
-  await writeFileAtomic(gitignorePath, `${withTrailingNewline}${missing.join('\n')}\n`);
-}
-
-/** Shared by `writeProjectSkeleton` and `writeProjectManifest` (V2-T28) — the one place that
- * serializes a `ProjectManifest` to `seeya.json`, atomically. */
-async function writeManifestFile(
-  root: string,
-  projectId: string,
-  manifest: ProjectManifest,
-): Promise<void> {
-  await writeFileAtomic(
-    manifestPath(root, projectId),
-    JSON.stringify(serializeProjectManifestDocument(manifest), null, 2) + '\n',
-  );
-}
-
-/** Reads and validates one `seeya.json` — throws on anything malformed (bad JSON, schema
- * mismatch, unsupported `schemaVersion`), `null` only when the file doesn't exist at all (D-025).
- * Shared by `readProjectManifest` (throws straight to its caller, a single explicit lookup) and
- * `listProjects` (catches this into a `RejectedDiscoveryRecord`, D-022) — same split
- * `adapters/storage/index.ts#readVersionedDocument`/`readOneHandoffOrRejection` already draw, just
- * relocated: this document doesn't live under `~/.seeya/`, so it isn't that module's to read. */
-async function readManifestDocument(filePath: string): Promise<Record<string, unknown> | null> {
-  let text: string;
-  try {
-    text = await readFile(filePath, 'utf8');
-  } catch (error) {
-    if (isEnoent(error)) {
-      return null;
-    }
-    throw new Error(`reading ${filePath} failed: ${String(error)}`);
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch (error) {
-    throw new Error(`${filePath} is not valid JSON: ${String(error)}`);
-  }
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    throw new Error(`${filePath} must be a JSON object at the root`);
-  }
-  // Same narrowing `adapters/storage/index.ts#readVersionedDocument` uses: the checks above
-  // already ruled out `null`/array/non-object, so this `as` documents a fact just proven, not a
-  // guess (AGENTS.md: `as` is only acceptable when the compiler genuinely can't see what the code
-  // just checked).
-  return resolveSchemaVersion(
-    filePath,
-    parsed as Record<string, unknown>,
-    {},
-    PROJECT_MANIFEST_SCHEMA_VERSION,
-  );
-}
-
-async function readManifestOrRejection(
-  root: string,
-  projectId: string,
-): Promise<ProjectManifest | RejectedDiscoveryRecord | null> {
-  const filePath = manifestPath(root, projectId);
-  try {
-    const resolved = await readManifestDocument(filePath);
-    return resolved === null ? null : parseProjectManifestDocument(resolved);
-  } catch (error) {
-    return {
-      file: filePath,
-      raw: undefined,
-      reason: error instanceof Error ? error.message : String(error),
-    };
-  }
-}
-
-function isRejection(
-  value: ProjectManifest | RejectedDiscoveryRecord | null,
-): value is RejectedDiscoveryRecord {
-  return value !== null && 'reason' in value;
-}
 
 export class FsWorkspaceRepository implements WorkspaceRepository {
   async isInitialized(root: string): Promise<boolean> {
@@ -251,137 +102,38 @@ export class FsWorkspaceRepository implements WorkspaceRepository {
     }
   }
 
-  async projectExists(root: string, projectId: string): Promise<boolean> {
-    try {
-      await stat(manifestPath(root, projectId));
-      return true;
-    } catch (error) {
-      if (isEnoent(error)) {
-        return false;
-      }
-      throw new Error(`checking ${manifestPath(root, projectId)} failed: ${String(error)}`);
-    }
+  projectExists(root: string, projectId: string): Promise<boolean> {
+    return projectExistsImpl(root, projectId);
   }
 
-  async writeProjectSkeleton(
-    root: string,
-    projectId: string,
-    skeleton: ProjectSkeleton,
-  ): Promise<void> {
-    const projectDir = path.join(root, projectId);
-    for (const relativeDir of skeleton.directories) {
-      await mkdir(path.join(projectDir, relativeDir), { recursive: true });
-    }
-    for (const file of skeleton.files) {
-      await writeFileAtomic(path.join(projectDir, file.relativePath), file.content);
-    }
-    await writeManifestFile(root, projectId, skeleton.manifest);
+  writeProjectSkeleton(root: string, projectId: string, skeleton: ProjectSkeleton): Promise<void> {
+    return writeProjectSkeletonImpl(root, projectId, skeleton);
   }
 
   /** V2-T28: overwrites only `seeya.json` — `add-repo` is the one caller, right after reading the
    * current manifest and appending one `AssociatedRepository` to `repositories`. */
-  async writeProjectManifest(
-    root: string,
-    projectId: string,
-    manifest: ProjectManifest,
-  ): Promise<void> {
-    await writeManifestFile(root, projectId, manifest);
+  writeProjectManifest(root: string, projectId: string, manifest: ProjectManifest): Promise<void> {
+    return writeProjectManifestImpl(root, projectId, manifest);
   }
 
-  async commitAll(
+  commitAll(
     root: string,
     projectId: string,
     message: string,
     lockHolder?: LockHolderProcess,
     manifestWriteAuthorized?: boolean,
   ): Promise<void> {
-    // D-047 item 3's own bug fix: `git add <projectId> .gitignore`, never `-A` — a second
-    // project's own pending change must never ride along on this commit (see this method's own
-    // regression test, "commitAll only ever stages the one project it was called for").
-    await ensureWorkspaceGitignoreIgnoresProjectLock(root);
-    const add = await runGit(root, ['add', projectId, GITIGNORE_FILE_NAME]);
-    if (!add.ran || add.exitCode !== 0) {
-      throw new Error(
-        `git add failed in workspace at "${root}": ${add.ran ? `exit ${add.exitCode}` : add.reason}`,
-      );
-    }
-    // Exit 0: nothing staged differs from HEAD — a no-op, never an empty commit (this port's own
-    // docstring on `commitAll`). Exit 1: something IS staged, proceed to commit. Anything else
-    // (`ran: false`) is a real failure to surface.
-    const diff = await runGit(root, ['diff', '--cached', '--quiet']);
-    if (diff.ran && diff.exitCode === 0) {
-      return;
-    }
-    if (!diff.ran) {
-      throw new Error(`git diff failed in workspace at "${root}": ${diff.reason}`);
-    }
-    // V2-T34 hotfix (PO review, 2026-09-25): folds SEEYA_LOCK_HOLDER_PID/_PROC_START into the
-    // commit's own env when `lockHolder` is given, so the workspace's own commit-msg hook can
-    // authorize a commit `seeya` makes while holding this project's lock even though it never runs
-    // inside a Claude Code session whose CLAUDE_CODE_SESSION_ID matches the lock's own sessionId.
-    // V2-T73 item 1: folds SEEYA_MANIFEST_WRITE_AUTHORIZED into the commit's own env when this
-    // call is one of seeya's own four legitimate writes to the project's `seeya.json` — the
-    // workspace's own commit-msg hook refuses any OTHER commit that touches that path
-    // (`core/workspace-commit-guard.ts`'s own new check), a session's edit riding along included.
-    const commit = await runGit(root, ['commit', '-m', message], {
-      ...process.env,
-      ...COMMIT_IDENTITY_ENV,
-      ...buildLockHolderEnv(lockHolder),
-      ...buildManifestWriteEnv(manifestWriteAuthorized ?? false),
-    });
-    if (!commit.ran || commit.exitCode !== 0) {
-      // V2-T34 production defect (PO review, 2026-09-25): the commit-msg hook's own refusal
-      // reason (`core/workspace-commit-guard.ts#decideCommitGuard`) lands on git's stderr — the
-      // ONE piece of information a caller (`seeya project open`/`adopt`/... ) needs to show the
-      // person instead of a bare exit code nobody could act on. `run-git.ts#runGit` now captures
-      // it; this is the one call site that actually writes a commit, so it's the one that matters.
-      throw new Error(
-        `git commit failed in workspace at "${root}": ` +
-          `${commit.ran ? `exit ${commit.exitCode}: ${commit.stderr.trim()}` : commit.reason}`,
-      );
-    }
+    return commitAllImpl(root, projectId, message, lockHolder, manifestWriteAuthorized);
   }
 
-  async listProjects(
+  listProjects(
     root: string,
   ): Promise<{ manifests: ProjectManifest[]; rejected: RejectedDiscoveryRecord[] }> {
-    let entries;
-    try {
-      entries = await readdir(root, { withFileTypes: true });
-    } catch (error) {
-      if (isEnoent(error)) {
-        // No workspace created on this device yet (D-025): zero projects, not an error.
-        return { manifests: [], rejected: [] };
-      }
-      return {
-        manifests: [],
-        rejected: [
-          { file: root, raw: undefined, reason: `listing ${root} failed: ${String(error)}` },
-        ],
-      };
-    }
-    const candidateIds = entries.filter((entry) => entry.isDirectory() && entry.name !== '.git');
-    const outcomes = await Promise.all(
-      candidateIds.map((entry) => readManifestOrRejection(root, entry.name)),
-    );
-    const manifests: ProjectManifest[] = [];
-    const rejected: RejectedDiscoveryRecord[] = [];
-    for (const outcome of outcomes) {
-      if (outcome === null) {
-        continue;
-      }
-      if (isRejection(outcome)) {
-        rejected.push(outcome);
-      } else {
-        manifests.push(outcome);
-      }
-    }
-    return { manifests, rejected };
+    return listProjectsImpl(root);
   }
 
-  async readProjectManifest(root: string, projectId: string): Promise<ProjectManifest | null> {
-    const resolved = await readManifestDocument(manifestPath(root, projectId));
-    return resolved === null ? null : parseProjectManifestDocument(resolved);
+  readProjectManifest(root: string, projectId: string): Promise<ProjectManifest | null> {
+    return readProjectManifestImpl(root, projectId);
   }
 
   /**
@@ -490,17 +242,8 @@ export class FsWorkspaceRepository implements WorkspaceRepository {
     return diff.stdout.split('\n').filter((line) => line.trim().length > 0);
   }
 
-  /** V2-T34 item 1: (re)writes `<root>/.git/hooks/commit-msg` and marks it executable — a no-op
-   * read-back, always overwrites (`core/workspace-hooks.ts`'s own docstring: this file is
-   * `seeya`'s own generated text, "reinstalled by every open"). `chmod` is a no-op on Windows
-   * (NTFS has no POSIX executable bit) — harmless there; Git for Windows' own bundled `sh.exe`
-   * doesn't check it before running a hook by that exact file name anyway (only a non-Windows git
-   * checks the bit before invoking a hook file directly).
-   */
-  async installCommitMsgHook(root: string, scriptContent: string): Promise<void> {
-    const hookPath = path.join(root, '.git', 'hooks', COMMIT_MSG_HOOK_FILE_NAME);
-    await writeFileAtomic(hookPath, scriptContent);
-    await chmod(hookPath, 0o755);
+  installCommitMsgHook(root: string, scriptContent: string): Promise<void> {
+    return installCommitMsgHookImpl(root, scriptContent);
   }
 
   listCommitsForAudit(
@@ -511,44 +254,16 @@ export class FsWorkspaceRepository implements WorkspaceRepository {
     return listCommitsForAuditImpl(root, projectId, sinceCommit);
   }
 
-  /** V2-T34 item 2 (PO review): writes `<root>/<projectId>/.claude/settings.json` — always
-   * overwrites, same "seeya's own generated text" discipline `installCommitMsgHook` already has. No
-   * executable bit needed (unlike the git hook): this is plain JSON Claude Code itself reads, never
-   * executed directly. */
-  async installHarnessHook(
-    root: string,
-    projectId: string,
-    settingsJsonContent: string,
-  ): Promise<void> {
-    await writeFileAtomic(
-      path.join(root, projectId, '.claude', 'settings.json'),
-      settingsJsonContent,
-    );
+  installHarnessHook(root: string, projectId: string, settingsJsonContent: string): Promise<void> {
+    return installHarnessHookImpl(root, projectId, settingsJsonContent);
   }
 
-  /** D-050/V2-T61: `git ls-files -- <projectId>/CLAUDE.md` — empty output means untracked (never
-   * existed, or exists on disk from a previous `open`'s own generated write but was never
-   * committed); any output means a person versioned their own `CLAUDE.md` for this project before
-   * this task shipped. `projectId` never contains a path separator (`core/project-id.ts
-   * #isValidProjectId`), so a plain forward-slash join is a valid git pathspec on every platform
-   * this project supports, including Windows. */
-  async isClaudeMdVersioned(root: string, projectId: string): Promise<boolean> {
-    const result = await runGit(root, ['ls-files', '--', `${projectId}/CLAUDE.md`]);
-    if (!result.ran || result.exitCode !== 0) {
-      throw new Error(
-        `git ls-files failed in workspace at "${root}": ` +
-          `${result.ran ? `exit ${result.exitCode}` : result.reason}`,
-      );
-    }
-    return result.stdout.trim().length > 0;
+  isClaudeMdVersioned(root: string, projectId: string): Promise<boolean> {
+    return isClaudeMdVersionedImpl(root, projectId);
   }
 
-  /** D-050/V2-T61: always overwrites — `seeya`'s own generated text, `installHarnessHook`'s own
-   * "reinstalled by every open" discipline, applied here. Only ever called after
-   * `isClaudeMdVersioned` reported false (`application/claude-md-bridge.ts#
-   * ensureGeneratedClaudeMdInstalled`'s own gate). */
-  async installGeneratedClaudeMd(root: string, projectId: string, content: string): Promise<void> {
-    await writeFileAtomic(path.join(root, projectId, 'CLAUDE.md'), content);
+  installGeneratedClaudeMd(root: string, projectId: string, content: string): Promise<void> {
+    return installGeneratedClaudeMdImpl(root, projectId, content);
   }
 
   /** V2-T73 item 2 — mechanics in `adapters/workspace/manifest-restore.ts`, same delegate shape as

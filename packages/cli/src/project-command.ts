@@ -36,27 +36,31 @@ import { resolveSessionReferenceForAdoption } from './session-reference.js';
 import { formatManifestRestoreLines } from './format-manifest-restore.js';
 import type { ProjectContext } from './composition.js';
 import {
+  formatCreateProjectReport,
+  formatProjectsReport,
+  formatShowProjectReport,
+} from './format-project-lifecycle.js';
+import {
   formatAddRepoReport,
-  formatAdoptAmbiguousMatchMessage,
-  formatAdoptNoMatchMessage,
-  formatAdoptSessionReport,
-  formatAuditCommandReport,
   formatAuditLines,
   formatClaudeMdLines,
-  formatCreateProjectReport,
   formatMissingRepositoryLines,
   formatOpenProjectReport,
   formatProjectLockWarningLines,
-  formatProjectsReport,
-  formatShowProjectReport,
-  parseAdoptionLaunchConfirmation,
   parseLeftoverChangesAnswer,
   parseReadOnlyOpenConfirmation,
-  renderAdoptionCommitConfirmation,
-  renderAdoptionLaunchConfirmation,
   renderLeftoverChangesConfirmation,
   renderReadOnlyOpenConfirmation,
-} from './format-project.js';
+} from './format-project-open.js';
+import { formatAuditCommandReport } from './format-project-audit.js';
+import {
+  formatAdoptAmbiguousMatchMessage,
+  formatAdoptNoMatchMessage,
+  formatAdoptSessionReport,
+  parseAdoptionLaunchConfirmation,
+  renderAdoptionCommitConfirmation,
+  renderAdoptionLaunchConfirmation,
+} from './format-project-adopt.js';
 
 export async function runProjectCreateCommand(
   context: ProjectContext,

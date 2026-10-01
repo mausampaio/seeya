@@ -189,7 +189,7 @@ export type AdoptSessionResult =
    * `seeya project adopt` on the SAME original session would still see `alreadyAdopted` is false
    * — nothing here marks the original as adopted), and `adoptions.json` never gets an entry.
    * `reason` is `commitAll`'s own thrown message, which now includes git's stderr
-   * (`adapters/workspace/index.ts#commitAll`'s own fix, same PO review) — the caller (CLI/window)
+   * (`adapters/workspace/commit.ts#commitAll`'s own fix, same PO review) — the caller (CLI/window)
    * shows it instead of the operation silently vanishing. */
   | {
       readonly kind: 'commitFailed';

@@ -21,7 +21,8 @@ export const MANIFEST_OWNERSHIP_NOTE =
 /**
  * The manifest's own file name, relative to a project's own directory — fixed here (V2-T73) so
  * `core/workspace-commit-guard.ts` (deciding which staged path IS the manifest) and
- * `adapters/workspace/index.ts` (writing/reading it) never spell the literal `'seeya.json'`
- * independently, which would risk the two drifting apart (AGENTS.md: "nada de duplicação").
+ * `adapters/workspace/project-manifest-files.ts` (writing/reading it) never spell the literal
+ * `'seeya.json'` independently, which would risk the two drifting apart (AGENTS.md: "nada de
+ * duplicação").
  */
 export const PROJECT_MANIFEST_FILE_NAME = 'seeya.json';

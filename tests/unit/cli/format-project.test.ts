@@ -1,25 +1,29 @@
 import { describe, expect, it } from 'vitest';
 import {
+  formatCreateProjectReport,
+  formatProjectsReport,
+  formatShowProjectReport,
+} from '../../../packages/cli/src/format-project-lifecycle.js';
+import {
   formatAddRepoReport,
+  formatAuditLines,
+  formatClaudeMdLines,
+  formatMissingRepositoryLines,
+  formatOpenProjectReport,
+  parseLeftoverChangesAnswer,
+  parseReadOnlyOpenConfirmation,
+  renderLeftoverChangesConfirmation,
+  renderReadOnlyOpenConfirmation,
+} from '../../../packages/cli/src/format-project-open.js';
+import { formatAuditCommandReport } from '../../../packages/cli/src/format-project-audit.js';
+import {
   formatAdoptAmbiguousMatchMessage,
   formatAdoptNoMatchMessage,
   formatAdoptSessionReport,
-  formatAuditCommandReport,
-  formatAuditLines,
-  formatClaudeMdLines,
-  formatCreateProjectReport,
-  formatMissingRepositoryLines,
-  formatOpenProjectReport,
-  formatProjectsReport,
-  formatShowProjectReport,
   parseAdoptionLaunchConfirmation,
-  parseLeftoverChangesAnswer,
-  parseReadOnlyOpenConfirmation,
   renderAdoptionCommitConfirmation,
   renderAdoptionLaunchConfirmation,
-  renderLeftoverChangesConfirmation,
-  renderReadOnlyOpenConfirmation,
-} from '../../../packages/cli/src/format-project.js';
+} from '../../../packages/cli/src/format-project-adopt.js';
 import type { DiscoveredSession, ProjectManifest } from '@seeya-ai/engine/core/types.js';
 import type { ProjectLockInfo } from '@seeya-ai/engine/core/project-lock.js';
 

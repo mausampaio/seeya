@@ -57,7 +57,7 @@ export class FsProjectLock implements ProjectLock {
     }
     const resolved = resolveSchemaVersion(
       filePath,
-      // Same narrowing `adapters/workspace/index.ts#readManifestDocument` already documents: the
+      // Same narrowing `adapters/workspace/project-manifest-files.ts#readManifestDocument` already documents: the
       // checks above just proved this isn't null/an array/a non-object, so this `as` states a
       // fact just established, not a guess (AGENTS.md's own rule on `as`).
       parsed as Record<string, unknown>,

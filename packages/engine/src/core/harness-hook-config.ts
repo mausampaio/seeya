@@ -22,7 +22,7 @@
  * Both are fixed the same way: this is no longer part of `core/project-skeleton.ts`'s tracked
  * files at all. `application/harness-hook.ts#ensureHarnessHookInstalled` writes it fresh at the
  * start of every `openProject`, the workspace's own `.gitignore` excludes every project's own
- * `.claude/` directory (`adapters/workspace/index.ts`'s own `IGNORED_WORKSPACE_PATTERNS` — a
+ * `.claude/` directory (`adapters/workspace/commit.ts`'s own `IGNORED_WORKSPACE_PATTERNS` — a
  * double-asterisk prefix before the slash, confirmed for real: `git status --porcelain
  * --ignored=matching` reports a project's own `.claude/` directory `!!`, ignored, at any project
  * depth — the prefix is needed because a bare `.claude/settings.json` line in the workspace-root
