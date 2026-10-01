@@ -19,6 +19,18 @@ import type { PathPlatformHint } from '@seeya-ai/engine/core/cwd-normalization.j
 const DEFAULT_MAX_LENGTH = 32;
 
 /**
+ * `formatDirectoryPathForDisplay`'s own default budget (PO review of V2-T66, third round) —
+ * deliberately NOT `DEFAULT_MAX_LENGTH` above. That 32 was tuned for the sidebar's own narrow
+ * column (`shortenDirectoryPath`'s own docstring, V2-T55 correction 1); the Today tab's session
+ * card and "Resume in" selector are surfaces over 1000px wide, where 32 characters truncated a
+ * `~`-abbreviated path down to its last segment or two ("…do-mesmo-de-verdade\pasta-atual") even
+ * though it would have fit whole at a wider budget. 80 is generous enough that a real `~`-relative
+ * path fits untruncated in the common case, while still bounding the rare pathological one — the
+ * full, untruncated path is always in the element's own `title` regardless.
+ */
+const TODAY_TAB_DIRECTORY_MAX_LENGTH = 80;
+
+/**
  * @example
  * shortenDirectoryPath('C:\\code\\seeya') // 'C:\\code\\seeya' — fits, unchanged
  * shortenDirectoryPath('C:\\ProvaSeeya\\um-projeto-com-nome-bem-comprido-mesmo')
@@ -96,7 +108,7 @@ export function formatDirectoryPathForDisplay(
   path: string,
   homeDir: string,
   platformHint: PathPlatformHint,
-  maxLength: number = DEFAULT_MAX_LENGTH,
+  maxLength: number = TODAY_TAB_DIRECTORY_MAX_LENGTH,
 ): string {
   return shortenDirectoryPath(collapseHomeDirectory(path, homeDir, platformHint), maxLength);
 }

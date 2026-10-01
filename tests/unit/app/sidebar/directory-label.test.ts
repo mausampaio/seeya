@@ -144,4 +144,19 @@ describe('formatDirectoryPathForDisplay (PO review of V2-T66, item 2)', () => {
       '~/code',
     );
   });
+
+  // PO review of V2-T66, third round: the default budget is the Today tab's own 80 characters
+  // (TODAY_TAB_DIRECTORY_MAX_LENGTH), not the sidebar's narrower 32 — a realistic `~`-relative
+  // worktree path (57 characters here) fits WHOLE at the default, keeping its `~`, where the
+  // sidebar's own 32-character budget would have truncated it down to just the last segment or
+  // two and dropped the `~` entirely.
+  it('the default budget (omitted maxLength) is wide enough to keep a realistic path whole', () => {
+    const path = '/home/<usuario>/code/seeya/dot-claude/worktrees/abc123def/new-directory';
+    const collapsed = collapseHomeDirectory(path, '/home/<usuario>', 'posix');
+    expect(collapsed.length).toBeLessThanOrEqual(80);
+    expect(collapsed.length).toBeGreaterThan(32);
+
+    expect(formatDirectoryPathForDisplay(path, '/home/<usuario>', 'posix')).toBe(collapsed);
+    expect(formatDirectoryPathForDisplay(path, '/home/<usuario>', 'posix')).toMatch(/^~\//);
+  });
 });
