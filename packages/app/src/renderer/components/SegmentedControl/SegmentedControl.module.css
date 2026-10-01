@@ -18,13 +18,13 @@
   overflow: hidden;
 }
 
+/* V2-T65 (D-052 item 7): font-size/weight moved into `Text` — this rule only ever positions/
+ * colours the segment now. */
 .option {
   flex: 1;
   border: none;
   background: var(--seeya-surface);
   color: var(--seeya-text-secondary);
-  font-family: var(--seeya-font-sans);
-  font-size: 13px;
   padding: var(--seeya-space-1) var(--seeya-space-3);
   text-align: center;
   cursor: pointer;
@@ -38,5 +38,4 @@
 .selected {
   background: var(--seeya-brand-soft);
   color: var(--seeya-brand-text);
-  font-weight: 500;
 }

@@ -42,4 +42,20 @@ describe('TextField (V2-T62, D-051; CSS module + render tests since V2-T64)', ()
     const { getByLabelText } = render(<TextField id="x" label="X" value="" disabled />);
     expect((getByLabelText('X') as HTMLInputElement).disabled).toBe(true);
   });
+
+  it('calls onBlur with the value straight off the event target (docs/INTERFACE.md § 8: salvar ao sair do campo)', () => {
+    const onBlur = vi.fn();
+    const { getByLabelText } = render(<TextField id="x" label="X" value="" onBlur={onBlur} />);
+    const input = getByLabelText('X') as HTMLInputElement;
+    input.value = 'typed-then-blurred';
+    fireEvent.blur(input);
+    expect(onBlur).toHaveBeenCalledWith('typed-then-blurred');
+  });
+
+  it('renders trailing content next to the label (Settings’ own custom/default tag)', () => {
+    const { getByText } = render(
+      <TextField id="x" label="X" value="" trailing={<span>custom</span>} />,
+    );
+    expect(getByText('custom')).not.toBeNull();
+  });
 });

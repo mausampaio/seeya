@@ -14,7 +14,7 @@
 // root runs the latter via `npm run dev --workspace=@seeya-ai/app`.
 
 import { spawn, spawnSync } from 'node:child_process';
-import { chmodSync, cpSync, existsSync, mkdirSync, statSync } from 'node:fs';
+import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,6 +22,14 @@ import * as esbuild from 'esbuild';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = path.resolve(packageRoot, '..', '..');
+// V2-T65 PO review: Settings' own General section shows the installed version
+// (docs/INTERFACE.md § 8) — `app.getVersion()` is the WRONG source for it: Electron falls back to
+// its own runtime version (e.g. "44.3.0") whenever it can't find packaged app metadata, which is
+// exactly the unpackaged case `npm run app`/this build script always produces. Read straight from
+// this package's own package.json instead (`@seeya-ai/app`'s `"version"`, currently "0.1.0") and
+// bake it into the main-process bundle at BUILD time via esbuild's `define` — a constant, not a
+// runtime file read, so it survives being packaged into app.asar unchanged.
+const appVersion = JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf8')).version;
 // D-052 (V2-T75): main.ts/preload.ts moved from src/electron to src/main (the Electron
 // main-process side); the renderer bootstrap, the Preact tree and every asset it links moved to
 // src/renderer. The OUTPUT directory name (dist/electron/) is unchanged on purpose — nothing
@@ -52,6 +60,9 @@ async function bundle() {
     format: 'esm',
     target: 'node22',
     external: ['electron', 'node-pty'],
+    // V2-T65: __SEEYA_APP_VERSION__ (declared ambient in src/main/build-constants.d.ts) — see
+    // this file's own `appVersion` comment above for why this isn't `app.getVersion()`.
+    define: { __SEEYA_APP_VERSION__: JSON.stringify(appVersion) },
   });
 
   // preload: forced to CommonJS (.cjs), not the package's default ESM — Electron's sandboxed

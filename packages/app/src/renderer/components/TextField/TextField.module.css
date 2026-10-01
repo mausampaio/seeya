@@ -1,19 +1,30 @@
 /* D-052 (V2-T75 left this unstyled, Q-102; V2-T64 brings it to the pattern) — same visual result
  * the global `.seeya-field*` classes already gave (`renderer/legacy/components.css`), now scoped
  * to this component alone. `Select` (not touched by this task, still no production caller) keeps
- * using the global classes directly — nothing here removes those. */
+ * using the global classes directly — nothing here removes those.
+ *
+ * V2-T65: font-size/weight moved out of every rule below into `Text` (D-052 item 7) — this file
+ * only ever positions/colours/spaces things now. */
 .field {
   display: flex;
   flex-direction: column;
   gap: var(--seeya-space-1);
 }
 
-.label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--seeya-text-secondary);
+.labelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--seeya-space-2);
 }
 
+.labelRow label {
+  cursor: pointer;
+}
+
+/* Exception to "font-size only through Text" (D-052 item 7): a native `<input>` cannot have a
+ * `Text` CHILD deciding its own typography — `font-size: 14px`/no explicit `line-height` here is
+ * `body-sm`'s own identity § 4.4 number, picked by hand for exactly this one unavoidable case. */
 .input {
   font-family: var(--seeya-font-sans);
   font-size: 14px;
@@ -30,14 +41,10 @@
 }
 
 .hint {
-  font-family: var(--seeya-font-mono);
-  font-size: 12px;
-  color: var(--seeya-text-tertiary);
   margin: 0;
 }
 
 .error {
-  font-size: 12px;
   color: var(--seeya-error-text);
   margin: 0;
 }

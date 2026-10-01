@@ -4,11 +4,13 @@ import { cleanup, render } from '@testing-library/preact';
 import type { ComponentChildren } from 'preact';
 import {
   CalendarIcon,
+  CameraIcon,
   ChatBalloonIcon,
   ChevronDownIcon,
   ChevronLeftIcon,
   ClockIcon,
   CloseIcon,
+  CompassIcon,
   FolderIcon,
   LockIcon,
   PlayIcon,
@@ -39,6 +41,8 @@ describe('outline icons (D-052, V2-T75 — real render; identity § 6.4)', () =>
     TerminalIcon,
     CloseIcon,
     LockIcon,
+    CameraIcon,
+    CompassIcon,
   ];
 
   it('every outline icon is drawn on the 24-unit grid with no fill and a rounded stroke', () => {

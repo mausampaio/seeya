@@ -9,7 +9,8 @@
  * Every icon is drawn on a 24-unit grid, one style per icon (outline — `fill="none"`,
  * `stroke="currentColor"` — or filled — `fill="currentColor"`, `stroke="none"` — never both mixed
  * within the same icon): `CalendarIcon`/`FolderIcon`/`ChatBalloonIcon`/`ChevronLeftIcon`/
- * `PlusIcon`/`ClockIcon`/`SettingsIcon`/`TerminalIcon`/`CloseIcon` are outline; `PlayIcon`/
+ * `PlusIcon`/`ClockIcon`/`SettingsIcon`/`TerminalIcon`/`CloseIcon`/`CameraIcon`/`CompassIcon` are
+ * outline; `PlayIcon`/
  * `StopIcon` are filled (the conventional shape for a media-style control, legible at a small
  * size in a way an outline triangle/square isn't); `StarIcon` is the one icon with a real
  * `filled` prop (outline by default, filled — brand-coloured — only when `filled` is true, the
@@ -259,6 +260,31 @@ export function TerminalIcon(props: IconProps = {}): JSX.Element {
 
 export function CloseIcon(props: IconProps = {}): JSX.Element {
   return outlineIcon([<path d="M6 6l12 12M18 6L6 18" />], props);
+}
+
+/** Settings' own "Capture" section nav row (V2-T65, `docs/INTERFACE.md` § 8). PO review: the
+ * first attempt here (`SlidersIcon`) reused `SettingsIcon`'s own three-line/three-dot path with
+ * only the coordinates nudged — close enough to read as the SAME icon as General right above it
+ * in the nav, confirmed by the PO's own screenshot review. A camera (capture = a snapshot of a
+ * session) is a genuinely distinct shape: a body + a lens, no lines/dots in common with any other
+ * icon in this set. */
+export function CameraIcon(props: IconProps = {}): JSX.Element {
+  return outlineIcon(
+    [
+      <path d="M4 8.5a1.5 1.5 0 0 1 1.5-1.5h2.3l1-1.5h6.4l1 1.5h2.3A1.5 1.5 0 0 1 20 8.5v8a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 16.5Z" />,
+      <circle cx="12" cy="12.5" r="3.2" />,
+    ],
+    props,
+  );
+}
+
+/** Settings' own "Discovery" section nav row (V2-T65, `docs/INTERFACE.md` § 8) — a compass,
+ * distinct from `FolderIcon` (already used for "All projects"/Projects elsewhere in this window). */
+export function CompassIcon(props: IconProps = {}): JSX.Element {
+  return outlineIcon(
+    [<circle cx="12" cy="12" r="8.5" />, <path d="M14.8 9.2l-2.1 5-5 2.1 2.1-5Z" />],
+    props,
+  );
 }
 
 /**

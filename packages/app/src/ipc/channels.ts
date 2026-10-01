@@ -140,6 +140,15 @@ export const CHANNELS = {
    * by the renderer's own last-known `AutostartControlAvailability` at click time, never
    * re-derived in `main.ts` (same D-041 discipline `daemonControl` already follows). */
   autostartControl: 'seeya:autostart-control',
+  /** Renderer → main: the autostart switch's own availability, fetched once when Settings' own
+   * General section first mounts (V2-T65) — same "fetch once for first paint, push for every
+   * refresh after" shape `getDaemonAvailability` already established, reusing the SAME
+   * `autostartAvailabilityUpdate` push for live updates while the dialog stays open. Answers from
+   * the ambient-tick cache only (never a direct `Autostart.status()` call of its own) — that call
+   * measured up to ~6s cold (`state/autostart-cache.ts`'s own docstring); a dialog opening would
+   * otherwise stall on it. `{ kind: 'unknown' }` before the first tick has ever populated the
+   * cache (D-025), corrected by the very next push. */
+  getAutostartAvailability: 'seeya:get-autostart-availability',
   /** Renderer → main: the ownership-transition dialog's own data (V2-T13 item 5, D-045 item 1) —
    * fetched once at startup, same "no polling of its own" shape `getTerminalFontConfig` already
    * has. `shouldOffer: false` means the dialog never opens this run. */
@@ -227,6 +236,11 @@ export const CHANNELS = {
    * empty `Directory` field are different facts (D-025): `canceled: true` leaves whatever the
    * person had already typed untouched, never clearing it. */
   pickDirectory: 'seeya:pick-directory',
+  /** Renderer → main: the installed version, for Settings' own General section (V2-T65,
+   * docs/INTERFACE.md § 8's own "a versão instalada... em texto terciário, selecionável") —
+   * `app.getVersion()`, fetched once when the section first mounts; no push counterpart, a
+   * running window's own version never changes until relaunched. */
+  getAppVersion: 'seeya:get-app-version',
 } as const;
 
 export interface CreateTabRequest {
@@ -530,6 +544,11 @@ export type SaveSettingResponse =
 /** `CHANNELS.autostartAvailabilityUpdate`'s payload — the exact shape
  * `state/autostart-control-panel.ts#resolveAutostartControlAvailability` produces (V2-T13 item 4). */
 export type AutostartAvailabilityUpdateEvent = AutostartControlAvailability;
+
+/** `CHANNELS.getAutostartAvailability`'s response — same shape as `AutostartAvailabilityUpdateEvent`,
+ * fetched instead of pushed (V2-T65), same "first paint without waiting for the ambient tick"
+ * reasoning as `getDaemonAvailability`/`getScheduleStrip` above. */
+export type AutostartAvailabilityResponse = AutostartAvailabilityUpdateEvent;
 
 /** `CHANNELS.autostartControl`'s payload. `action` is `'enable'` when the button last showed
  * "Enable autostart", `'disable'` otherwise — decided renderer-side from its own

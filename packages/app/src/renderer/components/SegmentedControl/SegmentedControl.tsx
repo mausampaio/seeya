@@ -18,6 +18,7 @@
 import type { JSX } from 'preact';
 import styles from './SegmentedControl.module.css';
 import { cx } from '../css-class.js';
+import { Text } from '../Text/index.js';
 
 export interface SegmentedControlOption {
   readonly value: string;
@@ -52,7 +53,11 @@ export function SegmentedControl(props: SegmentedControlProps): JSX.Element {
             aria-pressed={selected}
             onClick={() => props.onChange?.(option.value)}
           >
-            {option.label}
+            {/* D-052 item 7 (V2-T65 brings this to the pattern, Q-102): font-size/weight come from
+             * `Text` now, never the raw 13px/500 this file hardcoded before. */}
+            <Text as="span" variant="body-sm" {...(selected ? { weight: 500 as const } : {})}>
+              {option.label}
+            </Text>
           </button>
         );
       })}

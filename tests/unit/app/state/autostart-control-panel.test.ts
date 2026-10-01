@@ -12,17 +12,19 @@ const CLI_OWNER: DaemonOwner = { kind: 'cli' };
 const UNKNOWN_OWNER: DaemonOwner = { kind: 'unknown' };
 
 describe('resolveAutostartControlAvailability', () => {
-  it('owner is cli → notApplicable, regardless of status', () => {
+  it('owner is cli → notApplicable with ownerKind "cli", regardless of status', () => {
     const status: AutostartStatus = { kind: 'disabled' };
     expect(resolveAutostartControlAvailability(CLI_OWNER, status)).toEqual({
       kind: 'notApplicable',
+      ownerKind: 'cli',
     });
   });
 
-  it('owner is unknown → notApplicable, regardless of status (D-025)', () => {
+  it('owner is unknown → notApplicable with ownerKind "unknown", regardless of status (D-025)', () => {
     const status: AutostartStatus = { kind: 'enabled', registeredPath: 'C:\\seeya\\seeya.exe' };
     expect(resolveAutostartControlAvailability(UNKNOWN_OWNER, status)).toEqual({
       kind: 'notApplicable',
+      ownerKind: 'unknown',
     });
   });
 
@@ -85,7 +87,10 @@ describe('reduceAutostartControl', () => {
   });
 
   it('clicking while notApplicable is a no-op — the button should never be shown clickable then', () => {
-    const state: AutostartControlState = { kind: 'idle', availability: { kind: 'notApplicable' } };
+    const state: AutostartControlState = {
+      kind: 'idle',
+      availability: { kind: 'notApplicable', ownerKind: 'cli' },
+    };
     expect(reduceAutostartControl(state, { kind: 'clicked' })).toBe(state);
   });
 

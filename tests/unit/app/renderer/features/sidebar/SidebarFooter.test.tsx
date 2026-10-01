@@ -10,13 +10,18 @@ import type { DaemonControlAvailability } from '../../../../../../packages/app/s
 afterEach(cleanup);
 
 describe('SidebarFooter (D-052, V2-T75)', () => {
-  it('renders the legacy-owned anchors with their exact ids', () => {
+  it('renders the legacy-owned end-day anchor, and the real daemon control button', () => {
     window.seeya = createFakeSeeyaApi();
     const { container } = render(<SidebarFooter />);
     expect(container.querySelector('#end-day-button')).not.toBeNull();
-    expect(container.querySelector('#autostart-control-button')).not.toBeNull();
-    expect(container.querySelector('#autostart-control-result')).not.toBeNull();
     expect(container.querySelector('#daemon-control-button')).not.toBeNull();
+  });
+
+  it("never renders the autostart anchor any more (V2-T65 — moved to Settings' own General section)", () => {
+    window.seeya = createFakeSeeyaApi();
+    const { container } = render(<SidebarFooter />);
+    expect(container.querySelector('#autostart-control-button')).toBeNull();
+    expect(container.querySelector('#autostart-control-result')).toBeNull();
   });
 
   it('shows the daemon pill as "Daemon stopped" (body-sm, 14px/500) when stopped', () => {

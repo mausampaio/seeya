@@ -434,6 +434,11 @@ aqui antes de entrar no código.**
 | a lateral reescrita (V2-T75, D-052, `docs/INTERFACE.md` § 1) | `renderer/features/sidebar/` — `Sidebar.tsx` (raiz da região: logo, cabeçalho com o recolher, e os componentes abaixo, mais a própria alça de redimensionar via `useSidebarResize`); `useSidebar.ts` (dados de Projects/Today panel, favoritos/recentes/contadores derivados de `state/sidebar-summary.ts`, aba ativa via `renderer/legacy/tabs-view.ts#onActiveTabChanged`); `TodayCard`, `FavoritesSection`, `RecentSection`, `NavList` (apresentacionais); `SidebarFooter` + `useSidebarFooter.ts` (faixa de horário e pílula do daemon reativas — reusa `state/daemon-control-panel.ts#reduceDaemonControl` via `useReducer`; "End day…"/autostart continuam âncoras legadas, D-052's own "Cuidados", `renderer/legacy/end-day-dialog-view.ts`/`autostart-control-view.ts` inalterados); `useSidebarCollapse.ts`/`useSidebarResize.ts` (estado compartilhado com o botão de reabrir da barra de abas, em `App.tsx`, já que esse botão mora fora da própria lateral). Substitui inteiramente `sidebar-favorites-view.tsx`/`sidebar-collapse-view.ts`/`sidebar-resize-view.ts`/`schedule-strip-view.ts`/`daemon-control-view.tsx` (apagados) |
 | canal de IPC com função de cancelamento (V2-T75, D-052) | `SeeyaApi.onProjectsUpdate`/`onTodayUpdate`/`onScheduleUpdate`/`onDaemonAvailabilityUpdate`/`onAutostartAvailabilityUpdate`/`onThemeUpdate` (`main/preload.ts`) passaram a devolver uma função de cancelamento (`() => void`), compatível com todo chamador existente (que já ignorava o retorno) — é o contrato que `renderer/hooks/useIpcSubscription.ts` precisa para limpar no desmonte. Os demais `onX` da API continuam devolvendo `void`, sem cancelamento, por não terem consumidor que precise |
 | hook de assinatura de IPC / hook de tema / cliente tipado (V2-T75, D-052) | `renderer/hooks/useIpcSubscription.ts` (assina uma vez, no mount, e cancela no desmonte); `renderer/hooks/useTheme.ts` (o tema efetivo, `'light' \| 'dark'`, como estado reativo — mais estreito que `renderer/legacy/theme-view.ts#wireTheme`, que também aplica os efeitos colaterais, `data-theme`/tema do terminal; este hook é só para um componente que precisa do VALOR, nenhum consumidor ainda nesta tarefa); `renderer/ipc/client.ts#getSeeyaApi` (o único ponto de leitura de `window.seeya`, com o `declare global` movido para cá) |
+| Settings reescrita (V2-T65, D-052, `docs/INTERFACE.md` § 8) | `renderer/features/settings/` — `SettingsDialog.tsx` (raiz: `Dialog`'s own `open`/`onClose` reativos, novidade desta tarefa em `renderer/components/Dialog/`, em vez de `showModal()`/`.close()` por id), `useSettings.ts` (busca `getSettingsPanel`/`getAutostartAvailability`/`getAppVersion` no MOUNT — antes de o diálogo poder abrir, nunca vazio — e de novo a cada abertura, para refletir um `seeya config set` de outro terminal), `SettingsNav/` (seis `NavItem`, um por `SettingsNavSection` — as cinco `SettingsSection` de `state/settings-panel.ts` mais `'projects'`), `GeneralSection/` (tema + autostart + versão), `FieldsSection/` (Schedule/Capture/Discovery/Terminal — um `SettingsField` por linha), `SettingsField/` (campo + dica mono + `Chip` `custom`/`default` + descrição, salva em `onBlur`), `ProjectsSection/` (a política por projeto, só leitura, inalterada). Substitui `renderer/legacy/settings-dialog-view.ts` inteiro (apagado) |
+| `SettingsRow` ganha `label`/`section` (V2-T65) | `state/settings-panel.ts` — `label` é `MESSAGES.settingsFieldLabels[key]` (rótulo legível; a chave crua vira só a dica em mono do campo, nunca o rótulo); `section` é `SettingsSection \| null` (`null` só para `theme`, que tem seu próprio controle segmentado em vez de uma linha genérica) — `groupSettingsRowsBySection`/`findSettingsRow` são as duas funções puras novas, testadas, que `useSettings.ts` consome |
+| tema aplicado ao vivo pela Settings (V2-T65, correção de produção) | Antes desta tarefa, salvar `theme` em Settings só valia depois de fechar e abrir o app de novo — `main/main.ts#wireIpc`'s own `saveSetting` handler nunca reempurrava `themeUpdate`, só o listener `nativeTheme.on('updated', ...)` (uma mudança do SO) fazia isso. Corrigido chamando a MESMA `resolveAndSendEffectiveTheme()` que esse listener já usa, logo depois de `saveConfig` — `renderer/legacy/theme-view.ts#wireTheme` (inalterado) é quem de fato repinta `data-theme`/o terminal a partir desse push |
+| autostart sai do rodapé, vira interruptor em Settings (V2-T65, `docs/INTERFACE.md` § 8) | `renderer/features/settings/GeneralSection/` — `Switch` (`renderer/components/Switch/`, trazido ao padrão D-052 nesta tarefa: CSS module, `Text`, `disabledReason`) chamando `useSettings.ts#onAutostartToggle`, mesmo reducer `state/autostart-control-panel.ts#reduceAutostartControl` que o rodapé usava. `AutostartControlAvailability.notApplicable` ganhou `ownerKind: 'cli' \| 'unknown'` (D-024/D-025 — duas razões diferentes para o mesmo estado desabilitado, nunca uma frase mais vaga que esconde qual), usado por `settingsAutostartNotApplicableCli`/`Unknown`. `renderer/legacy/autostart-control-view.ts` apagado; `renderer/features/sidebar/SidebarFooter` não renderiza mais `#autostart-control-button`/`#autostart-control-result` |
+| canais de IPC novos da Settings (V2-T65) | `ipc/channels.ts` — `getAutostartAvailability` (invoke, primeira pintura do interruptor; responde do cache do ciclo ambiente, nunca chama `Autostart.status()` direto — essa chamada já mediu ~6s fria, `state/autostart-cache.ts`; `{ kind: 'unknown' }` antes do primeiro ciclo, D-025) e `getAppVersion` (invoke, `app.getVersion()`, sem contraparte de push — a versão instalada de uma janela aberta não muda sozinha) |
 | sessão descoberta | `DiscoveredSession` |
 | sessão com PID / sem PID | `SessionWithPid` / `SessionWithoutPid` |
 | estado da sessão | `SessionState` |
@@ -582,11 +587,12 @@ now**; também estende a janela de `captureVerificationScreenshot` de 2.500ms pa
 esta é a única instrumentação que espera por DOIS `endDay` reais antes da captura valer a pena),
 `SEEYA_APP_AUTO_SNOOZE_15` (V2-T5b: clica o botão real **Snooze +15m** da faixa de horário, para
 provar que o clique persiste `snoozeMinutesTotal` em `estado.json` e que a faixa atualiza sem
-esperar o próximo ciclo ambiente), `SEEYA_APP_AUTO_EDIT_SETTINGS` (V2-T14: abre o diálogo real de
-**Settings…**, tenta um valor inválido em `relevanceHours` — prova a recusa do item 2, a mensagem
-de erro da própria linha fica visível e nada é gravado — e então um valor válido em `endOfDayTime`
-— prova os itens 1 e 3 juntos: a origem daquela linha vira "set in config.json" e a faixa de
-horário na barra lateral atualiza na hora, sem reiniciar nada), `SEEYA_APP_AUTO_TOGGLE_SIDEBAR`
+esperar o próximo ciclo ambiente), `SEEYA_APP_AUTO_EDIT_SETTINGS` (V2-T14; reescrita pela V2-T65
+para o diálogo novo de seções, `docs/INTERFACE.md` § 8: abre o diálogo real de **Settings…**,
+navega até a seção Schedule e tenta um valor inválido em `endOfDayTime` — prova a recusa: a
+mensagem de erro da própria linha fica visível, com o valor recusado, e nada é gravado — via
+`.focus()`/um evento `input` real/`.blur()` no campo, a mesma sequência que tabular para fora dele
+faria), `SEEYA_APP_AUTO_TOGGLE_SIDEBAR`
 (V2-T30: clica o botão real de recolher a lateral, para provar o estado recolhido e o rótulo
 do botão numa captura da janela real), `SEEYA_APP_STARTUP_TIMING_PATH`
 (V2-T17 item 4: grava, no arquivo indicado, o instante em que o primeiro `sessionsUpdate` foi
@@ -611,10 +617,16 @@ se o foco voltou para o terminal da aba ativa; uma captura de tela não mostrari
 nenhum, então esta grava o fato em vez de uma imagem), `SEEYA_APP_AUTO_NARROW_SIDEBAR` (aceite do
 mantenedor da V2-T75: mesma técnica de `SEEYA_APP_AUTO_RESIZE_SIDEBAR`, com delta negativo, para
 provar que um nome de sessão longo trunca com reticências — nunca rolagem horizontal escondida —
-com a lateral perto do `MIN_SIDEBAR_WIDTH`) e `SEEYA_APP_AUTO_OPEN_SNOOZE_MENU` (aceite do
+com a lateral perto do `MIN_SIDEBAR_WIDTH`), `SEEYA_APP_AUTO_OPEN_SNOOZE_MENU` (aceite do
 mantenedor da V2-T75: clica o botão real `#schedule-strip-snooze-button`, para provar o `Menu` de
 verdade — `role="menu"`, `+15m`/`+30m`/`+1h` — aberto sobre o rodapé; só faz algo quando a agenda
-já oferece Snooze, o mesmo "o botão simplesmente não existe" que uma pessoa encontraria) —
+já oferece Snooze, o mesmo "o botão simplesmente não existe" que uma pessoa encontraria) e
+`SEEYA_APP_THEME_TOGGLE_AFTER_SCREENSHOT_PATH` (V2-T65: combinada com `SEEYA_APP_SCREENSHOT_PATH`,
+troca a captura única de sempre por `captureLiveThemeToggleVerification` — abre **Settings…**,
+captura a seção General num tema, clica o segmento **Dark**, espera a troca ao vivo (o mesmo
+`saveSetting` empurrando `themeUpdate` de volta, o conserto de produção desta tarefa) e captura de
+novo, as duas sem reiniciar a janela; a única instrumentação com dois arquivos de captura em vez
+de um) —
 mesma categoria de `SEEYA_DAEMON_CHILD`
 acima (nunca vão para disco, ninguém digita), mas nenhuma delas é lida por `npm run app` nem
 documentada no `README.md`: existem só para um agente sem tela/teclado próprios provar a janela

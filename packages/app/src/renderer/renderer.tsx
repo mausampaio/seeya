@@ -3,16 +3,15 @@
  * had grown to 1407 lines and every region's DOM wiring at once — absorbing the V2-T51 goal). Its
  * only job now: mount the window's Preact tree (`App.tsx`) into `#root`, then wire every LEGACY
  * region's own module (D-052/V2-T75: everything under `renderer/legacy/` — dialogs, the tab
- * strip, the Today/Projects/Sessions page panes, theme, settings), in the order each one's own
- * data dependency requires. The lateral (`renderer/features/sidebar/`) needs almost none of this
- * wiring any more — it is a real component now, mounted as part of `<App/>` itself, driven by its
- * own hooks subscribing straight to the IPC client. `wireAutostartControl` is the one exception
- * still wired here (D-052's own "Cuidados: autostart continua no rodapé até a V2-T65" — its
- * button/result text stay legacy-imperative, targeting the two stable anchor elements the new
- * `SidebarFooter` renders for it, unchanged by this task). Excluded from `packages/app/src`'s
- * coverage floor with everything else that cannot run without a display — every module this file
- * wires is unit-tested (the pure ones) or is itself excluded for the same "cannot run headless"
- * reason (the DOM-wiring ones).
+ * strip, the Today/Projects/Sessions page panes, theme), in the order each one's own data
+ * dependency requires. The lateral (`renderer/features/sidebar/`) and Settings
+ * (`renderer/features/settings/`, V2-T65) need none of this wiring any more — both are real
+ * components now, mounted as part of `<App/>` itself, driven by their own hooks subscribing
+ * straight to the IPC client (Settings' own autostart switch replaces the last "Cuidados:
+ * autostart continua... até a V2-T65" exception D-052 had carved out here). Excluded from
+ * `packages/app/src`'s coverage floor with everything else that cannot run without a display —
+ * every module this file wires is unit-tested (the pure ones) or is itself excluded for the same
+ * "cannot run headless" reason (the DOM-wiring ones).
  */
 import { render } from 'preact';
 import { AppShell } from './App.js';
@@ -24,12 +23,10 @@ import { wireTheme } from './legacy/theme-view.js';
 import { focusActiveTabTerminal } from './features/tabs/index.js';
 import { wireFallbackDialog } from './legacy/fallback-dialog-view.js';
 import { wireEndDayDialog } from './legacy/end-day-dialog-view.js';
-import { wireAutostartControl } from './legacy/autostart-control-view.js';
 import {
   offerDaemonOwnershipTransitionIfNeeded,
   wireDaemonOwnershipTransitionDialog,
 } from './legacy/daemon-ownership-transition-view.js';
-import { wireSettingsDialog } from './legacy/settings-dialog-view.js';
 import { refreshTodayPanel, wireTodayIncomingEvents } from './legacy/today-panel-view.js';
 import { wireProjectPanel } from './legacy/project-panel-view.js';
 import './ipc/client.js';
@@ -78,8 +75,6 @@ async function main(): Promise<void> {
   await wireTheme();
   wireFallbackDialog();
   wireEndDayDialog();
-  wireAutostartControl();
-  wireSettingsDialog();
   wireDaemonOwnershipTransitionDialog();
   wireTodayIncomingEvents();
   registerActiveTerminalFocuser(focusActiveTabTerminal);

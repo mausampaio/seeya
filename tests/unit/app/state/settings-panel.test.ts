@@ -6,6 +6,9 @@ import {
 import {
   buildSettingsRows,
   buildProjectPolicyLines,
+  groupSettingsRowsBySection,
+  findSettingsRow,
+  type SettingsSection,
 } from '../../../../packages/app/src/state/settings-panel.js';
 
 describe('buildSettingsRows', () => {
@@ -69,6 +72,81 @@ describe('buildSettingsRows', () => {
     const rows = buildSettingsRows(DEFAULT_CONFIG);
     expect(rows.some((row) => (row.key as string) === 'projectPolicy')).toBe(false);
     expect(rows.some((row) => (row.key as string) === 'schemaVersion')).toBe(false);
+  });
+
+  it('every row has a non-empty readable label — catches a key added without a matching settingsFieldLabels entry', () => {
+    const rows = buildSettingsRows(DEFAULT_CONFIG);
+    for (const row of rows) {
+      expect(row.label.length, `missing label for "${row.key}"`).toBeGreaterThan(0);
+      expect(row.label, `label for "${row.key}" fell back to the raw key`).not.toBe(row.key);
+    }
+  });
+
+  it('every row except theme has a section; theme has none (its own segmented control)', () => {
+    const rows = buildSettingsRows(DEFAULT_CONFIG);
+    for (const row of rows) {
+      if (row.key === 'theme') {
+        expect(row.section).toBeNull();
+      } else {
+        expect(row.section, `missing section for "${row.key}"`).not.toBeNull();
+      }
+    }
+  });
+});
+
+describe('groupSettingsRowsBySection', () => {
+  it('groups every generic row under its own section (EDITABLE_CONFIG_KEYS interleaves the five sections, so each bucket is checked on its own, not as one flattened list), and drops theme', () => {
+    const rows = buildSettingsRows(DEFAULT_CONFIG);
+    const bySection = groupSettingsRowsBySection(rows);
+    const sections: readonly SettingsSection[] = [
+      'general',
+      'schedule',
+      'capture',
+      'discovery',
+      'terminal',
+    ];
+    // Every generic row (everything but theme) lands in EXACTLY one of the five buckets — no row
+    // lost, none duplicated across buckets.
+    const regroupedKeys = sections.flatMap((section) => bySection[section].map((row) => row.key));
+    const expectedKeys = rows.filter((row) => row.key !== 'theme').map((row) => row.key);
+    expect(regroupedKeys.toSorted()).toEqual(expectedKeys.toSorted());
+
+    expect(bySection.general).toEqual([]);
+    expect(bySection.schedule.map((row) => row.key)).toEqual([
+      'endOfDayTime',
+      'leadTimesInMinutes',
+      'overdueFireThresholdMinutes',
+      'leadTimeHysteresisMinutes',
+    ]);
+    expect(bySection.capture.map((row) => row.key)).toEqual([
+      'captureModel',
+      'budgetPerSessionUsd',
+      'captureConcurrency',
+      'forkCleanupDays',
+      'maxGitRootsToVisit',
+      'maxCaptureAttemptsPerSessionPerDay',
+    ]);
+    expect(bySection.discovery.map((row) => row.key)).toEqual([
+      'relevanceHours',
+      'idleMinutes',
+      'ignore',
+      'maxBriefingScanDays',
+    ]);
+    expect(bySection.terminal.map((row) => row.key)).toEqual([
+      'terminalFontFamily',
+      'terminalFontSize',
+    ]);
+  });
+});
+
+describe('findSettingsRow', () => {
+  it('returns the row matching the given key', () => {
+    const rows = buildSettingsRows(DEFAULT_CONFIG);
+    expect(findSettingsRow(rows, 'theme').key).toBe('theme');
+  });
+
+  it('throws, naming the missing key, when the row is not in the given array', () => {
+    expect(() => findSettingsRow([], 'theme')).toThrow(/theme/);
   });
 });
 

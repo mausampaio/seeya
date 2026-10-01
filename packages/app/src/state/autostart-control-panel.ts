@@ -15,7 +15,15 @@ import type { AutostartStatus } from '@seeya-ai/engine/core/ports.js';
 import type { DaemonOwner } from '@seeya-ai/engine/core/types.js';
 
 export type AutostartControlAvailability =
-  | { readonly kind: 'notApplicable' }
+  | {
+      readonly kind: 'notApplicable';
+      /** V2-T65 (docs/INTERFACE.md § 8's own "indisponível com o motivo"): WHY it's not
+       * applicable — the CLI owns it on this machine, or the query that would tell couldn't
+       * resolve either way (D-025, never collapsed into one vaguer "not applicable" with the
+       * reason thrown away, the way this case used to be before Settings needed to SHOW the
+       * reason rather than just hide the footer button). */
+      readonly ownerKind: 'cli' | 'unknown';
+    }
   | { readonly kind: 'enable' }
   | { readonly kind: 'disable' }
   | { readonly kind: 'unknown' };
@@ -34,7 +42,7 @@ export function resolveAutostartControlAvailability(
   status: AutostartStatus,
 ): AutostartControlAvailability {
   if (owner.kind !== 'app') {
-    return { kind: 'notApplicable' };
+    return { kind: 'notApplicable', ownerKind: owner.kind };
   }
   switch (status.kind) {
     case 'disabled':

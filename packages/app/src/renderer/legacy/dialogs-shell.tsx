@@ -1,11 +1,16 @@
 /**
- * V2-T62 (D-051): every `<dialog>` this window has, as Preact markup instead of the static HTML
- * `index.html` used to carry — SAME ids, SAME classes, SAME nesting, no region redesigned. Split
- * out of `app-shell.tsx` on its own (fourteen dialogs would otherwise make that file's own layout
- * markup hard to find) rather than by feature, because that is exactly how `index.html` grouped
- * them: one block, after `#app`, never inside it. Opening/closing stays imperative (`.showModal()`/
- * `.close()` by `id`, from each dialog's own `*-view.ts`) — see `../ui/dialog.tsx`'s own docstring
- * for why a Preact-rendered `<dialog>` needs no change there at all.
+ * V2-T62 (D-051): every LEGACY `<dialog>` this window has, as Preact markup instead of the static
+ * HTML `index.html` used to carry — SAME ids, SAME classes, SAME nesting, no region redesigned.
+ * Split out of `app-shell.tsx` on its own (over a dozen dialogs would otherwise make that file's
+ * own layout markup hard to find) rather than by feature, because that is exactly how
+ * `index.html` grouped them: one block, after `#app`, never inside it. Opening/closing stays
+ * imperative (`.showModal()`/`.close()` by `id`, from each dialog's own `*-view.ts`) — see
+ * `../ui/dialog.tsx`'s own docstring for why a Preact-rendered `<dialog>` needs no change there at
+ * all.
+ *
+ * V2-T65: Settings is no longer one of these — `renderer/features/settings/SettingsDialog` is a
+ * real, reactive component now, mounted directly in `App.tsx` with its own `open`/`onClose` state
+ * instead of an imperative anchor here.
  */
 import { Dialog } from '../components/Dialog/Dialog.js';
 
@@ -31,14 +36,6 @@ export function DialogsShell() {
           <button id="end-day-dialog-run" type="button" hidden></button>
           <button id="end-day-dialog-cancel" type="button" hidden></button>
         </div>
-      </Dialog>
-      <Dialog id="settings-dialog">
-        <h3 id="settings-dialog-title"></h3>
-        <p id="settings-dialog-daemon-note"></p>
-        <div id="settings-rows"></div>
-        <h4 id="settings-project-policy-heading"></h4>
-        <div id="settings-project-policy-lines"></div>
-        <button id="settings-dialog-close" type="button"></button>
       </Dialog>
       <Dialog id="daemon-ownership-transition-dialog">
         <h3 id="daemon-ownership-transition-title"></h3>

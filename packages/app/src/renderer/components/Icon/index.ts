@@ -1,11 +1,13 @@
 export {
   CalendarIcon,
+  CameraIcon,
   ChatBalloonIcon,
   ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   ClockIcon,
   CloseIcon,
+  CompassIcon,
   FolderIcon,
   LockIcon,
   PlayIcon,

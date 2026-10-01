@@ -1,0 +1,37 @@
+/* V2-T65 (D-052) — layered on TOP of the shared `.seeya-dialog` chrome (border/radius/background/
+ * shadow/padding, `renderer/legacy/components.css`), never replacing it: `Dialog.tsx`'s own
+ * docstring has why. This file only adds what the shared chrome doesn't express — a fixed, wide
+ * two-pane layout, since every OTHER `.seeya-dialog` caller is a narrow single-column form. */
+.dialog {
+  width: min(640px, calc(100vw - var(--seeya-space-8)));
+  max-height: calc(100vh - var(--seeya-space-8));
+  display: flex;
+  flex-direction: column;
+}
+
+.body {
+  display: flex;
+  gap: var(--seeya-space-6);
+  overflow-y: auto;
+  /* Leaves room for the nav's own focus ring/the content's own first field without clipping. */
+  padding: 2px;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--seeya-space-4);
+  margin-top: var(--seeya-space-4);
+  padding-top: var(--seeya-space-4);
+  border-top: 1px solid var(--seeya-border);
+}
+
+.footer p {
+  min-width: 0;
+}
