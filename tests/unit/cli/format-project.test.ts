@@ -19,7 +19,7 @@ import {
   renderAdoptionLaunchConfirmation,
   renderLeftoverChangesConfirmation,
   renderReadOnlyOpenConfirmation,
-} from '../../../packages/cli/src/format-project.js';
+} from '../../../packages/cli/src/format-project-adopt.js';
 import type { DiscoveredSession, ProjectManifest } from '@seeya-ai/engine/core/types.js';
 import type { ProjectLockInfo } from '@seeya-ai/engine/core/project-lock.js';
 

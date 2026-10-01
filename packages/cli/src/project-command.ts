@@ -56,7 +56,7 @@ import {
   renderAdoptionLaunchConfirmation,
   renderLeftoverChangesConfirmation,
   renderReadOnlyOpenConfirmation,
-} from './format-project.js';
+} from './format-project-adopt.js';
 
 export async function runProjectCreateCommand(
   context: ProjectContext,
