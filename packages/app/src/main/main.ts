@@ -194,8 +194,21 @@ async function captureVerificationScreenshot(
     process.env.SEEYA_APP_AUTO_DECLINE_DAEMON_OWNERSHIP_TRANSITION === '1' ||
     process.env.SEEYA_APP_AUTO_RESIZE_SIDEBAR === '1' ||
     process.env.SEEYA_APP_AUTO_VERIFY_DIALOG_FOCUS_RETURN_PATH !== undefined;
+  // V2-T64: the tab strip demo's own sequence (several tabs opened/closed/fabricated one after
+  // another, each step waiting a real IPC round trip or a real exit) runs longer than any single
+  // click above but needs none of the "Working…" daemon-ownership delay the V2-T55 category
+  // exists for — its own window, not folded into either number above.
+  const usesTabStripDemo =
+    process.env.SEEYA_APP_AUTO_TAB_STRIP_DEMO === '1' ||
+    process.env.SEEYA_APP_AUTO_OPEN_NEW_TAB_POPOVER === '1';
   await clock.sleep(
-    process.env.SEEYA_APP_AUTO_END_DAY === '1' ? 8000 : usesV2T55Instrumentation ? 7000 : 2500,
+    process.env.SEEYA_APP_AUTO_END_DAY === '1'
+      ? 8000
+      : usesV2T55Instrumentation
+        ? 7000
+        : usesTabStripDemo
+          ? 4500
+          : 2500,
   );
   const image = await window.webContents.capturePage();
   const { writeFile } = await import('node:fs/promises');
@@ -233,9 +246,15 @@ async function writeStartupTiming(clock: Clock, timingPath: string): Promise<voi
 }
 
 function createWindow(clock: Clock): BrowserWindow {
+  // SEEYA_APP_WINDOW_WIDTH/SEEYA_APP_WINDOW_HEIGHT: same "instrumentação só do spike" class as
+  // every other SEEYA_APP_* flag — a verification screenshot's own requested canvas size (e.g.
+  // 1280×800), never read by `npm run app`. Falls back to the real app's own 1200×800 default
+  // when unset, which is every normal run.
+  const windowWidth = Number(process.env.SEEYA_APP_WINDOW_WIDTH ?? '1200');
+  const windowHeight = Number(process.env.SEEYA_APP_WINDOW_HEIGHT ?? '800');
   const window = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: Number.isFinite(windowWidth) ? windowWidth : 1200,
+    height: Number.isFinite(windowHeight) ? windowHeight : 800,
     title: MESSAGES.windowTitle,
     // V2-T11 item 2: the taskbar icon in dev (`npm run app`, Windows) and the window icon on
     // Linux, where the packaged executable's own icon resource (electron-builder.yml's own
@@ -575,6 +594,115 @@ function createWindow(clock: Clock): BrowserWindow {
           const { writeFile } = await import('node:fs/promises');
           await writeFile(focusReturnVerificationPath, JSON.stringify({ focusReturnedToTerminal }));
         });
+    });
+  }
+  // SEEYA_APP_AUTO_TAB_STRIP_DEMO: same "instrumentação só do spike" class as every flag above
+  // (V2-T64) — builds a tab strip with one of each icon kind for a single real screenshot: a
+  // shell tab opened through the real New tab popover, then closed (its own real pty exit marks
+  // it "· exited"), a fabricated "project" tab and a fabricated "session" tab (two
+  // `CHANNELS.resumeTabOpened` events sent directly, the same technique
+  // `NERD_GLYPH_PROOF_LINE` above already uses for `CHANNELS.tabData` — no real project/session
+  // needs to exist for a screenshot that is only proving which ICON each `kind` renders), and
+  // finally the real Sessions page tab, left active. `main.ts`'s own `ptyManager`/`tabs` never
+  // learn about the two fabricated ids — `PtyManager.resize`/`.write` are no-ops for an id they
+  // never spawned (their own docstrings), so this never risks crashing a real pty. Never set by
+  // `npm run app` or the README.
+  if (process.env.SEEYA_APP_AUTO_TAB_STRIP_DEMO === '1') {
+    window.webContents.once('did-finish-load', () => {
+      void clock
+        .sleep(600)
+        .then(() => window.webContents.executeJavaScript(dismissDaemonOwnershipTransitionScript))
+        .then(() => clock.sleep(400))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('new-tab-button').click();",
+          ),
+        )
+        .then(() => clock.sleep(200))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('new-tab-kind-shell').click();",
+          ),
+        )
+        .then(() => clock.sleep(200))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('new-tab-form').requestSubmit();",
+          ),
+        )
+        .then(() => clock.sleep(300))
+        .then(() => {
+          const projectTab: ResumeTabOpenedEvent = {
+            id: 'demo-project-tab',
+            label: 'auth-hardening',
+            cwd: 'C:\\seeya-demo\\workspace\\auth-hardening',
+            pid: 999001,
+            kind: 'project',
+          };
+          window.webContents.send(CHANNELS.resumeTabOpened, projectTab);
+        })
+        .then(() => clock.sleep(300))
+        .then(() => {
+          const sessionTab: ResumeTabOpenedEvent = {
+            id: 'demo-session-tab',
+            label: 'fix-flaky-test',
+            cwd: 'C:\\seeya-demo\\code\\app',
+            pid: 999002,
+            kind: 'session',
+          };
+          window.webContents.send(CHANNELS.resumeTabOpened, sessionTab);
+        })
+        .then(() => clock.sleep(300))
+        .then(() =>
+          // Still running — ends the real pty; the exit event that follows is what actually marks
+          // it "· exited" (`useTabStrip.ts`'s own `onTabExit` handler), never faked directly.
+          window.webContents.executeJavaScript(
+            'document.querySelector(\'[aria-label="Close shell"]\')?.click();',
+          ),
+        )
+        .then(() => clock.sleep(500))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('sessions-link')?.click();",
+          ),
+        )
+        .then(() => clock.sleep(300))
+        .then(() => {
+          // SEEYA_APP_AUTO_OPEN_NEW_TAB_POPOVER: combined with the flag above, opens the New tab
+          // popover on top of the demo's own tab strip and selects "Other…" — the second real
+          // screenshot this task's own aceite asks for. Standalone (without the demo flag), the
+          // popover still opens over whatever the window already shows.
+          if (process.env.SEEYA_APP_AUTO_OPEN_NEW_TAB_POPOVER !== '1') {
+            return Promise.resolve();
+          }
+          return window.webContents
+            .executeJavaScript("document.getElementById('new-tab-button').click();")
+            .then(() => clock.sleep(200))
+            .then(() =>
+              window.webContents.executeJavaScript(
+                "document.getElementById('new-tab-kind-other').click();",
+              ),
+            );
+        });
+    });
+  } else if (process.env.SEEYA_APP_AUTO_OPEN_NEW_TAB_POPOVER === '1') {
+    // Standalone (no tab strip demo): just the popover, with "Other…" selected.
+    window.webContents.once('did-finish-load', () => {
+      void clock
+        .sleep(600)
+        .then(() => window.webContents.executeJavaScript(dismissDaemonOwnershipTransitionScript))
+        .then(() => clock.sleep(400))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('new-tab-button').click();",
+          ),
+        )
+        .then(() => clock.sleep(200))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('new-tab-kind-other').click();",
+          ),
+        );
     });
   }
   return window;
