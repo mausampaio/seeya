@@ -18,7 +18,14 @@
     "noEmit": true,
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
-    "jsxImportSource": "preact"
+    "jsxImportSource": "preact",
+    // Same mapping as the root `tsconfig.json`: `@seeya-ai/engine`'s package "exports" point at
+    // its build output, which does not exist yet when `npm run verificar` type-checks this program
+    // (before `npm run build`) on a fresh checkout — the CI failure after V2-T75, when this tree
+    // started importing the engine.
+    "paths": {
+      "@seeya-ai/engine/*": ["../../../engine/src/*"]
+    }
   },
   "include": ["**/*.ts", "**/*.tsx"]
 }
