@@ -130,6 +130,32 @@ describe('buildRecentProjectRows (V2-T63 item 4)', () => {
     ]);
     expect(rows[0]?.lastActivity).toEqual(new Date('2026-09-30T00:00:00.000Z'));
   });
+
+  // PO review (2026-10-01): Recent now carries the same badge/sessions shape as Favorites
+  // (`ProjectSidebarRow`), rendered by the shared `ProjectRow` component — a project open in this
+  // window reads the same whether it was found via Favorites or Recent.
+  it('badge is "openHere" with the project\'s own sessions, same as Favorites', () => {
+    const rows = buildRecentProjectRows([
+      project({
+        sessions: [
+          session({ matchedTabId: 'tab-1', lastActivity: new Date('2026-09-30T12:00:00.000Z') }),
+        ],
+      }),
+    ]);
+    expect(rows[0]?.badge).toBe('openHere');
+    expect(rows[0]?.sessions).toHaveLength(1);
+  });
+
+  it('badge is "locked" with no sessions shown when the lock is held elsewhere', () => {
+    const rows = buildRecentProjectRows([
+      project({
+        lockText: 'held by session 22222222 (pid 4242) since ...',
+        sessions: [session({ lastActivity: new Date('2026-09-30T12:00:00.000Z') })],
+      }),
+    ]);
+    expect(rows[0]?.badge).toBe('locked');
+    expect(rows[0]?.sessions).toEqual([]);
+  });
 });
 
 describe('countRunningSessions (V2-T63 item 6)', () => {

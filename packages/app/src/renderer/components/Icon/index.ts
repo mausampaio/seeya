@@ -6,6 +6,7 @@ export {
   ClockIcon,
   CloseIcon,
   FolderIcon,
+  LockIcon,
   PlayIcon,
   PlusIcon,
   SettingsIcon,

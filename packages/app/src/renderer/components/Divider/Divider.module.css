@@ -1,0 +1,8 @@
+/* D-052 (V2-T75), PO review (2026-10-01). A plain `<hr>` carries the browser's own UA-stylesheet
+ * border/margin (a 2px inset groove in Chromium) — this rule resets it to the identity's own
+ * border token and spacing scale, the only visual values this component has. */
+.divider {
+  border: none;
+  border-top: 1px solid var(--seeya-border);
+  margin: var(--seeya-space-2) 0;
+}

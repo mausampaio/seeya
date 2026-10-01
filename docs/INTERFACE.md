@@ -69,10 +69,14 @@ De cima para baixo:
    Destacado quando a aba Today está ativa. Sem briefing pendente: `Nothing to resume`, sem
    contador.
 3. **Favorites:** projetos marcados com estrela, com o botão `+` (New project) no cabeçalho da
-   seção. Cada linha: estrela, nome e o estado do lock quando houver (`open here` na cor da marca,
-   `locked` na cor de atenção). O projeto aberto nesta janela mostra, recuadas, as sessões dele
-   com ponto de estado, nome e id curto.
+   seção. Cada linha: estrela, nome e o estado do lock quando houver (`open here` na cor da marca
+   com ícone de cadeado, `locked` na cor de atenção com o mesmo ícone). O projeto aberto nesta
+   janela ganha fundo `surface-subtle` e mostra, recuadas, as sessões dele — ponto de estado, nome
+   e id curto em mono.
 4. **Recent:** até 5 projetos pela última atividade, sem repetir favoritos. Derivado, não gravado.
+   Mesmo formato de linha de Favorites (destaque, lock, sessões recuadas), trocando só o ícone
+   inicial (pasta, nunca favoritável daqui) e sem a ação de estrela. Um separador de 1 px (token de
+   borda) marca o fim do bloco Today/Favorites/Recent antes de All projects/Sessions.
 5. **All projects** com o total → abre a aba Projects. Um subdiretório do espaço de trabalho cujo
    `seeya.json` não valida nunca some em silêncio (V2-T72 item 2): aparece como **Ignored
    projects**, uma linha por entrada, com o id (derivado do nome do diretório) e o motivo — a
@@ -80,6 +84,10 @@ De cima para baixo:
    redação.
 6. **Sessions** com o contador das que têm processo rodando (`3 running`, pílula de sucesso) →
    abre a aba Sessions. Nenhuma lista de sessões na lateral.
+
+Todo ícone de linha (estrela, pasta, cadeado, e os de All projects/Sessions) alinha na mesma
+coluna, com o mesmo tamanho e o mesmo espaço até o texto — garantido pelo componente de linha
+compartilhado, nunca por ajuste avulso por seção.
 7. **Rodapé**, fixo:
    - `End of day HH:MM` e quanto falta (`in 2 h 10 min`), ou o estado da agenda (`skipped
      today`, `already ran today`, `not configured`, `due now`).

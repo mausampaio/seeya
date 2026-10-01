@@ -9,6 +9,7 @@ import {
   ClockIcon,
   CloseIcon,
   FolderIcon,
+  LockIcon,
   PlayIcon,
   PlusIcon,
   SettingsIcon,
@@ -35,6 +36,7 @@ describe('outline icons (D-052, V2-T75 — real render; identity § 6.4)', () =>
     SettingsIcon,
     TerminalIcon,
     CloseIcon,
+    LockIcon,
   ];
 
   it('every outline icon is drawn on the 24-unit grid with no fill and a rounded stroke', () => {

@@ -182,6 +182,19 @@ export function PlusIcon(props: IconProps = {}): JSX.Element {
   return outlineIcon([<path d="M12 5v14M5 12h14" />], props);
 }
 
+/** PO review (2026-10-01): the lateral's own lock status (`docs/INTERFACE.md` § 1 item 3 — "open
+ * here"/"locked" next to a project row), replacing the earlier `Chip`-pill treatment with an icon
+ * the identity's own § 6.4 already covers (simple, geometric, outline). */
+export function LockIcon(props: IconProps = {}): JSX.Element {
+  return outlineIcon(
+    [
+      <rect x="6" y="11" width="12" height="9" rx="2" />,
+      <path d="M8.5 11V8a3.5 3.5 0 0 1 7 0v3" />,
+    ],
+    props,
+  );
+}
+
 /** Always points left — the lateral's own collapse button only ever collapses from this position
  * (V2-T63 correction: the sidebar's whole header, this button included, is hidden while
  * collapsed, so there's no "reopen" state for this specific icon to show — reopening is the

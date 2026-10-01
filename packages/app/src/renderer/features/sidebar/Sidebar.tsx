@@ -19,6 +19,7 @@ import { useRef } from 'preact/hooks';
 import styles from './Sidebar.module.css';
 import { cx, mergeClassName } from '../../components/css-class.js';
 import { IconButton } from '../../components/IconButton/index.js';
+import { Divider } from '../../components/Divider/index.js';
 import { ChevronLeftIcon } from '../../components/Icon/index.js';
 import { useSidebar, isPageTabActive } from './useSidebar.js';
 import { useSidebarResize } from './useSidebarResize.js';
@@ -80,6 +81,9 @@ export function Sidebar(props: SidebarProps): JSX.Element {
               onToggleFavorite={data.toggleFavorite}
             />
             <RecentSection rows={data.recent} onOpenProject={data.openProject} />
+            {/* PO review (2026-10-01): a separator between Recent and All projects/Sessions, per
+             * the prototype — `docs/INTERFACE.md` § 1. */}
+            <Divider />
             <NavList
               allProjectsCount={data.allProjectsCount}
               runningSessionsCount={data.runningSessionsCount}
