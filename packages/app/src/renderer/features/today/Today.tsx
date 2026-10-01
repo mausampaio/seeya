@@ -18,7 +18,6 @@
  * component returned the empty state unconditionally before ever checking `controls.result`,
  * which silently dropped a genuinely successful resume's own confirmation).
  *
-
  * `disabledReason` for "Resume selected" is decided HERE, not inside `SelectionFooter` (D-041):
  * `hasResumable === false` means every row is already `runningNow` (nothing resumable at all,
  * `MESSAGES.todayAllSessionsRunning`); `hasResumable === true` with nothing checked yet means
