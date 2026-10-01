@@ -143,6 +143,87 @@ describe('TerminalPane (V2-T64)', () => {
     expect(resizeTab).toHaveBeenCalledWith(expect.objectContaining({ id: 'resume-1' }));
   });
 
+  // V2-T75-terminal-resize: maintainer diagnosis (2026-10-02) — a hidden terminal (another tab,
+  // or a page tab, active) used to still get fit/resized by `useTabStrip.ts`'s own `fitAll()`,
+  // sending the pty a near-zero size that corrupted PowerShell/bash's own line-wrapping state.
+  it('mounted hidden (no spawnRequest): fit() at mount never calls resizeTab', () => {
+    render(
+      <TerminalPane
+        id="hidden-1"
+        hidden
+        fontFamily="monospace"
+        fontSize={14}
+        spawnRequest={null}
+        onRegister={() => {}}
+        onUnregister={() => {}}
+        onSpawned={() => {}}
+      />,
+    );
+    expect(resizeTab).not.toHaveBeenCalled();
+  });
+
+  it('becoming visible: a fit() call after hidden -> visible resizes the pty', () => {
+    // An object, not a bare `let`: TypeScript's control-flow narrowing doesn't see an assignment
+    // made inside the `onRegister` closure during `render()`, so a bare `let handle = null`
+    // stays narrowed to `null` at every later use regardless of its declared type — a `.current`
+    // property access isn't narrowed the same way.
+    const handleBox: { current: TerminalHandle | null } = { current: null };
+    const { rerender } = render(
+      <TerminalPane
+        id="hidden-2"
+        hidden
+        fontFamily="monospace"
+        fontSize={14}
+        spawnRequest={null}
+        onRegister={(_id, h) => {
+          handleBox.current = h;
+        }}
+        onUnregister={() => {}}
+        onSpawned={() => {}}
+      />,
+    );
+    expect(resizeTab).not.toHaveBeenCalled();
+    rerender(
+      <TerminalPane
+        id="hidden-2"
+        hidden={false}
+        fontFamily="monospace"
+        fontSize={14}
+        spawnRequest={null}
+        onRegister={() => {}}
+        onUnregister={() => {}}
+        onSpawned={() => {}}
+      />,
+    );
+    // `useTabStrip.ts`'s own `activeId` effect calls `handle.fit()` imperatively right after the
+    // DOM commit — simulated here directly, since this test renders `TerminalPane` alone, without
+    // that hook above it.
+    handleBox.current?.fit();
+    expect(resizeTab).toHaveBeenCalledWith(expect.objectContaining({ id: 'hidden-2' }));
+  });
+
+  it('fitting twice with no size change in between sends only one resizeTab call', () => {
+    const handleBox: { current: TerminalHandle | null } = { current: null };
+    render(
+      <TerminalPane
+        id="tab-1"
+        hidden={false}
+        fontFamily="monospace"
+        fontSize={14}
+        spawnRequest={null}
+        onRegister={(_id, h) => {
+          handleBox.current = h;
+        }}
+        onUnregister={() => {}}
+        onSpawned={() => {}}
+      />,
+    );
+    resizeTab.mockClear();
+    handleBox.current?.fit();
+    handleBox.current?.fit();
+    expect(resizeTab).toHaveBeenCalledTimes(0);
+  });
+
   it('a failed spawn never calls onSpawned (the error is written into the terminal itself)', async () => {
     createTab = vi.fn(() => Promise.reject(new Error('could not find "claude"')));
     window.seeya = createFakeSeeyaApi({ createTab, writeTab: vi.fn(), resizeTab });

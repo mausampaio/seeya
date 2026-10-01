@@ -27,13 +27,17 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import styles from './TerminalPane.module.css';
 import { cx } from '../../../components/css-class.js';
-import { getSeeyaApi } from '../../../ipc/client.js';
+import { getSeeyaApi, type SeeyaApi } from '../../../ipc/client.js';
 import {
   currentActiveTerminalTheme,
   registerTerminalForTheme,
   unregisterTerminalForTheme,
 } from '../terminal-theme-registry.js';
 import type { TerminalSpawnRequest } from '../../../../state/tab-strip.js';
+import {
+  decideTerminalResize,
+  type TerminalDimensions,
+} from '../../../../state/terminal-resize.js';
 
 export interface TerminalHandle {
   readonly write: (data: string) => void;
@@ -59,6 +63,32 @@ function writeSpawnError(terminal: Terminal, error: unknown): void {
   // `openTab`'s own catch block, `renderer/legacy/tabs-view.ts` before this task).
   const message = error instanceof Error ? error.message : String(error);
   terminal.write(`\x1b[31m${message}\x1b[0m\r\n`);
+}
+
+/** The "decide, then act" half of `TerminalHandle.fit()` — kept separate so that function stays
+ * under AGENTS.md's ~20-line guideline. Returns the dimensions actually sent (to become the next
+ * call's `previous`), or `previous` unchanged when `decideTerminalResize` skipped. */
+function resizeIfNeeded(
+  api: SeeyaApi,
+  id: string,
+  terminal: Terminal,
+  hidden: boolean,
+  previous: TerminalDimensions | null,
+): TerminalDimensions | null {
+  const decision = decideTerminalResize(
+    hidden,
+    { cols: terminal.cols, rows: terminal.rows },
+    previous,
+  );
+  if (decision.kind !== 'resize') {
+    return previous;
+  }
+  api.resizeTab({ id, cols: decision.dimensions.cols, rows: decision.dimensions.rows });
+  // V2-T6: measured defect — a full repaint forces xterm.js to redraw every row from its own
+  // buffer, fixing orphaned characters a ConPTY/xterm.js row-wrap disagreement right after a
+  // resize otherwise leaves behind.
+  terminal.refresh(0, terminal.rows - 1);
+  return decision.dimensions;
 }
 
 /** Mounts the `@xterm/xterm` instance into `container` (the padded-out `.surface` inner element
@@ -90,15 +120,35 @@ function mountTerminal(
   });
   terminal.onData((data) => api.writeTab({ id: props.id, data }));
 
+  // V2-T75-terminal-resize: the pty's own last-known size, so a resize only goes out when it
+  // actually changed (`decideTerminalResize`'s own "unchanged" case) — a closure variable, not
+  // React state, since nothing here ever needs to re-render on it (same imperative-instance
+  // reasoning this file's own docstring already gives for not lifting the `Terminal` itself).
+  let lastResizedDimensions: TerminalDimensions | null = null;
+
   const handle: TerminalHandle = {
     write: (data) => terminal.write(data),
     fit: () => {
-      fitAddon.fit();
-      api.resizeTab({ id: props.id, cols: terminal.cols, rows: terminal.rows });
-      // V2-T6: measured defect — a full repaint forces xterm.js to redraw every row from its own
-      // buffer, fixing orphaned characters a ConPTY/xterm.js row-wrap disagreement right after a
-      // resize otherwise leaves behind.
-      terminal.refresh(0, terminal.rows - 1);
+      // `backgroundTarget.hidden` (the live DOM boolean), not `props.hidden`: this closure is
+      // created once, at mount, so `props` is frozen at its FIRST-render value, while
+      // `backgroundTarget` (the `.pane` Preact actually toggles `hidden` on every render) always
+      // reflects the CURRENT state — `terminal-resize.ts`'s own docstring has the measured reason
+      // this matters.
+      // `=== true`, not a bare boolean coercion: `HTMLElement.hidden`'s own DOM lib type also
+      // allows the `'until-found'` content-attribute value (a newer HTML feature this component
+      // never sets) — this component only ever assigns a real boolean (`props.hidden`), so `true`
+      // is the only value that means "actually hidden" here.
+      const hidden = backgroundTarget.hidden === true;
+      if (!hidden) {
+        fitAddon.fit();
+      }
+      lastResizedDimensions = resizeIfNeeded(
+        api,
+        props.id,
+        terminal,
+        hidden,
+        lastResizedDimensions,
+      );
     },
     focus: () => terminal.focus(),
   };
