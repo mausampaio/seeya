@@ -4,7 +4,7 @@ title: V2-T75 — Estrutura de componentes e a lateral reescrita nela
 status: Review
 assignee: []
 created_date: '2026-09-30 21:21'
-updated_date: '2026-10-01 11:16'
+updated_date: '2026-10-01 12:20'
 labels: []
 milestone: m-2
 dependencies: []
@@ -390,5 +390,11 @@ author: agente
 created: 2026-10-01 11:16
 ---
 Correcao: eram tres comentarios de teste (#8, #9 e #10 - o terceiro e uma string repetida de x, usada para isolar o defeito de aspas), nao dois. Mesma observacao do comentario anterior: ignorar os tres, sem conteudo relevante para a tarefa.
+---
+
+author: PO
+created: 2026-10-01 12:20
+---
+Revisão do PO em 2026-10-01 da rodada de aceite do mantenedor sobre a lateral (agenda, Snooze em menu, terminal com tema e margem, um botão de recolher por vez, hover do x, transição e sombra da lateral, Text e escala tipográfica, ProjectRow comum a Favorites e Recent, Divider, ícones alinhados). Três rodadas de captura conferidas pelo PO; a última achou um defeito de produção: a lateral ficava 10-20 s vazia ao abrir porque a primeira pintura descartava o resultado do invoke — corrigido no hook de assinatura (fetchInitial). Mesclado, portão do zero verde (3223 testes), também sem identidade global do git. Nota: o tamanho de texto dos botões legados (End day, autostart) depende de o CSS do Button repetir a escala, porque o código legado ainda troca o texto deles — sai quando as regiões legadas forem reescritas.
 ---
 <!-- COMMENTS:END -->
