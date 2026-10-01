@@ -64,7 +64,7 @@ export function Sidebar(props: SidebarProps): JSX.Element {
               onClick={props.onToggleCollapse}
             >
               {/* PO review (defect 2, V2-T75) — see FavoritesSection.tsx's own "new-project-button"
-               * comment for the measurement behind the 20px override. */}
+               * comment and Icon.tsx's own `sizeStyle` docstring for why 24px and the real fix. */}
               <ChevronLeftIcon size={24} />
             </IconButton>
           </div>

@@ -59,6 +59,25 @@ const VIEW_BOX_SIZE = 24;
  */
 const TARGET_STROKE_WIDTH_PX = 2;
 
+/**
+ * PO review (defect 2, round 2, V2-T75): bumping `size`/`strokeWidth` (above) never changed a
+ * single rendered pixel, because the real cause was neither — `getComputedStyle` on the live
+ * `<svg>` inside `#sidebar-collapse-toggle`/`#new-project-button` showed `width: 10px` against an
+ * `attrWidth` of `"24"`, with `matchedRules: []` (no stylesheet rule, confirmed by walking every
+ * loaded sheet and `element.matches()`), while a sibling-free, perfectly-sized 24px flex parent
+ * sat right above it. The `width`/`height` HTML attributes on `<svg>` are UA-stylesheet
+ * PRESENTATIONAL HINTS, not CSS — Chromium's flexbox `flex-basis: auto` resolution does not treat
+ * them as "a specified size" for an SVG the way it does for `<img>`, so the item's hypothetical
+ * main size falls back to something far smaller than the intended square (confirmed identical
+ * across two icons with completely different path geometry — "<" and "+" — ruling out a
+ * content/bounding-box explanation). An explicit CSS `width`/`height` (inline `style`, below)
+ * always outranks a presentational attribute and IS picked up by `flex-basis: auto`, so the box
+ * stays the full requested size regardless of context.
+ */
+function sizeStyle(size: number) {
+  return { width: `${size}px`, height: `${size}px`, flexShrink: 0 };
+}
+
 function outlineIcon(paths: readonly JSX.Element[], props: IconProps = {}): JSX.Element {
   const size = props.size ?? DEFAULT_SIZE;
   const strokeWidth = (TARGET_STROKE_WIDTH_PX * VIEW_BOX_SIZE) / size;
@@ -66,6 +85,7 @@ function outlineIcon(paths: readonly JSX.Element[], props: IconProps = {}): JSX.
     <svg
       width={size}
       height={size}
+      style={sizeStyle(size)}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -86,6 +106,7 @@ function filledIcon(paths: readonly JSX.Element[], props: IconProps = {}): JSX.E
     <svg
       width={size}
       height={size}
+      style={sizeStyle(size)}
       viewBox="0 0 24 24"
       fill="currentColor"
       stroke="none"
@@ -142,6 +163,7 @@ export function StarIcon(props: StarIconProps = {}): JSX.Element {
     <svg
       width={size}
       height={size}
+      style={sizeStyle(size)}
       viewBox="0 0 24 24"
       fill={props.filled === true ? 'var(--seeya-brand-text)' : 'none'}
       stroke={props.filled === true ? 'var(--seeya-brand-text)' : 'currentColor'}
