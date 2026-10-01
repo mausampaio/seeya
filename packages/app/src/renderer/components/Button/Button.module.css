@@ -28,6 +28,28 @@
   width: 100%;
 }
 
+/* `Button.tsx`'s own `loading` prop docstring has the full reasoning: the `Spinner` inside is
+ * ALWAYS mounted once `loading` is anything but `undefined`, so its box (and this slot's) never
+ * appears/disappears — only `visibility` toggles (`.spinnerSlotHidden` below), which keeps the
+ * button's own width constant across the loading transition itself, the one requirement that
+ * actually matters here. */
+.spinnerSlot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinnerSlotHidden {
+  visibility: hidden;
+}
+
+/* `visibility: hidden` alone leaves the spinner's own CSS animation running (invisibly) forever —
+ * pausing it while hidden costs nothing visually and avoids spinning a hundred idle buttons' worth
+ * of animation frames in a window that's otherwise at rest. */
+.spinnerSlotHidden :global(svg) {
+  animation-play-state: paused;
+}
+
 /* Sizes — padding, PLUS font-size/line-height matching `Text`'s own body-sm/body-md/body-lg
  * exactly (identity § 4.4). PO review (2026-10-01, round 2): `Text` (`Button.tsx`'s own
  * `TEXT_VARIANT_BY_SIZE`) is the PRIMARY source for this button's own text — but two of this

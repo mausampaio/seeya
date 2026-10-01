@@ -120,6 +120,27 @@ describe('GeneralSection (V2-T65, docs/INTERFACE.md § 8)', () => {
     expect(getByText(/Could not determine/)).not.toBeNull();
   });
 
+  /**
+   * Regression test (maintainer's own follow-up, V2-T65-estado-na-tela item 2): the switch was
+   * already correctly disabled while `autostart.kind === 'running'` (`autostartDisabled`'s own
+   * logic predates this round) — what it DIDN'T have was any spinner/`aria-busy`, which is what
+   * this test adds coverage for, now that `Switch` has a real `loading` prop to carry it.
+   */
+  it('shows the switch as loading (aria-busy, spinner) while a toggle is running', () => {
+    const { container, getByLabelText } = render(
+      <GeneralSection
+        themeRow={THEME_ROW}
+        onThemeChange={() => {}}
+        autostart={{ kind: 'running', availability: { kind: 'enable' } }}
+        onAutostartToggle={() => {}}
+        appVersion={null}
+      />,
+    );
+    expect((getByLabelText('Start with the system') as HTMLInputElement).disabled).toBe(true);
+    expect(container.querySelector('[aria-busy="true"]')).not.toBeNull();
+    expect(container.querySelector('svg')).not.toBeNull();
+  });
+
   it('shows the result text after a toggle finishes', () => {
     const { getByText } = render(
       <GeneralSection

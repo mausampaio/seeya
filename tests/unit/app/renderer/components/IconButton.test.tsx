@@ -83,4 +83,53 @@ describe('IconButton (D-052, V2-T75)', () => {
     rerender(<Harness />);
     expect(captured).toBe(getByRole('button'));
   });
+
+  describe('loading (D-052, maintainer complement, V2-T65-estado-na-tela item 2)', () => {
+    it('omitted: renders the icon normally, not disabled, no aria-busy', () => {
+      const { getByRole } = render(
+        <IconButton aria-label="Start daemon">
+          <span data-testid="icon" />
+        </IconButton>,
+      );
+      const button = getByRole('button') as HTMLButtonElement;
+      expect(button.disabled).toBe(false);
+      expect(button.getAttribute('aria-busy')).toBeNull();
+      expect(button.querySelector('[data-testid="icon"]')).not.toBeNull();
+    });
+
+    it('true: replaces the icon with a Spinner, in the SAME fixed-size box — disables, aria-busy', () => {
+      const { getByRole, container } = render(
+        <IconButton aria-label="Start daemon" loading>
+          <span data-testid="icon" />
+        </IconButton>,
+      );
+      const button = getByRole('button') as HTMLButtonElement;
+      expect(button.disabled).toBe(true);
+      expect(button.getAttribute('aria-busy')).toBe('true');
+      // The icon is gone WHILE loading (IconButton's own box size, unlike Button, never changes —
+      // `size` already fixes `width`/`height` in CSS regardless of what's inside).
+      expect(button.querySelector('[data-testid="icon"]')).toBeNull();
+      expect(container.querySelector('svg')).not.toBeNull();
+    });
+
+    it('a click handler never fires while loading', () => {
+      const onClick = vi.fn();
+      const { getByRole } = render(
+        <IconButton aria-label="x" loading onClick={onClick}>
+          i
+        </IconButton>,
+      );
+      fireEvent.click(getByRole('button'));
+      expect(onClick).not.toHaveBeenCalled();
+    });
+
+    it('still applies the same size class while loading — the box itself never resizes', () => {
+      const { getByRole } = render(
+        <IconButton aria-label="x" size="sm" loading>
+          i
+        </IconButton>,
+      );
+      expect(classesOf(getByRole('button'))).toContain(styles.sm);
+    });
+  });
 });

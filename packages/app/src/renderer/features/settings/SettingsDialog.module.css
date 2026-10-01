@@ -5,6 +5,20 @@
 .dialog {
   width: min(640px, calc(100vw - var(--seeya-space-8)));
   max-height: calc(100vh - var(--seeya-space-8));
+}
+
+/* Bug fix (maintainer-found, V2-T65-estado-na-tela): `display` used to sit on the bare `.dialog`
+ * class above, unconditionally. `SettingsDialog` is mounted once for the life of the window
+ * (`SettingsDialog.tsx`'s own docstring) and never unmounts on close — `Dialog.tsx` only calls the
+ * native `.close()`, which drops the `open` attribute. An AUTHOR rule always wins over the UA
+ * stylesheet's own `dialog:not([open]) { display: none }` regardless of specificity (origin beats
+ * specificity in the cascade), so an unconditional `display: flex` here kept the dialog visually
+ * painted — and clickable-through, since it had already left the top layer — until some UNRELATED
+ * state change forced Preact to re-render. Gating the declaration on `[open]` means this rule only
+ * applies while the dialog really is open, so the UA rule is free to hide it the instant `.close()`
+ * runs — confirmed with a real build: Settings now disappears the moment Done is clicked, no
+ * second interaction needed. */
+.dialog[open] {
   display: flex;
   flex-direction: column;
 }

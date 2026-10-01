@@ -69,3 +69,19 @@
   /* Lines up under the label, not under the track — the same width the switch itself occupies. */
   margin-left: calc(36px + var(--seeya-space-2));
 }
+
+/* `Switch.tsx`'s own `loading` prop docstring has the full reasoning — same reserved-slot shape
+ * as `Button.module.css`'s own `.spinnerSlot`/`.spinnerSlotHidden`. */
+.spinnerSlot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinnerSlotHidden {
+  visibility: hidden;
+}
+
+.spinnerSlotHidden :global(svg) {
+  animation-play-state: paused;
+}

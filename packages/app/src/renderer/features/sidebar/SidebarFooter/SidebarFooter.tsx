@@ -53,12 +53,14 @@ const SNOOZE_MENU_ITEMS = SNOOZE_OPTIONS.map(([minutes, label]) => ({
 }));
 
 export function SidebarFooter(): JSX.Element {
-  const { schedule, onSnooze, onSkip, daemon, onDaemonControlClicked } = useSidebarFooter();
+  const { schedule, scheduleActionPending, onSnooze, onSkip, daemon, onDaemonControlClicked } =
+    useSidebarFooter();
   const [snoozeMenuOpen, setSnoozeMenuOpen] = useState(false);
   const snoozeTriggerRef = useRef<HTMLButtonElement>(null);
 
   const running = daemon.availability.kind === 'stop';
   const unknown = daemon.availability.kind === 'unknown';
+  const daemonBusy = daemon.kind === 'running';
   const daemonLabel = unknown
     ? MESSAGES.daemonControlUnknown
     : running
@@ -111,6 +113,8 @@ export function SidebarFooter(): JSX.Element {
                     variant="secondary"
                     size="sm"
                     fullWidth
+                    loading={scheduleActionPending === 'snooze'}
+                    disabled={scheduleActionPending === 'skip'}
                     buttonRef={snoozeTriggerRef}
                     onClick={() => setSnoozeMenuOpen((open) => !open)}
                   >
@@ -132,7 +136,15 @@ export function SidebarFooter(): JSX.Element {
               )}
               {schedule.canSkip && (
                 <GridItem span={1}>
-                  <Button variant="secondary" size="sm" fullWidth onClick={onSkip}>
+                  <Button
+                    id="schedule-strip-skip-button"
+                    variant="secondary"
+                    size="sm"
+                    fullWidth
+                    loading={scheduleActionPending === 'skip'}
+                    disabled={scheduleActionPending === 'snooze'}
+                    onClick={onSkip}
+                  >
                     {MESSAGES.scheduleStripSkipToday}
                   </Button>
                 </GridItem>
@@ -154,6 +166,7 @@ export function SidebarFooter(): JSX.Element {
             id="daemon-control-button"
             variant="ghost"
             disabled={unknown}
+            loading={daemonBusy}
             aria-label={daemonButtonLabel}
             onClick={onDaemonControlClicked}
           >
