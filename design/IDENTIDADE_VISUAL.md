@@ -498,6 +498,11 @@ Os raios acompanham a construção arredondada do símbolo, mas não devem torna
 
 No tema dark, reduzir sombras e reforçar bordas.
 
+**Exceção: a lateral do aplicativo.** Ela não se sobrepõe ao conteúdo, mas recebe uma sombra suave
+na borda direita para se ler como camada acima da área de trabalho (decisão de 2026-10-01). Usa o
+mesmo token de sombra, com intensidade menor que a de popover; no tema dark, sombra ainda menor e
+borda reforçada. Nenhum outro painel fixo herda esta exceção.
+
 ### 6.4 Ícones
 
 - traço arredondado entre `1.5` e `2 px`;

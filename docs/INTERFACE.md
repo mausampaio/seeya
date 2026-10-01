@@ -51,6 +51,12 @@ nos campos de texto).
 botão do cabeçalho da lateral aparece; com ela recolhida, só o botão de expandir no início da barra
 de abas. Os dois juntos na tela confundem.
 
+**Movimento e profundidade da lateral** (aceite do mantenedor, 2026-10-01): abrir e recolher a
+lateral tem transição de largura (180–240 ms, easing da identidade, seção 6.5; sem animação com
+`prefers-reduced-motion`). A lateral fica visualmente **acima** do conteúdo: sombra suave na borda
+direita (no tema escuro, sombra menor e borda reforçada, identidade 6.3). A exceção está registrada na
+identidade visual, seção 6.3.
+
 Continuam valendo: recolher a lateral (botão e `Ctrl+B`), redimensionar (180–480 px, padrão
 280, lembrado por máquina), foco devolvido ao terminal ao fechar um diálogo.
 
@@ -93,6 +99,10 @@ autostart (vai para Settings).
   (balão), shell (terminal), página (calendário para Today, pasta para Projects, balão para
   Sessions). Rótulos como hoje (nome do handoff, id do projeto, nome da sessão).
 - Aba cujo processo saiu: `· exited` no rótulo; o `×` passa a remover.
+- Hover distinto: passar sobre a aba realça a aba inteira; passar sobre o `×` realça só o `×`
+  (fundo próprio, cor de texto mais forte), para ficar claro qual clique fecha.
+- O terminal tem margem interna (16 px nas laterais, 12 px em cima e embaixo); o texto nunca
+  encosta na borda, e o ajuste de colunas/linhas do terminal desconta essa margem.
 - `+` abre o popover **New tab**: seletor `claude` · `codex` · `Shell` · `Other…` (este abre um
   campo de comando livre), campo `Directory` com botão de escolher pasta e até três diretórios
   recentes como atalho. `Open` e `Cancel`.
