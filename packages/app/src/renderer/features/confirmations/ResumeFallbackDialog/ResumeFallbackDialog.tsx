@@ -45,10 +45,15 @@ interface OutcomeCardProps {
 
 function OutcomeCard(props: OutcomeCardProps): JSX.Element {
   return (
-    <Surface padding="md" radius="md" className={cx(styles, 'card')}>
-      <Stack gap="sm">
-        <Stack direction="horizontal" justify="between" align="center">
-          <Text as="h4" variant="heading-4">
+    <Surface padding="sm" radius="md" className={cx(styles, 'card')}>
+      <Stack gap="xs">
+        <Stack direction="horizontal" justify="between" align="center" gap="sm">
+          {/* PO review, round 2: `margin: 0` on both lines below — `<h4>`/`<p>` carry the
+           * BROWSER's own default margin (the actual source of the "vão grande" between title
+           * and text, never the `Stack`'s own `gap`, which doesn't collapse against a flex
+           * child's own margin — it adds on top of it), so the card's own spacing comes ONLY from
+           * `Stack`'s `gap` (the design-system's token scale), never an unstyled UA default. */}
+          <Text as="h4" variant="heading-4" className={cx(styles, 'cardTitle')}>
             {props.title}
           </Text>
           {props.recommended === true && (
@@ -57,7 +62,7 @@ function OutcomeCard(props: OutcomeCardProps): JSX.Element {
             </Chip>
           )}
         </Stack>
-        <Text as="p" variant="body-sm" tone="secondary">
+        <Text as="p" variant="body-sm" tone="secondary" className={cx(styles, 'cardExplanation')}>
           {props.explanation}
         </Text>
         <Button id={props.id} variant={props.variant} fullWidth onClick={props.onSelect}>
@@ -91,7 +96,7 @@ export function ResumeFallbackDialog(): JSX.Element {
   }
 
   const context: ComponentChildren = request !== null && (
-    <Text as="p" variant="body-sm" tone="secondary">
+    <Text as="p" variant="body-sm" tone="secondary" className={cx(styles, 'context')}>
       {request.reasonText} ({request.cwd})
     </Text>
   );

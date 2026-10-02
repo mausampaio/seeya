@@ -7,6 +7,15 @@
   width: 100%;
 }
 
+/* PO review, round 2: the card's title/explanation, and the dialog's own context line below the
+ * title — `OutcomeCard`'s own docstring on why a bare `<h4>`/`<p>` needs this (the browser's own
+ * default margin, not the `Stack`'s `gap`, was the real source of the "vão grande" between them). */
+.cardTitle,
+.cardExplanation,
+.context {
+  margin: 0;
+}
+
 /* A real capture with all three cards (`offersResumeWithoutPlan: true`) showed the third one's
  * own button pushed below the window's edge — this dialog has no single shared footer to pin
  * the way `Dialog`'s own `footer` prop does (each card carries its own button), so the cards
