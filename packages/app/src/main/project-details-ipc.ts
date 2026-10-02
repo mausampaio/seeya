@@ -14,14 +14,11 @@
  * (`project-ipc.ts`). The lock is therefore held while a confirmation is on screen, exactly as the
  * CLI holds it while it waits at a prompt.
  */
-import path from 'node:path';
 import { ipcMain, type BrowserWindow } from 'electron';
-import { resolveWorkspaceRoot } from '@seeya-ai/engine/application/workspace.js';
 import { addRepository } from '@seeya-ai/engine/application/repository-association.js';
 import { removeRepository } from '@seeya-ai/engine/application/project-remove-repo.js';
 import { removeProject } from '@seeya-ai/engine/application/project-remove.js';
 import { revertAdoption } from '@seeya-ai/engine/application/project-revert-adoption.js';
-import { describeProjectLockStatus } from '@seeya-ai/engine/application/project-lock.js';
 import { renderDeleteAdoptedCopyQuestionLine } from '@seeya-ai/engine/core/project-management-message.js';
 import { CHANNELS } from '../ipc/channels.js';
 import type {
@@ -46,52 +43,14 @@ import {
   buildRevertAdoptionDeps,
   type AppContext,
 } from '../composition/index.js';
+import { readProjectDetails } from '../composition/project-details-reader.js';
 import { PendingConfirmations } from '../resume/pending-confirmations.js';
-import { formatLockText } from '../state/projects-panel.js';
-import { buildProjectDetailsData, collectRepositoryPaths } from '../state/project-details.js';
 import {
   formatAddRepositoryActionResult,
   formatRemoveProjectActionResult,
   formatRemoveRepositoryActionResult,
   formatRevertAdoptionActionResult,
 } from '../state/project-details-result.js';
-
-async function readProjectDetails(
-  context: AppContext,
-  projectId: string,
-): Promise<GetProjectDetailsResponse> {
-  const root = await resolveWorkspaceRoot(context.storage, context.home.seeyaHome);
-  const manifest = await context.workspace.readProjectManifest(root, projectId);
-  if (manifest === null) {
-    return { kind: 'notFound', projectId };
-  }
-  const lockStatus = await describeProjectLockStatus(
-    { projectLock: context.projectLock, processControl: context.processControl },
-    root,
-    projectId,
-  );
-  const repositoryMap = await context.storage.readRepositoryMap();
-  const existingPaths = new Set<string>();
-  for (const mappedPath of collectRepositoryPaths(
-    projectId,
-    manifest.repositories,
-    repositoryMap,
-  )) {
-    if (await context.directoryExistence.exists(mappedPath)) {
-      existingPaths.add(mappedPath);
-    }
-  }
-  return buildProjectDetailsData({
-    manifest,
-    dir: path.join(root, projectId),
-    lockStatus,
-    lockHeldByText: formatLockText(lockStatus),
-    repositoryMap,
-    existingPaths,
-    adoptions: await context.storage.readAdoptions(),
-    fileCount: await context.workspace.countProjectFiles(root, projectId),
-  });
-}
 
 export function wireProjectDetailsIpc(
   window: BrowserWindow,

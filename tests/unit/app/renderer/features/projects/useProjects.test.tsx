@@ -4,6 +4,7 @@ import { act, cleanup, renderHook, waitFor } from '@testing-library/preact';
 import { createFakeSeeyaApi } from '../../_fake-seeya-api.js';
 import { useProjects } from '../../../../../../packages/app/src/renderer/features/projects/useProjects.js';
 import { registerTabSelector } from '../../../../../../packages/app/src/renderer/features/tabs/tab-select-bridge.js';
+import { registerProjectDetailsOpener } from '../../../../../../packages/app/src/renderer/features/project-details/project-details-bridge.js';
 import type { ProjectPanelRow } from '../../../../../../packages/app/src/state/projects-panel.js';
 import type { ResumeTabOpenedEvent } from '../../../../../../packages/app/src/ipc/channels.js';
 
@@ -125,5 +126,16 @@ describe('useProjects (V2-T67)', () => {
       projectId: 'auth-hardening',
       favorite: true,
     });
+  });
+
+  it('onManage opens the Project details dialog for that row, without touching openProject', () => {
+    const opener = vi.fn();
+    registerProjectDetailsOpener(opener);
+    const openProject = vi.fn();
+    window.seeya = createFakeSeeyaApi({ openProject });
+    const { result } = renderHook(() => useProjects());
+    void act(() => result.current.onManage(project({ projectId: 'billing' })));
+    expect(opener).toHaveBeenCalledWith('billing');
+    expect(openProject).not.toHaveBeenCalled();
   });
 });

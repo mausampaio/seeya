@@ -184,6 +184,7 @@ describe('ProjectsTable (V2-T67)', () => {
         onToggleFavorite={() => {}}
         onRowAction={() => {}}
         isRowActionPending={() => false}
+        onManage={() => {}}
       />,
     );
     expect(getByText('Name')).not.toBeNull();
@@ -202,6 +203,7 @@ describe('ProjectsTable (V2-T67)', () => {
         onToggleFavorite={() => {}}
         onRowAction={onRowAction}
         isRowActionPending={() => false}
+        onManage={() => {}}
       />,
     );
     expect(getByText('Unlocked')).not.toBeNull();
@@ -218,6 +220,7 @@ describe('ProjectsTable (V2-T67)', () => {
         onToggleFavorite={() => {}}
         onRowAction={() => {}}
         isRowActionPending={() => false}
+        onManage={() => {}}
       />,
     );
     expect(getByText('Open in this window')).not.toBeNull();
@@ -235,6 +238,7 @@ describe('ProjectsTable (V2-T67)', () => {
         onToggleFavorite={() => {}}
         onRowAction={() => {}}
         isRowActionPending={() => false}
+        onManage={() => {}}
       />,
     );
     expect(getByText('Locked by session abcd1234')).not.toBeNull();
@@ -254,6 +258,7 @@ describe('ProjectsTable (V2-T67)', () => {
         onToggleFavorite={() => {}}
         onRowAction={() => {}}
         isRowActionPending={() => true}
+        onManage={() => {}}
       />,
     );
     expect(getByText('Open').closest('button')?.getAttribute('aria-busy')).toBe('true');
@@ -269,6 +274,7 @@ describe('ProjectsTable (V2-T67)', () => {
         onToggleFavorite={() => {}}
         onRowAction={() => {}}
         isRowActionPending={() => false}
+        onManage={() => {}}
       />,
     );
     const dash = getByText('—');
@@ -286,6 +292,7 @@ describe('ProjectsTable (V2-T67)', () => {
         onToggleFavorite={() => {}}
         onRowAction={() => {}}
         isRowActionPending={() => false}
+        onManage={() => {}}
       />,
     );
     const cell = getByText(expected);
@@ -302,9 +309,47 @@ describe('ProjectsTable (V2-T67)', () => {
         onToggleFavorite={onToggleFavorite}
         onRowAction={() => {}}
         isRowActionPending={() => false}
+        onManage={() => {}}
       />,
     );
     fireEvent.click(getByRole('button', { name: /Star Auth hardening/i }));
     expect(onToggleFavorite).toHaveBeenCalledWith('auth-hardening', true);
+  });
+
+  // V2-T83 (`docs/INTERFACE.md` § 4a): a separate icon-only button opens "Project details"; the
+  // row's own main action is untouched.
+  it('has a "Manage project" icon button that calls onManage and leaves the row action alone', () => {
+    const onManage = vi.fn();
+    const onRowAction = vi.fn();
+    const row = project({ name: 'Auth hardening' });
+    const { getByRole } = render(
+      <ProjectsTable
+        rows={[row]}
+        onToggleFavorite={() => {}}
+        onRowAction={onRowAction}
+        isRowActionPending={() => false}
+        onManage={onManage}
+      />,
+    );
+    const button = getByRole('button', { name: 'Manage project Auth hardening' });
+    expect(button.getAttribute('title')).toBe('Manage project Auth hardening');
+    fireEvent.click(button);
+    expect(onManage).toHaveBeenCalledWith(row);
+    expect(onRowAction).not.toHaveBeenCalled();
+  });
+
+  it('offers "Manage project" on a locked row too — reading is never blocked', () => {
+    const row = project({ lock: { kind: 'lockedByOther', holderDisplaySessionId: 'abcd1234' } });
+    const { getByRole } = render(
+      <ProjectsTable
+        rows={[row]}
+        onToggleFavorite={() => {}}
+        onRowAction={() => {}}
+        isRowActionPending={() => false}
+        onManage={() => {}}
+      />,
+    );
+    const button = getByRole('button', { name: /Manage project/ }) as HTMLButtonElement;
+    expect(button.disabled).toBe(false);
   });
 });
