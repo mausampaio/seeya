@@ -4,7 +4,7 @@ title: V2-T67 — Aba Projects
 status: Review
 assignee: []
 created_date: '2026-09-30 10:34'
-updated_date: '2026-10-02 02:36'
+updated_date: '2026-10-02 03:58'
 labels: []
 milestone: m-2
 dependencies:
@@ -171,5 +171,11 @@ Recusas encontradas: o comando `backlog task edit --comment` foi recusado pelo a
 longo demais para o verificador de isolamento de worktree confirmar que não é um comando git) —
 este comentário foi escrito editando o markdown da tarefa diretamente, como a própria
 `AGENTS.md` manda nesse caso, em vez de contornar a recusa.
+---
+
+author: PO
+created: 2026-10-02 03:58
+---
+Revisão do PO (2026-10-02): duas rodadas. Rodada 1 devolveu Ignored projects com erro cru e caminho absoluto (aba e lateral), colunas quebrando linha, 'unknown' cru na última atividade e botões de ação desalinhados. Rodada 2 corrigiu os quatro (resumo compartilhado em state/error-reason-summary.ts, box-sizing das células, '—' com title, largura fixa da ação). Q-104 e Q-105 aceitas como resolvidas pelo agente. Capturas reais conferidas nos dois temas contra docs/INTERFACE.md § 4. Mesclada no po-gate; npm run verificar do zero e npm test sem identidade git verdes (3581 testes). Publicada; aguarda aceite do mantenedor pelo instalador.
 ---
 <!-- COMMENTS:END -->
