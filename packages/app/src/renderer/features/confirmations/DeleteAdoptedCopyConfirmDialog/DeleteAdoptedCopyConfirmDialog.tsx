@@ -66,15 +66,15 @@ export function DeleteAdoptedCopyConfirmDialog(): JSX.Element {
     >
       {request !== null && (
         <Stack gap="md">
-          <Text as="p" variant="body-md" id="delete-adopted-copy-confirm-context">
+          <Text as="div" variant="body-md" id="delete-adopted-copy-confirm-context">
             {request.question}
           </Text>
           <Stack gap="xs">
-            <Text as="p" variant="body-sm" tone="secondary">
+            <Text as="div" variant="body-sm" tone="secondary">
               <strong>{MESSAGES.confirmDeleteCopyDelete}:</strong>{' '}
               {MESSAGES.confirmDeleteCopyDeleteExplanation}
             </Text>
-            <Text as="p" variant="body-sm" tone="secondary">
+            <Text as="div" variant="body-sm" tone="secondary">
               <strong>{MESSAGES.confirmDeleteCopyKeep}:</strong>{' '}
               {MESSAGES.confirmDeleteCopyKeepExplanation}
             </Text>

@@ -147,6 +147,7 @@ import {
 } from '../resume/tab-session-resumer.js';
 import { wireProjectIpc } from './project-ipc.js';
 import { wireProjectDetailsIpc } from './project-details-ipc.js';
+import { captureProjectDetailsVerification } from './verification-project-details.js';
 import { wireSessionSearchIpc } from './session-search-ipc.js';
 import { wireSessionResumeIpc } from './session-resume-ipc.js';
 import { wireDirectoryPickerIpc } from './directory-picker-ipc.js';
@@ -1751,6 +1752,19 @@ function createWindow(clock: Clock): BrowserWindow {
   if (adoptionFlowDir !== undefined) {
     window.webContents.once('did-finish-load', () => {
       void captureAdoptionFlowVerification(window, clock, adoptionFlowDir);
+    });
+  }
+  // SEEYA_APP_VERIFY_PROJECT_DETAILS_DIR (V2-T83): same "a DIRECTORY, not a single file" shape as the
+  // flags above — see `verification-project-details.ts`'s own docstring for the sequence and for
+  // what the driver script must have prepared (a disposable workspace, a live lock holder, and
+  // `SEEYA_APP_VERIFY_PICKED_DIRECTORIES` in place of the native folder dialog). Never set by
+  // `npm run app` or the README.
+  const projectDetailsDir = process.env.SEEYA_APP_VERIFY_PROJECT_DETAILS_DIR;
+  if (projectDetailsDir !== undefined) {
+    window.webContents.once('did-finish-load', () => {
+      void captureProjectDetailsVerification(window, clock, projectDetailsDir).then(() =>
+        quitAfterConfiguredDelay(clock),
+      );
     });
   }
   // SEEYA_APP_VERIFY_SELECT_STATES_DIR (V2-T81): same "a DIRECTORY, not a single file" shape as the

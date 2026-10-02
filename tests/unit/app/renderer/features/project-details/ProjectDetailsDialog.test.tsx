@@ -1,6 +1,13 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/preact';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  waitFor,
+  type RenderResult,
+} from '@testing-library/preact';
 import { createFakeSeeyaApi } from '../../_fake-seeya-api.js';
 import {
   ProjectDetailsDialog,
@@ -116,9 +123,9 @@ function installApi(
   return api;
 }
 
-async function openDialog(): Promise<ReturnType<typeof render>> {
+async function openDialog(): Promise<RenderResult> {
   const view = render(<ProjectDetailsDialog />);
-  act(() => openProjectDetails('auth-hardening'));
+  void act(() => openProjectDetails('auth-hardening'));
   await waitFor(() => expect(view.container.querySelector('#project-details-name')).not.toBeNull());
   return view;
 }
@@ -131,7 +138,7 @@ describe('ProjectDetailsDialog (V2-T83, docs/INTERFACE.md § 4a)', () => {
     expect(dialog.open).toBe(false);
     expect(api.getProjectDetails).not.toHaveBeenCalled();
 
-    act(() => openProjectDetails('auth-hardening'));
+    void act(() => openProjectDetails('auth-hardening'));
     await waitFor(() => expect(dialog.open).toBe(true));
     await waitFor(() =>
       expect(api.getProjectDetails).toHaveBeenCalledWith({ projectId: 'auth-hardening' }),
@@ -303,7 +310,9 @@ describe('ProjectDetailsDialog (V2-T83, docs/INTERFACE.md § 4a)', () => {
       (view.getByText('Remove project…').closest('button') as HTMLButtonElement).disabled,
     ).toBe(true);
 
-    await act(async () => finish?.(response()));
+    await act(() => {
+      finish?.(response());
+    });
     await waitFor(() =>
       expect(
         (view.getByText('Add repository…').closest('button') as HTMLButtonElement).disabled,
@@ -441,7 +450,7 @@ describe('ProjectDetailsDialog (V2-T83, docs/INTERFACE.md § 4a)', () => {
     });
     const view = await openDialog();
     const notice = view.container.querySelector('#project-details-locked-notice');
-    expect(notice?.textContent).toContain('held by session s (pid 1) since X');
+    expect(notice?.textContent).toContain('Locked by session s');
     const writes = [
       view.getByText('Add repository…'),
       view.getByText('Revert…'),
@@ -450,7 +459,7 @@ describe('ProjectDetailsDialog (V2-T83, docs/INTERFACE.md § 4a)', () => {
     ].map((node) => node.closest('button') as HTMLButtonElement);
     for (const button of writes) {
       expect(button.disabled).toBe(true);
-      expect(button.getAttribute('title')).toContain('held by session s (pid 1) since X');
+      expect(button.getAttribute('title')).toContain('Locked by session s');
     }
     // Reading: the lists are still there, and Close still works.
     expect(view.container.querySelectorAll('#project-details-repositories li')).toHaveLength(3);
@@ -471,7 +480,7 @@ describe('ProjectDetailsDialog (V2-T83, docs/INTERFACE.md § 4a)', () => {
   it('a project that no longer exists says so instead of showing empty sections', async () => {
     installApi({ details: { kind: 'notFound', projectId: 'auth-hardening' }, row: null });
     const view = render(<ProjectDetailsDialog />);
-    act(() => openProjectDetails('auth-hardening'));
+    void act(() => openProjectDetails('auth-hardening'));
     await waitFor(() =>
       expect(view.container.querySelector('#project-details-not-found')?.textContent).toBe(
         'Project "auth-hardening" no longer exists in the workspace.',
@@ -483,7 +492,7 @@ describe('ProjectDetailsDialog (V2-T83, docs/INTERFACE.md § 4a)', () => {
   it('a failed read is shown, never a blank dialog', async () => {
     installApi({ details: () => Promise.reject(new Error('disk on fire')) });
     const view = render(<ProjectDetailsDialog />);
-    act(() => openProjectDetails('auth-hardening'));
+    void act(() => openProjectDetails('auth-hardening'));
     await waitFor(() =>
       expect(view.container.querySelector('#project-details-load-error')?.textContent).toBe(
         'Could not read the project: disk on fire',

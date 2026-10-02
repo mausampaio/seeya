@@ -43,7 +43,7 @@ function ActionResult(props: { readonly result: ProjectActionResponse }): JSX.El
     <InfoBox tone={props.result.tone === 'success' ? 'success' : props.result.tone}>
       <Stack gap="xs">
         {props.result.lines.map((line) => (
-          <Text key={line} as="p" variant="body-sm" className={cx(styles, 'resultLine')}>
+          <Text key={line} as="div" variant="body-sm" className={cx(styles, 'resultLine')}>
             {line}
           </Text>
         ))}
@@ -58,7 +58,7 @@ function RemovedBody(props: {
 }): JSX.Element {
   return (
     <Stack gap="md">
-      <Text as="p" variant="heading-3" id="project-details-removed-title">
+      <Text as="div" variant="heading-3" id="project-details-removed-title">
         {MESSAGES.projectDetailsRemovedTitle(props.projectId)}
       </Text>
       <ActionResult result={props.removed} />
@@ -71,21 +71,21 @@ function ProjectBody(props: { readonly controls: ProjectDetailsControls }): JSX.
   const { details } = controls;
   if (controls.loadError !== null && details === null) {
     return (
-      <Text as="p" variant="body-sm" tone="secondary" id="project-details-load-error">
+      <Text as="div" variant="body-sm" tone="secondary" id="project-details-load-error">
         {controls.loadError}
       </Text>
     );
   }
   if (details === null) {
     return (
-      <Text as="p" variant="body-sm" tone="secondary">
+      <Text as="div" variant="body-sm" tone="secondary">
         {MESSAGES.projectDetailsLoading}
       </Text>
     );
   }
   if (details.kind === 'notFound') {
     return (
-      <Text as="p" variant="body-sm" tone="secondary" id="project-details-not-found">
+      <Text as="div" variant="body-sm" tone="secondary" id="project-details-not-found">
         {MESSAGES.projectDetailsNotFound(details.projectId)}
       </Text>
     );
@@ -103,7 +103,7 @@ function ProjectBody(props: { readonly controls: ProjectDetailsControls }): JSX.
       />
       {blockedReason !== undefined && (
         <InfoBox tone="warning" className={cx(styles, 'notice')}>
-          <Text as="p" variant="body-sm" id="project-details-locked-notice">
+          <Text as="div" variant="body-sm" id="project-details-locked-notice">
             {blockedReason}
           </Text>
         </InfoBox>

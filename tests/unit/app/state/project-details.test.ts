@@ -198,20 +198,24 @@ describe('resolveWriteBlockedReason', () => {
     ).toBe('This project is open in a tab. Close that tab to change it from here.');
   });
 
-  it('blocked by another session names the holder', () => {
+  it('blocked by another session says it the way the Lock column does', () => {
     expect(
       resolveWriteBlockedReason(
         { kind: 'blocked', heldByText: 'session s (pid 1) since X' },
         { kind: 'lockedByOther', holderDisplaySessionId: 's' },
       ),
-    ).toBe(
-      'Locked — held by session s (pid 1) since X. Changes are disabled until the lock is released.',
-    );
+    ).toBe('Locked by session s. Changes are disabled until the lock is released.');
+    expect(
+      resolveWriteBlockedReason(
+        { kind: 'blocked', heldByText: 'an unidentified session (pid 1) since X' },
+        { kind: 'lockedByOther', holderDisplaySessionId: null },
+      ),
+    ).toBe('Locked by an unidentified session. Changes are disabled until the lock is released.');
   });
 
   it('blocked with no panel row falls back to the holder wording', () => {
-    expect(resolveWriteBlockedReason({ kind: 'blocked', heldByText: 'someone' }, null)).toContain(
-      'held by someone',
-    );
+    expect(
+      resolveWriteBlockedReason({ kind: 'blocked', heldByText: 'held by session s' }, null),
+    ).toBe('held by session s. Changes are disabled until the lock is released.');
   });
 });

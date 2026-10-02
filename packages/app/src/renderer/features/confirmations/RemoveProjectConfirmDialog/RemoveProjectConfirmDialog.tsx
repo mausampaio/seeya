@@ -66,19 +66,19 @@ export function RemoveProjectConfirmDialog(): JSX.Element {
       {request !== null && (
         <Stack gap="md">
           <Stack gap="xs">
-            <Text as="p" variant="body-md" id="remove-project-confirm-context">
+            <Text as="div" variant="body-md" id="remove-project-confirm-context">
               {MESSAGES.confirmRemoveProjectContext(request.fileCount)}
             </Text>
-            <Text as="p" variant="body-md" id="remove-project-confirm-not-deleted">
+            <Text as="div" variant="body-md" id="remove-project-confirm-not-deleted">
               {MESSAGES.confirmRemoveProjectNotDeleted}
             </Text>
           </Stack>
           <Stack gap="xs">
-            <Text as="p" variant="body-sm" tone="secondary">
+            <Text as="div" variant="body-sm" tone="secondary">
               <strong>{MESSAGES.confirmRemoveProjectDecline}:</strong>{' '}
               {MESSAGES.confirmRemoveProjectDeclineExplanation}
             </Text>
-            <Text as="p" variant="body-sm" tone="secondary">
+            <Text as="div" variant="body-sm" tone="secondary">
               <strong>{MESSAGES.confirmRemoveProjectProceed}:</strong>{' '}
               {MESSAGES.confirmRemoveProjectProceedExplanation}
             </Text>

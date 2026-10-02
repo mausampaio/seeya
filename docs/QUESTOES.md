@@ -9575,5 +9575,36 @@ encerrado): o item não existe. Com adiamento mas já depois do horário configu
 desabilitado, com o motivo numa segunda linha ("09:30 has already passed"). O layout do rodapé não
 muda. `Menu` ganhou `disabledReason`/`separatorBefore` por item (nada muda para quem não os usa; o
 `Select` compartilha só o `useRovingFocus`, não o `Menu`).
+## Q-109 — V2-T83: o que a § 4a não diz sobre o diálogo de detalhes do projeto
+
+**Bloqueia:** não — registro, solução mínima já aplicada.
+
+**Contexto.** `docs/INTERFACE.md` § 4a descreve o diálogo por seção, mas deixa quatro pontos em
+aberto que a implementação precisou decidir agora.
+
+1. **Projeto aberto numa aba desta própria janela.** O lock dele é da sessão do `claude` que o `open`
+   lançou (processo vivo), então o motor recusaria qualquer escrita. A § 4a só fala de "travado por
+   outra sessão viva". **Decisão:** é o mesmo caso (escrita desabilitada, leitura continua), mas o
+   motivo muda: "This project is open in a tab. Close that tab to change it from here." — a pessoa
+   resolve fechando a aba, não esperando outra sessão.
+2. **O texto de "apagar a cópia?" é o da CLI, e a frase da CLI é torta.**
+   `core/project-management-message.ts#renderDeleteAdoptedCopyQuestionLine` (movida byte a byte de
+   `cli/format-project-undo.ts`) diz "The adopted copy (session X) it kept writing after being
+   adopted on <ISO>..." — falta um "—"/"which" depois do id, e as datas saem em ISO. A § 4a pede "o
+   mesmo texto da CLI" e a tarefa pede saída da CLI inalterada, então não corrigi a frase.
+   **A decidir:** consertar a gramática (e talvez formatar as datas) nos dois lados de uma vez, numa
+   tarefa que aceite mudar a saída da CLI.
+3. **Push de `projectsUpdate` fora de ordem.** Uma ação de escrita segura o lock do projeto; um tick
+   ambiente de 10s que começava durante ela lia "locked by an unidentified session" e, calculado em
+   paralelo com o push que a própria ação faz ao soltar o lock, podia terminar por último e deixar
+   esse estado velho na tela até o tick seguinte (visto numa captura real do próprio diálogo: o
+   projeto aparecia "Locked" logo depois de **Remove**). **Decisão:**
+   `main/project-ipc.ts#pushProjectsUpdate` descarta o resultado de uma chamada que uma mais nova já
+   superou. Efeito além da tarefa: vale para todo push (Open/Adopt/New project/favorito), sem mudar
+   nenhum outro comportamento; nenhuma regra nova no motor.
+4. **Erro de "Add repository…" mostra o caminho cru.** `pathNotFound` carrega o caminho inteiro
+   (`seeya: "<caminho>" does not exist.`), como na CLI. Pelo seletor nativo ele não acontece na
+   prática (a pessoa escolhe uma pasta que existe); não abreviei com `~` para manter "o mesmo texto
+   da CLI".
 
 **Resposta:** (preenchida pelo PO)

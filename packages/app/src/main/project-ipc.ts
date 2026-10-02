@@ -70,6 +70,7 @@ import {
 import { ProjectAdoptTabLauncher, ProjectOpenTabLauncher } from '../resume/project-tab-launcher.js';
 import type { TabResumeOpener } from '../resume/tab-session-resumer.js';
 import { PendingConfirmations } from '../resume/pending-confirmations.js';
+import { deliverLatestOnly } from '../composition/latest-only.js';
 import {
   buildProjectsPanelData,
   type ProjectsPanelData,
@@ -187,9 +188,12 @@ export function wireProjectIpc(
     );
   }
 
-  async function pushProjectsUpdate(): Promise<void> {
-    window.webContents.send(CHANNELS.projectsUpdate, await computeProjectsPanelData());
-  }
+  // V2-T83: only the NEWEST push is ever sent (`composition/latest-only.ts` has the full reasoning:
+  // a write action holds the project lock, so an ambient tick that overlaps it could otherwise
+  // finish last and leave a stale "Locked" on screen).
+  const pushProjectsUpdate = deliverLatestOnly(computeProjectsPanelData, (data) => {
+    window.webContents.send(CHANNELS.projectsUpdate, data);
+  });
 
   // V2-T30 item 1: fetched once, at startup (`renderer/features/projects/useProjects.ts`),
   // the same "explicit request-response for the FIRST paint, push for every refresh after that"

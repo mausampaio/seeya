@@ -8,7 +8,7 @@
  */
 import { findRepositoryMapEntry } from '@seeya-ai/engine/core/repository-map.js';
 import { MESSAGES } from '../text/messages.js';
-import type { ProjectRowLock } from './projects-panel.js';
+import { formatProjectRowLockText, type ProjectRowLock } from './projects-panel.js';
 import type { ProjectLockStatus } from '@seeya-ai/engine/application/project-lock.js';
 import { computeDisplaySessionIds } from '@seeya-ai/engine/application/session-id-display.js';
 import type {
@@ -180,7 +180,12 @@ export function resolveWriteBlockedReason(
   if (writeAccess.kind === 'open') {
     return undefined;
   }
-  return rowLock?.kind === 'openHere'
-    ? MESSAGES.projectDetailsLockedOpenHere
-    : MESSAGES.projectDetailsLockedByOther(writeAccess.heldByText);
+  if (rowLock?.kind === 'openHere') {
+    return MESSAGES.projectDetailsLockedOpenHere;
+  }
+  // The same words the Projects tab's own Lock column uses ("Locked by session 33333333") whenever
+  // the panel row is there; the engine's own, longer holder sentence only when it is not.
+  const holder =
+    rowLock?.kind === 'lockedByOther' ? formatProjectRowLockText(rowLock) : writeAccess.heldByText;
+  return MESSAGES.projectDetailsLockedByOther(holder);
 }

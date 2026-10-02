@@ -17,8 +17,8 @@ export const PROJECT_DETAILS_MESSAGES = {
   projectDetailsPathLabel: 'Folder',
   projectDetailsLockedOpenHere:
     'This project is open in a tab. Close that tab to change it from here.',
-  projectDetailsLockedByOther: (heldByText: string): string =>
-    `Locked — held by ${heldByText}. Changes are disabled until the lock is released.`,
+  projectDetailsLockedByOther: (holder: string): string =>
+    `${holder}. Changes are disabled until the lock is released.`,
   projectDetailsLoadError: (message: string): string => `Could not read the project: ${message}`,
   projectDetailsActionError: (message: string): string => `That did not work: ${message}`,
 

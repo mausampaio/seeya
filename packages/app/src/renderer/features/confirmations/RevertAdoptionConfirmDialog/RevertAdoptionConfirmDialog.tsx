@@ -64,15 +64,15 @@ export function RevertAdoptionConfirmDialog(): JSX.Element {
     >
       {request !== null && (
         <Stack gap="md">
-          <Text as="p" variant="body-md" id="revert-adoption-confirm-context">
+          <Text as="div" variant="body-md" id="revert-adoption-confirm-context">
             {MESSAGES.confirmRevertContextCommits(request.commitCount)}
           </Text>
           <Stack gap="xs">
-            <Text as="p" variant="body-sm" tone="secondary">
+            <Text as="div" variant="body-sm" tone="secondary">
               <strong>{MESSAGES.confirmRevertDecline}:</strong>{' '}
               {MESSAGES.confirmRevertDeclineExplanation}
             </Text>
-            <Text as="p" variant="body-sm" tone="secondary">
+            <Text as="div" variant="body-sm" tone="secondary">
               <strong>{MESSAGES.confirmRevertProceed}:</strong>{' '}
               {MESSAGES.confirmRevertProceedExplanation}
             </Text>

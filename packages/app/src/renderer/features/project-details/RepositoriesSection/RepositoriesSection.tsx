@@ -116,7 +116,7 @@ export function RepositoriesSection(props: RepositoriesSectionProps): JSX.Elemen
       }
     >
       {props.repositories.length === 0 ? (
-        <Text as="p" variant="body-sm" tone="secondary">
+        <Text as="div" variant="body-sm" tone="secondary">
           {MESSAGES.projectDetailsRepositoriesEmpty}
         </Text>
       ) : (

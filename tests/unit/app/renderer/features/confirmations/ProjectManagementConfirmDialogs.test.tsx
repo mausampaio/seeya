@@ -27,7 +27,7 @@ describe('RevertAdoptionConfirmDialog (V2-T83, docs/INTERFACE.md § 9)', () => {
       const listener = onConfirmRevertAdoptionRequest.mock.calls[0]?.[0] as (
         event: unknown,
       ) => void;
-      act(() =>
+      void act(() =>
         listener({
           requestId: 'req-1',
           projectId: 'auth-hardening',
@@ -109,7 +109,7 @@ describe('DeleteAdoptedCopyConfirmDialog (V2-T83)', () => {
       const listener = onConfirmDeleteAdoptedCopyRequest.mock.calls[0]?.[0] as (
         event: unknown,
       ) => void;
-      act(() =>
+      void act(() =>
         listener({
           requestId: 'req-2',
           projectId: 'auth-hardening',
@@ -179,7 +179,7 @@ describe('RemoveProjectConfirmDialog (V2-T83)', () => {
     const view = render(<RemoveProjectConfirmDialog />);
     const emit = (fileCount: number): void => {
       const listener = onConfirmRemoveProjectRequest.mock.calls[0]?.[0] as (event: unknown) => void;
-      act(() =>
+      void act(() =>
         listener({
           requestId: 'req-3',
           projectId: 'auth-hardening',

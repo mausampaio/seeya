@@ -26,7 +26,7 @@ export function RemoveProjectSection(props: RemoveProjectSectionProps): JSX.Elem
       title={MESSAGES.projectDetailsRemoveHeading}
       className={cx(styles, 'section')}
     >
-      <Text as="p" variant="body-sm" tone="secondary">
+      <Text as="div" variant="body-sm" tone="secondary">
         {MESSAGES.projectDetailsRemoveDescription}
       </Text>
       <div class={cx(styles, 'action')}>

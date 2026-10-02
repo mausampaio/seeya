@@ -28,19 +28,19 @@ export function ProjectDetailsHeader(props: ProjectDetailsHeaderProps): JSX.Elem
   const displayDir = formatDirectoryPathForDisplay(props.dir, props.homeDir, props.platformHint);
   return (
     <Stack gap="xs" className={cx(styles, 'header')}>
-      <Text as="p" variant="heading-3" id="project-details-name" truncate title={props.name}>
+      <Text as="div" variant="heading-3" id="project-details-name" truncate title={props.name}>
         {props.name}
       </Text>
-      <Text as="p" variant="code" tone="secondary" id="project-details-id">
+      <Text as="div" variant="code" tone="secondary" id="project-details-id">
         {props.projectId}
       </Text>
       {props.lockText !== null && (
-        <Text as="p" variant="body-sm" tone="secondary" id="project-details-lock">
+        <Text as="div" variant="body-sm" tone="secondary" id="project-details-lock">
           {MESSAGES.projectDetailsLockLabel}: {props.lockText}
         </Text>
       )}
       <Text
-        as="p"
+        as="div"
         variant="body-sm"
         tone="secondary"
         truncate
