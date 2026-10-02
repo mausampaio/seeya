@@ -270,9 +270,9 @@ describe('AdoptionDialog (V2-T70)', () => {
   });
   describe('the adopted result (V2-T82 item 1)', () => {
     async function showAdoptedResult(): Promise<{ openProject: ReturnType<typeof vi.fn> }> {
-      const openProject = vi.fn((_request: { projectId: string }) =>
-        Promise.resolve({ outcomeText: '' }),
-      );
+      const openProject = vi.fn<
+        (request: { projectId: string }) => Promise<{ outcomeText: string }>
+      >(() => Promise.resolve({ outcomeText: '' }));
       window.seeya = createFakeSeeyaApi({ openProject });
       render(<AdoptionDialog />);
       dispatchAdoptPanel({
