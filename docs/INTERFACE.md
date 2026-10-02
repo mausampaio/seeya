@@ -182,6 +182,34 @@ tab` / `Open` / `Read only…`) continua como está.
 - Toda ação mostra `loading`, aplica o resultado na hora (a lista de projetos é reempurrada) e nunca
   falha em silêncio — o motivo do motor aparece no próprio diálogo.
 
+## 4b. Arquivar projeto (V2-T84)
+
+Decisão do mantenedor em 2026-10-02: projeto não vive para sempre, e remover não é a resposta para
+um projeto que terminou. **Arquivar** é o único estado de ciclo de vida — neutro (serve para
+concluído, pausado ou abandonado), reversível, e sem um campo de status que alguém teria de manter.
+`Remove project` continua existindo para o que foi criado por engano.
+
+- **Onde fica:** no `seeya.json` do projeto — a data do arquivamento e uma nota opcional de uma
+  linha ("Finished — shipped on …"). É fato do projeto (viaja com o espaço de trabalho), ao
+  contrário do favorito, que é preferência da máquina. Escrita só pelo seeya, com commit, pelo
+  caminho protegido do manifesto (V2-T73).
+- **Projeto arquivado some do dia a dia:** fora dos favoritos e dos recentes da lateral, fora da
+  contagem de `All projects`, e fora da lista padrão da aba Projects. A aba ganha o filtro
+  `Archived` (ao lado de `All` · `With a running session` · `Locked`), que mostra só os arquivados,
+  com a data e a nota. As sessões dele continuam na aba Sessions, com o nome do projeto.
+- **Arquivar não muda a captura:** uma sessão viva num projeto arquivado é capturada pelo End day
+  como qualquer outra. Arquivar muda visibilidade, não comportamento.
+- **Abrir um arquivado:** a ação da linha é `Unarchive…`, que pergunta (seção 9) se quer só
+  desarquivar ou desarquivar e abrir — nunca bloqueia, nunca abre em silêncio.
+- **No diálogo Project details (seção 4a):** `Archive project…` acima de `Remove project`, como a
+  opção recomendada; a confirmação pede a nota (opcional) e diz o que muda. `Remove project` passa
+  a dizer que é para projeto criado por engano. Num projeto arquivado, o lugar é de `Unarchive`.
+- **Projeto travado por outra sessão viva:** arquivar é recusado com o motivo (é uma escrita no
+  projeto, D-047 item 8).
+- **CLI:** `seeya project archive <id> [--note "<texto>"]` e `seeya project unarchive <id>`;
+  `project list` separa os arquivados (com a data e a nota), `project show` diz o estado, e
+  `project open` num arquivado recusa dizendo como desarquivar.
+
 ## 5. Aba Sessions
 
 - Título `Sessions`, total e quantas rodando.
