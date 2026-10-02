@@ -28,6 +28,7 @@ import { buildRecentNewTabDirectories } from '../../../state/recent-directories.
 import { setActiveTabId } from './active-tab-registry.js';
 import { registerPageTabOpener } from './page-tab-bridge.js';
 import { registerActiveTabFocuser } from './focus-bridge.js';
+import { registerTabSelector } from './tab-select-bridge.js';
 import type { TerminalHandle } from './TerminalPane/index.js';
 
 export interface TabStripData {
@@ -159,6 +160,10 @@ export function useTabStrip(): TabStripData {
       setActiveId(event.id);
     });
     registerPageTabOpener(openOrFocusPageTab);
+    // V2-T67: registered here, once, for the Projects tab's own "Go to tab" row action
+    // (`tab-select-bridge.ts`'s own docstring) — `setActiveId` is this hook's own state setter,
+    // the exact function `selectTab` (`TabStripData`, below) already exposes to `TabStrip.tsx`.
+    registerTabSelector(setActiveId);
     // Mounts once, for the life of the window — same lifetime the legacy module-level listeners
     // had; `window.seeya.onTabData`/`onTabExit`/`onResumeTabOpened` have no unsubscribe of their
     // own (`main/preload.ts`'s own docstring on why only six `onXUpdate` methods do), and this
