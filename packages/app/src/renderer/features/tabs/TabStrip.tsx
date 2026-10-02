@@ -7,18 +7,15 @@
  * BOTH kinds of pane through one function), so splitting them across two components here would
  * only recreate the coupling with extra prop-drilling.
  *
- * **What's still static, unmoved markup inside `#terminal-host`.** The Sessions page pane
- * (`#page-sessions` and everything inside it) is NOT this task's region (`docs/INTERFACE.md` § 5
- * is a separate, later task) — same id, same nesting, unchanged, so `renderer/legacy/
- * session-search-view.ts`/`other-sessions-dir-dialog-view.ts` keep working exactly as before. Only
- * `hidden` is new: it is computed from `activeId`, the same single source of truth every other
- * pane in this component uses, instead of each page tab button toggling it by hand.
- *
- * `#page-today` (V2-T66) and `#page-projects` (V2-T67, `docs/INTERFACE.md` § 4) are real
- * components now — `<Today/>` and `<Projects/>` (`renderer/features/today/`,
- * `renderer/features/projects/`) — replacing the `#today-panel`/`#projects-list` anchors their own
- * legacy views used to fill by hand (both apagados by their own task). Same `id`s, same position
- * in the tree, so nothing else in this file changes. The bare `<p id="project-open-result-text">`
+ * `#page-today` (V2-T66), `#page-projects` (V2-T67, `docs/INTERFACE.md` § 4), and `#page-sessions`
+ * (V2-T68, `docs/INTERFACE.md` § 5) are real components now — `<Today/>`, `<Projects/>` and
+ * `<Sessions/>` (`renderer/features/today/`, `renderer/features/projects/`,
+ * `renderer/features/sessions/`) — replacing the `#today-panel`/`#projects-list`/
+ * `#other-sessions-list`+`#session-search-*` anchors their own legacy views used to fill by hand
+ * (all apagados by their own task). Same `id`s on the ancestor, same position in the tree, so
+ * nothing else in this file changes — only `hidden` is computed from `activeId`, the same single
+ * source of truth every other pane in this component uses, instead of each page tab button
+ * toggling it by hand. The bare `<p id="project-open-result-text">`
  * sibling of `<Projects/>` is a LEFTOVER, not part of this tab's own designed content
  * (`docs/INTERFACE.md` § 4 never mentions it) — `renderer/legacy/adopt-flow-view.ts`'s own
  * post-adoption "Open project" follow-up button (V2-T30 item 5, untouched by V2-T67) still writes
@@ -54,6 +51,7 @@ import { watchSidebarWidthTransition } from './sidebar-transition-watcher.js';
 import { MESSAGES } from '../../../text/messages.js';
 import { Today } from '../today/index.js';
 import { Projects } from '../projects/index.js';
+import { Sessions } from '../sessions/index.js';
 
 export interface TabStripProps {
   /** `App.tsx`'s own sidebar-reopen button — rendered as the first element of this component's
@@ -177,15 +175,7 @@ export function TabStrip(props: TabStripProps): JSX.Element {
           <p id="project-open-result-text"></p>
         </div>
         <div id="page-sessions" class="page-pane" hidden={data.activeId !== 'page-sessions'}>
-          <h2>Other sessions</h2>
-          <ul id="other-sessions-list"></ul>
-          <form id="session-search-form">
-            <label id="session-search-label" for="session-search-input"></label>
-            <input id="session-search-input" type="text" />
-            <button type="submit" id="session-search-button"></button>
-          </form>
-          <p id="session-search-message"></p>
-          <ul id="session-search-result"></ul>
+          <Sessions />
         </div>
         {data.terminalTabs.map((tab) => (
           <TerminalPane

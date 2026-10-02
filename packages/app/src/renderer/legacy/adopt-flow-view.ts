@@ -9,7 +9,6 @@ import { MESSAGES } from '../../text/messages.js';
 import { reduceAdoptPanel, type AdoptPanelState } from '../../state/adopt-panel.js';
 import { resolveChosenAdoptProjectId } from '../../state/adopt-picker.js';
 import { getLatestProjectsPanelData, triggerProjectOpen } from './projects-panel-cache.js';
-import { closeOtherSessionsDirDialog } from './other-sessions-dir-dialog-view.js';
 import { renderDialogLines } from './dialog-lines.js';
 import type {
   AnswerAdoptionCommitConfirmRequest,
@@ -125,45 +124,34 @@ function wireAdoptFlowLabels(): void {
  * and rendered by `renderAdoptDialogs` after every step, mirroring `renderer.ts#endDayState`'s own
  * discipline for a different multi-step dialog. Wired once, at startup, from `electron/
  * project-panel-view.ts#wireProjectPanel`.
+ *
+ * **`state`/`apply` are module-level, not local to `wireAdoptFlow`** (V2-T68) — `openAdoptPicker`
+ * below needs to reach them from OUTSIDE this module, the same "ligação apenas" the Sessions tab's
+ * own task asks for (the flow's own redesign is V2-T70); hoisting is the smallest change that
+ * makes that possible without a second state machine.
  */
+let state: AdoptPanelState = { kind: 'idle' };
+function apply(next: AdoptPanelState): void {
+  state = next;
+  renderAdoptDialogs(state);
+}
+
+/**
+ * Opens the picker for `sessionId`/`sessionName` — the Sessions tab's own `Adopt…` button
+ * (`renderer/features/sessions/`, V2-T68) calls this directly instead of the DOM-delegated
+ * `.adopt-button`/`data-session-id` click handler the deleted directory modal and id-search result
+ * used to rely on (both apagados by this task): a real Preact component has an `onClick` of its
+ * own, so there is no DOM to delegate from any more.
+ *
+ * @example
+ * openAdoptPicker('11111111-1111-4111-8111-111111111111', 'Payments investigation');
+ */
+export function openAdoptPicker(sessionId: string, sessionName: string): void {
+  apply(reduceAdoptPanel(state, { kind: 'pickerOpened', sessionId, sessionName }));
+}
+
 export function wireAdoptFlow(): void {
-  let state: AdoptPanelState = { kind: 'idle' };
-  function apply(next: AdoptPanelState): void {
-    state = next;
-    renderAdoptDialogs(state);
-  }
-
   wireAdoptFlowLabels();
-
-  /**
-   * "Adopt…" on a session row (event delegation — rows are rebuilt on every push/render). V2-T55
-   * moved every "Adopt…" button out of the flat `#other-sessions-list` (now directory rows only,
-   * `other-sessions-and-ignored-view.ts`) into two other containers that share the identical row
-   * markup (`electron/session-row-view.ts#renderSessionActionRow`): the directory modal
-   * (`#other-sessions-dir-dialog-sessions`) and the id-search result
-   * (`#session-search-result`) — one delegated listener per container, same trigger logic.
-   */
-  for (const containerId of ['other-sessions-dir-dialog-sessions', 'session-search-result']) {
-    document.getElementById(containerId)?.addEventListener('click', (event) => {
-      const button = (event.target as HTMLElement).closest<HTMLButtonElement>('.adopt-button');
-      const sessionId = button?.dataset.sessionId;
-      const sessionName = button?.dataset.sessionName;
-      if (
-        button !== null &&
-        !button.disabled &&
-        sessionId !== undefined &&
-        sessionName !== undefined
-      ) {
-        // PO acceptance correction 3 (2026-09-25): starting an adoption from INSIDE the directory
-        // modal closes it first, so the picker never opens stacked on top of an already-open
-        // dialog. `session-search-result` has no modal of its own to close.
-        if (containerId === 'other-sessions-dir-dialog-sessions') {
-          closeOtherSessionsDirDialog();
-        }
-        apply(reduceAdoptPanel(state, { kind: 'pickerOpened', sessionId, sessionName }));
-      }
-    });
-  }
 
   const pickDialog = document.getElementById('adopt-pick-dialog') as HTMLDialogElement;
   const existingRadio = document.getElementById('adopt-target-existing') as HTMLInputElement;

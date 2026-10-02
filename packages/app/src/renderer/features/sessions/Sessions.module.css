@@ -1,0 +1,11 @@
+/* V2-T68 — the Sessions tab's own root. `.page-pane` (the ancestor `#page-sessions` already has,
+ * `renderer/legacy/legacy.css`) already gives `overflow-y: auto`/padding, same split
+ * `Projects.module.css`'s own docstring explains for an identical ancestor-owned concern. */
+.sessions {
+  display: flex;
+  flex-direction: column;
+}
+
+.ambiguousNotice {
+  margin-bottom: var(--seeya-space-2);
+}

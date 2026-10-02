@@ -1,0 +1,42 @@
+/* V2-T68 — the Sessions tab's own table. Same `table-layout: fixed` + explicit `<th>` `width`
+ * discipline as `ProjectsTable.module.css` — see that file's own top comment for the full
+ * reasoning (makes `Text`'s own `truncate` prop actually truncate). */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.headerCell {
+  box-sizing: border-box;
+  text-align: left;
+  padding: var(--seeya-space-2) var(--seeya-space-3);
+  border-bottom: 1px solid var(--seeya-border-strong);
+}
+
+.headerCell.alignRight {
+  text-align: right;
+}
+
+/* The action cell holds up to two buttons side by side (`Resume`+`Adopt…`), right-aligned within
+ * its own fixed-width column — `display: flex` (never `block`, unlike `ProjectsTable.module.css`'s
+ * own single-button `.actionCell`) is what lines the two up instead of stacking them. */
+.actionCell {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--seeya-space-2);
+}
+
+/* The short id, shown as `[id]`/`Copied!` — a plain button, not `Button`/`IconButton` (neither
+ * fits a tiny monospace-adjacent id label), styled close to a secondary `Text` link. */
+.idCopyButton {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+}
+
+.idCopyButton:hover {
+  text-decoration: underline;
+}

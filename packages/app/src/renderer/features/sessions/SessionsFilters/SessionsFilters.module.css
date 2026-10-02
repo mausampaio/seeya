@@ -1,0 +1,13 @@
+/* V2-T68 — the search field + three filter controls row. Same shape as `ProjectsFilters.module.css`. */
+.filters {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--seeya-space-4);
+  margin-bottom: var(--seeya-space-4);
+}
+
+.search {
+  flex: 1;
+  min-width: 200px;
+}

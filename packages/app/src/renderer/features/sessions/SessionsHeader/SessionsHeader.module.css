@@ -1,0 +1,14 @@
+/* V2-T68 — the Sessions tab's own title row. Same shape as `ProjectsHeader.module.css`. */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--seeya-space-4);
+  margin-bottom: var(--seeya-space-4);
+}
+
+.titleGroup {
+  display: flex;
+  align-items: baseline;
+  gap: var(--seeya-space-2);
+}
