@@ -190,6 +190,23 @@ export function formatProjectRowLockText(lock: ProjectRowLock): string {
   }
 }
 
+/** The Lock COLUMN's own text (V2-T84): the same three facts as `formatProjectRowLockText`, with
+ * the locked case spelled `Locked · <id>` so the session id is never cut at the table's narrowest
+ * width — the full sentence stays on the cell's `title`.
+ *
+ * @example
+ * formatProjectRowLockCellText({ kind: 'lockedByOther', holderDisplaySessionId: '33333333' })
+ * // 'Locked · 33333333'
+ */
+export function formatProjectRowLockCellText(lock: ProjectRowLock): string {
+  if (lock.kind !== 'lockedByOther') {
+    return formatProjectRowLockText(lock);
+  }
+  return lock.holderDisplaySessionId === null
+    ? MESSAGES.projectsLockLockedByUnknownCompact
+    : MESSAGES.projectsLockLockedByCompact(lock.holderDisplaySessionId);
+}
+
 /** Every distinct `sessionId` currently holding a project's lock, across the whole push — the
  * batch `computeDisplaySessionIds` scopes its collision-safe short ids to (V2-T55 item 5's own
  * "escopando ids curtos só ao lote do resultado"). */

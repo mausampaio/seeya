@@ -37,6 +37,7 @@ import { ProjectSessionsPanel, type ProjectSessionsPanelProps } from './ProjectS
 import { MESSAGES } from '../../../../text/messages.js';
 import { formatArchiveDate } from '@seeya-ai/engine/core/project-management-message.js';
 import {
+  formatProjectRowLockCellText,
   formatProjectRowLockText,
   formatSessionLastActivityText,
   resolveProjectRowAction,
@@ -105,7 +106,7 @@ const COLUMNS: readonly {
   // 135px of actual text; "Billing reconciliation", 132px) is exactly the case the PO's own report
   // named as wrapping for no reason; truncation is still correct (and expected) for a genuinely
   // long name, `02-search-active.png`'s own fixture proves that case separately.
-  { key: 'lock', headerKey: 'projectsTableHeaderLock', width: '205px' },
+  { key: 'lock', headerKey: 'projectsTableHeaderLock', width: '172px' },
   {
     key: 'sessions',
     headerKey: 'projectsTableHeaderSessions',
@@ -121,7 +122,7 @@ const COLUMNS: readonly {
   // `toLocaleString()` (`formatSessionLastActivityText`) renders a full date AND time
   // ("02/10/2026, 00:16:44", 21 characters in the pt-BR locale this was measured against, 147px of
   // actual text at this column's own font) — 174px is this column's measured minimum plus margin.
-  { key: 'lastActivity', headerKey: 'projectsTableHeaderLastActivity', width: '152px' },
+  { key: 'lastActivity', headerKey: 'projectsTableHeaderLastActivity', width: '176px' },
   // Paired with `.actionButton`'s own fixed (not minimum) width below — a real capture at
   // 115px/min-width:95px showed the three action labels at three DIFFERENT rendered widths
   // ("Go to tab" and "Read only…" are both naturally wider than the 95px floor, so `min-width`
@@ -288,13 +289,25 @@ function NameCell(props: {
 /** The Lock column's cell: the lock text, or — while `Archived` is on — the archive date. */
 function LockOrArchivedCell(props: { readonly row: ProjectPanelRow }): JSX.Element {
   const { row } = props;
-  const text =
-    row.lifecycle.kind === 'archived'
-      ? formatArchiveDate(row.lifecycle.archivedAt)
-      : formatProjectRowLockText(row.lock);
+  if (row.lifecycle.kind === 'archived') {
+    const date = formatArchiveDate(row.lifecycle.archivedAt);
+    return (
+      <Text as="span" variant="body-sm" tone="secondary" truncate title={date}>
+        {date}
+      </Text>
+    );
+  }
+  // The column shows the compact spelling (the id never gets cut); the cell's `title` keeps the
+  // full sentence `docs/INTERFACE.md` § 4 names.
   return (
-    <Text as="span" variant="body-sm" tone="secondary" truncate title={text}>
-      {text}
+    <Text
+      as="span"
+      variant="body-sm"
+      tone="secondary"
+      truncate
+      title={formatProjectRowLockText(row.lock)}
+    >
+      {formatProjectRowLockCellText(row.lock)}
     </Text>
   );
 }

@@ -765,6 +765,17 @@ foco de teclado numa opção, o "Resume in" da aba Today, o menu do Snooze e o s
 da adoção aberto dentro do diálogo modal; mais `focus-after-escape.txt`, o `id` de quem tem o
 foco depois de um Esc real. As teclas são eventos reais de `sendInputEvent`, nunca `.click()`
 sintético; combinada com `SEEYA_APP_VERIFY_ADOPTION_FAKE`, nunca lança `claude`),
+`SEEYA_APP_VERIFY_ARCHIVE_DIR` (V2-T84: mesma forma de pasta-não-arquivo — onze capturas nomeadas
+pela funcionalidade de arquivar (`main/verification-archive.ts`), com cliques reais nos
+componentes reais: a aba Projects em `All` (sem os arquivados) e em `Archived` (com data e nota),
+a aba Sessions com o `Resume` desligado de um projeto arquivado, a pergunta de `Unarchive…`, o
+Project details de um arquivado e de um ativo, a confirmação de `Archive project…` com a nota e o
+arquivamento feito de verdade (lock, manifesto, commit pelo gancho), a lista e a lateral sem o
+projeto, e `Unarchive and open` pelo `openProject` real até o harness fictício; mais
+`metrics.json` — a geometria de todo texto truncável da tabela a 1200px (um texto com
+`scrollWidth` maior que `clientWidth` está cortado) e os fatos que uma captura não mostra
+(`Resume` desabilitado com o motivo no `title`). Combinada com `SEEYA_APP_VERIFY_FAKE_HARNESS_LOG`;
+nunca lança `claude`),
 `SEEYA_APP_VERIFY_FAKE_HARNESS_LOG` (V2-T82: troca o `HarnessLauncher` de `openProject` por
 `composition/verification-fake-harness-launcher.ts` — nunca lança `claude`, só acrescenta uma
 linha JSON por chamada de `open()` no arquivo indicado; `AppContext.harnessLauncherOverride`;

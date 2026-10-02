@@ -231,7 +231,7 @@ describe('ProjectsTable (V2-T67)', () => {
     expect(getByText('Go to tab')).not.toBeNull();
   });
 
-  it('a project locked by another session shows "Locked by session <id>" and "Read only…"', () => {
+  it('a project locked by another session shows "Locked · <id>" (full sentence on the title) and "Read only…"', () => {
     const row = project({
       lock: { kind: 'lockedByOther', holderDisplaySessionId: 'abcd1234' },
     });
@@ -245,7 +245,10 @@ describe('ProjectsTable (V2-T67)', () => {
         {...EXPANSION_PROPS}
       />,
     );
-    expect(getByText('Locked by session abcd1234')).not.toBeNull();
+    // V2-T84: the column's compact spelling keeps the whole id visible at the narrowest width;
+    // the INTERFACE.md sentence is still there as the cell's tooltip.
+    const cell = getByText('Locked · abcd1234');
+    expect(cell.getAttribute('title')).toBe('Locked by session abcd1234');
     expect(getByText('Read only…')).not.toBeNull();
   });
 

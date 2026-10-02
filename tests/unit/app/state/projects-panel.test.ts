@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildProjectsPanelData,
+  formatProjectRowLockCellText,
   formatProjectRowLockText,
   resolveProjectRowAction,
 } from '../../../../packages/app/src/state/projects-panel.js';
@@ -490,5 +491,20 @@ describe('buildProjectsPanelData (V2-T30 item 1)', () => {
       ]);
       expect(data.ignoredProjects.map((row) => row.projectId)).toEqual(['a', 'b']);
     });
+  });
+});
+
+describe("formatProjectRowLockCellText (V2-T84, the Lock column's compact spelling)", () => {
+  it('spells the locked case "Locked · <id>" and leaves the other two as the full text', () => {
+    expect(
+      formatProjectRowLockCellText({ kind: 'lockedByOther', holderDisplaySessionId: '33333333' }),
+    ).toBe('Locked · 33333333');
+    expect(
+      formatProjectRowLockCellText({ kind: 'lockedByOther', holderDisplaySessionId: null }),
+    ).toBe('Locked · unknown');
+    expect(formatProjectRowLockCellText({ kind: 'unlocked' })).toBe('Unlocked');
+    expect(formatProjectRowLockCellText({ kind: 'openHere', tabId: 't' })).toBe(
+      'Open in this window',
+    );
   });
 });

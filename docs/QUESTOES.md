@@ -9645,4 +9645,39 @@ ela estourava e invertia a asserção (não era timeout); virou 20 000ms numa co
 projetos de integração é o de `vitest.config.ts` (e por quê), distinguindo-o do prazo "operação +
 folga" de `termination`? Não editei o documento.
 
+## Q-112 — V2-T84: o que a § 4b não diz sobre arquivar um projeto
+
+**Bloqueia:** não — registro, solução mínima já aplicada.
+
+**Contexto.** `docs/INTERFACE.md` § 4b fixa o comportamento principal e deixa pontos em aberto que a
+implementação precisou decidir agora.
+
+1. **Colunas da aba Projects no filtro `Archived`.** A § 4b diz "com a data e a nota" e deixa trocar
+   colunas. **Decisão:** a coluna Lock (sem sentido num projeto que ninguém abre) passa a se chamar
+   `Archived` e mostra a data (`YYYY-MM-DD`, UTC, o mesmo formato da CLI); a nota vai numa segunda
+   linha sob o nome (completa no `title`). Sessões, repositórios e última atividade ficam. A linha
+   perde o chevron de sessões, então nunca oferece `Resume`.
+2. **Contagem do cabeçalho com o filtro `Archived`.** "Considera só os ativos" vale para a contagem
+   inteira: o cabeçalho mostra sempre o total de ativos, também dentro de `Archived`.
+3. **`Unarchive…` com o projeto travado por outra sessão viva.** A § 4b só pede "desabilitada com o
+   motivo" para o Project details. **Decisão:** a ação da linha também fica desabilitada, com o motivo
+   no `title` (o motor recusaria de qualquer jeito, D-047 item 8). Dentro de `Unarchive…`, o diálogo
+   mostra a recusa do motor se ela vier mesmo assim, nunca fecha em silêncio.
+4. **`Unarchive` dentro do Project details.** Roda direto (reversível, nada se perde), sem passar
+   pela pergunta de duas saídas da linha; a confirmação de `Archive project…` existe porque pede a
+   nota e porque some do dia a dia.
+5. **Adotar uma sessão para um projeto arquivado.** A § 4b não diz. **Decisão mínima:** o seletor de
+   projeto da adoção na janela continua listando todos (o motor `adoptSession` não olha o
+   `lifecycle`, como a captura e a descoberta); não mudei esse comportamento. Se o mantenedor quiser
+   arquivados fora do seletor, é uma linha em `useAdoption.ts`.
+6. **`schemaVersion` do manifesto sobe de 1 para 2 em toda escrita.** A § 4b manda subir. Efeito
+   além da tarefa: um `seeya` antigo (anterior a esta tarefa) recusa ler um `seeya.json` v2, mesmo
+   de projeto ativo — o espaço de trabalho passa a exigir o `seeya` novo em todas as máquinas que o
+   leem. Um manifesto v1 continua legível (migra sem mudar nada) e só vira v2 na próxima escrita.
+7. **Largura da coluna Lock (pendência do PO).** O id do lock perdia os últimos caracteres a 1200 px
+   (medido: `scrollWidth` 190 > `clientWidth` 181). **Decisão:** a coluna mostra `Locked · <id>`
+   (completo no `title` como `Locked by session <id>`, a frase da § 4), e as larguras foram
+   redistribuídas (Lock 205→172 px, Última atividade 152→176 px — esta também cortava a data, 143 >
+   128, achado na mesma medição). Medido de novo no bundle real: nenhum texto da tabela truncado.
+
 **Resposta:** (preenchida pelo PO)
