@@ -55,7 +55,12 @@ describe('ClaudeHarnessLauncher — V2-T28', () => {
     process.env['FAKE_CLAUDE_EXIT_CODE'] = '0';
     const launcher = new ClaudeHarnessLauncher({ claudeBinary: fixture.binaryPath });
 
-    const result = await launcher.open(PROJECT_CWD, [], SESSION_ID, null);
+    const result = await launcher.open(
+      PROJECT_CWD,
+      [],
+      { kind: 'fresh', sessionId: SESSION_ID },
+      null,
+    );
 
     expect(result).toStrictEqual({ kind: 'opened', exitCode: 0 });
     const calls = await readCapturedInteractiveClaudeCalls(fixture);
@@ -68,7 +73,12 @@ describe('ClaudeHarnessLauncher — V2-T28', () => {
     const launcher = new ClaudeHarnessLauncher({ claudeBinary: fixture.binaryPath });
     const addDirs = [path.join(PROJECT_CWD, 'app-api'), path.join(PROJECT_CWD, 'app-web')];
 
-    const result = await launcher.open(PROJECT_CWD, addDirs, SESSION_ID, null);
+    const result = await launcher.open(
+      PROJECT_CWD,
+      addDirs,
+      { kind: 'fresh', sessionId: SESSION_ID },
+      null,
+    );
 
     expect(result).toStrictEqual({ kind: 'opened', exitCode: 0 });
     const calls = await readCapturedInteractiveClaudeCalls(fixture);
@@ -82,11 +92,37 @@ describe('ClaudeHarnessLauncher — V2-T28', () => {
     ]);
   });
 
+  it('V2-T77: a resume launch spawns the fake claude with --resume <id> and the terminated --add-dir list', async () => {
+    process.env['FAKE_CLAUDE_EXIT_CODE'] = '0';
+    const launcher = new ClaudeHarnessLauncher({ claudeBinary: fixture.binaryPath });
+
+    await launcher.open(
+      PROJECT_CWD,
+      [path.join(PROJECT_CWD, 'app-api')],
+      { kind: 'resume', sessionId: SESSION_ID },
+      null,
+    );
+
+    const calls = await readCapturedInteractiveClaudeCalls(fixture);
+    expect(calls[0]?.argv).toStrictEqual([
+      '--resume',
+      SESSION_ID,
+      '--add-dir',
+      path.join(PROJECT_CWD, 'app-api'),
+      '--',
+    ]);
+  });
+
   it('V2-T35 item 2: a non-null systemPromptAppend becomes --append-system-prompt <text>', async () => {
     process.env['FAKE_CLAUDE_EXIT_CODE'] = '0';
     const launcher = new ClaudeHarnessLauncher({ claudeBinary: fixture.binaryPath });
 
-    await launcher.open(PROJECT_CWD, [], SESSION_ID, 'Project note: locked.');
+    await launcher.open(
+      PROJECT_CWD,
+      [],
+      { kind: 'fresh', sessionId: SESSION_ID },
+      'Project note: locked.',
+    );
 
     const calls = await readCapturedInteractiveClaudeCalls(fixture);
     expect(calls[0]?.argv).toStrictEqual([
@@ -101,7 +137,12 @@ describe('ClaudeHarnessLauncher — V2-T28', () => {
     process.env['FAKE_CLAUDE_EXIT_CODE'] = '7';
     const launcher = new ClaudeHarnessLauncher({ claudeBinary: fixture.binaryPath });
 
-    const result = await launcher.open(PROJECT_CWD, [], SESSION_ID, null);
+    const result = await launcher.open(
+      PROJECT_CWD,
+      [],
+      { kind: 'fresh', sessionId: SESSION_ID },
+      null,
+    );
 
     expect(result).toStrictEqual({ kind: 'opened', exitCode: 7 });
   });
@@ -111,7 +152,7 @@ describe('ClaudeHarnessLauncher — V2-T28', () => {
     process.env['CLAUDE_CODE_CHILD_SESSION'] = 'contaminated-value';
     const launcher = new ClaudeHarnessLauncher({ claudeBinary: fixture.binaryPath });
 
-    await launcher.open(PROJECT_CWD, [], SESSION_ID, null);
+    await launcher.open(PROJECT_CWD, [], { kind: 'fresh', sessionId: SESSION_ID }, null);
 
     const calls = await readCapturedInteractiveClaudeCalls(fixture);
     expect(calls[0]?.env['CLAUDE_CODE_CHILD_SESSION']).toBeUndefined();
@@ -124,7 +165,12 @@ describe('ClaudeHarnessLauncher — V2-T28', () => {
         claudeBinary: path.join(missingDir, 'no-such-claude-binary'),
       });
 
-      const result = await launcher.open(PROJECT_CWD, [], SESSION_ID, null);
+      const result = await launcher.open(
+        PROJECT_CWD,
+        [],
+        { kind: 'fresh', sessionId: SESSION_ID },
+        null,
+      );
 
       expect(result).toStrictEqual({ kind: 'failedToStart' });
     } finally {

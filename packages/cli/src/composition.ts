@@ -497,6 +497,8 @@ export interface ProjectContext {
    * imported a second time by `application/` (D-020's own matrix: `application/` cannot import
    * `adapters/`). */
   readonly lockFileName: string;
+  /** V2-T77: `open --resume`'s own membership check compares `cwd`s the way this machine does. */
+  readonly platformHint: PathPlatformHint;
   /** V2-T34 (PO review): `resolveCliHookEnv()`'s own docstring below. */
   readonly hookEnv: Readonly<Record<string, string>>;
 }
@@ -533,6 +535,7 @@ export function buildProjectContext(
     cliEntryPath: resolveCliEntryPath(),
     auditMarker: new FsProjectAuditMarker(),
     lockFileName: PROJECT_LOCK_FILE_NAME,
+    platformHint: process.platform === 'win32' ? 'win32' : 'posix',
     hookEnv: resolveCliHookEnv(electronVersion),
   };
 }

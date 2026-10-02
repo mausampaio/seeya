@@ -9,14 +9,15 @@ import { describe, expect, it } from 'vitest';
 import { buildOpenArgs } from '@seeya-ai/engine/adapters/harness/args.js';
 
 const SESSION_ID = '11111111-1111-4111-8111-111111111111';
+const FRESH = { kind: 'fresh', sessionId: SESSION_ID } as const;
 
 describe('buildOpenArgs', () => {
   it('no directories, no system prompt append — just --session-id', () => {
-    expect(buildOpenArgs([], SESSION_ID, null)).toEqual(['--session-id', SESSION_ID]);
+    expect(buildOpenArgs([], FRESH, null)).toEqual(['--session-id', SESSION_ID]);
   });
 
   it('one directory: --session-id <id> --add-dir <dir> --', () => {
-    expect(buildOpenArgs(['/code/app-api'], SESSION_ID, null)).toEqual([
+    expect(buildOpenArgs(['/code/app-api'], FRESH, null)).toEqual([
       '--session-id',
       SESSION_ID,
       '--add-dir',
@@ -26,7 +27,7 @@ describe('buildOpenArgs', () => {
   });
 
   it('several directories: all listed, THEN the terminator', () => {
-    expect(buildOpenArgs(['/code/app-api', '/code/app-web'], SESSION_ID, null)).toEqual([
+    expect(buildOpenArgs(['/code/app-api', '/code/app-web'], FRESH, null)).toEqual([
       '--session-id',
       SESSION_ID,
       '--add-dir',
@@ -37,7 +38,7 @@ describe('buildOpenArgs', () => {
   });
 
   it('a system prompt append comes right after --session-id, before --add-dir', () => {
-    expect(buildOpenArgs(['/code/app-api'], SESSION_ID, 'Project note')).toEqual([
+    expect(buildOpenArgs(['/code/app-api'], FRESH, 'Project note')).toEqual([
       '--session-id',
       SESSION_ID,
       '--append-system-prompt',
@@ -48,8 +49,21 @@ describe('buildOpenArgs', () => {
     ]);
   });
 
+  it('a resume launch uses --resume <id> in the same first position, never --session-id (V2-T77)', () => {
+    const resume = { kind: 'resume', sessionId: SESSION_ID } as const;
+    expect(buildOpenArgs(['/code/app-api'], resume, null)).toEqual([
+      '--resume',
+      SESSION_ID,
+      '--add-dir',
+      '/code/app-api',
+      '--',
+    ]);
+    expect(buildOpenArgs([], resume, null)).toEqual(['--resume', SESSION_ID]);
+    expect(buildOpenArgs([], resume, null)).not.toContain('--session-id');
+  });
+
   it('null system prompt append never adds the flag at all', () => {
-    const args = buildOpenArgs([], SESSION_ID, null);
+    const args = buildOpenArgs([], FRESH, null);
     expect(args).not.toContain('--append-system-prompt');
   });
 
@@ -61,7 +75,7 @@ describe('buildOpenArgs', () => {
    * prove the terminator is there, on purpose, in the right place.
    */
   it('the array always ends with the literal "--" terminator when any directory is present', () => {
-    const args = buildOpenArgs(['/code/app-api', '/code/app-web'], SESSION_ID, null);
+    const args = buildOpenArgs(['/code/app-api', '/code/app-web'], FRESH, null);
     expect(args[args.length - 1]).toBe('--');
     expect(args.filter((arg) => arg === '--')).toHaveLength(1);
   });

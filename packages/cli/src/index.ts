@@ -425,14 +425,32 @@ projectCommand
   )
   .argument('<id>', 'The project id, e.g. "auth-hardening".')
   .option('--with <harness>', "Harness to open instead of the project's own default.")
-  .action(async (id: string, options: { with?: string }) => {
-    const context = buildProjectContext();
+  .option(
+    '--resume <session>',
+    "Resume one of the project's own sessions instead of starting a new one (V2-T77): same lock, " +
+      'hooks and questions as a plain open. The session by sessionId (or prefix — also finds one ' +
+      'closed longer ago than "seeya sessions" shows), name or cwd. Refused when the session is ' +
+      'running right now or has no evidence of belonging to the project.',
+  )
+  .action(async (id: string, options: { with?: string; resume?: string }) => {
+    // `--resume` needs session discovery too; a plain open never pays for it.
+    const adoptContext = options.resume === undefined ? null : await buildProjectAdoptContext();
+    const context = adoptContext ?? buildProjectContext();
     const deps = await buildProjectOpenDeps(context);
-    const exitCode = await runProjectOpenCommand(deps, id, options.with, {
+    const io = {
       stdin: process.stdin,
       stdout: process.stdout,
       isTTY: process.stdin.isTTY === true,
-    });
+    };
+    const resume =
+      adoptContext === null || options.resume === undefined
+        ? undefined
+        : {
+            sessionRef: options.resume,
+            sessionProvider: adoptContext.sessionProvider,
+            sessionIdLookup: adoptContext.sessionIdLookup,
+          };
+    const exitCode = await runProjectOpenCommand(deps, id, options.with, io, resume);
     if (exitCode !== 0) {
       process.exitCode = exitCode;
     }

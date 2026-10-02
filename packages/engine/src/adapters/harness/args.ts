@@ -1,3 +1,5 @@
+import type { HarnessSessionLaunch } from '../../core/ports.js';
+
 /**
  * Argument array for `seeya project open` (V2-T28) — opens `claude` fresh (no `--resume`, no
  * prompt) with each associated repository's local path released via `--add-dir`.
@@ -14,18 +16,21 @@
  */
 
 /**
+ * V2-T77: a `resume` launch swaps `--session-id <id>` for `--resume <id>` and nothing else — it
+ * sits in the same first position, so it is still never adjacent to the variadic `--add-dir`.
+ *
  * @example
- * buildOpenArgs([], '11111111-1111-4111-8111-111111111111', null)
+ * buildOpenArgs([], { kind: 'fresh', sessionId: '11111111-1111-4111-8111-111111111111' }, null)
  * // ['--session-id', '11111111-1111-4111-8111-111111111111']
- * buildOpenArgs(['/code/app-api', '/code/app-web'], '11111111-1111-4111-8111-111111111111', 'note')
- * // ['--session-id', '...', '--append-system-prompt', 'note', '--add-dir', '/code/app-api', '/code/app-web', '--']
+ * buildOpenArgs(['/code/app-api'], { kind: 'resume', sessionId: '11111111-1111-4111-8111-111111111111' }, null)
+ * // ['--resume', '11111111-...', '--add-dir', '/code/app-api', '--']
  */
 export function buildOpenArgs(
   addDirs: readonly string[],
-  sessionId: string,
+  launch: HarnessSessionLaunch,
   systemPromptAppend: string | null,
 ): string[] {
-  const args = ['--session-id', sessionId];
+  const args = [launch.kind === 'resume' ? '--resume' : '--session-id', launch.sessionId];
   if (systemPromptAppend !== null) {
     args.push('--append-system-prompt', systemPromptAppend);
   }

@@ -15,6 +15,7 @@ import type {
   HandoffGenerator,
   HarnessLauncher,
   HarnessOpenResult,
+  HarnessSessionLaunch,
   ManifestRestoreOutcome,
   ProcessControl,
   ProjectAuditMarker,
@@ -1254,7 +1255,7 @@ export class FakeHarnessLauncher implements HarnessLauncher {
   readonly calls: {
     readonly cwd: string;
     readonly addDirs: readonly string[];
-    readonly sessionId: string;
+    readonly launch: HarnessSessionLaunch;
     readonly systemPromptAppend: string | null;
   }[] = [];
 
@@ -1263,10 +1264,10 @@ export class FakeHarnessLauncher implements HarnessLauncher {
   open(
     cwd: string,
     addDirs: readonly string[],
-    sessionId: string,
+    launch: HarnessSessionLaunch,
     systemPromptAppend: string | null,
   ): Promise<HarnessOpenResult> {
-    this.calls.push({ cwd, addDirs, sessionId, systemPromptAppend });
+    this.calls.push({ cwd, addDirs, launch, systemPromptAppend });
     return Promise.resolve(this.result);
   }
 }

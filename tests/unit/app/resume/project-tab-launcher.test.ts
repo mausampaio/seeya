@@ -63,7 +63,7 @@ describe('ProjectOpenTabLauncher (V2-T30 item 3)', () => {
     const resultPromise = launcher.open(
       '/seeya/workspace/auth-hardening',
       ['/code/app-api'],
-      '11111111-1111-4111-8111-111111111111',
+      { kind: 'fresh', sessionId: '11111111-1111-4111-8111-111111111111' },
       'note',
     );
     expect(opener.openedTabs).toEqual([
@@ -101,7 +101,12 @@ describe('ProjectOpenTabLauncher (V2-T30 item 3)', () => {
     const launcher = new ProjectOpenTabLauncher({ claudeCommand: 'claude', opener, label: 'x' });
 
     await expect(
-      launcher.open('/seeya/workspace/x', [], '11111111-1111-4111-8111-111111111111', null),
+      launcher.open(
+        '/seeya/workspace/x',
+        [],
+        { kind: 'fresh', sessionId: '11111111-1111-4111-8111-111111111111' },
+        null,
+      ),
     ).resolves.toEqual({ kind: 'failedToStart' });
   });
 });

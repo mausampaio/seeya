@@ -73,6 +73,7 @@ describe('formatProjectOpenOutcomeText (V2-T30 item 3)', () => {
       kind: 'opened',
       projectId: 'auth-hardening',
       harness: 'claude',
+      sessionLaunch: 'fresh',
       exitCode: 0,
       addedDirs: [],
       missing: [],

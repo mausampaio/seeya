@@ -1569,10 +1569,22 @@ export interface HarnessLauncher {
   open(
     cwd: string,
     addDirs: readonly string[],
-    sessionId: string,
+    launch: HarnessSessionLaunch,
     systemPromptAppend: string | null,
   ): Promise<HarnessOpenResult>;
 }
+
+/**
+ * V2-T77: which session `HarnessLauncher.open` starts — a discriminated union (D-024), never a
+ * bare id plus a flag. `fresh` is the `open` of V2-T35 (`claude --session-id <id>`, an id the
+ * composition root generated); `resume` is `seeya project open <id> --resume <session>`
+ * (`claude --resume <id>`, the session's own existing id). With `resume`, `systemPromptAppend` is
+ * ignored by design: Q-069 measured that `--append-system-prompt*` never reaches a resumed
+ * session, so `application/project-open.ts` passes `null` rather than pretend.
+ */
+export type HarnessSessionLaunch =
+  | { readonly kind: 'fresh'; readonly sessionId: string }
+  | { readonly kind: 'resume'; readonly sessionId: string };
 
 // Own block at the end of the file on purpose (V2-T33), same pattern `HarnessLauncher`/
 // `AppInstallation` above already established: a new interface, appended rather than inserted

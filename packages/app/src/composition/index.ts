@@ -399,6 +399,7 @@ export function buildProjectOpenDeps(
     ...projectHookIdentity(),
     auditMarker: new FsProjectAuditMarker(),
     lockFileName: PROJECT_LOCK_FILE_NAME,
+    platformHint: context.platformHint,
   };
 }
 

@@ -8,7 +8,7 @@
  * either — adapter-to-adapter imports are allowed by the layer matrix (docs/ARQUITETURA.md; only
  * `application/`, `cli/` and `scheduler/` are restricted from `adapters/`).
  */
-import type { HarnessLauncher, HarnessOpenResult } from '../../core/ports.js';
+import type { HarnessLauncher, HarnessOpenResult, HarnessSessionLaunch } from '../../core/ports.js';
 import { runInteractive } from '../resumption/spawn-interactive.js';
 import { buildResumptionEnv } from '../resumption/env.js';
 import { buildOpenArgs } from './args.js';
@@ -27,13 +27,13 @@ export class ClaudeHarnessLauncher implements HarnessLauncher {
   async open(
     cwd: string,
     addDirs: readonly string[],
-    sessionId: string,
+    launch: HarnessSessionLaunch,
     systemPromptAppend: string | null,
   ): Promise<HarnessOpenResult> {
     const claudeBinary = this.options.claudeBinary ?? DEFAULT_CLAUDE_BINARY;
     const result = await runInteractive({
       claudeBinary,
-      args: buildOpenArgs(addDirs, sessionId, systemPromptAppend),
+      args: buildOpenArgs(addDirs, launch, systemPromptAppend),
       cwd,
       env: buildResumptionEnv(process.env),
     });

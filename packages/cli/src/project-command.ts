@@ -16,6 +16,7 @@ import { addRepository } from '@seeya-ai/engine/application/repository-associati
 import { openProject } from '@seeya-ai/engine/application/project-open.js';
 import type {
   ConfirmLeftoverChanges,
+  OpenSessionRequest,
   ConfirmReadOnlyOpen,
   ProjectOpenDeps,
 } from '@seeya-ai/engine/application/project-open.js';
@@ -46,6 +47,7 @@ import {
   formatClaudeMdLines,
   formatMissingRepositoryLines,
   formatOpenProjectReport,
+  formatResumeLimitLines,
   formatProjectLockWarningLines,
   parseLeftoverChangesAnswer,
   parseReadOnlyOpenConfirmation,
@@ -185,26 +187,38 @@ export async function runProjectOpenCommand(
   projectId: string,
   harness: string | undefined,
   io: ProjectOpenIo,
+  resume?: ProjectResumeRequest,
 ): Promise<number> {
+  const sessionRequest = await resolveOpenSessionRequest(resume, io);
+  if (sessionRequest === null) {
+    return 1;
+  }
   const reader = openConfirmationReader(io);
   let result;
   try {
-    result = await openProject(deps, projectId, harness, {
-      onBeforeLaunch: ({ missing, lock, audit, claudeMd, manifestRestore }) => {
-        const lines = [
-          ...formatManifestRestoreLines(manifestRestore),
-          ...formatAuditLines(audit),
-          ...formatClaudeMdLines(projectId, claudeMd),
-          ...formatMissingRepositoryLines(projectId, missing),
-          ...formatProjectLockWarningLines(projectId, lock),
-        ];
-        for (const line of lines) {
-          io.stdout.write(`${line}\n`);
-        }
+    result = await openProject(
+      deps,
+      projectId,
+      harness,
+      {
+        onBeforeLaunch: ({ missing, lock, audit, claudeMd, manifestRestore }) => {
+          const lines = [
+            ...formatManifestRestoreLines(manifestRestore),
+            ...formatAuditLines(audit),
+            ...formatClaudeMdLines(projectId, claudeMd),
+            ...formatMissingRepositoryLines(projectId, missing),
+            ...formatProjectLockWarningLines(projectId, lock),
+            ...(sessionRequest.kind === 'resume' ? formatResumeLimitLines(projectId) : []),
+          ];
+          for (const line of lines) {
+            io.stdout.write(`${line}\n`);
+          }
+        },
+        confirmReadOnlyOpen: makeReadOnlyOpenConfirmer(reader),
+        confirmLeftoverChanges: makeLeftoverChangesConfirmer(reader),
       },
-      confirmReadOnlyOpen: makeReadOnlyOpenConfirmer(reader),
-      confirmLeftoverChanges: makeLeftoverChangesConfirmer(reader),
-    });
+      sessionRequest,
+    );
   } finally {
     reader?.close();
   }
@@ -212,6 +226,45 @@ export async function runProjectOpenCommand(
   // V2-T35 item 1: a deliberate decline is not a failure ("Nothing selected — nothing resumed"'s
   // own precedent in `start-day-command.ts`) — everything else non-`opened` is.
   return result.kind === 'opened' || result.kind === 'lockConfirmationDeclined' ? 0 : 1;
+}
+
+/** V2-T77: what `seeya project open <id> --resume <session>` needs to turn the typed `<session>`
+ * into a `DiscoveredSession` — the same two ports `runProjectAdoptCommand` already takes. */
+export interface ProjectResumeRequest {
+  readonly sessionRef: string;
+  readonly sessionProvider: SessionProvider;
+  readonly sessionIdLookup: SessionIdLookup;
+}
+
+/** `{ kind: 'new' }` without `--resume`; with it, the session resolved exactly like `adopt` resolves
+ * its own (V2-T55: id/prefix, name or cwd; an id-shaped value also searches past `relevanceHours`).
+ * `null` means the reference matched nothing or more than one — already reported on `io.stdout`,
+ * and nothing was launched (an ambiguous match is never resolved on the person's behalf, D-025). */
+async function resolveOpenSessionRequest(
+  resume: ProjectResumeRequest | undefined,
+  io: ProjectOpenIo,
+): Promise<OpenSessionRequest | null> {
+  if (resume === undefined) {
+    return { kind: 'new' };
+  }
+  const discovery = await resume.sessionProvider.list();
+  const match = await resolveSessionReferenceForAdoption(
+    discovery.sessions,
+    resume.sessionIdLookup,
+    resume.sessionRef,
+  );
+  if (match.kind === 'found') {
+    return { kind: 'resume', session: match.item };
+  }
+  io.stdout.write(
+    `${
+      match.kind === 'notFound'
+        ? formatAdoptNoMatchMessage(resume.sessionRef, discovery.sessions.length)
+        : formatAdoptAmbiguousMatchMessage(resume.sessionRef, match.matches)
+    }
+`,
+  );
+  return null;
 }
 
 /** V2-T29 item 4: `adoptSession`'s own `ConfirmAdoptionCommit` — same "no TTY, no silent guess"
