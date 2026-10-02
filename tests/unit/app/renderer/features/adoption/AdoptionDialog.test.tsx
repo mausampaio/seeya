@@ -42,7 +42,7 @@ describe('AdoptionDialog (V2-T70)', () => {
     await waitFor(() => expect(getDialog().open).toBe(true));
 
     expect(getByText('Payments investigation')).not.toBeNull();
-    expect(getByText('[11111111]')).not.toBeNull();
+    expect(getByText('11111111')).not.toBeNull();
     // No projects exist in this fixture's own cache — the empty-list message shows instead of a
     // `<select>` with no options.
     expect(getByText('No projects yet — type a new project id below.')).not.toBeNull();

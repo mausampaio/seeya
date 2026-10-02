@@ -668,10 +668,15 @@ async function captureSessionsTabStatesVerification(
   function setSelectValue(id: string, value: string): Promise<unknown> {
     return window.webContents.executeJavaScript(`
       (() => {
-        const el = document.getElementById('${id}');
-        if (!el) { return; }
-        el.value = ${JSON.stringify(value)};
-        el.dispatchEvent(new Event('change', { bubbles: true }));
+        // V2-T81: \`Select\` is a trigger button + a listbox of \`role="option"\` items (every item
+        // is always in the DOM — the Popover only hides its dialog), not a native <select>: choose
+        // an option exactly as a click would, through its own \`data-value\`.
+        const trigger = document.getElementById('${id}');
+        if (!trigger) { return; }
+        const listbox = document.getElementById(trigger.getAttribute('aria-controls') || '');
+        const option = [...(listbox ? listbox.querySelectorAll('[role="option"]') : [])]
+          .find((o) => o.getAttribute('data-value') === ${JSON.stringify(value)});
+        if (option) { option.click(); }
       })();
     `);
   }
@@ -744,14 +749,12 @@ async function captureSessionsTabStatesVerification(
 
   await window.webContents.executeJavaScript(`
     (() => {
-      const select = document.getElementById('sessions-filter-directory');
-      const option = select ? [...select.options].find((o) =>
+      const trigger = document.getElementById('sessions-filter-directory');
+      const listbox = trigger ? document.getElementById(trigger.getAttribute('aria-controls') || '') : null;
+      const option = listbox ? [...listbox.querySelectorAll('[role="option"]')].find((o) =>
         o.textContent.includes('directory-filter-demo') || (o.title || '').includes('directory-filter-demo')
       ) : undefined;
-      if (select && option) {
-        select.value = option.value;
-        select.dispatchEvent(new Event('change', { bubbles: true }));
-      }
+      if (option) { option.click(); }
     })();
   `);
   await clock.sleep(300);
@@ -1163,6 +1166,91 @@ async function captureAdoptionFlowVerification(
 }
 
 /**
+ * V2-T81 (`renderer/components/Select/`): captures every place the select and the Snooze menu
+ * appear, in whichever theme the fixture home's own `config.json` names, so the two can be
+ * compared side by side. Never drives anything with side effects: it only opens/closes lists and
+ * moves keyboard focus (real key events through `sendInputEvent`, not synthetic DOM ones), and the
+ * adoption dialog is only ever OPENED to its first step (`SEEYA_APP_VERIFY_ADOPTION_FAKE` keeps a
+ * real `claude` out of reach regardless). Files, in order: `01-sessions-filters-closed`,
+ * `02-project-list-open`, `03-directory-list-open` (long path), `04-directory-keyboard-focus`
+ * (ArrowDown/ArrowDown/ArrowDown), `05-today-resume-in-open` (mono), `06-snooze-menu-open`,
+ * `07-adoption-project-open` (inside the modal dialog); plus `focus-after-escape.txt`, the id of
+ * the element holding focus after Esc closed the project list (the trigger, when it works).
+ */
+async function captureSelectStatesVerification(
+  window: BrowserWindow,
+  clock: Clock,
+  outDir: string,
+): Promise<void> {
+  const { writeFile } = await import('node:fs/promises');
+  async function shoot(name: string): Promise<void> {
+    const image = await window.webContents.capturePage();
+    await writeFile(path.join(outDir, name), image.toPNG());
+  }
+  function run(script: string): Promise<unknown> {
+    return window.webContents.executeJavaScript(script);
+  }
+  function click(selector: string): Promise<unknown> {
+    return run(`!!document.querySelector(${JSON.stringify(selector)})?.click();`);
+  }
+  async function pressKey(keyCode: string): Promise<void> {
+    window.webContents.sendInputEvent({ type: 'keyDown', keyCode });
+    window.webContents.sendInputEvent({ type: 'keyUp', keyCode });
+    await clock.sleep(150);
+  }
+
+  // No ownership-transition dismiss here: the driver pre-writes the declined answer into the
+  // disposable home (`daemon-ownership-transition.json`), so that dialog never appears.
+  await clock.sleep(2600);
+
+  await click('#sessions-link');
+  await clock.sleep(1200);
+  await shoot('01-sessions-filters-closed.png');
+
+  await click('#sessions-filter-project');
+  await clock.sleep(300);
+  await shoot('02-project-list-open.png');
+  await pressKey('Escape');
+  await clock.sleep(200);
+  const focused = await run('document.activeElement && document.activeElement.id');
+  await writeFile(path.join(outDir, 'focus-after-escape.txt'), String(focused));
+
+  await click('#sessions-filter-directory');
+  await clock.sleep(300);
+  await shoot('03-directory-list-open.png');
+  await pressKey('Down');
+  await pressKey('Down');
+  await pressKey('Down');
+  await shoot('04-directory-keyboard-focus.png');
+  await pressKey('Escape');
+  await clock.sleep(200);
+
+  await click('#today-card');
+  await clock.sleep(600);
+  await click('[id^="today-resume-in-"]');
+  await clock.sleep(300);
+  await shoot('05-today-resume-in-open.png');
+  await pressKey('Escape');
+  await clock.sleep(200);
+
+  await click('#schedule-strip-snooze-button');
+  await clock.sleep(300);
+  await shoot('06-snooze-menu-open.png');
+  await pressKey('Escape');
+  await clock.sleep(200);
+
+  await click('#sessions-link');
+  await clock.sleep(500);
+  await click('[data-adopt-session-id] button');
+  await clock.sleep(600);
+  await click('#adoption-pick-existing-select');
+  await clock.sleep(300);
+  await shoot('07-adoption-project-open.png');
+
+  await quitAfterConfiguredDelay(clock);
+}
+
+/**
  * V2-T17 item 4: opt-in instrumentation for the "time until the session list is on screen"
  * measurement (`docs/DESEMPENHO.md`). Writes the wall-clock instant (via the injected `Clock`,
  * D-019 — `process.hrtime`/`Date.now()` are banned outside `adapters/clock/` by
@@ -1559,6 +1647,15 @@ function createWindow(clock: Clock): BrowserWindow {
   if (adoptionFlowDir !== undefined) {
     window.webContents.once('did-finish-load', () => {
       void captureAdoptionFlowVerification(window, clock, adoptionFlowDir);
+    });
+  }
+  // SEEYA_APP_VERIFY_SELECT_STATES_DIR (V2-T81): same "a DIRECTORY, not a single file" shape as the
+  // flags above — see `captureSelectStatesVerification`'s own docstring for the sequence. Combine
+  // with `SEEYA_APP_VERIFY_ADOPTION_FAKE`. Never set by `npm run app` or the README.
+  const selectStatesDir = process.env.SEEYA_APP_VERIFY_SELECT_STATES_DIR;
+  if (selectStatesDir !== undefined) {
+    window.webContents.once('did-finish-load', () => {
+      void captureSelectStatesVerification(window, clock, selectStatesDir);
     });
   }
   // SEEYA_APP_AUTO_OPEN_SHELL_TAB: same "instrumentação só do spike" class as SEEYA_APP_OFFSCREEN

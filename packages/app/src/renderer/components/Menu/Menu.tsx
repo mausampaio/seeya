@@ -15,11 +15,12 @@
  *   onSelect={(value) => snooze(Number(value))} onRequestClose={() => setOpen(false)}/>
  */
 import { useEffect, useRef } from 'preact/hooks';
-import type { JSX, RefObject, TargetedEvent } from 'preact';
+import type { JSX, RefObject } from 'preact';
 import styles from './Menu.module.css';
 import { cx } from '../css-class.js';
 import { Popover } from '../Popover/index.js';
 import { Text } from '../Text/index.js';
+import { useRovingFocus } from '../../hooks/useRovingFocus.js';
 
 export interface MenuItem {
   readonly value: string;
@@ -38,12 +39,13 @@ export interface MenuProps {
   readonly onRequestClose: () => void;
 }
 
-function menuItemButtons(list: HTMLUListElement | null): HTMLButtonElement[] {
-  return Array.from(list?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? []);
-}
-
 export function Menu(props: MenuProps): JSX.Element {
   const listRef = useRef<HTMLUListElement>(null);
+  // Arrow-key roving focus is shared with `Select` (`renderer/hooks/useRovingFocus.ts`, V2-T81) —
+  // defaults only (ArrowUp/ArrowDown, wrapping): no Home/End, no typeahead, exactly what this
+  // menu always did. Esc/Enter need no handling — Esc already closes the underlying `<dialog>`
+  // natively, and Enter/Space on a focused `<button>` already fires its own `onClick`.
+  const { onKeyDown, items } = useRovingFocus({ listRef, itemSelector: '[role="menuitem"]' });
 
   // WAI-ARIA menu pattern: opening a menu moves focus straight to its first item — the trigger
   // button never keeps focus once the menu is showing (this is also what makes arrow-key roving
@@ -52,22 +54,8 @@ export function Menu(props: MenuProps): JSX.Element {
     if (!props.open) {
       return;
     }
-    menuItemButtons(listRef.current)[0]?.focus();
+    items()[0]?.focus();
   }, [props.open]);
-
-  function handleKeyDown(event: TargetedEvent<HTMLUListElement, KeyboardEvent>): void {
-    const buttons = menuItemButtons(listRef.current);
-    const currentIndex = buttons.indexOf(document.activeElement as HTMLButtonElement);
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      buttons[(currentIndex + 1) % buttons.length]?.focus();
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      buttons[(currentIndex - 1 + buttons.length) % buttons.length]?.focus();
-    }
-    // Esc/Enter need no handling here — Esc already closes the underlying `<dialog>` natively, and
-    // Enter/Space on a focused `<button>` already fires its own `onClick` without help.
-  }
 
   function select(value: string): void {
     props.onSelect(value);
@@ -86,7 +74,7 @@ export function Menu(props: MenuProps): JSX.Element {
         role="menu"
         aria-label={props.ariaLabel}
         class={cx(styles, 'menu')}
-        onKeyDown={handleKeyDown}
+        onKeyDown={onKeyDown}
       >
         {props.items.map((item) => (
           <li key={item.value} role="none">

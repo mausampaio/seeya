@@ -29,6 +29,13 @@ export function registerActiveTerminalFocuser(focuser: () => void): void {
  */
 export function wireDialogFocusReturn(): void {
   for (const dialog of document.querySelectorAll('dialog')) {
-    dialog.addEventListener('close', () => focusActiveTerminal());
+    dialog.addEventListener('close', () => {
+      // V2-T81: a `Popover` that returns focus to its own anchor (`Select`'s trigger) opts out —
+      // sending focus to the terminal afterwards would undo that.
+      if (dialog.dataset.returnFocus === 'anchor') {
+        return;
+      }
+      focusActiveTerminal();
+    });
   }
 }

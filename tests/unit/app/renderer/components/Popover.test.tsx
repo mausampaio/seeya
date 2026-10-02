@@ -72,3 +72,48 @@ describe('Popover (D-052, V2-T64)', () => {
     expect(onRequestClose).not.toHaveBeenCalled();
   });
 });
+
+describe('Popover focus and width options (V2-T81)', () => {
+  function OptionsHarness(props: { readonly returnFocus: boolean }) {
+    const anchorRef = useRef<HTMLButtonElement>(null);
+    return (
+      <>
+        <button ref={anchorRef} type="button" data-testid="anchor">
+          +
+        </button>
+        <Popover
+          id="opt-popover"
+          open
+          anchorRef={anchorRef}
+          matchAnchorWidth
+          returnFocusToAnchor={props.returnFocus}
+          onRequestClose={() => {}}
+        >
+          <p>content</p>
+        </Popover>
+      </>
+    );
+  }
+
+  it('returnFocusToAnchor: closing focuses the anchor and marks the dialog for the global focus return to skip', () => {
+    const { container, getByTestId } = render(<OptionsHarness returnFocus />);
+    const dialog = container.querySelector('dialog') as HTMLDialogElement;
+    expect(dialog.dataset.returnFocus).toBe('anchor');
+    dialog.close();
+    expect(document.activeElement).toBe(getByTestId('anchor'));
+  });
+
+  it('without returnFocusToAnchor the dialog carries no marker and focus is not forced', () => {
+    const { container, getByTestId } = render(<OptionsHarness returnFocus={false} />);
+    const dialog = container.querySelector('dialog') as HTMLDialogElement;
+    expect(dialog.dataset.returnFocus).toBeUndefined();
+    dialog.close();
+    expect(document.activeElement).not.toBe(getByTestId('anchor'));
+  });
+
+  it('matchAnchorWidth sets a min-width from the anchor on open', () => {
+    const { container } = render(<OptionsHarness returnFocus={false} />);
+    const dialog = container.querySelector('dialog') as HTMLDialogElement;
+    expect(dialog.style.minWidth).toMatch(/^\d+(\.\d+)?px$/);
+  });
+});
