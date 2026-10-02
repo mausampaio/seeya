@@ -9400,3 +9400,27 @@ própria tabela) decide se vale a pena um retorno visível. B) acrescentar uma l
 linha da tabela agora, não pedida pela spec.
 
 **Resposta:** (preenchida pelo PO)
+
+## Q-106 — V2-T68: a aba Sessions não tem ação para "rodando, mas sem aba nesta janela"
+
+**Bloqueia:** não — registro, solução mínima já aplicada.
+
+**Contexto.** `docs/INTERFACE.md` § 5 nomeia três ações pela combinação estado×projeto: `Go to tab`
+(aberta numa aba desta janela), `Resume` (sem processo, sem projeto) e `Adopt…` (sem projeto e
+elegível) — mais a célula vazia explícita para "sem processo, com projeto" (adiada para a V2-T77).
+A spec é silenciosa sobre uma quinta combinação que existe de fato: uma sessão `alive`/`idle` (um
+processo real rodando) cujo `pid` não bate com nenhuma aba desta janela — por exemplo, uma sessão
+aberta num terminal externo, ou numa outra janela do `seeya`.
+
+**Decisão mínima que segui.** `state/sessions-table.ts#resolveSessionRowAction` devolve
+`{ kind: 'runningElsewhere' }` para esse caso — célula de ação vazia, nada clicável. `Resume`
+abriria uma segunda cópia de algo que já está rodando (o mesmo motivo que já desabilita `Adopt…`
+para uma sessão viva, `sidebar/project-sessions.ts#resolveAdoptEligibility`); não há aba desta
+janela para `Go to tab` ir. D-025: ausência de uma aba correspondente não vira uma ação inventada.
+
+**Onde isto aparece na tela.** Só quando a pessoa tem uma sessão rodando fora desta janela E o
+filtro "Running" está ativo (ou "All") — um caso real, mas incomum o bastante para não ter entrado
+na lista de capturas obrigatórias da tarefa (`docs/INTERFACE.md` § 5 nomeia só os quatro estados de
+ação: `Go to tab`, `Resume`, `Adopt…` habilitado/desabilitado, mais a célula vazia de projeto).
+
+**Resposta:** (preenchida pelo PO)
