@@ -4,6 +4,7 @@ title: V2-T80 — Testes estáveis sob carga
 status: Review
 assignee: []
 created_date: '2026-10-02 13:15'
+updated_date: '2026-10-02 18:21'
 labels:
   - test
 dependencies: []
@@ -29,3 +30,13 @@ Varredura de `tests/`. `setTimeout(resolve, 0)` para esperar I/O: só o do resum
 
 Outros guards. `dependency-cruiser.test.ts` e os de cobertura/projetos ainda usam processo filho: a causa (custo de partida por caso) vale, mas não houve falha medida (dependency-cruiser ~2,5s); não alterados.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-10-02 18:21
+---
+Revisão do PO (2026-10-02): guardas do eslint pela API do ESLint dentro do processo (uma instância por worker, warm-up num beforeAll com prazo próprio nomeado; prazos por caso inalterados) — 90-97s para 10,4s sem carga; sob carga artificial 8 execuções/0 falhas (antes, só a API sem warm-up: 11/4). tab-session-resumer espera a pasta esvaziar com vi.waitFor — 10/0 sob carga. Varredura de tests/ registrada nas notas. A linha de base antiga sob carga não foi remedida pelo agente (checkout dos arquivos antigos recusado, corretamente não contornado); valem os três portões vermelhos de 2026-10-02 (1, 12 e 14 falhas). Prova do PO: portão do zero e npm test sem identidade git verdes de primeira (3700 testes) com dois agentes de interface rodando em paralelo — a condição que derrubou o portão três vezes hoje. Fecha Q-107 na prática; marcar a questão como respondida quando alguém tocar docs/QUESTOES.md. Primeira tarefa feita com agente Sonnet 5.5.
+---
+<!-- COMMENTS:END -->
