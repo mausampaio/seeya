@@ -4,6 +4,7 @@ title: V2-T47 — Log do instalador com codificação errada
 status: Review
 assignee: []
 created_date: '2026-09-24 14:40'
+updated_date: '2026-10-02 21:21'
 labels: []
 milestone: m-3
 dependencies: []
@@ -88,3 +89,13 @@ linhas em branco entre os passos.
 **Só o aceite prova:** o instalador real (elevado, por máquina) escrevendo em `~/.seeya/installer.log`
 e a leitura do log real mostrando `—`; nada foi instalado nem tocado nesta máquina.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-10-02 21:21
+---
+Revisão do PO (2026-10-02): a causa medida difere da que a tarefa descrevia — no NSIS Unicode do electron-builder os bytes da saída da CLI já chegam ao arquivo como UTF-8 válido (E2 80 94); faltava o BOM, e leitores do Windows que adivinham a codificação caem em ANSI e mostram mojibake. Correção: BOM UTF-8 garantido antes de cada escrita (log antigo sem BOM é convertido de uma vez, sem misturar codificações; teto de 256 KiB preservado) e quebra de linha final da saída capturada removida. Provado: dist:windows compila; macros de log isoladas num script makensis produzem os bytes certos nos quatro casos. NÃO provado (fica para o aceite do mantenedor numa instalação real por cima): que o installer.log real passa a abrir com o travessão correto e sem linhas em branco — a leitura do log real foi recusada ao agente e não foi contornada. Se o aceite falhar, a causa é outra e a tarefa reabre. Mesclada no po-gate; portão do zero e npm test sem identidade git verdes (3738 testes). Agente Sonnet 5.5 (18 min).
+---
+<!-- COMMENTS:END -->
