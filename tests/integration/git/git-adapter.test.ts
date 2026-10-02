@@ -12,12 +12,13 @@
  * next day just because UTC did).
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { GitAdapter } from '@seeya-ai/engine/adapters/git/index.js';
 import { runGit } from '@seeya-ai/engine/adapters/git/run-git.js';
 import { FakeClock } from '../discovery/_fake-clock.js';
+import { removeTempDir } from '../../_remove-temp-dir.js';
 import {
   addWorktree,
   commitAt,
@@ -72,7 +73,7 @@ describe('GitAdapter.readFacts — cwd that is not a repository', () => {
       const result = await adapter.readFacts(root);
       expect(result).toStrictEqual({ hasGit: false });
     } finally {
-      await rm(root, { recursive: true, force: true });
+      await removeTempDir(root);
     }
   });
 });
@@ -242,7 +243,7 @@ describe('GitAdapter.readEvidenceAcrossRepos — D-032', () => {
 
   afterEach(async () => {
     await Promise.all([removeGitFixture(repoA), removeGitFixture(repoB)]);
-    await rm(outsideDir, { recursive: true, force: true });
+    await removeTempDir(outsideDir);
   });
 
   async function buildTwoRepos(): Promise<void> {
@@ -368,7 +369,7 @@ describe('GitAdapter.readFacts — a worktree git still remembers but whose dire
     // Removed straight from disk, not via `git worktree remove` -- `git worktree list` keeps
     // remembering it (the real "prunable" situation this test exists to reproduce), and any git
     // command targeting it now fails to even start (ENOENT on chdir).
-    await rm(goneWorktreeDir, { recursive: true, force: true });
+    await removeTempDir(goneWorktreeDir);
 
     const adapter = new GitAdapter({ clock: new FakeClock(NOW) });
     const result = await adapter.readFacts(fixture.mainDir);

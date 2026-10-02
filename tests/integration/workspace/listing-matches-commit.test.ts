@@ -6,12 +6,13 @@
  * `.gitignore` predates those patterns) saw them as plain untracked files. Real `git`, real tmpdir.
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FsWorkspaceRepository } from '@seeya-ai/engine/adapters/workspace/index.js';
 import { runGit } from '@seeya-ai/engine/adapters/git/run-git.js';
 import { buildProjectSkeleton } from '@seeya-ai/engine/core/project-skeleton.js';
+import { removeTempDir } from '../../_remove-temp-dir.js';
 
 const PROJECT = 'auth-hardening';
 
@@ -44,7 +45,7 @@ describe('pending-change listings match what commitAll commits', () => {
   let root: string | undefined;
   afterEach(async () => {
     if (root !== undefined) {
-      await rm(root, { recursive: true, force: true });
+      await removeTempDir(root);
       root = undefined;
     }
   }, 60_000);

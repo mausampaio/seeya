@@ -13,13 +13,14 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { processControl } from '@seeya-ai/engine/adapters/process/index.js';
 import { terminateAbruptly } from '@seeya-ai/engine/adapters/process/termination.js';
 import { spawnInNewConsole } from './_windows-console.js';
+import { removeTempDir } from '../../_remove-temp-dir.js';
 
 const CHILD_SCRIPT = fileURLToPath(
   new URL('../../fixtures/process/graceful-child.mjs', import.meta.url),
@@ -110,7 +111,7 @@ afterEach(async () => {
   }
   spawnedPids = [];
   if (tempDir !== undefined) {
-    await rm(tempDir, { recursive: true, force: true });
+    await removeTempDir(tempDir);
     tempDir = undefined;
   }
 });

@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, rm } from 'node:fs/promises';
+import { mkdtemp, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -7,10 +7,12 @@ import { RESUME_PROMPT_ARG_LIMIT_CHARS } from '@seeya-ai/engine/adapters/resumpt
 import type { ResumeOutcome } from '@seeya-ai/engine/core/types.js';
 import {
   createFakeInteractiveClaudeFixture,
+  FAKE_CLAUDE_FAST_FAILURE_GRACE_MS,
   readCapturedInteractiveClaudeCalls,
   removeFakeInteractiveClaudeFixture,
   type FakeInteractiveClaudeFixture,
 } from './_fixtures.js';
+import { removeTempDir } from '../../_remove-temp-dir.js';
 
 /**
  * Drives both halves of the S5-T9 split port the way `application/start-day.ts` does when the
@@ -78,7 +80,7 @@ describe('ClaudeSessionResumer — S3-T2', () => {
       }
     }
     await removeFakeInteractiveClaudeFixture(fixture);
-    await rm(seeyaHome, { recursive: true, force: true });
+    await removeTempDir(seeyaHome);
   });
 
   it('attaches cleanly when --resume succeeds: kind is "resumed", one call, the argument prompt', async () => {
@@ -106,7 +108,7 @@ describe('ClaudeSessionResumer — S3-T2', () => {
       const resumer = new ClaudeSessionResumer({
         seeyaHome,
         claudeBinary: fixture.binaryPath,
-        fastFailureGraceMs: 2_000,
+        fastFailureGraceMs: FAKE_CLAUDE_FAST_FAILURE_GRACE_MS,
       });
 
       const outcome = await attemptAndOpenFallbackIfNeeded(
@@ -173,7 +175,7 @@ describe('ClaudeSessionResumer — S3-T2', () => {
       const resumer = new ClaudeSessionResumer({
         seeyaHome,
         claudeBinary: fixture.binaryPath,
-        fastFailureGraceMs: 2_000,
+        fastFailureGraceMs: FAKE_CLAUDE_FAST_FAILURE_GRACE_MS,
       });
       const plan = 'a short plan the user would not want dumped into an exception';
 
@@ -212,7 +214,7 @@ describe('ClaudeSessionResumer — S3-T2', () => {
       const resumer = new ClaudeSessionResumer({
         seeyaHome,
         claudeBinary: fixture.binaryPath,
-        fastFailureGraceMs: 2_000,
+        fastFailureGraceMs: FAKE_CLAUDE_FAST_FAILURE_GRACE_MS,
       });
 
       let thrown: Error | undefined;
@@ -264,7 +266,7 @@ describe('ClaudeSessionResumer — S3-T2', () => {
       const resumer = new ClaudeSessionResumer({
         seeyaHome,
         claudeBinary: fixture.binaryPath,
-        fastFailureGraceMs: 2_000,
+        fastFailureGraceMs: FAKE_CLAUDE_FAST_FAILURE_GRACE_MS,
       });
 
       const result = await resumer.resumeWithoutPrompt('session-1', PROJECT_CWD);

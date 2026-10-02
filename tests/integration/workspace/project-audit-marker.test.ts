@@ -4,10 +4,11 @@
  * `.seeya-lock`/`FsProjectLock` already has.
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FsProjectAuditMarker } from '@seeya-ai/engine/adapters/workspace/project-audit-marker.js';
+import { removeTempDir } from '../../_remove-temp-dir.js';
 
 async function makeTmpDir(): Promise<string> {
   return mkdtemp(path.join(tmpdir(), 'seeya-audit-marker-'));
@@ -18,7 +19,7 @@ describe('FsProjectAuditMarker', () => {
 
   afterEach(async () => {
     if (root !== undefined) {
-      await rm(root, { recursive: true, force: true });
+      await removeTempDir(root);
       root = undefined;
     }
   });

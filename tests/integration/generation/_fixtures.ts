@@ -19,12 +19,13 @@
  * `shell:false` code path production uses is what every generation test also exercises.
  */
 import { existsSync } from 'node:fs';
-import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { removeTempDir } from '../../_remove-temp-dir.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -213,7 +214,7 @@ export async function createFakeClaudeFixture(): Promise<FakeClaudeFixture> {
 }
 
 export async function removeFakeClaudeFixture(fixture: FakeClaudeFixture): Promise<void> {
-  await rm(fixture.dir, { recursive: true, force: true });
+  await removeTempDir(fixture.dir);
 }
 
 export interface CapturedClaudeCall {

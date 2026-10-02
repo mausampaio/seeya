@@ -5,7 +5,7 @@
  * `removeE2eHome` in its own `afterEach` (same convention as
  * `tests/integration/discovery/_fixtures.ts`).
  */
-import { mkdir, mkdtemp, rm, utimes, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
@@ -22,6 +22,7 @@ import {
   removeFakeNotificationCommandsFixture,
   type FakeNotificationCommandsFixture,
 } from './_fake-notification-commands.js';
+import { removeTempDir } from '../_remove-temp-dir.js';
 
 export interface E2eHome {
   readonly root: string;
@@ -98,7 +99,7 @@ export async function removeE2eHome(home: E2eHome): Promise<void> {
   // `fs.rm`'s own documented mechanism for this Windows behavior — never a hand-rolled sleep loop
   // (D-019 forbids `setTimeout` outside `adapters/clock/`, and this is test-only cleanup, not
   // production code, but there is no reason to reinvent what `fs.rm` already offers).
-  await rm(home.root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  await removeTempDir(home.root);
 }
 
 /** Reads back what the fake `claude` process actually received on its LAST invocation this test

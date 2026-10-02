@@ -14,7 +14,7 @@
  */
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { spawn } from 'node:child_process';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,6 +23,7 @@ import { runGit } from '@seeya-ai/engine/adapters/git/run-git.js';
 import { buildProjectSkeleton } from '@seeya-ai/engine/core/project-skeleton.js';
 import { buildProjectCommitMessage } from '@seeya-ai/engine/core/project-commit.js';
 import { buildCommitMsgHookScript } from '@seeya-ai/engine/core/workspace-hooks.js';
+import { removeTempDir } from '../../_remove-temp-dir.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const CLI_ENTRY_PATH = path.join(REPO_ROOT, 'packages', 'cli', 'dist', 'index.js');
@@ -106,11 +107,11 @@ describe('the workspace-own local git identity — real execution (V2-T58, D-047
           '"npm run verificar" already does).',
       );
     });
-  }, 30_000);
+  });
 
   afterEach(async () => {
     if (root !== undefined) {
-      await rm(root, { recursive: true, force: true });
+      await removeTempDir(root);
       root = undefined;
     }
   });
@@ -158,7 +159,7 @@ describe('the workspace-own local git identity — real execution (V2-T58, D-047
     const message = await headMessage(dir);
     expect(message).toContain('Seeya-Project-Id: auth-hardening');
     expect(message).toContain('Seeya-Session-Id: unknown');
-  }, 30_000);
+  });
 
   it('without configureIdentity, the same session commit fails for lack of any identity at all', async () => {
     const dir = await makeTmpDir();
@@ -194,5 +195,5 @@ describe('the workspace-own local git identity — real execution (V2-T58, D-047
 
     expect(attempt.exitCode).not.toBe(0);
     expect(attempt.stderr).toContain('Author identity unknown');
-  }, 30_000);
+  });
 });
