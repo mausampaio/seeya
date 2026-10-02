@@ -4,7 +4,7 @@ title: V2-T78 — Estabilizar workspace-boundary no Windows
 status: Review
 assignee: []
 created_date: '2026-10-02 00:54'
-updated_date: '2026-10-02 12:20'
+updated_date: '2026-10-02 15:19'
 labels:
   - test
 dependencies: []
@@ -92,3 +92,13 @@ pós-rebase; os commits anteriores (`5bd042e`/`ff17540`) não existem mais no hi
 
 **Recusas encontradas:** nenhuma.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-10-02 15:19
+---
+Revisão do PO (2026-10-02): causa medida (createProject de ponta a ponta com git+gancho+CLI leva até 2,5s sem carga; sob carga estoura 5s e o git ainda vivo causa EBUSY no rm). Prazo de 20s justificado pela medição e rm com maxRetries (precedente de tests/e2e/_harness.ts). Questão renumerada para Q-107 (a V2-T68 já usara Q-106). O resíduo dos guardas do eslint vai para a V2-T80. Mesclada no po-gate; portão do zero e npm test sem identidade git verdes junto com a V2-T71 (3672 testes).
+---
+<!-- COMMENTS:END -->

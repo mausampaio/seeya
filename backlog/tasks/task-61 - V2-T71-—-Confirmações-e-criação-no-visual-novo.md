@@ -4,7 +4,7 @@ title: V2-T71 — Confirmações e criação no visual novo
 status: Review
 assignee: []
 created_date: '2026-09-30 10:34'
-updated_date: '2026-10-02 14:59'
+updated_date: '2026-10-02 15:19'
 labels: []
 milestone: m-2
 dependencies:
@@ -130,5 +130,11 @@ author: Claude (agente)
 created: 2026-10-02 14:59
 ---
 PO review round 1 addressed. 1) Lock dialog now shows the SHORT session id (state/project-lock-confirm.ts#shortLockHolderSessionId, same computeDisplaySessionIds scheme as the Projects tab lock column), full id moved to the context line's title attribute (hover tooltip). 2) LeftoverChangesConfirmDialog footer rebuilt: both explanations are now full-width stacked lines (Continue without committing: .../Commit now: ...) above a single aligned button row, primary on the right -- same shape as the lock and daemon-ownership dialogs. 3) ResumeFallbackDialog cards compacted (title+chip on one line, margin:0 on title/explanation/context to remove the browser UA-default gap that Stack's own gap does not collapse against) -- all three cards (promptTooLarge variant) now fit without scrolling at the standard verification window height; cardsScroll max-height stays as a small-window safety net only. 4) Confirmed: core/changed-file-status.ts (ChangedFileEntry/ChangedFileStatus/parseChangedFileStatusLine) is the sole parser behind WorkspaceRepository.listChangedFilesWithStatus; the dialog only consumes the already-typed ChangedFileRow via state/changed-file-row.ts -- untouched this round, available for V2-T70 to reuse as-is. Screenshots 01-04 regenerated in both themes via the existing scratchpad verify.mjs driver (never committed); npm run verificar run clean from scratch after the fixes.
+---
+
+author: PO
+created: 2026-10-02 15:19
+---
+Revisão do PO (2026-10-02): duas rodadas. Rodada 1 devolveu id do lock inteiro (inconsistente com a coluna Lock da aba Projects), rodapé de mudanças pendentes com explicações em colunas estreitas e botões desalinhados, e cartões da retomada com espaço demais (primeiro cartão fora da tela). Rodada 2 corrigiu os três. Capturas reais conferidas nos dois temas contra docs/INTERFACE.md § 9; nada real aceito (transição só com 'Leave it as it is', instalação fictícia). core/changed-file-status.ts fica como a leitura única de status M/A/D/R, a ser reusada pela V2-T70. Mesclada no po-gate; portão do zero e npm test sem identidade git verdes (3672 testes).
 ---
 <!-- COMMENTS:END -->
