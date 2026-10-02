@@ -13,6 +13,7 @@ import type { PathPlatformHint } from '@seeya-ai/engine/core/cwd-normalization.j
 import type { AdoptionRecord, ProjectManifest, SessionState } from '@seeya-ai/engine/core/types.js';
 import type { RejectedDiscoveryRecord } from '@seeya-ai/engine/core/ports.js';
 import type { ProjectLockStatus } from '@seeya-ai/engine/application/project-lock.js';
+import { computeDisplaySessionIds } from '@seeya-ai/engine/application/session-id-display.js';
 import {
   groupOtherSessionsByDirectory,
   groupSessionsByProject,
@@ -46,13 +47,55 @@ export interface ProjectPanelSessionRow {
   readonly matchedTabId: string | null;
 }
 
+/**
+ * V2-T67 (`docs/INTERFACE.md` § 4's own "lock (`Open in this window`/`Unlocked`/`Locked by
+ * session <id>`) ... Ação da linha segue o lock"): the Projects tab's own lock column AND row
+ * action are two readings of the exact same fact (D-024: a single source of truth, never a text
+ * string and a separately-decided action that could drift apart). `openHere` wins over the raw
+ * `ProjectLockStatus` — a project whose own session already has a tab open in THIS window reads
+ * "Open in this window" with a `Go to tab` action, even if its `.seeya-lock` happens to be held by
+ * that very session (the ordinary case) — same precedence `sidebar-summary.ts
+ * #resolveProjectLockBadge` already uses for the identical fact, computed independently here
+ * (D-052's "own region, own state" — touching that sidebar-only function to share this one risks
+ * the unrelated lateral region this task must leave unchanged).
+ *
+ * A `staleLock` (the holder's process is no longer alive) reads as `unlocked` here, never a
+ * fourth, more alarming lock text: `docs/INTERFACE.md` § 4 names exactly three lock texts, and
+ * opening a stale-locked project already succeeds with no confirmation at all
+ * (`checkProjectLock`'s own `decision: 'acquire'` for a dead holder) — showing a scarier word for
+ * a fact that doesn't change what clicking the button does would mislead, not inform. Registered
+ * as Q-104 (`docs/QUESTOES.md`), the spec itself is silent about this one case.
+ */
+export type ProjectRowLock =
+  | { readonly kind: 'openHere'; readonly tabId: string }
+  | { readonly kind: 'unlocked' }
+  | {
+      readonly kind: 'lockedByOther';
+      /** V2-T55 item 5's own short-id convention (`computeDisplaySessionIds`), scoped to the
+       * batch of lock holders in THIS push (never the whole sidebar's own batch) — `null` only
+       * when the lock itself carries no `sessionId` at all (D-025: an unidentified holder, an old
+       * `.seeya-lock` written before V2-T35 item 4, never a guessed id). */
+      readonly holderDisplaySessionId: string | null;
+    };
+
+/** `docs/INTERFACE.md` § 4's own three row actions, read straight off `ProjectRowLock` by
+ * `resolveProjectRowAction` below — never re-derived a second way at the render layer. */
+export type ProjectRowAction =
+  | { readonly kind: 'goToTab'; readonly tabId: string }
+  | { readonly kind: 'open' }
+  | { readonly kind: 'readOnly' };
+
 export interface ProjectPanelRow {
   readonly projectId: string;
   readonly name: string;
   /** Plain English, ready to render — "unlocked", "held by session X (pid N) since ...", or
    * "stale — last held by ... (reclaimable)". Never a raw `ProjectLockStatus` handed to the DOM
-   * layer, same "the state module decides what to say" split every other panel here follows. */
+   * layer, same "the state module decides what to say" split every other panel here follows.
+   * Kept for `sidebar-summary.ts`'s own `resolveProjectLockBadge` (unchanged by this task); the
+   * Projects tab itself reads `lock` below instead. */
   readonly lockText: string;
+  /** V2-T67 — see this field's own type's docstring above. */
+  readonly lock: ProjectRowLock;
   readonly sessions: readonly ProjectPanelSessionRow[];
   /** V2-T63: whether this project is starred on THIS machine
    * (`@seeya-ai/engine/core/favorite-projects.js`'s own `favorite-projects.json`, read once per
@@ -60,6 +103,98 @@ export interface ProjectPanelRow {
    * tab and whether the project also appears in the lateral's own Favorites section
    * (`state/sidebar-summary.ts`). */
   readonly favorite: boolean;
+  /** V2-T67 (`docs/INTERFACE.md` § 4's own "repositórios" column) — `ProjectManifest.repositories
+   * .length`, nothing more: a repository's own existence on disk is never checked here (that
+   * question belongs to `seeya project open`'s own "Repository ... no longer exists" warning, a
+   * different concern). */
+  readonly repositoryCount: number;
+  /** V2-T67 (`docs/INTERFACE.md` § 4's own "última atividade (ordenação padrão: mais recente
+   * primeiro; projeto sem atividade conhecida vai ao fim, nunca uma data inventada — D-025)") —
+   * the most recent `ProjectPanelSessionRow.lastActivity` among this project's OWN sessions, the
+   * same evidence-based timestamp `state/sidebar-summary.ts#buildRecentProjectRows` already reads
+   * one session at a time; `null` when no session of this project carries any activity evidence
+   * at all, never guessed from the manifest file's own mtime or the workspace's git history. */
+  readonly lastActivity: Date | null;
+}
+
+/** V2-T67 — see `ProjectRowLock`'s own docstring for the precedence this follows. */
+function resolveProjectRowLock(
+  sessions: readonly ProjectPanelSessionRow[],
+  status: ProjectLockStatus,
+  holderDisplaySessionIds: ReadonlyMap<string, string>,
+): ProjectRowLock {
+  const openTab = sessions.find((session) => session.matchedTabId !== null);
+  if (openTab !== undefined && openTab.matchedTabId !== null) {
+    return { kind: 'openHere', tabId: openTab.matchedTabId };
+  }
+  if (status.kind !== 'heldByLiveSession') {
+    return { kind: 'unlocked' };
+  }
+  const holderDisplaySessionId =
+    status.lock.sessionId === undefined
+      ? null
+      : (holderDisplaySessionIds.get(status.lock.sessionId) ?? null);
+  return { kind: 'lockedByOther', holderDisplaySessionId };
+}
+
+/**
+ * @example
+ * resolveProjectRowAction({ kind: 'unlocked' }) // { kind: 'open' }
+ */
+export function resolveProjectRowAction(lock: ProjectRowLock): ProjectRowAction {
+  switch (lock.kind) {
+    case 'openHere':
+      return { kind: 'goToTab', tabId: lock.tabId };
+    case 'unlocked':
+      return { kind: 'open' };
+    case 'lockedByOther':
+      return { kind: 'readOnly' };
+  }
+}
+
+/** The lock column's own ready-to-render text — `docs/INTERFACE.md` § 4's exact three strings.
+ *
+ * @example
+ * formatProjectRowLockText({ kind: 'unlocked' }) // 'Unlocked'
+ */
+export function formatProjectRowLockText(lock: ProjectRowLock): string {
+  switch (lock.kind) {
+    case 'openHere':
+      return MESSAGES.projectsLockOpenHere;
+    case 'unlocked':
+      return MESSAGES.projectsLockUnlocked;
+    case 'lockedByOther':
+      return lock.holderDisplaySessionId === null
+        ? MESSAGES.projectsLockLockedByUnknown
+        : MESSAGES.projectsLockLockedBy(lock.holderDisplaySessionId);
+  }
+}
+
+/** Every distinct `sessionId` currently holding a project's lock, across the whole push — the
+ * batch `computeDisplaySessionIds` scopes its collision-safe short ids to (V2-T55 item 5's own
+ * "escopando ids curtos só ao lote do resultado"). */
+function collectLockHolderSessionIds(
+  lockStatusByProjectId: ReadonlyMap<string, ProjectLockStatus>,
+): readonly string[] {
+  const ids: string[] = [];
+  for (const status of lockStatusByProjectId.values()) {
+    if (status.kind === 'heldByLiveSession' && status.lock.sessionId !== undefined) {
+      ids.push(status.lock.sessionId);
+    }
+  }
+  return ids;
+}
+
+/** This module's own docstring on `ProjectPanelRow.lastActivity` explains why `null` (never a
+ * session with activity evidence) is the only way out of this loop. */
+function mostRecentSessionActivity(sessions: readonly ProjectPanelSessionRow[]): Date | null {
+  let latest: Date | null = null;
+  for (const session of sessions) {
+    if (session.lastActivity !== null && (latest === null || session.lastActivity > latest)) {
+      latest = session.lastActivity;
+    }
+  }
+  return latest;
 }
 
 export interface ProjectPanelOtherSessionRow extends ProjectPanelSessionRow {
@@ -197,15 +332,27 @@ export function buildProjectsPanelData(
     lockSessionIdByProjectId(lockStatusByProjectId),
     platform,
   );
-  const projectRows = projects.map((project): ProjectPanelRow => ({
-    projectId: project.manifest.id,
-    name: project.manifest.name,
-    lockText: formatLockText(
-      lockStatusByProjectId.get(project.manifest.id) ?? { kind: 'unlocked' },
-    ),
-    sessions: (grouping.sessionsByProjectId.get(project.manifest.id) ?? []).map(toSessionRow),
-    favorite: favoriteProjectIds.has(project.manifest.id),
-  }));
+  // V2-T67: the Projects tab's own "Locked by session <id>" column — scoped to the lock holders
+  // actually present in THIS push, never the whole sidebar's own batch of every discovered id.
+  const holderDisplaySessionIds = computeDisplaySessionIds(
+    collectLockHolderSessionIds(lockStatusByProjectId),
+  );
+  const projectRows = projects.map((project): ProjectPanelRow => {
+    const status = lockStatusByProjectId.get(project.manifest.id) ?? { kind: 'unlocked' };
+    const sessions = (grouping.sessionsByProjectId.get(project.manifest.id) ?? []).map(
+      toSessionRow,
+    );
+    return {
+      projectId: project.manifest.id,
+      name: project.manifest.name,
+      lockText: formatLockText(status),
+      lock: resolveProjectRowLock(sessions, status, holderDisplaySessionIds),
+      sessions,
+      favorite: favoriteProjectIds.has(project.manifest.id),
+      repositoryCount: project.manifest.repositories.length,
+      lastActivity: mostRecentSessionActivity(sessions),
+    };
+  });
   const otherSessionsByDirectory = groupOtherSessionsByDirectory(
     grouping.otherSessions,
     platform,

@@ -32,13 +32,15 @@ describe('MESSAGES', () => {
     });
   });
 
-  // V2-T30: the "Projects"/"Other sessions" row labels — pulled out of
-  // electron/projects-list-view.ts's own DOM-building code so the text assembly has its own test.
-  // V2-T55 item 5: the short id now rides along, next to the name, in every session row.
-  it('projectSessionRowLabel names the session, its short id, and its state', () => {
-    expect(MESSAGES.projectSessionRowLabel('demo-project-session', 'abcd1234', 'ended')).toBe(
-      'demo-project-session [abcd1234] (ended)',
-    );
+  // V2-T67: the Projects tab's own count/lock texts.
+  it('projectsTabCount pluralizes the project count', () => {
+    expect(MESSAGES.projectsTabCount(0)).toBe('0 projects');
+    expect(MESSAGES.projectsTabCount(1)).toBe('1 project');
+    expect(MESSAGES.projectsTabCount(2)).toBe('2 projects');
+  });
+
+  it('projectsLockLockedBy names the holder by its short session id', () => {
+    expect(MESSAGES.projectsLockLockedBy('abcd1234')).toBe('Locked by session abcd1234');
   });
 
   // V2-T55 item 2: "Other sessions" groups by directory, one row with a count instead of one per
