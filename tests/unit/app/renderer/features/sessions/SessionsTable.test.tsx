@@ -127,18 +127,23 @@ describe('SessionsTable (V2-T68)', () => {
     });
   });
 
-  // PO review round 2 (production defect: the Name column's own rendered width measured `0` in a
-  // real window, `table-layout: fixed` growing the table past its container instead of shrinking
-  // the explicit columns — `SessionsTable.tsx`'s own `COLUMNS` docstring has the full mechanism).
-  // happy-dom (this file's own environment) never runs a real layout engine, so it cannot catch
-  // that overflow directly; this guard instead locks the one number that caused it.
-  describe('column width budget (regression guard)', () => {
-    it('Name has no explicit width — it is the one column meant to take whatever is left over', () => {
-      const name = COLUMNS.find((column) => column.key === 'name');
-      expect(name?.width).toBeUndefined();
+  // V2-T81 PO review: the old rule (every column but Name fixed, sum capped at 850px) starved the
+  // text columns at 1500px. New rule (`SessionsTable.tsx`'s own `COLUMNS` docstring): Id, State,
+  // Last activity and the action column are FIXED at a width that fits their whole content; Name,
+  // Directory and Project are FLEXIBLE (no width) and share what is left. happy-dom never runs a
+  // layout engine, so the real-pixel proof is the `getBoundingClientRect()` read against the built
+  // bundle; this guard locks the numbers that rule rests on.
+  describe('column width rule (regression guard)', () => {
+    const widthOf = (key: string): number =>
+      Number(COLUMNS.find((column) => column.key === key)?.width?.replace('px', '') ?? Number.NaN);
+
+    it('Name, Directory and Project are flexible: no explicit width', () => {
+      for (const key of ['name', 'directory', 'project']) {
+        expect(COLUMNS.find((column) => column.key === key)?.width, key).toBeUndefined();
+      }
     });
 
-    it('every OTHER column keeps its own name, in order, and an explicit width', () => {
+    it('keeps the columns, in order', () => {
       expect(COLUMNS.map((column) => column.key)).toEqual([
         'name',
         'id',
@@ -148,26 +153,19 @@ describe('SessionsTable (V2-T68)', () => {
         'lastActivity',
         'action',
       ]);
-      for (const column of COLUMNS) {
-        if (column.key === 'name') {
-          continue;
-        }
-        expect(column.width).toBeDefined();
-      }
     });
 
-    it('the sum of every explicit column width stays under a ceiling that leaves Name a real column', () => {
-      // Measured against the real built bundle at this window's own DEFAULT size (1200px wide,
-      // 260px sidebar, `state/sidebar-width.ts#DEFAULT_SIDEBAR_WIDTH`): the table's own available
-      // content width is ~938px. 850px leaves Name at least ~88px there — comfortably positive,
-      // same "truncate a long one, never lose the column" tradeoff `ProjectsTable.tsx`'s own Name
-      // column already makes — while still giving a future column a little real room to grow
-      // without instantly tripping this guard over a single pixel.
-      const totalFixedWidthPx = COLUMNS.filter((column) => column.key !== 'name').reduce(
-        (sum, column) => sum + Number(column.width?.replace('px', '') ?? 0),
-        0,
-      );
-      expect(totalFixedWidthPx).toBeLessThanOrEqual(850);
+    it('the fixed columns are at least as wide as their whole content (never truncate)', () => {
+      expect(widthOf('id')).toBeGreaterThanOrEqual(100); // 8 mono characters + cell padding
+      expect(widthOf('state')).toBeGreaterThanOrEqual(160); // "no running process"
+      expect(widthOf('lastActivity')).toBeGreaterThanOrEqual(174); // "02/10/2026, 00:16:44"
+      expect(widthOf('action')).toBeGreaterThanOrEqual(200); // Resume + Adopt…
+    });
+
+    it('the fixed widths leave room for the flexible columns (sum stays under 660px)', () => {
+      const fixedKeys = ['id', 'state', 'lastActivity', 'action'];
+      const total = fixedKeys.reduce((sum, key) => sum + widthOf(key), 0);
+      expect(total).toBeLessThanOrEqual(660);
     });
   });
 });

@@ -42,7 +42,7 @@ function SessionCard(props: {
           {session.name}
         </Text>
         <Text as="span" variant="code" tone="tertiary">
-          [{session.displaySessionId}]
+          {session.displaySessionId}
         </Text>
         <Chip tone="neutral" size="sm">
           {session.stateLabel}

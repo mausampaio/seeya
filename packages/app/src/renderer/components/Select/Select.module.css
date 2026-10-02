@@ -1,11 +1,13 @@
-/* V2-T66 (D-052, Q-102) — replaces the global `.seeya-field*` classes (`renderer/legacy/
- * components.css`, removed by this task now that nothing references them directly any more),
- * scoped to this component alone. Label typography now comes from `Text` (D-052 item 7) — this
- * file only positions/colours/spaces the `<select>` itself. */
+/* V2-T81 (D-052) — the select is a trigger button plus a `Popover` list, not a native `<select>`
+ * (whose arrow and open list the OS draws, out of reach of CSS). Typography always comes from
+ * `Text` (D-052 item 7); this file only positions, colours and spaces. */
 .field {
   display: flex;
   flex-direction: column;
   gap: var(--seeya-space-1);
+  /* A flex item defaults to `min-width: auto`, which would stop a long option label from ever
+   * shrinking enough to need its ellipsis. */
+  min-width: 0;
 }
 
 .labelRow label,
@@ -13,29 +15,109 @@
   cursor: pointer;
 }
 
-/* Exception to "font-size only through Text" (D-052 item 7): a native `<select>` cannot have a
- * `Text` CHILD deciding its own typography — `TextField.module.css`'s own `.input` comment has the
- * same reasoning, same `body-sm` number. */
-.select {
-  font-family: var(--seeya-font-sans);
-  font-size: 14px;
-  color: var(--seeya-text);
+/* The trigger takes the Snooze button's own box (`Button.module.css`'s `.button.secondary.sm`):
+ * same padding, radius, border and fill, so every chooser in the window reads as one family. The
+ * arrow gets a real gap (`gap`) instead of sitting against the border. */
+.trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--seeya-space-3);
+  /* Content-sized (never wider than the reasonable ceiling) unless `fullWidth` says otherwise. */
+  width: fit-content;
+  max-width: 280px;
+  box-sizing: border-box;
+  padding: var(--seeya-space-1) var(--seeya-space-3);
+  border: 1px solid var(--seeya-border-strong);
+  border-radius: var(--seeya-radius-md);
   background: var(--seeya-surface);
-  border: 1px solid var(--seeya-border-control);
-  border-radius: var(--seeya-radius-sm);
-  padding: var(--seeya-space-2) var(--seeya-space-3);
+  color: var(--seeya-text);
+  font-family: var(--seeya-font-sans);
+  cursor: pointer;
+  transition:
+    background-color var(--seeya-motion-micro) var(--seeya-motion-easing),
+    border-color var(--seeya-motion-micro) var(--seeya-motion-easing);
 }
 
-.select.monospace {
-  font-family: var(--seeya-font-mono);
+/* `fullWidth` (D-052's shared vocabulary): the field and its trigger take the whole width of what
+ * they sit in, no ceiling — the label then uses all the room (a long path truncates only at the
+ * container's own edge). */
+.fullWidth {
+  width: 100%;
 }
 
-.select:disabled {
+.trigger.fullWidth {
+  max-width: none;
+}
+
+.trigger:not(:disabled):hover {
+  background: var(--seeya-surface-hover);
+}
+
+.trigger:disabled {
   cursor: not-allowed;
   opacity: 0.6;
 }
 
-.select:focus-visible {
+.trigger:focus-visible {
   outline: 2px solid var(--seeya-focus-ring);
   outline-offset: 2px;
+}
+
+.trigger.monospace {
+  font-family: var(--seeya-font-mono);
+}
+
+.value {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+/* The popover's own padding/border/shadow (`Popover.module.css`) frame the list, like `Menu`'s.
+ * The width follows the trigger (`matchAnchorWidth`, never narrower) and a long list scrolls
+ * inside itself — the popover never grows past the viewport. */
+dialog.popover {
+  max-width: min(480px, calc(100vw - 16px));
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: min(320px, 50vh);
+  overflow-y: auto;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--seeya-space-3);
+  border-radius: var(--seeya-radius-sm);
+  padding: var(--seeya-space-2);
+  cursor: pointer;
+  color: var(--seeya-text);
+}
+
+.option:hover,
+.option:focus {
+  background: var(--seeya-surface-hover);
+  outline: none;
+}
+
+.option:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--seeya-focus-ring);
+}
+
+.optionSelected {
+  font-weight: 500;
+}
+
+.optionLabel {
+  flex: 1;
+  min-width: 0;
 }

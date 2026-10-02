@@ -11,6 +11,18 @@ const TWO_DIR_HISTORY: readonly CwdHistoryEntry[] = [
   { cwd: '/new', firstDay: '2026-08-16', lastDay: '2026-08-16', exists: true },
 ];
 
+/** The listbox items of the select whose trigger is `trigger` (V2-T81: no native `<select>` any
+ * more — the trigger's `aria-controls` names the listbox of `role="option"` items). */
+function optionsOf(trigger: HTMLElement): HTMLElement[] {
+  const list = document.getElementById(trigger.getAttribute('aria-controls') ?? '');
+  return Array.from(list?.querySelectorAll<HTMLElement>('[role="option"]') ?? []);
+}
+
+/** The submitted value: the `aria-selected` option's `data-value`. */
+function selectedValue(trigger: HTMLElement): string | undefined {
+  return optionsOf(trigger).find((o) => o.getAttribute('aria-selected') === 'true')?.dataset.value;
+}
+
 describe('CwdChangeNotice (D-052, V2-T66)', () => {
   it('shows the history note and the per-directory explanation', () => {
     const { getByText } = render(
@@ -40,7 +52,8 @@ describe('CwdChangeNotice (D-052, V2-T66)', () => {
         platformHint="posix"
       />,
     );
-    expect((getByLabelText('Resume in') as HTMLSelectElement).value).toBe('/new');
+    expect(getByLabelText('Resume in').textContent).toContain('/new');
+    expect(selectedValue(getByLabelText('Resume in'))).toBe('/new');
   });
 
   it('reflects an explicitly chosen directory, not the default, once one is chosen', () => {
@@ -59,7 +72,7 @@ describe('CwdChangeNotice (D-052, V2-T66)', () => {
         platformHint="posix"
       />,
     );
-    expect((getByLabelText('Resume in') as HTMLSelectElement).value).toBe('/first');
+    expect(selectedValue(getByLabelText('Resume in'))).toBe('/first');
   });
 
   it('calls onChooseCwd with the sessionId and the newly picked value', () => {
@@ -79,7 +92,9 @@ describe('CwdChangeNotice (D-052, V2-T66)', () => {
         platformHint="posix"
       />,
     );
-    fireEvent.change(getByLabelText('Resume in'), { target: { value: '/first' } });
+    const trigger = getByLabelText('Resume in');
+    fireEvent.click(trigger);
+    fireEvent.click(optionsOf(trigger).find((o) => o.dataset.value === '/first') as HTMLElement);
     expect(onChooseCwd).toHaveBeenCalledWith('s1', '/first');
   });
 
@@ -114,7 +129,7 @@ describe('CwdChangeNotice (D-052, V2-T66)', () => {
         platformHint="posix"
       />,
     );
-    expect((getByLabelText('Resume in') as HTMLSelectElement).disabled).toBe(true);
+    expect((getByLabelText('Resume in') as HTMLButtonElement).disabled).toBe(true);
   });
 });
 
@@ -165,10 +180,10 @@ describe('CwdChangeNotice — directory display (PO review of V2-T66, item 2)', 
         platformHint="posix"
       />,
     );
-    const select = getByLabelText('Resume in') as HTMLSelectElement;
-    expect(select.value).toBe('/home/<usuario>/new-project');
-    const option = select.querySelector('option') as HTMLOptionElement;
-    expect(option.textContent).toBe('~/new-project');
+    const trigger = getByLabelText('Resume in');
+    expect(selectedValue(trigger)).toBe('/home/<usuario>/new-project');
+    const option = optionsOf(trigger)[0] as HTMLElement;
+    expect(option.textContent).toContain('~/new-project');
     expect(option.getAttribute('title')).toBe('/home/<usuario>/new-project');
   });
 });

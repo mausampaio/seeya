@@ -43,6 +43,16 @@ export interface PopoverProps {
    * state stays truthful (mirrors the native `close` event every other `<dialog>` in this window
    * already relies on, `Dialog`'s own docstring). */
   readonly onRequestClose: () => void;
+  /** V2-T81: the popover is never narrower than its anchor (a `Select`'s own list must be at
+   * least as wide as its trigger) — sets `min-width` from the anchor's own measured width, each
+   * time it opens, BEFORE the popover itself is measured for positioning. Off by default (a
+   * `Menu` sizes to its content). */
+  readonly matchAnchorWidth?: boolean;
+  /** V2-T81: on close, focus goes back to the anchor itself (a `Select` trigger the person was
+   * on) instead of the active terminal (`renderer/legacy/dialog-focus-return.ts`, which skips any
+   * dialog carrying `data-return-focus="anchor"`). Off by default — the long-standing behaviour
+   * for the New tab popover and the Snooze menu. */
+  readonly returnFocusToAnchor?: boolean;
   readonly className?: string;
   readonly children: ComponentChildren;
 }
@@ -113,6 +123,9 @@ export function Popover(props: PopoverProps): JSX.Element {
     }
     const anchor = props.anchorRef.current;
     if (anchor !== null) {
+      if (props.matchAnchorWidth === true) {
+        dialog.style.minWidth = `${anchor.getBoundingClientRect().width}px`;
+      }
       positionNear(dialog, anchor);
     }
   }, [props.open]);
@@ -133,7 +146,13 @@ export function Popover(props: PopoverProps): JSX.Element {
       id={props.id}
       class={mergeClassName(cx(styles, 'popover'), props.className)}
       onClick={handleBackdropClick}
-      onClose={() => props.onRequestClose()}
+      data-return-focus={props.returnFocusToAnchor === true ? 'anchor' : undefined}
+      onClose={() => {
+        if (props.returnFocusToAnchor === true) {
+          props.anchorRef.current?.focus();
+        }
+        props.onRequestClose();
+      }}
     >
       {props.children}
     </dialog>

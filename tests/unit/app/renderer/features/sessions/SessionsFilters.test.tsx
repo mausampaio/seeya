@@ -19,6 +19,13 @@ const BASE_PROPS = {
   platformHint: 'posix' as const,
 };
 
+/** The options of the select whose trigger button is `trigger` (V2-T81: no native `<select>` any
+ * more — the trigger's `aria-controls` names the listbox, which holds the `role="option"` items). */
+function optionsOf(trigger: HTMLElement): HTMLElement[] {
+  const list = document.getElementById(trigger.getAttribute('aria-controls') ?? '');
+  return Array.from(list?.querySelectorAll<HTMLElement>('[role="option"]') ?? []);
+}
+
 describe('SessionsFilters (V2-T68)', () => {
   it('renders the search field and the three state options', () => {
     const { getByLabelText, getByText } = render(<SessionsFilters {...BASE_PROPS} />);
@@ -53,8 +60,7 @@ describe('SessionsFilters (V2-T68)', () => {
         projectOptions={[{ value: 'auth-hardening', label: 'Auth hardening' }]}
       />,
     );
-    const select = getByLabelText('Project') as HTMLSelectElement;
-    const labels = [...select.options].map((option) => option.textContent);
+    const labels = optionsOf(getByLabelText('Project')).map((option) => option.textContent);
     expect(labels).toEqual(['Any project', 'No project', 'Auth hardening']);
   });
 
@@ -67,7 +73,11 @@ describe('SessionsFilters (V2-T68)', () => {
         onProjectFilterChange={onProjectFilterChange}
       />,
     );
-    fireEvent.change(getByLabelText('Project'), { target: { value: 'auth-hardening' } });
+    const trigger = getByLabelText('Project');
+    fireEvent.click(trigger);
+    fireEvent.click(
+      optionsOf(trigger).find((option) => option.dataset.value === 'auth-hardening') as HTMLElement,
+    );
     expect(onProjectFilterChange).toHaveBeenCalledWith('auth-hardening');
   });
 
@@ -80,9 +90,10 @@ describe('SessionsFilters (V2-T68)', () => {
         platformHint="posix"
       />,
     );
-    const select = getByLabelText('Directory') as HTMLSelectElement;
-    const option = [...select.options].find((entry) => entry.value === 'key');
-    expect(option?.textContent).toBe('/repo/payments');
+    const option = optionsOf(getByLabelText('Directory')).find(
+      (entry) => entry.dataset.value === 'key',
+    );
+    expect(option?.textContent).toContain('/repo/payments');
     expect(option?.title).toBe('/repo/payments');
   });
 });
