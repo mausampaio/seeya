@@ -33,29 +33,41 @@ type SessionsTableHeaderKey = Extract<
 >;
 
 /** One entry per column, in order — same `width`/`align` discipline as `ProjectsTable.tsx`'s own
- * `COLUMNS`; widths picked generously (never pixel-measured against a real bundle for this task,
- * unlike that file's own PO-reviewed numbers) and adjusted if the real verification screenshots
- * show a column fighting its neighbour. */
-const COLUMNS: readonly {
+ * `COLUMNS`. **PO review round 2 (V2-T70's own visual proof found it):** the original set of
+ * widths here was never pixel-measured and summed to 1054px — with `table-layout: fixed`, when a
+ * table's explicit column widths sum to MORE than its container's own width, the browser grows
+ * the TABLE itself past the container instead of shrinking those columns, and starves the one
+ * column left without an explicit width (Name) down to a measured `0`, not just "narrow" —
+ * confirmed with a real `getBoundingClientRect()` read against the built bundle at this window's
+ * own default size (1200px, 260px sidebar, ~938px content width): `th0`'s own rendered width was
+ * exactly `0`. These numbers are the same real-bundle-measurement discipline as
+ * `ProjectsTable.tsx`'s own COLUMNS (not a screenshot ruler) — `id`/`directory`/`project` all keep
+ * their own `truncate` + `title` backstop for a value longer than these mid-range widths, `state`
+ * stays at its own PO-reviewed 160px (the one column whose longest realistic value, "no running
+ * process", must never truncate), and `action` is the minimum that fits `Resume`+`Adopt…` side by
+ * side (`.actionButton`'s own `min-width: 84px` × 2 + `gap: 8px` + this cell's own `12px` × 2
+ * padding, `TableRow.module.css#.cell`). Sum: 800px, leaving Name ~140px at this window's default
+ * size — truncating a long name is correct and expected (the same tradeoff `ProjectsTable.tsx`'s
+ * own Name column already makes), never losing the column outright. */
+// Exported for `tests/unit/app/renderer/features/sessions/SessionsTable.test.tsx`'s own column-
+// width-budget guard — happy-dom (this test's own environment) never runs a real layout engine,
+// so it cannot reproduce the `table-layout: fixed` overflow this file's own docstring just
+// measured; the guard instead locks the one number that caused it (the sum of every EXPLICIT
+// column width) under a ceiling, so a future width bump that revives the bug fails a fast unit
+// test instead of waiting for the next real-window capture to notice.
+export const COLUMNS: readonly {
   readonly key: string;
   readonly headerKey?: SessionsTableHeaderKey;
   readonly width?: string;
   readonly align?: 'right';
 }[] = [
   { key: 'name', headerKey: 'sessionsTableHeaderName' },
-  { key: 'id', headerKey: 'sessionsTableHeaderId', width: '130px' },
-  // PO review round 1: `formatSessionStateLabel`'s own longest value ("no running process", the
-  // `unknown` label) needs this much room on one line — `truncate` below is only a backstop for a
-  // future, longer label, never the common case for this column.
+  { key: 'id', headerKey: 'sessionsTableHeaderId', width: '80px' },
   { key: 'state', headerKey: 'sessionsTableHeaderState', width: '160px' },
-  { key: 'directory', headerKey: 'sessionsTableHeaderDirectory', width: '200px' },
-  { key: 'project', headerKey: 'sessionsTableHeaderProject', width: '150px' },
-  { key: 'lastActivity', headerKey: 'sessionsTableHeaderLastActivity', width: '174px' },
-  // PO review round 1: wide enough for `Resume`+`Adopt…` side by side (`.actionButton`'s own
-  // `min-width` below) without the row's own content pushing into `lastActivity` — the defect a
-  // real capture found: the disabled `Adopt…`'s OLD `disabledReason` text (removed below, title-only
-  // now) used to double this cell's height and invade the date column.
-  { key: 'action', width: '240px', align: 'right' },
+  { key: 'directory', headerKey: 'sessionsTableHeaderDirectory', width: '130px' },
+  { key: 'project', headerKey: 'sessionsTableHeaderProject', width: '100px' },
+  { key: 'lastActivity', headerKey: 'sessionsTableHeaderLastActivity', width: '130px' },
+  { key: 'action', width: '200px', align: 'right' },
 ];
 
 /** The short id, copyable (`docs/INTERFACE.md` § 5's own "id curto copiável; copiar dá retorno
@@ -150,23 +162,32 @@ function ActionCell(props: {
       >
         {MESSAGES.sessionsActionResume}
       </Button>
-      <Button
-        size="sm"
-        disabled={action.adopt.kind === 'unavailable'}
-        className={cx(styles, 'actionButton')}
-        // PO review round 1 (`docs/INTERFACE.md` § 5's own "dica no botão desabilitado"): `title`
-        // ONLY, never `disabledReason` — that prop renders a sibling line of text IN the table
-        // cell, doubling the row's height and pushing `lastActivity` out of its own column, exactly
-        // the defect a real capture found. A tooltip is the dica the spec actually asks for.
-        // Conditional spread, not `title={... : undefined}` — `Button.tsx`'s own `title?: string`
-        // has no `| undefined` escape hatch, and this package's `exactOptionalPropertyTypes`
-        // refuses a present-but-`undefined` value for it (same reasoning `Button.tsx`'s own
-        // `buttonRef` conditional spread already documents).
-        {...(action.adopt.kind === 'unavailable' ? { title: action.adopt.reason } : {})}
-        onClick={() => props.onAdopt(row)}
-      >
-        {MESSAGES.adoptButton}
-      </Button>
+      {/* V2-T70's own `main/main.ts` verification instrumentation clicks the first
+       * `[data-adopt-session-id] button` it finds — `Button.tsx`'s own `ButtonProps` is a closed
+       * interface with no passthrough for an arbitrary `data-*` attribute (confirmed against a
+       * real build: the attribute never reached the DOM when passed to `Button` directly), so the
+       * marker lives on this wrapping `span` instead, same reasoning `SessionIdCopyButton`'s own
+       * `data-session-id` already documents (a stable id survives the batch-scoped
+       * `displaySessionId`). */}
+      <span data-adopt-session-id={row.sessionId}>
+        <Button
+          size="sm"
+          disabled={action.adopt.kind === 'unavailable'}
+          className={cx(styles, 'actionButton')}
+          // PO review round 1 (`docs/INTERFACE.md` § 5's own "dica no botão desabilitado"): `title`
+          // ONLY, never `disabledReason` — that prop renders a sibling line of text IN the table
+          // cell, doubling the row's height and pushing `lastActivity` out of its own column,
+          // exactly the defect a real capture found. A tooltip is the dica the spec actually asks
+          // for. Conditional spread, not `title={... : undefined}` — `Button.tsx`'s own
+          // `title?: string` has no `| undefined` escape hatch, and this package's
+          // `exactOptionalPropertyTypes` refuses a present-but-`undefined` value for it (same
+          // reasoning `Button.tsx`'s own `buttonRef` conditional spread already documents).
+          {...(action.adopt.kind === 'unavailable' ? { title: action.adopt.reason } : {})}
+          onClick={() => props.onAdopt(row)}
+        >
+          {MESSAGES.adoptButton}
+        </Button>
+      </span>
     </div>
   );
 }

@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render } from '@testing-library/preact';
 import { SessionsTable } from '../../../../../../packages/app/src/renderer/features/sessions/SessionsTable/index.js';
+import { COLUMNS } from '../../../../../../packages/app/src/renderer/features/sessions/SessionsTable/SessionsTable.js';
 import type { SessionsPanelRow } from '../../../../../../packages/app/src/state/sessions-panel.js';
 
 afterEach(cleanup);
@@ -123,6 +124,50 @@ describe('SessionsTable (V2-T68)', () => {
       fireEvent.click(getByText('abcd1234'));
       expect(writeText).toHaveBeenCalledWith('abcd1234');
       expect(await findByText('Copied!')).not.toBeNull();
+    });
+  });
+
+  // PO review round 2 (production defect: the Name column's own rendered width measured `0` in a
+  // real window, `table-layout: fixed` growing the table past its container instead of shrinking
+  // the explicit columns — `SessionsTable.tsx`'s own `COLUMNS` docstring has the full mechanism).
+  // happy-dom (this file's own environment) never runs a real layout engine, so it cannot catch
+  // that overflow directly; this guard instead locks the one number that caused it.
+  describe('column width budget (regression guard)', () => {
+    it('Name has no explicit width — it is the one column meant to take whatever is left over', () => {
+      const name = COLUMNS.find((column) => column.key === 'name');
+      expect(name?.width).toBeUndefined();
+    });
+
+    it('every OTHER column keeps its own name, in order, and an explicit width', () => {
+      expect(COLUMNS.map((column) => column.key)).toEqual([
+        'name',
+        'id',
+        'state',
+        'directory',
+        'project',
+        'lastActivity',
+        'action',
+      ]);
+      for (const column of COLUMNS) {
+        if (column.key === 'name') {
+          continue;
+        }
+        expect(column.width).toBeDefined();
+      }
+    });
+
+    it('the sum of every explicit column width stays under a ceiling that leaves Name a real column', () => {
+      // Measured against the real built bundle at this window's own DEFAULT size (1200px wide,
+      // 260px sidebar, `state/sidebar-width.ts#DEFAULT_SIDEBAR_WIDTH`): the table's own available
+      // content width is ~938px. 850px leaves Name at least ~88px there — comfortably positive,
+      // same "truncate a long one, never lose the column" tradeoff `ProjectsTable.tsx`'s own Name
+      // column already makes — while still giving a future column a little real room to grow
+      // without instantly tripping this guard over a single pixel.
+      const totalFixedWidthPx = COLUMNS.filter((column) => column.key !== 'name').reduce(
+        (sum, column) => sum + Number(column.width?.replace('px', '') ?? 0),
+        0,
+      );
+      expect(totalFixedWidthPx).toBeLessThanOrEqual(850);
     });
   });
 });

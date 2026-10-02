@@ -7,10 +7,13 @@ import { registerTabSelector } from '../../../../../../packages/app/src/renderer
 import type { ProjectPanelOtherSessionRow } from '../../../../../../packages/app/src/state/projects-panel.js';
 import type { ProjectsPanelData } from '../../../../../../packages/app/src/state/projects-panel.js';
 
-const { openAdoptPicker } = vi.hoisted(() => ({ openAdoptPicker: vi.fn() }));
-vi.mock('../../../../../../packages/app/src/renderer/legacy/adopt-flow-view.js', () => ({
-  openAdoptPicker,
-}));
+const { openAdoptionDialog } = vi.hoisted(() => ({ openAdoptionDialog: vi.fn() }));
+vi.mock(
+  '../../../../../../packages/app/src/renderer/features/adoption/adoption-dialog-bridge.js',
+  () => ({
+    openAdoptionDialog,
+  }),
+);
 
 afterEach(cleanup);
 
@@ -100,7 +103,7 @@ describe('useSessions (V2-T68)', () => {
     await waitFor(() => expect(result.current.isResumePending(row)).toBe(false));
   });
 
-  it('onAdopt opens the shared adopt picker with the session id and name', async () => {
+  it('onAdopt opens the single adoption dialog with the session card', async () => {
     window.seeya = createFakeSeeyaApi({
       getProjectsPanel: vi.fn(() =>
         Promise.resolve(panelWithOtherSessions([otherSession({ sessionId: 'a', name: 'Alpha' })])),
@@ -108,8 +111,16 @@ describe('useSessions (V2-T68)', () => {
     });
     const { result } = renderHook(() => useSessions());
     await waitFor(() => expect(result.current.rows).toHaveLength(1));
-    void act(() => result.current.onAdopt(result.current.rows[0]!));
-    expect(openAdoptPicker).toHaveBeenCalledWith('a', 'Alpha');
+    const row = result.current.rows[0]!;
+    void act(() => result.current.onAdopt(row));
+    expect(openAdoptionDialog).toHaveBeenCalledWith({
+      sessionId: row.sessionId,
+      name: row.name,
+      displaySessionId: row.displaySessionId,
+      cwd: row.cwd,
+      state: row.state,
+      stateLabel: row.stateLabel,
+    });
   });
 
   it('a query shaped like an id, with no local match, falls back to the direct lookup', async () => {

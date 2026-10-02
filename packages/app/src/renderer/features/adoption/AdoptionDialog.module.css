@@ -1,0 +1,20 @@
+/* PO review round 2 — same "the base `.seeya-dialog` chrome gives no width of its own" shape
+ * `EndDayDialog.module.css`/`LeftoverChangesConfirmDialog.module.css` already document for a
+ * multi-pane/data-driven-list dialog: without this, a native `<dialog>` with no declared width
+ * sizes itself to its own content's intrinsic width, which grew close to the window's own edge
+ * the moment the picker's "What happens next" box held a real absolute path. `560px`, capped by
+ * the window's own edge minus a margin (not `360px` — `NewProjectDialog.module.css`'s own single
+ * short field holds materially less content than this dialog's own review step ever does) — same
+ * formula `LeftoverChangesConfirmDialog.module.css` uses for an identical "data-driven list"
+ * shape. */
+.dialog {
+  width: min(560px, calc(100vw - var(--seeya-space-8)));
+}
+
+/* Same reasoning `LeftoverChangesConfirmDialog.module.css#.footerStack` already documents: without
+ * this, `Dialog.module.css#.footer`'s own `justify-content: flex-end` shrinks a single footer
+ * child (the context+explanations+buttons `Stack` below) to its own content width instead of
+ * filling the row the body above it already does. */
+.footerStack {
+  width: 100%;
+}

@@ -1,6 +1,7 @@
 import type { FallbackConfirmer } from '@seeya-ai/engine/application/start-day.js';
 import type {
   Briefing,
+  ChangedFileStatsEntry,
   Clock,
   CommitMessageFile,
   DirectoryExistence,
@@ -668,6 +669,25 @@ export class FakeWorkspaceRepository implements WorkspaceRepository {
   ): Promise<readonly ChangedFileEntry[]> {
     void root;
     return Promise.resolve(this.changedFilesWithStatusByProject.get(projectId) ?? []);
+  }
+
+  // V2-T70: no test against this fake exercises the review dialog's own type/line-count display
+  // (that's `tests/integration/workspace/changed-file-stats.test.ts`'s job, against a real git
+  // repository) — every path from `changedFilesByProject` above is reported `modified`/unknown
+  // lines here, just enough shape for a caller that only cares about `listChangedFiles` itself to
+  // keep compiling against this fake.
+  listChangedFilesWithStats(
+    root: string,
+    projectId: string,
+  ): Promise<readonly ChangedFileStatsEntry[]> {
+    void root;
+    return Promise.resolve(
+      (this.changedFilesByProject.get(projectId) ?? []).map((path) => ({
+        kind: 'modified' as const,
+        path,
+        lines: null,
+      })),
+    );
   }
 
   // V2-T32: `project-remove.test.ts`/`project-remove-repo.test.ts`/`project-revert-adoption

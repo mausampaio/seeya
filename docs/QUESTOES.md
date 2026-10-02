@@ -9492,3 +9492,26 @@ alcance de um ajuste dentro de `vitest.config.ts`. B) abrir uma tarefa dedicada 
 de agendamento entre projetos, já que ela se repete.
 
 **Resposta:** (preenchida pelo PO)
+
+## Q-108 — V2-T70: um arquivo renomeado na revisão da adoção
+
+**Bloqueia:** não — registro, solução mínima já aplicada.
+
+**Contexto.** `docs/INTERFACE.md` § 7 item 2 pede tipo (`M`/`A`, e `D` se existir) e linhas por
+arquivo na revisão antes do commit. A spec não fala de um arquivo renomeado — `git status
+--porcelain` reporta isso como uma linha `R  velho -> novo` (um único "caminho", já com a seta),
+enquanto `git diff --numstat` descreve a mesma mudança como `velho => novo` (seta diferente, e só
+quando o conteúdo também mudou; renomeio puro sem alteração de conteúdo não aparece no numstat).
+
+**Decisão mínima que segui.** `WorkspaceRepository.listChangedFilesWithStats` classifica uma linha
+`R` como `modified`, com `path` igual ao texto inteiro `"velho -> novo"` (nunca separado em dois
+campos) e `lines: null` — nunca tenta casar essa linha contra a grafia diferente do numstat para
+não arriscar atribuir uma contagem errada a ela (D-025: ausente é mais honesto que um número que
+pode estar errado). Documentado no próprio docstring da porta (`core/ports.ts`).
+
+**Onde isto aparece na tela.** Só quando a cópia da adoção renomeia um arquivo dentro do projeto —
+nenhuma das instruções de adoção (`adapters/harness/adopt-instruction.ts`) pede isso, e não é o
+caminho comum. A linha ainda aparece na revisão (tipo `M`, caminho com a seta, sem contagem de
+linhas) — nunca desaparece nem quebra a lista.
+
+**Resposta:** (preenchida pelo PO)

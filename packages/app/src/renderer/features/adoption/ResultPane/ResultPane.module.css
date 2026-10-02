@@ -1,0 +1,14 @@
+/* PO review round 2: a failure's own `outcomeText` is the main fact of this state — the short,
+ * `~`-abbreviated line alone (ending in "…", `summarizeErrorReason`'s own `MAX_SUMMARY_LENGTH`)
+ * left no way to read the rest short of inspecting the DOM, since a native `title` tooltip is
+ * never itself selectable/scrollable text. This block shows the COMPLETE message, always visible,
+ * wrapping instead of overflowing (`overflow-wrap: anywhere` — same reason
+ * `PickPane.module.css#.explanationLine` needs it: a raw path/git-stderr line has no spaces for
+ * the browser's default line-breaking to use) and capped with its own scrollbar for a message
+ * long enough to otherwise push the dialog's fixed footer below the window. */
+.fullReason {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 160px;
+  overflow-y: auto;
+}

@@ -1280,6 +1280,30 @@ export interface WorkspaceRepository {
   listChangedFilesWithStatus(root: string, projectId: string): Promise<readonly ChangedFileEntry[]>;
 
   /**
+   * V2-T70 (`docs/INTERFACE.md` § 7 item 2 — "revisão dos arquivos com tipo e linhas antes do
+   * commit"): the same uncommitted changes `listChangedFiles`/`listChangedFilesWithStatus` report,
+   * enriched with a line count per file — the adoption review dialog needs to show a type
+   * (added/modified/deleted) AND a line count, not just a path or a bare status letter. Scoped to
+   * `root/projectId` exactly like `listChangedFiles`/`commitAll` (D-047 item 3).
+   *
+   * **V2-T73 rebase (PO coordination): built on `listChangedFilesWithStatus` above, never a second
+   * `git status` query** — `adapters/workspace/changed-file-stats.ts` calls that method for the
+   * type (mapping its `ChangedFileStatus` onto this method's own narrower `kind`, V2-T71's own
+   * `renamed`/`other` both collapsing into `modified` here, Q-108) and only adds `git diff
+   * --numstat`/a direct file read for the line counts. A renamed entry (`git status`'s own `R
+   * old -> new` line, `ChangedFileStatus.renamed`) is reported as `modified` with `path` set to
+   * that whole `"old -> new"` string and `lines: null` (D-025: this port never tries to re-match a
+   * rename's `old => new` numstat line against status's own `old -> new` arrow — a mismatch would
+   * risk a WRONG count more than an absent one costs); `other` (a porcelain combination neither
+   * status enum names precisely, e.g. "both modified") gets the same `modified`/`lines: null`
+   * treatment, for the identical reason.
+   */
+  listChangedFilesWithStats(
+    root: string,
+    projectId: string,
+  ): Promise<readonly ChangedFileStatsEntry[]>;
+
+  /**
    * V2-T32: deletes `root/projectId` recursively — `seeya project remove`'s own physical removal.
    * Never commits (`commitAll`, right after, is the separate, explicit step every other mutating
    * method here already keeps distinct) and never touches anything outside `root/projectId` itself
@@ -1449,6 +1473,40 @@ export type ManifestRestoreOutcome =
   | { readonly kind: 'unchanged' }
   | { readonly kind: 'restored'; readonly diffSummary: string }
   | { readonly kind: 'noCommittedVersion' };
+
+/**
+ * `WorkspaceRepository.listChangedFilesWithStats`'s own line-count shape (V2-T70) — `null`, never
+ * a fabricated `0`, whenever the underlying `git diff --numstat`/file read couldn't tell (a binary
+ * file, a read failure) — D-025's "ausência de dado não vira afirmação" applied to a number this
+ * time, not just a missing field.
+ */
+export interface ChangedFileLineCounts {
+  readonly added: number;
+  readonly removed: number;
+}
+
+/**
+ * `WorkspaceRepository.listChangedFilesWithStats`'s own per-file shape (V2-T70, `docs/
+ * INTERFACE.md` § 7 item 2) — a discriminated union on `kind` (D-024), never a flag next to a
+ * generic "changed" entry: the adoption review dialog shows a different badge for `added`/
+ * `modified`/`deleted`, and a type this narrow is what keeps a caller from having to re-derive it
+ * from the raw git status character itself. Named distinctly from `core/changed-file-status.ts
+ * #ChangedFileEntry` (V2-T71, imported just above) — that one is `{ path, status }`, display-only
+ * and never fed back into a git call; this one adds the line counts V2-T70's own review dialog
+ * needs, which is what forces a second, richer shape rather than one type serving both shapes.
+ */
+export type ChangedFileStatsEntry =
+  | { readonly kind: 'added'; readonly path: string; readonly lines: ChangedFileLineCounts | null }
+  | {
+      readonly kind: 'modified';
+      readonly path: string;
+      readonly lines: ChangedFileLineCounts | null;
+    }
+  | {
+      readonly kind: 'deleted';
+      readonly path: string;
+      readonly lines: ChangedFileLineCounts | null;
+    };
 
 /**
  * `WorkspaceRepository.findSessionCommits`/`findCommitsAfter`'s own return shape (V2-T32) — one

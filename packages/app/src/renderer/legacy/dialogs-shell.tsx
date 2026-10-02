@@ -17,62 +17,15 @@
  * `renderer/features/confirmations/` (`ProjectLockConfirmDialog`/`LeftoverChangesConfirmDialog`/
  * `ResumeFallbackDialog`/`DaemonOwnershipTransitionDialog`) replace the `#project-lock-confirm-
  * dialog`/`#leftover-changes-confirm-dialog`/`#fallback-dialog`/`#daemon-ownership-transition-
- * dialog` anchors that used to live here.
+ * dialog` anchors that used to live here. V2-T70 (rebased onto V2-T71): the last four — the whole
+ * "Adopt…" flow (`adopt-pick-dialog`/`adopt-launch-confirm-dialog`/`adopt-commit-confirm-dialog`/
+ * `adopt-result-dialog`) — left the same way too, replaced by `renderer/features/adoption/
+ * AdoptionDialog`, one reactive dialog for what used to be four static anchors. That was the last
+ * of this file's own dialogs: nothing legacy is left to shell out, so this component now renders
+ * nothing — kept (rather than deleted outright) only because `App.tsx` still mounts it and a
+ * future legacy dialog could land here again before this whole file is finally removed; deleting
+ * both is a small, separate cleanup for whoever next touches either.
  */
-import { Dialog } from '../components/Dialog/Dialog.js';
-
 export function DialogsShell() {
-  return (
-    <>
-      <Dialog id="adopt-pick-dialog" className="project-dialog">
-        <h3 id="adopt-pick-title"></h3>
-        <form id="adopt-pick-form">
-          <label>
-            <input type="radio" name="adopt-target" id="adopt-target-existing" checked />
-            Existing project
-          </label>
-          <select id="adopt-existing-select"></select>
-          <label>
-            <input type="radio" name="adopt-target" id="adopt-target-new" />
-            New project
-          </label>
-          <input
-            id="adopt-new-project-id-input"
-            type="text"
-            placeholder="auth-hardening"
-            disabled
-          />
-          <p id="adopt-pick-error" class="project-dialog-error"></p>
-          <div class="project-dialog-actions">
-            <button type="submit" id="adopt-pick-submit"></button>
-            <button type="button" id="adopt-pick-cancel"></button>
-          </div>
-        </form>
-      </Dialog>
-      <Dialog id="adopt-launch-confirm-dialog" className="project-dialog">
-        <h3 id="adopt-launch-confirm-title"></h3>
-        <div id="adopt-launch-confirm-lines"></div>
-        <div class="project-dialog-actions">
-          <button id="adopt-launch-confirm-proceed" type="button"></button>
-          <button id="adopt-launch-confirm-decline" type="button"></button>
-        </div>
-      </Dialog>
-      <Dialog id="adopt-commit-confirm-dialog" className="project-dialog">
-        <h3 id="adopt-commit-confirm-title"></h3>
-        <div id="adopt-commit-confirm-lines"></div>
-        <div class="project-dialog-actions">
-          <button id="adopt-commit-confirm-commit" type="button"></button>
-          <button id="adopt-commit-confirm-decline" type="button"></button>
-        </div>
-      </Dialog>
-      <Dialog id="adopt-result-dialog" className="project-dialog">
-        <h3 id="adopt-result-title"></h3>
-        <p id="adopt-result-text"></p>
-        <div class="project-dialog-actions">
-          <button id="adopt-result-open-project" type="button" hidden></button>
-          <button id="adopt-result-close" type="button"></button>
-        </div>
-      </Dialog>
-    </>
-  );
+  return null;
 }

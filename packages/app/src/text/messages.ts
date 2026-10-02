@@ -513,21 +513,40 @@ export const MESSAGES = {
     "Proceed, and the new session will be told what's still pending.",
   leftoverChangesConfirmCommitExplanation:
     'Commit these changes now (attributed to an unidentified session) before continuing.',
+  // V2-T70 (`docs/INTERFACE.md` § 7): the single adoption dialog — picker, explanation and
+  // review/result, replacing the four separate dialogs V2-T30 item 5 used to show.
   adoptPickTitle: 'Adopt into project',
   adoptPickExistingLabel: 'Existing project',
   adoptPickNewLabel: 'New project',
-  adoptPickSubmit: 'Continue',
+  adoptPickNewProjectIdLabel: 'Project id',
+  adoptPickSubmit: 'Open the copy',
   adoptPickCancel: 'Cancel',
   adoptPickNoProjectChosen: 'Choose an existing project or type a new project id.',
-  adoptLaunchConfirmTitle: 'Adopt this session?',
-  adoptLaunchConfirmProceed: 'Continue',
-  adoptLaunchConfirmDecline: 'Cancel',
-  adoptCommitConfirmTitle: 'Commit these changes?',
-  adoptCommitConfirmCommit: 'Commit',
-  adoptCommitConfirmDecline: 'Discard',
+  adoptPickInvalidNewProjectId:
+    'Use lowercase letters, digits and hyphens — for example payments-webhooks.',
+  adoptPickNoExistingProjects: 'No projects yet — type a new project id below.',
+  adoptPickExplanationHeading: 'What happens next',
+  adoptReviewTitle: 'Review before committing',
+  adoptReviewEmpty: 'Nothing changed inside the project.',
+  // PO review round 2 (`docs/INTERFACE.md` § 9's own "uma linha de contexto, o que cada opção
+  // faz escrito ao lado dela" — the pattern `leftoverChangesConfirmContext`/
+  // `leftoverChangesConfirm{Commit,Proceed}Explanation` above already established): the context
+  // line sits in the scrollable body, above the file list; the two explanations sit in the
+  // dialog's own fixed footer, above the buttons they describe.
+  adoptReviewContext: (count: number, projectId: string): string =>
+    `${count} file${count === 1 ? '' : 's'} changed in project "${projectId}":`,
+  adoptReviewCommit: 'Commit',
+  adoptReviewDiscard: 'Discard',
+  adoptReviewDiscardExplanation: "Discard the copy's changes — nothing is recorded in the project.",
+  adoptReviewCommitExplanation: 'Commit these changes to the project, attributed to this adoption.',
   adoptResultTitle: 'Adoption result',
   adoptResultOpenProject: 'Open project',
   adoptResultClose: 'Close',
+  // V2-T70: the adoption review dialog's own per-file type badge (`state/adoption-review.ts`'s
+  // own `AdoptionReviewRow.kind`).
+  adoptReviewKindAdded: 'A',
+  adoptReviewKindModified: 'M',
+  adoptReviewKindDeleted: 'D',
 
   // V2-T63 — the lateral redesign (docs/INTERFACE.md § 1) and the reusable page-tab mechanism
   // (§ 2's own "abas de página": Today/Projects/Sessions).

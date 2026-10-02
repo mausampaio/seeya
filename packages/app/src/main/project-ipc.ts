@@ -32,26 +32,24 @@ import {
 import { openProject, SUPPORTED_HARNESS } from '@seeya-ai/engine/application/project-open.js';
 import { adoptSession } from '@seeya-ai/engine/application/project-adopt.js';
 import type { RejectedDiscoveryRecord } from '@seeya-ai/engine/core/ports.js';
-import {
-  renderAdoptionCommitChangedFilesLines,
-  renderAdoptionLaunchExplanationLines,
-} from '@seeya-ai/engine/core/project-adoption-message.js';
+import { renderAdoptionLaunchExplanationLines } from '@seeya-ai/engine/core/project-adoption-message.js';
+import { collapseHomeDirectory } from '../sidebar/directory-label.js';
 import { CHANNELS } from '../ipc/channels.js';
 import type {
   AdoptSessionRequest,
   AdoptSessionResponse,
   AnswerAdoptionCommitConfirmRequest,
-  AnswerAdoptionLaunchConfirmRequest,
   AnswerLeftoverChangesOpenConfirmRequest,
   AnswerProjectLockOpenConfirmRequest,
   ConfirmAdoptionCommitRequestEvent,
-  ConfirmAdoptionLaunchRequestEvent,
   ConfirmLeftoverChangesOpenRequestEvent,
   ConfirmProjectLockOpenRequestEvent,
   CreateProjectRequest,
   CreateProjectResponse,
   OpenProjectRequest,
   OpenProjectResponse,
+  PreviewAdoptionLaunchRequest,
+  PreviewAdoptionLaunchResponse,
   ToggleFavoriteProjectRequest,
 } from '../ipc/channels.js';
 import { toggleFavoriteProjectId } from '@seeya-ai/engine/core/favorite-projects.js';
@@ -143,9 +141,6 @@ export function wireProjectIpc(
   const pendingLeftoverChangesConfirmations = new PendingConfirmations<
     'commitNow' | 'proceedWithoutCommitting'
   >('open-leftover-changes');
-  const pendingLaunchConfirmations = new PendingConfirmations<'proceed' | 'decline'>(
-    'adopt-launch',
-  );
   const pendingCommitConfirmations = new PendingConfirmations<'commit' | 'decline'>('adopt-commit');
 
   async function computeProjectsPanelData(): Promise<ProjectsPanelData> {
@@ -286,6 +281,59 @@ export function wireProjectIpc(
     },
   );
 
+  // V2-T70: the single adoption dialog's own live preview of
+  // `renderAdoptionLaunchExplanationLines` — called as the person picks/types a project id, BEFORE
+  // `adoptSession` is ever invoked. Resolves the workspace root the same way `openProject`'s own
+  // handler does; never creates anything (`path.join` alone, no `ensureProjectExists`) — a project
+  // id that doesn't exist yet previews exactly where it WOULD be created.
+  //
+  // PO review round 2: the raw lines (the CLI's own `renderAdoptionLaunchConfirmation` calls the
+  // SAME engine function with the SAME raw paths, unchanged by this) carry the real machine's own
+  // absolute path, username included — a privacy leak on screen and what forced this dialog wider
+  // than every other one. The function itself stays pure and un-parametrized (`core/` never learns
+  // `~`-abbreviation, a window-only concern); this handler instead calls it TWICE — once against
+  // `collapseHomeDirectory`'d paths (what the dialog shows), once against the raw ones (`fullText`,
+  // for a `title` tooltip when it differs) — rather than string-replacing a path substring inside
+  // an already-assembled prose sentence, which would break the moment that sentence's own wording
+  // changes around it.
+  ipcMain.handle(
+    CHANNELS.previewAdoptionLaunch,
+    async (
+      _event,
+      request: PreviewAdoptionLaunchRequest,
+    ): Promise<PreviewAdoptionLaunchResponse> => {
+      const root = await resolveWorkspaceRoot(context.storage, context.home.seeyaHome);
+      const projectDir = path.join(root, request.projectId);
+      const platformHint = process.platform === 'win32' ? 'win32' : 'posix';
+      const abbreviatedCwd = collapseHomeDirectory(
+        request.originalCwd,
+        context.homeDir,
+        platformHint,
+      );
+      const abbreviatedProjectDir = collapseHomeDirectory(
+        projectDir,
+        context.homeDir,
+        platformHint,
+      );
+      const displayLines = renderAdoptionLaunchExplanationLines(
+        abbreviatedCwd,
+        abbreviatedProjectDir,
+        request.projectId,
+      );
+      const fullLines = renderAdoptionLaunchExplanationLines(
+        request.originalCwd,
+        projectDir,
+        request.projectId,
+      );
+      return {
+        explanationLines: displayLines.map((text, index) => ({
+          text,
+          fullText: fullLines[index] ?? text,
+        })),
+      };
+    },
+  );
+
   ipcMain.handle(
     CHANNELS.adoptSession,
     async (_event, request: AdoptSessionRequest): Promise<AdoptSessionResponse> => {
@@ -317,11 +365,16 @@ export function wireProjectIpc(
       }
       const config = await context.storage.readConfig();
       const processIdentity = await context.resolveProcessIdentity();
-      const launcher = new ProjectAdoptTabLauncher({
-        claudeCommand: CLAUDE_COMMAND,
-        opener: tabOpener,
-        label: original.name,
-      });
+      // V2-T70: a real window always builds the real `ProjectAdoptTabLauncher`; only the
+      // verification-only `adoptionLauncherOverride` (`SEEYA_APP_VERIFY_ADOPTION_FAKE`) ever
+      // replaces it — see `composition/verification-fake-adoption-launcher.ts`'s own docstring.
+      const launcher =
+        context.adoptionLauncherOverride ??
+        new ProjectAdoptTabLauncher({
+          claudeCommand: CLAUDE_COMMAND,
+          opener: tabOpener,
+          label: original.name,
+        });
       const deps = buildProjectAdoptDeps(
         context,
         processIdentity,
@@ -330,24 +383,24 @@ export function wireProjectIpc(
         config.idleMinutes,
       );
       const result = await adoptSession(deps, original, request.projectId, {
-        confirmLaunch: async ({ originalCwd, projectDir, projectId }) => {
-          const { requestId, answer } = pendingLaunchConfirmations.create();
-          const event: ConfirmAdoptionLaunchRequestEvent = {
-            requestId,
-            explanationLines: renderAdoptionLaunchExplanationLines(
-              originalCwd,
-              projectDir,
-              projectId,
-            ),
-          };
-          window.webContents.send(CHANNELS.confirmAdoptionLaunchRequest, event);
-          return answer;
-        },
+        // V2-T70: the window's own single adoption dialog already showed this exact explanation
+        // (`CHANNELS.previewAdoptionLaunch`, computed from the same inputs) and the person already
+        // clicked "Open the copy" before this call ever started — proceeding here is not a second
+        // question, it is the window keeping the promise its own "Open the copy" button made
+        // (`docs/INTERFACE.md` § 7 item 1: "não pergunte duas vezes").
+        confirmLaunch: () => Promise.resolve('proceed'),
         confirmCommit: async (changedFiles) => {
+          void changedFiles; // Superseded by the structured read below (D-041: no second source).
+          const root = await resolveWorkspaceRoot(context.storage, context.home.seeyaHome);
+          const changedFileEntries = await context.workspace.listChangedFilesWithStats(
+            root,
+            request.projectId,
+          );
           const { requestId, answer } = pendingCommitConfirmations.create();
           const event: ConfirmAdoptionCommitRequestEvent = {
             requestId,
-            changedFilesLines: renderAdoptionCommitChangedFilesLines(changedFiles),
+            projectId: request.projectId,
+            changedFileEntries,
           };
           window.webContents.send(CHANNELS.confirmAdoptionCommitRequest, event);
           return answer;
@@ -359,13 +412,6 @@ export function wireProjectIpc(
         adopted: isAdoptedResult(result),
         projectId: request.projectId,
       };
-    },
-  );
-
-  ipcMain.on(
-    CHANNELS.answerAdoptionLaunchConfirm,
-    (_event, answer: AnswerAdoptionLaunchConfirmRequest) => {
-      pendingLaunchConfirmations.resolve(answer.requestId, answer.decision);
     },
   );
 

@@ -1,0 +1,34 @@
+/* V2-T70 — the picker's own session card and inline validation error; everything else is
+ * `Stack`/`SegmentedControl`/`Select`/`TextField`/`InfoBox`'s own spacing.
+ *
+ * PO review round 2: `overflow-x: hidden` scoped HERE, never on the shared
+ * `Dialog.module.css#.body` — see that file's own docstring for why a blanket fix broke a
+ * different pane's own result transition in a way this task didn't track down. This pane is a
+ * safe, narrow place for it: the 2px sub-pixel overflow a real capture found was measured
+ * specifically on this step's own container (`core/ports.ts`-free, no file list, no footer
+ * transition involved), and `min-width: 0` below already makes this element the one meant to
+ * shrink to the dialog's own width in the first place. */
+.pane {
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.sessionCard {
+  padding: var(--seeya-space-3);
+  border-radius: var(--seeya-radius-md);
+  background: var(--seeya-surface-subtle);
+}
+
+.error {
+  color: var(--seeya-error-text);
+}
+
+/* PO review round 2: an abbreviated (`~\...`) path still has no spaces for the browser's default
+ * line-breaking to use as a wrap point — without this, one long unbroken path forces the WHOLE
+ * dialog wider than its own `AdoptionDialog.module.css` width instead of wrapping onto a second
+ * line, which is what produced the stray horizontal scrollbar a real capture found (`Dialog.tsx`'s
+ * own `.body { overflow-y: auto }` computes `overflow-x: auto` too per the CSS spec's mixed-overflow
+ * rule, so anything wider than the dialog becomes scrollable instead of visibly clipped). */
+.explanationLine {
+  overflow-wrap: anywhere;
+}
