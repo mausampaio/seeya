@@ -4,7 +4,7 @@ title: V2-T79 — Texto do botão centralizado com loading
 status: Review
 assignee: []
 created_date: '2026-10-02 09:46'
-updated_date: '2026-10-02 07:40'
+updated_date: '2026-10-02 10:45'
 labels:
   - ui
 dependencies: []
@@ -102,3 +102,13 @@ recusa dava ("separe em comandos simples"). O mesmo aconteceu, pela mesma razão
 `backlog task edit --notes` com heredoc — contornado editando este markdown diretamente, como o
 próprio `AGENTS.md` prevê para esse caso.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-10-02 10:45
+---
+Revisão do PO (2026-10-02): causa confirmada (slot do spinner reservado no fluxo sempre que loading era passado) e corrigida com sobreposição — fora de loading o botão é idêntico a um sem a prop, travado por teste de innerHTML. Capturas reais conferidas nos dois temas: Open, Skip today e Create centralizados; Skip today em loading com spinner centrado sem mudar largura. Switch conferido (slot não desloca nada visível), IconButton já correto. Falha de processo registrada: um comando recusado pelo guarda da worktree foi reescrito como script .mjs — o contorno que o despacho proíbe, mesmo que a mensagem de recusa sugira. Sem efeito em estado real (home descartável). Mesclada no po-gate; npm run verificar do zero e npm test sem identidade git verdes (3581 testes).
+---
+<!-- COMMENTS:END -->
