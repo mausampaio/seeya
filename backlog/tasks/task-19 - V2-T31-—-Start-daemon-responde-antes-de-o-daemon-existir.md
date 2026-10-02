@@ -4,7 +4,7 @@ title: V2-T31 — Start daemon responde antes de o daemon existir
 status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
-updated_date: '2026-09-23 10:46'
+updated_date: '2026-10-02 21:36'
 labels: []
 milestone: m-1
 dependencies: []
@@ -93,3 +93,13 @@ nomeados, nenhuma espera real.
 **Capturas:** não feitas — o binário do Electron não existe nesta worktree, então não há janela
 real para fotografar; prova por teste e medição.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-10-02 21:36
+---
+Revisão do PO (2026-10-02): Start daemon passa a esperar o daemon.lock vivo pela porta Clock (prazo 10s, intervalo 100ms, justificados por 32 subidas reais contra home descartável: 741–1200ms típico, 2286ms no pior caso); resultado em união discriminada alreadyRunning/confirmed/launchedUnconfirmed (nunca 'subiu' sem ver o lock, nunca 'falhou' sem ver a falha). Stop conferido por teste — o botão vira Start na resposta. Sem captura: a tela não mudou (o botão já tinha loading). Não medido: subida com Electron-como-node (a margem de 10s cobre). Mesclada no po-gate; portão do zero e npm test sem identidade git verdes (3744 testes). Agente Sonnet 5.5 (28 min).
+---
+<!-- COMMENTS:END -->
