@@ -1194,9 +1194,14 @@ async function captureSelectStatesVerification(
     return run(`!!document.querySelector(${JSON.stringify(selector)})?.click();`);
   }
   async function pressKey(keyCode: string): Promise<void> {
+    // Same reason as `captureSessionsTabStatesVerification`'s own clipboard click: an offscreen
+    // window never got real OS focus, and key events only reach the focused element once the
+    // document itself is focused (`window.focus()` never `.show()`s this invisible window).
+    window.focus();
+    window.webContents.focus();
     window.webContents.sendInputEvent({ type: 'keyDown', keyCode });
     window.webContents.sendInputEvent({ type: 'keyUp', keyCode });
-    await clock.sleep(150);
+    await clock.sleep(400);
   }
 
   // No ownership-transition dismiss here: the driver pre-writes the declined answer into the
@@ -1221,6 +1226,12 @@ async function captureSelectStatesVerification(
   await pressKey('Down');
   await pressKey('Down');
   await pressKey('Down');
+  // What holds focus after the three real ArrowDown presses (the fourth option's text, when the
+  // roving focus works) — written next to the capture so the focus ring can be checked against it.
+  const focusedOption = await run(
+    "document.activeElement ? document.activeElement.getAttribute('role') + ':' + document.activeElement.textContent : 'none'",
+  );
+  await writeFile(path.join(outDir, '04-focused-element.txt'), String(focusedOption));
   await shoot('04-directory-keyboard-focus.png');
   await pressKey('Escape');
   await clock.sleep(200);

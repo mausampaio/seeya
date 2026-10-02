@@ -92,7 +92,7 @@ dialog.popover {
 }
 
 .option:hover,
-.option:focus-visible {
+.option:focus {
   background: var(--seeya-surface-hover);
   outline: none;
 }
