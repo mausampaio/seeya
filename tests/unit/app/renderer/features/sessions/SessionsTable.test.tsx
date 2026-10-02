@@ -64,12 +64,16 @@ describe('SessionsTable (V2-T68)', () => {
     expect(queryByText('Adopt…')).toBeNull();
   });
 
-  it('a session with a project and no process shows an empty action cell', () => {
+  it('a session with a project and no process shows Resume alone, never Adopt… (V2-T77)', () => {
+    const onRowAction = vi.fn();
     const r = row({ state: 'ended', projectId: 'p', projectName: 'Auth hardening', adopt: null });
-    const { getByText, queryByText } = render(<SessionsTable {...BASE_PROPS} rows={[r]} />);
+    const { getByText, queryByText } = render(
+      <SessionsTable {...BASE_PROPS} rows={[r]} onRowAction={onRowAction} />,
+    );
     expect(getByText('Auth hardening')).not.toBeNull();
-    expect(queryByText('Resume')).toBeNull();
     expect(queryByText('Adopt…')).toBeNull();
+    fireEvent.click(getByText('Resume'));
+    expect(onRowAction).toHaveBeenCalledWith(r);
   });
 
   it('a session with no project and no process shows "No project" and both Resume and Adopt…', () => {

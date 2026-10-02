@@ -57,6 +57,29 @@ describe('formatProjectOpenOutcomeText (V2-T30 item 3)', () => {
     expect(text).toContain('session 11111111');
   });
 
+  it('sessionRunning says why a resume was refused (V2-T77)', () => {
+    const text = formatProjectOpenOutcomeText({
+      kind: 'sessionRunning',
+      projectId: 'auth-hardening',
+      sessionId: '11111111-1111-4111-8111-111111111111',
+      name: 'auth-hardening',
+      state: 'idle',
+    });
+    expect(text).toContain('"auth-hardening" is running right now (idle)');
+    expect(text).toContain('second copy');
+  });
+
+  it('sessionNotInProject says no evidence ties the session to the project (V2-T77)', () => {
+    const text = formatProjectOpenOutcomeText({
+      kind: 'sessionNotInProject',
+      projectId: 'auth-hardening',
+      sessionId: '11111111-1111-4111-8111-111111111111',
+      name: 'elsewhere',
+      cwd: '/code/elsewhere',
+    });
+    expect(text).toContain('no evidence of belonging to project "auth-hardening"');
+  });
+
   it('lockConfirmationDeclined names who holds it', () => {
     const result: OpenProjectResult = {
       kind: 'lockConfirmationDeclined',

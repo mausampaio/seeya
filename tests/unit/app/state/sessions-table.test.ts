@@ -160,11 +160,20 @@ describe('resolveSessionRowAction (V2-T68)', () => {
     expect(resolveSessionRowAction(row({ state: 'idle' }))).toEqual({ kind: 'runningElsewhere' });
   });
 
-  it('a not-running session that belongs to a project is "projectResumePending"', () => {
+  it('a not-running session that belongs to a project is "projectResume" (V2-T77), never adoptable', () => {
     const action = resolveSessionRowAction(
       row({ state: 'ended', projectId: 'p', projectName: 'P', adopt: null }),
     );
-    expect(action).toEqual({ kind: 'projectResumePending' });
+    expect(action).toEqual({ kind: 'projectResume', projectId: 'p' });
+  });
+
+  it('a project session open in a tab is still "goToTab", and a running one has no action', () => {
+    expect(
+      resolveSessionRowAction(row({ matchedTabId: 't', projectId: 'p', projectName: 'P' })),
+    ).toEqual({ kind: 'goToTab', tabId: 't' });
+    expect(
+      resolveSessionRowAction(row({ state: 'alive', projectId: 'p', projectName: 'P' })),
+    ).toEqual({ kind: 'runningElsewhere' });
   });
 
   it('a not-running session with no project is "standalone", carrying its own adopt eligibility', () => {

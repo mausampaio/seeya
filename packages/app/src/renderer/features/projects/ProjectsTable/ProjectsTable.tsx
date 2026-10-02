@@ -20,14 +20,15 @@
  * itself so "Open"/"Read only…"/"Go to tab" all measure the same, right-aligned within the column
  * (`.actionCell`) instead of each hugging its own label's width.
  */
-import type { ComponentChildren, JSX } from 'preact';
+import { Fragment, type ComponentChildren, type JSX } from 'preact';
 import styles from './ProjectsTable.module.css';
 import { cx } from '../../../components/css-class.js';
 import { Text } from '../../../components/Text/index.js';
 import { TableRow } from '../../../components/TableRow/index.js';
 import { IconButton } from '../../../components/IconButton/index.js';
 import { Button } from '../../../components/Button/index.js';
-import { StarIcon } from '../../../components/Icon/index.js';
+import { ChevronDownIcon, ChevronRightIcon, StarIcon } from '../../../components/Icon/index.js';
+import { ProjectSessionsPanel, type ProjectSessionsPanelProps } from './ProjectSessionsPanel.js';
 import { MESSAGES } from '../../../../text/messages.js';
 import {
   formatProjectRowLockText,
@@ -41,6 +42,12 @@ export interface ProjectsTableProps {
   readonly onToggleFavorite: (projectId: string, favorite: boolean) => void;
   readonly onRowAction: (row: ProjectPanelRow) => void;
   readonly isRowActionPending: (row: ProjectPanelRow) => boolean;
+  /** V2-T77 (`docs/INTERFACE.md` § 5a): which rows are expanded to show their own sessions. */
+  readonly expandedProjectIds: ReadonlySet<string>;
+  readonly onToggleExpanded: (projectId: string) => void;
+  /** What each expanded row's sessions list needs — everything `ProjectSessionsPanel` takes except
+   * the project itself, which the table already knows per row. */
+  readonly sessionsPanel: Omit<ProjectSessionsPanelProps, 'project'>;
 }
 
 /** Narrowed to exactly the five header labels this table actually shows — all plain strings in
@@ -195,18 +202,43 @@ function LastActivityCell(props: { readonly lastActivity: Date | null }): JSX.El
   );
 }
 
+/** V2-T77: the expand/collapse button sits right before the project's name, so a row reads
+ * `> Name` and the sessions open directly under it. `aria-expanded` carries the state for assistive
+ * tech; the chevron points down when open, right when closed. */
+function NameCell(props: {
+  readonly row: ProjectPanelRow;
+  readonly expanded: boolean;
+  readonly onToggleExpanded: (projectId: string) => void;
+}): JSX.Element {
+  const { row, expanded } = props;
+  return (
+    <div class={cx(styles, 'nameCell')}>
+      <IconButton
+        size="sm"
+        aria-label={MESSAGES.projectSessionsExpandLabel(row.name, expanded)}
+        aria-expanded={expanded}
+        onClick={() => props.onToggleExpanded(row.projectId)}
+      >
+        {expanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
+      </IconButton>
+      <Text as="span" variant="body-sm" weight={500} truncate title={row.name}>
+        {row.name}
+      </Text>
+    </div>
+  );
+}
+
 function buildRowCells(
   row: ProjectPanelRow,
   pending: boolean,
-  onToggleFavorite: ProjectsTableProps['onToggleFavorite'],
-  onRowAction: ProjectsTableProps['onRowAction'],
+  expanded: boolean,
+  props: ProjectsTableProps,
 ): readonly ComponentChildren[] {
+  const { onToggleFavorite, onRowAction } = props;
   const lockText = formatProjectRowLockText(row.lock);
   return [
     <FavoriteStarButton row={row} onToggleFavorite={onToggleFavorite} />,
-    <Text as="span" variant="body-sm" weight={500} truncate title={row.name}>
-      {row.name}
-    </Text>,
+    <NameCell row={row} expanded={expanded} onToggleExpanded={props.onToggleExpanded} />,
     <Text as="span" variant="body-sm" tone="secondary" truncate title={lockText}>
       {lockText}
     </Text>,
@@ -238,17 +270,23 @@ export function ProjectsTable(props: ProjectsTableProps): JSX.Element {
         </tr>
       </thead>
       <tbody>
-        {props.rows.map((row) => (
-          <TableRow
-            key={row.projectId}
-            cells={buildRowCells(
-              row,
-              props.isRowActionPending(row),
-              props.onToggleFavorite,
-              props.onRowAction,
-            )}
-          />
-        ))}
+        {props.rows.map((row) => {
+          const expanded = props.expandedProjectIds.has(row.projectId);
+          return (
+            <Fragment key={row.projectId}>
+              <TableRow
+                cells={buildRowCells(row, props.isRowActionPending(row), expanded, props)}
+              />
+              {expanded && (
+                <tr>
+                  <td colSpan={COLUMNS.length} class={cx(styles, 'sessionsCell')}>
+                    <ProjectSessionsPanel project={row} {...props.sessionsPanel} />
+                  </td>
+                </tr>
+              )}
+            </Fragment>
+          );
+        })}
       </tbody>
     </table>
   );

@@ -33,6 +33,12 @@ import { buildProjectsTableRows, type ProjectsTableFilter } from '../../../state
 // never imports `TabStrip`, so this direct import closes no cycle at all.
 import { selectTab } from '../tabs/tab-select-bridge.js';
 import { openNewProjectDialog } from './new-project-dialog-bridge.js';
+import { showProjectSessionsInSessionsTab } from '../sessions/sessions-filter-bridge.js';
+import {
+  useProjectSessionResume,
+  type ProjectSessionResumeResult,
+} from '../../hooks/useProjectSessionResume.js';
+import type { ProjectSessionsPanelProps } from './ProjectsTable/ProjectSessionsPanel.js';
 
 const AWAITING_FIRST_PROJECTS_PANEL: ProjectsPanelData = {
   projects: [],
@@ -55,6 +61,15 @@ export interface ProjectsControls {
    * the full reasoning for why `goToTab` never does. */
   readonly isRowActionPending: (row: ProjectPanelRow) => boolean;
   readonly openNewProject: () => void;
+  /** V2-T77 (`docs/INTERFACE.md` § 5a): which project rows are expanded to show their sessions,
+   * and the toggle. Plain view state — nothing persisted, a reopened window starts collapsed. */
+  readonly expandedProjectIds: ReadonlySet<string>;
+  readonly onToggleExpanded: (projectId: string) => void;
+  /** What every expanded row's session list needs (`ProjectSessionsPanel`). */
+  readonly sessionsPanel: Omit<ProjectSessionsPanelProps, 'project'>;
+  /** The last project-session `Resume` started from this tab — never silent. */
+  readonly resumeResult: ProjectSessionResumeResult | null;
+  readonly dismissResumeResult: () => void;
 }
 
 export function useProjects(): ProjectsControls {
@@ -128,6 +143,29 @@ export function useProjects(): ProjectsControls {
     [panel.projects, filter, query],
   );
 
+  const [expandedProjectIds, setExpandedProjectIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const onToggleExpanded = useCallback((projectId: string) => {
+    setExpandedProjectIds((previous) => {
+      const next = new Set(previous);
+      if (!next.delete(projectId)) {
+        next.add(projectId);
+      }
+      return next;
+    });
+  }, []);
+  const projectResume = useProjectSessionResume();
+  const sessionsPanel = useMemo(
+    () => ({
+      isResumePending: projectResume.isPending,
+      onResume: projectResume.resume,
+      onGoToTab: selectTab,
+      onShowAll: showProjectSessionsInSessionsTab,
+    }),
+    [projectResume.isPending, projectResume.resume],
+  );
+
   return {
     panel,
     filter,
@@ -139,5 +177,10 @@ export function useProjects(): ProjectsControls {
     onRowAction,
     isRowActionPending,
     openNewProject: openNewProjectDialog,
+    expandedProjectIds,
+    onToggleExpanded,
+    sessionsPanel,
+    resumeResult: projectResume.result,
+    dismissResumeResult: projectResume.dismissResult,
   };
 }

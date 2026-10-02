@@ -30,6 +30,23 @@
   text-align: right;
 }
 
+/* V2-T77: the expand button and the project's name side by side; `min-width: 0` on the flex row
+ * (and the name's own `truncate`) is what lets a long name still ellipsize instead of pushing the
+ * cell wider than its fixed-layout column. */
+.nameCell {
+  display: flex;
+  align-items: center;
+  gap: var(--seeya-space-1);
+  min-width: 0;
+}
+
+/* The full-width cell under an expanded row: no padding of its own, the sessions panel inside it
+ * (`ProjectSessionsPanel.module.css`) owns its spacing and background. */
+.sessionsCell {
+  padding: 0;
+  border-bottom: 1px solid var(--seeya-border);
+}
+
 /* The action button's own cell: right-aligned within its fixed-width column, same reasoning as
  * `.numericCell` above but for an `inline-flex` `<button>` rather than a text span. */
 .actionCell {

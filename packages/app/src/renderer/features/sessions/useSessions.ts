@@ -43,6 +43,11 @@ import {
 } from '../../../state/sessions-table.js';
 import { selectTab } from '../tabs/tab-select-bridge.js';
 import { openAdoptionDialog } from '../adoption/adoption-dialog-bridge.js';
+import { registerSessionsProjectFilterSetter } from './sessions-filter-bridge.js';
+import {
+  useProjectSessionResume,
+  type ProjectSessionResumeResult,
+} from '../../hooks/useProjectSessionResume.js';
 
 const AWAITING_FIRST_PROJECTS_PANEL: ProjectsPanelData = {
   projects: [],
@@ -99,6 +104,10 @@ export interface SessionsControls {
   readonly onRowAction: (row: SessionsPanelRow) => void;
   readonly isResumePending: (row: SessionsPanelRow) => boolean;
   readonly onAdopt: (row: SessionsPanelRow) => void;
+  /** V2-T77: what happened to the last project-session `Resume` started from this tab — never
+   * silent (`useProjectSessionResume.ts`'s own top docstring). */
+  readonly resumeResult: ProjectSessionResumeResult | null;
+  readonly dismissResumeResult: () => void;
 }
 
 export function useSessions(): SessionsControls {
@@ -116,7 +125,16 @@ export function useSessions(): SessionsControls {
 
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<SessionsTableFilters>(DEFAULT_SESSIONS_TABLE_FILTERS);
+  const projectResume = useProjectSessionResume();
   const [pendingResumeIds, setPendingResumeIds] = useState<ReadonlySet<string>>(() => new Set());
+
+  // V2-T77: the Projects tab's "Show all in Sessions" lands here — see `sessions-filter-bridge.ts`.
+  useEffect(() => {
+    registerSessionsProjectFilterSetter((projectId) => {
+      setQuery('');
+      setFilters({ ...DEFAULT_SESSIONS_TABLE_FILTERS, project: projectId });
+    });
+  }, []);
 
   const allRows = useMemo(() => flattenSessionsPanelRows(panel), [panel]);
   const localRows = useMemo(
@@ -215,16 +233,23 @@ export function useSessions(): SessionsControls {
       }
       if (action.kind === 'standalone') {
         onResume(row);
+        return;
       }
-      // `runningElsewhere`/`projectResumePending` offer nothing clickable — this row action is
-      // only ever reached from the table's own Resume button, which doesn't render for those two.
+      if (action.kind === 'projectResume') {
+        // V2-T77: a session that belongs to a project resumes through the project's own `open`
+        // flow (lock, hooks, `CLAUDE.md`, the same questions), never the simple resume above.
+        projectResume.resume(action.projectId, row.sessionId);
+      }
+      // `runningElsewhere` offers nothing clickable — this row action is only ever reached from
+      // the table's own buttons, which don't render for it.
     },
-    [onResume],
+    [onResume, projectResume],
   );
 
   const isResumePending = useCallback(
-    (row: SessionsPanelRow) => pendingResumeIds.has(row.sessionId),
-    [pendingResumeIds],
+    (row: SessionsPanelRow) =>
+      pendingResumeIds.has(row.sessionId) || projectResume.isPending(row.sessionId),
+    [pendingResumeIds, projectResume],
   );
 
   const onAdopt = useCallback((row: SessionsPanelRow) => {
@@ -257,5 +282,7 @@ export function useSessions(): SessionsControls {
     onRowAction,
     isResumePending,
     onAdopt,
+    resumeResult: projectResume.result,
+    dismissResumeResult: projectResume.dismissResult,
   };
 }

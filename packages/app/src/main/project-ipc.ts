@@ -29,9 +29,15 @@ import {
   describeProjectLockStatus,
   type ProjectLockStatus,
 } from '@seeya-ai/engine/application/project-lock.js';
-import { openProject, SUPPORTED_HARNESS } from '@seeya-ai/engine/application/project-open.js';
+import {
+  openProject,
+  SUPPORTED_HARNESS,
+  type OpenProjectResult,
+  type OpenSessionRequest,
+} from '@seeya-ai/engine/application/project-open.js';
 import { adoptSession } from '@seeya-ai/engine/application/project-adopt.js';
 import type { RejectedDiscoveryRecord } from '@seeya-ai/engine/core/ports.js';
+import type { DiscoveredSession } from '@seeya-ai/engine/core/types.js';
 import { renderAdoptionLaunchExplanationLines } from '@seeya-ai/engine/core/project-adoption-message.js';
 import { collapseHomeDirectory } from '../sidebar/directory-label.js';
 import { CHANNELS } from '../ipc/channels.js';
@@ -50,6 +56,8 @@ import type {
   OpenProjectResponse,
   PreviewAdoptionLaunchRequest,
   PreviewAdoptionLaunchResponse,
+  ResumeProjectSessionRequest,
+  ResumeProjectSessionResponse,
   ToggleFavoriteProjectRequest,
 } from '../ipc/channels.js';
 import { toggleFavoriteProjectId } from '@seeya-ai/engine/core/favorite-projects.js';
@@ -143,6 +151,20 @@ export function wireProjectIpc(
   >('open-leftover-changes');
   const pendingCommitConfirmations = new PendingConfirmations<'commit' | 'decline'>('adopt-commit');
 
+  /** A session by its FULL id — the window's own discovery first, then the direct lookup past
+   * `relevanceHours` (V2-T55 item 1: a click can name a session only that lookup found). `undefined`
+   * when neither knows it (D-025: never guessed). Shared by `adoptSession` and
+   * `resumeProjectSession`, which resolve a click the same way. */
+  async function findSessionById(sessionId: string): Promise<DiscoveredSession | undefined> {
+    const discovery = await context.sessionProvider.list();
+    const windowed = discovery.sessions.find((session) => session.sessionId === sessionId);
+    if (windowed !== undefined) {
+      return windowed;
+    }
+    const fallback = await context.sessionIdLookup.findByIdPrefix(sessionId);
+    return fallback.kind === 'found' ? fallback.session : undefined;
+  }
+
   async function computeProjectsPanelData(): Promise<ProjectsPanelData> {
     const { projects, lockStatusByProjectId, rejected } = await readProjectsWithLockStatus(context);
     const adoptions = await context.storage.readAdoptions();
@@ -207,9 +229,14 @@ export function wireProjectIpc(
     },
   );
 
-  ipcMain.handle(
-    CHANNELS.openProject,
-    async (_event, request: OpenProjectRequest): Promise<OpenProjectResponse> => {
+  /** The whole `open` pipeline for one project, shared by `CHANNELS.openProject` (a new session)
+   * and `CHANNELS.resumeProjectSession` (V2-T77: the same pipeline, `claude --resume`) — one place,
+   * so the two can never drift apart on the questions they ask or the text they report. */
+  const runOpenProject = async (
+    request: OpenProjectRequest,
+    sessionRequest: OpenSessionRequest,
+  ): Promise<{ readonly outcomeText: string; readonly result: OpenProjectResult }> => {
+    {
       const processIdentity = await context.resolveProcessIdentity();
       // V2-T82: only the verification-only `harnessLauncherOverride` ever replaces the real one.
       const launcher =
@@ -224,49 +251,81 @@ export function wireProjectIpc(
       // (the same pre-launch channel the CLI already prints through) — captured here so the
       // window's own single "how it ended" text can mention it too, never silently.
       let manifestRestoreSuffix = '';
-      const result = await openProject(deps, request.projectId, SUPPORTED_HARNESS, {
-        onBeforeLaunch: ({ manifestRestore }) => {
-          manifestRestoreSuffix = formatManifestRestoreSuffix(manifestRestore);
+      const result = await openProject(
+        deps,
+        request.projectId,
+        SUPPORTED_HARNESS,
+        {
+          onBeforeLaunch: ({ manifestRestore }) => {
+            manifestRestoreSuffix = formatManifestRestoreSuffix(manifestRestore);
+          },
+          confirmReadOnlyOpen: async (heldBy) => {
+            const { requestId, answer } = pendingLockConfirmations.create();
+            const event: ConfirmProjectLockOpenRequestEvent = {
+              requestId,
+              projectId: request.projectId,
+              heldBySessionId: heldBy.sessionId ?? null,
+              heldByPid: heldBy.pid,
+              heldByAcquiredAt: heldBy.acquiredAt,
+            };
+            window.webContents.send(CHANNELS.confirmProjectLockOpenRequest, event);
+            return answer;
+          },
+          // V2-T71 (`docs/INTERFACE.md` § 9's own "a lista de arquivos (M/A)"): a second, additive
+          // read of the SAME pending changes `handleLeftoverChanges` already computed (as the
+          // `changedFiles` parameter below, still plain paths — `ConfirmLeftoverChanges`'s own
+          // signature is untouched, since the adoption flow's commit-review dialog shares that
+          // type and this task must never change it), just to keep each file's own status for
+          // display. Cheap and rare (only when there ARE leftover changes at all) — never worth a
+          // second port method call avoided at the cost of widening a type three other call sites
+          // would then have to follow.
+          confirmLeftoverChanges: async (changedFiles) => {
+            void changedFiles;
+            const { requestId, answer } = pendingLeftoverChangesConfirmations.create();
+            const root = await resolveWorkspaceRoot(context.storage, context.home.seeyaHome);
+            const entries = await context.workspace.listChangedFilesWithStatus(
+              root,
+              request.projectId,
+            );
+            const event: ConfirmLeftoverChangesOpenRequestEvent = {
+              requestId,
+              projectId: request.projectId,
+              changedFiles: entries,
+            };
+            window.webContents.send(CHANNELS.confirmLeftoverChangesOpenRequest, event);
+            return answer;
+          },
         },
-        confirmReadOnlyOpen: async (heldBy) => {
-          const { requestId, answer } = pendingLockConfirmations.create();
-          const event: ConfirmProjectLockOpenRequestEvent = {
-            requestId,
-            projectId: request.projectId,
-            heldBySessionId: heldBy.sessionId ?? null,
-            heldByPid: heldBy.pid,
-            heldByAcquiredAt: heldBy.acquiredAt,
-          };
-          window.webContents.send(CHANNELS.confirmProjectLockOpenRequest, event);
-          return answer;
-        },
-        // V2-T71 (`docs/INTERFACE.md` § 9's own "a lista de arquivos (M/A)"): a second, additive
-        // read of the SAME pending changes `handleLeftoverChanges` already computed (as the
-        // `changedFiles` parameter below, still plain paths — `ConfirmLeftoverChanges`'s own
-        // signature is untouched, since the adoption flow's commit-review dialog shares that
-        // type and this task must never change it), just to keep each file's own status for
-        // display. Cheap and rare (only when there ARE leftover changes at all) — never worth a
-        // second port method call avoided at the cost of widening a type three other call sites
-        // would then have to follow.
-        confirmLeftoverChanges: async (changedFiles) => {
-          void changedFiles;
-          const { requestId, answer } = pendingLeftoverChangesConfirmations.create();
-          const root = await resolveWorkspaceRoot(context.storage, context.home.seeyaHome);
-          const entries = await context.workspace.listChangedFilesWithStatus(
-            root,
-            request.projectId,
-          );
-          const event: ConfirmLeftoverChangesOpenRequestEvent = {
-            requestId,
-            projectId: request.projectId,
-            changedFiles: entries,
-          };
-          window.webContents.send(CHANNELS.confirmLeftoverChangesOpenRequest, event);
-          return answer;
-        },
-      });
+        sessionRequest,
+      );
       await pushProjectsUpdate();
-      return { outcomeText: formatProjectOpenOutcomeText(result) + manifestRestoreSuffix };
+      return { outcomeText: formatProjectOpenOutcomeText(result) + manifestRestoreSuffix, result };
+    }
+  };
+
+  ipcMain.handle(
+    CHANNELS.openProject,
+    async (_event, request: OpenProjectRequest): Promise<OpenProjectResponse> => {
+      const { outcomeText } = await runOpenProject(request, { kind: 'new' });
+      return { outcomeText };
+    },
+  );
+
+  // V2-T77: same pipeline, `claude --resume`. The session is resolved here (the window's own
+  // discovery first, then the direct lookup past `relevanceHours`); one that cannot be found is a
+  // reported outcome, never a throw — a stale click must not crash the handler.
+  ipcMain.handle(
+    CHANNELS.resumeProjectSession,
+    async (_event, request: ResumeProjectSessionRequest): Promise<ResumeProjectSessionResponse> => {
+      const session = await findSessionById(request.sessionId);
+      if (session === undefined) {
+        return { outcomeText: formatSessionNotDiscoverableText(request.sessionId), resumed: false };
+      }
+      const { outcomeText, result } = await runOpenProject(
+        { projectId: request.projectId },
+        { kind: 'resume', session },
+      );
+      return { outcomeText, resumed: result.kind === 'opened' };
     },
   );
 
@@ -340,21 +399,11 @@ export function wireProjectIpc(
   ipcMain.handle(
     CHANNELS.adoptSession,
     async (_event, request: AdoptSessionRequest): Promise<AdoptSessionResponse> => {
-      const discovery = await context.sessionProvider.list();
-      const windowedMatch = discovery.sessions.find(
-        (session) => session.sessionId === request.sessionId,
-      );
-      // V2-T55 item 1: a click can name a session the window already found only through the
-      // id-search field's own direct, unwindowed lookup (`session.sessionId` here is always a
-      // FULL id, never a prefix — the click carried the exact row's own id, so `found` is the
-      // only outcome this ever reasonably produces). Mirrors `cli/session-reference.ts
-      // #resolveSessionReferenceForAdoption`'s own fallback for the identical reason: a session
-      // closed longer ago than `relevanceHours` has no entry in `discovery.sessions` at all.
-      const fallback =
-        windowedMatch === undefined
-          ? await context.sessionIdLookup.findByIdPrefix(request.sessionId)
-          : null;
-      const original = windowedMatch ?? (fallback?.kind === 'found' ? fallback.session : undefined);
+      // V2-T55 item 1 (see `findSessionById`'s own docstring): a click can name a session only the
+      // direct, unwindowed lookup knows — `request.sessionId` is always a FULL id, the click carried
+      // the exact row's own id. Mirrors `cli/session-reference.ts#resolveSessionReferenceForAdoption`'s
+      // own fallback for the identical reason.
+      const original = await findSessionById(request.sessionId);
       if (original === undefined) {
         // D-025: the session this click referred to is no longer discoverable (aged past
         // relevanceHours AND not found by a direct id lookup, or the record vanished) — never
