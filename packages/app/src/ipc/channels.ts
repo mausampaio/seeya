@@ -253,6 +253,14 @@ export const CHANNELS = {
    * `cwd` as `~` for display (`sidebar/directory-label.ts#collapseHomeDirectory`); fetched once,
    * a running window's own home directory never changes. */
   getHomeDir: 'seeya:get-home-dir',
+  /** Renderer → main: the Sessions tab's own `Resume` button (V2-T68, `docs/INTERFACE.md` § 5) —
+   * a session with no process and no project, resumed in a tab through the SAME
+   * `SessionResumer.resumeWithoutPrompt`/`TabSessionResumer` the fallback-without-plan flow (V2-T7)
+   * already uses, `claude --resume <id>` with no prompt argument at all. Resolves once the fast-
+   * failure race settles (`raceExitAgainstGrace`, a few seconds at most) — unlike `openProject`,
+   * which resolves only when the tab eventually CLOSES, this one is short enough to await directly
+   * for the row's own `loading` state. */
+  resumeSession: 'seeya:resume-session',
 } as const;
 
 export interface CreateTabRequest {
@@ -741,11 +749,31 @@ export interface FindSessionByIdRequest {
   readonly idOrPrefix: string;
 }
 
-/** `CHANNELS.findSessionById`'s response — the SAME row shape "Other sessions"'s own directory
- * modal renders (`ProjectPanelOtherSessionRow`, `electron/session-row-view.ts`'s own reused
- * markup), never a second, parallel row type for what's structurally the identical fact. D-025:
- * `ambiguous`/`notFound` are their own cases, never flattened into `found: null`. */
+/** `CHANNELS.findSessionById`'s response — the SAME row shape the Sessions tab's own table uses
+ * for a session with no project (`ProjectPanelOtherSessionRow`, V2-T68's own
+ * `state/sessions-panel.ts#SessionsPanelRow` builds on it directly), never a second, parallel row
+ * type for what's structurally the identical fact. D-025: `ambiguous`/`notFound` are their own
+ * cases, never flattened into `found: null`. */
 export type FindSessionByIdResponse =
   | { readonly kind: 'found'; readonly session: ProjectPanelOtherSessionRow }
   | { readonly kind: 'ambiguous'; readonly candidates: readonly ProjectPanelOtherSessionRow[] }
   | { readonly kind: 'notFound' };
+
+/** `CHANNELS.resumeSession`'s payload (V2-T68) — `name` labels the tab the same way
+ * `ResumeSelectedRequest`'s own handler resolves a label for a handoff-backed resume
+ * (`TabResumeOpener.openTab`'s own `label`), since `SessionResumer.resumeWithoutPrompt` itself
+ * only ever takes `sessionId`/`cwd` (`core/ports.ts`). */
+export interface ResumeSessionRequest {
+  readonly sessionId: string;
+  readonly cwd: string;
+  readonly name: string;
+}
+
+/** `CHANNELS.resumeSession`'s response — `resumed: false` covers the one failure
+ * `TabSessionResumer#resumeWithoutPrompt` can report (`resumeWithoutPlanFailed`, a fast exit with
+ * a non-zero code) — the Sessions tab shows no result area for this action (same precedent
+ * `OpenProjectResponse`'s own docstring on "nothing shows a filesystem path back" sets for a
+ * fire-and-forget row action, Q-105), so this only ever clears the row's own `loading` state. */
+export interface ResumeSessionResponse {
+  readonly resumed: boolean;
+}

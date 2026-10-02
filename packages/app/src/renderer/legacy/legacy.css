@@ -82,56 +82,16 @@ body {
   color: var(--seeya-success-text);
 }
 
-#projects-panel-empty,
-#other-sessions-empty {
+/* V2-T68: the `#other-sessions-empty`/`#other-sessions-list`/`.other-sessions-dir-row`/
+ * `.session-action-row`/`.session-id-copy`/`.session-last-activity`/`.adopt-button` rules that
+ * used to sit here are gone — none of that DOM exists any more (`renderer/legacy/
+ * other-sessions-dir-dialog-view.ts`/`session-search-view.ts`/`session-row-view.ts`, all apagados
+ * by this task; `renderer/features/sessions/` is a real component now, styled by its own CSS
+ * modules, and the Adopt flow's own button is a real `Button` component, never `.adopt-button`).
+ * `#projects-panel-empty` stays — unrelated to any of this, still a separate legacy id. */
+#projects-panel-empty {
   font-size: 12px;
   color: var(--seeya-text-secondary);
-}
-
-#other-sessions-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  font-size: 12px;
-}
-
-#other-sessions-list li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 4px 0;
-  border-bottom: 1px solid var(--seeya-border);
-}
-
-/* PO acceptance of V2-T55, correction 1 (2026-09-25): a long, unbroken path (no whitespace for
- * the browser to wrap at) forced this row past the sidebar's own width — same class of bug V2-T48
- * item 2 already fixed once for the autostart line, below. `min-width: 0` lets this flex item
- * actually shrink instead of insisting on its content's natural (unwrapped) width; `shortenDirectoryPath`
- * (`sidebar/directory-label.ts`) already keeps the STRING itself short, this is the backstop for
- * whatever it doesn't cover (a very narrow window, an unusual font). */
-.other-sessions-dir-row {
-  width: 100%;
-  min-width: 0;
-  text-align: left;
-  overflow-wrap: anywhere;
-}
-
-.session-action-row {
-  overflow-wrap: anywhere;
-}
-
-.session-id-copy {
-  font-size: 11px;
-}
-
-.session-last-activity {
-  color: var(--seeya-text-secondary);
-}
-
-.adopt-button {
-  flex: none;
-  font-size: 11px;
 }
 
 #project-open-result-text {

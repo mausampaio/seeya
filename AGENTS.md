@@ -463,6 +463,12 @@ aqui antes de entrar no código.**
 | seletor de tab por id (V2-T67, reusável por qualquer região) | `renderer/features/tabs/tab-select-bridge.ts#selectTab`/`registerTabSelector` — mesmo formato de `page-tab-bridge.ts`/`focus-bridge.ts`, mas para qualquer tab (terminal incluído, não só uma das três páginas fixas): a ação `Go to tab` da aba Projects foca a aba onde a sessão do projeto já está aberta nesta janela, sem a aba Projects importar `TabStrip.tsx` diretamente (evita o ciclo que o `dependency-cruiser` recusaria) |
 | diálogo "New project…" (V2-T67, D-052) | `renderer/features/projects/NewProjectDialog/` — substitui `renderer/legacy/new-project-dialog-view.ts`/o `<Dialog id="new-project-dialog">` estático de `dialogs-shell.tsx` (ambos apagados); mesmos campos e mesma IPC `createProject`, agora um componente reativo (`Dialog`/`TextField`/`Button`). Aberto de dois lugares — o `+` da lateral (`FavoritesSection.tsx`) e o botão "New project" da própria aba — através de `new-project-dialog-bridge.ts#openNewProjectDialog` (mesmo padrão de bridge acima), já que um `<dialog>` dentro de um `#page-projects` escondido (`display: none`) nunca aparece via `showModal()` — por isso este diálogo é montado direto por `App.tsx`, nunca dentro de `<Projects/>`. ids mantidos (`new-project-button`, `new-project-id-input`, `new-project-cancel`) para a instrumentação de verificação da V2-T74 (`main/main.ts#verifyTextFieldClipboardRoundTrip`) continuar funcionando sem mudança |
 | `TableRow` ganha CSS module e teste (V2-T67, D-052, Q-102) | `renderer/components/TableRow/` — primeira chamadora de produção é a própria tabela da aba Projects; `.seeya-table-row*` (`renderer/legacy/components.css`) saiu, confirmado sem uso direto por grep antes de apagar |
+| aba Sessions (V2-T68, D-052, `docs/INTERFACE.md` § 5) | `renderer/features/sessions/` — `Sessions.tsx` (raiz, montada uma vez dentro de `#page-sessions`) + `useSessions.ts` (dados — mesmo `onProjectsUpdate`/`getProjectsPanel` que a aba Projects já lê, nunca uma segunda descoberta de sessões) + `SessionsHeader`/`SessionsFilters`/`SessionsTable`. Substitui inteiramente `renderer/legacy/other-sessions-dir-dialog-view.ts` (o modal por diretório) e `renderer/legacy/session-search-view.ts`/`session-row-view.ts` (o campo de busca por id e a linha compartilhada que ele usava), todos apagados — `renderer/legacy/other-sessions-and-ignored-view.ts` perde sua metade "Other sessions" e é renomeado `ignored-projects-view.ts`, guardando só "Ignored projects" (região da lateral, intocada por esta tarefa) |
+| `SessionsPanelRow`/`flattenSessionsPanelRows` (V2-T68) | `state/sessions-panel.ts` — achata `ProjectsPanelData` (as sessões de cada `ProjectPanelRow` mais as de `otherSessionsByDirectory`) numa lista só, acrescentando `projectId`/`projectName` (`null` sem projeto) e `adopt` (`null` exatamente quando há projeto — D-025: nunca uma elegibilidade inventada para um fato que não se aplica) |
+| busca/filtro/ação da aba Sessions (V2-T68) | `state/sessions-table.ts` — `buildSessionsTableRows` (filtro de estado `all`/`running`/`notRunning`, projeto `any`/`none`/um id real, diretório por `cwd` normalizado, busca por nome OU por prefixo do `sessionId` completo); `resolveSessionRowAction` devolve `SessionRowAction` (D-024): `goToTab` (`matchedTabId`, vence sempre), `runningElsewhere` (rodando mas sem aba nesta janela — Q-106, sem ação), `projectResumePending` (sem processo, com projeto — célula vazia, V2-T77/§5a preenche depois) ou `standalone` (sem processo, sem projeto — `Resume` E `Adopt…` lado a lado, nunca alternativas) |
+| busca por id na aba Sessions, nunca a lista filtrada (V2-T68) | `useSessions.ts` — a checagem "já conhecida?" roda contra TODAS as sessões que a janela já tem (`allRows`), nunca contra a tabela já filtrada por estado/projeto/diretório/busca — só quando nenhuma bate E a consulta tem forma de id (`core/session-id-shape.ts#looksLikeSessionIdReference`) é que a busca direta da V2-T55 (`CHANNELS.findSessionById`, fora de `relevanceHours`) roda; sem debounce (D-019 proíbe `setTimeout` neste `renderer/`), cada tecla que ainda parece um id dispara uma nova chamada, sempre sob demanda, nunca no ciclo de 10s |
+| retomada avulsa pela aba Sessions (V2-T68) | `CHANNELS.resumeSession` (`ipc/channels.ts`) — `main/session-resume-ipc.ts#wireSessionResumeIpc`, reusando a MESMA `TabSessionResumer#resumeWithoutPrompt` (V2-T7) que o fallback sem plano já usa: `claude --resume <id>` sem prompt, numa aba, resolvendo quando a corrida de falha rápida (`FAST_FAILURE_GRACE_MS`) se decide — nunca quando a sessão termina (diferente de `openProject`). Só para uma sessão sem projeto e sem processo (`standalone`); a retomada de uma sessão DE projeto é a V2-T77 |
+| copiar o id curto como componente real (V2-T68) | `renderer/features/sessions/SessionsTable/SessionsTable.tsx#SessionIdCopyButton` — mesmo clique com `navigator.clipboard.writeText` que `renderer/legacy/session-row-view.ts` (apagado) já fazia, agora com estado Preact em vez de mutar `title` por fora; **sem auto-reversão** (D-019: nada de `setTimeout` para voltar o texto) — `Copied!` substitui `[id]` e fica assim pelo resto da vida da linha, mesmo fim que a versão legada já tinha (só mudava o `title`, nunca revertia). `data-session-id` no botão é só para a instrumentação de verificação clicar uma linha específica |
 | sessão descoberta | `DiscoveredSession` |
 | sessão com PID / sem PID | `SessionWithPid` / `SessionWithoutPid` |
 | estado da sessão | `SessionState` |
@@ -622,12 +628,7 @@ do botão numa captura da janela real), `SEEYA_APP_STARTUP_TIMING_PATH`
 (V2-T17 item 4: grava, no arquivo indicado, o instante em que o primeiro `sessionsUpdate` foi
 enviado ao renderer — a metade, do lado do app, da medida "tempo até a lista de sessões na tela"
 de `docs/DESEMPENHO.md`; `packages/app/scripts/measure-startup.mjs` é a outra metade, que lança o
-processo e faz a subtração), `SEEYA_APP_AUTO_OPEN_OTHER_SESSIONS_DIR` (V2-T55 item 3: clica a
-primeira linha de diretório de "Other sessions", para provar que o modal abre com a lista real —
-nome, id curto, rótulo de estado, última atividade, **Adopt…**), `SEEYA_APP_AUTO_SEARCH_SESSION_ID`
-(V2-T55 item 4: única destas variáveis que carrega um VALOR, não só `'1'` — o id ou prefixo a
-digitar no campo de busca; envia o formulário e prova um resultado real, inclusive de uma sessão
-fora de `relevanceHours`), `SEEYA_APP_AUTO_RESIZE_SIDEBAR` (aceite do mantenedor da V2-T55,
+processo e faz a subtração), `SEEYA_APP_AUTO_RESIZE_SIDEBAR` (aceite do mantenedor da V2-T55,
 correção 2: dispara uma sequência real de eventos de ponteiro — `pointerdown`/`pointermove`/
 `pointerup` — na borda arrastável `#sidebar-resize-handle`, exercitando de verdade os listeners de
 arrasto em vez de só trocar a custom property CSS diretamente), `SEEYA_APP_AUTO_DECLINE_DAEMON_OWNERSHIP_TRANSITION` (dispensa
@@ -687,7 +688,24 @@ ainda em `loading` — ver `SEEYA_APP_VERIFY_HOLD_SKIP_MS` a seguir) e
 milissegundos informados ANTES de devolvê-la ao renderer — `skipTodayNow`'s own escrita local já
 aconteceu de verdade, só a resposta fica retida — para que uma captura logo depois do clique prove
 o rótulo de um botão `loading` ainda centralizado, sem correr contra a latência real de uma
-escrita local quase instantânea; ausente, não muda nada do caminho normal) —
+escrita local quase instantânea; ausente, não muda nada do caminho normal), `SEEYA_APP_AUTO_OPEN_SESSIONS_TAB`
+(V2-T68: clica o real `sessions-link` da lateral — único propósito é abrir a aba Sessions antes de
+uma captura simples com `SEEYA_APP_SCREENSHOT_PATH`, o mesmo papel que `SEEYA_APP_AUTO_TOGGLE_SIDEBAR`
+já cumpre para a lateral; substitui `SEEYA_APP_AUTO_OPEN_OTHER_SESSIONS_DIR`/`SEEYA_APP_AUTO_SEARCH_SESSION_ID`
+(V2-T55), cujo DOM-alvo — o modal por diretório, o campo de busca legado — esta tarefa apagou) e
+`SEEYA_APP_VERIFY_SESSIONS_TAB_STATES_DIR` (V2-T68: mesma forma de pasta-não-arquivo de
+`SEEYA_APP_VERIFY_PROJECTS_TAB_STATES_DIR` acima — dez capturas nomeadas em sequência pela aba
+Sessions: a tabela inteira (`Go to tab` real — mesmo mecanismo de dobrar o pid de
+`SEEYA_APP_VERIFICATION_TAB_PID_PATH` numa sessão fictícia que a V2-T67 já usa —, `Resume`+`Adopt…`
+habilitado, `Resume`+`Adopt…` desabilitado com o motivo, a célula vazia de sessão de projeto sem
+processo, e um nome/diretório longo truncado), os dois filtros de estado além de `All`, um filtro
+de projeto, um filtro de diretório, busca por nome, busca por id de uma sessão fora de
+`relevanceHours`, prefixo ambíguo, sem resultado, e o retorno visível de copiar o id curto —
+`window.focus()` antes do clique sintético é o que faz a Clipboard API aceitar a escrita nesta
+janela offscreen: sem foco real, `navigator.clipboard.writeText` recusa com "Document is not
+focused" mesmo depois de um `sendInputEvent` (um clique de verdade, ao contrário de `el.click()`
+via `executeJavaScript`, que não carrega ativação de usuário nenhuma para a Clipboard API aceitar) —
+medido com esta própria instrumentação antes da correção) —
 mesma categoria de `SEEYA_DAEMON_CHILD`
 acima (nunca vão para disco, ninguém digita), mas nenhuma delas é lida por `npm run app` nem
 documentada no `README.md`: existem só para um agente sem tela/teclado próprios provar a janela

@@ -544,4 +544,33 @@ export const MESSAGES = {
   // explicitly (D-025: never a guessed date, just a clearer way to say there isn't one).
   projectsLastActivityUnknown: '—',
   projectsLastActivityUnknownTitle: 'No activity recorded for this project yet.',
+
+  // V2-T68 — the Sessions tab (`docs/INTERFACE.md` § 5), replacing the directory modal and the
+  // id-search field this task deletes (`other-sessions-dir-dialog-view.ts`/`session-search-view.ts`).
+  sessionsTabTitle: 'Sessions',
+  sessionsTabCount: (count: number): string => `${count} ${count === 1 ? 'session' : 'sessions'}`,
+  sessionsTabRunningCount: (count: number): string => `${count} running`,
+  sessionsSearchLabel: 'Search by name or id',
+  sessionsSearchPlaceholder: 'Name, id, or the start of it',
+  sessionsFilterStateGroupLabel: 'Filter by state',
+  sessionsFilterStateAll: 'All',
+  sessionsFilterStateRunning: 'Running',
+  sessionsFilterStateNotRunning: 'Not running',
+  sessionsFilterProjectLabel: 'Project',
+  sessionsFilterProjectAny: 'Any project',
+  sessionsFilterProjectNone: 'No project',
+  sessionsFilterDirectoryLabel: 'Directory',
+  sessionsFilterDirectoryAny: 'Any directory',
+  sessionsTableHeaderName: 'Name',
+  sessionsTableHeaderId: 'Id',
+  sessionsTableHeaderState: 'State',
+  sessionsTableHeaderDirectory: 'Directory',
+  sessionsTableHeaderProject: 'Project',
+  sessionsTableHeaderLastActivity: 'Last activity',
+  sessionsNoProject: 'No project',
+  sessionsActionResume: 'Resume',
+  sessionsEmptyTitle: 'No sessions yet',
+  sessionsEmptyDescription: 'Discovered sessions will show up here.',
+  sessionsNoMatchTitle: 'No sessions match',
+  sessionsNoMatchDescription: 'Try a different search or filter.',
 } as const;

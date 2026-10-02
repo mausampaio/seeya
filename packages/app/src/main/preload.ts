@@ -69,6 +69,8 @@ import type {
   ThemeUpdateEvent,
   ToggleFavoriteProjectRequest,
   PickDirectoryResponse,
+  ResumeSessionRequest,
+  ResumeSessionResponse,
 } from '../ipc/channels.js';
 
 export interface SeeyaApi {
@@ -208,6 +210,10 @@ export interface SeeyaApi {
    * fetched once — used to abbreviate a `cwd` as `~` for display
    * (`sidebar/directory-label.ts#collapseHomeDirectory`), never to resolve a real path. */
   getHomeDir(): Promise<string>;
+  /** V2-T68: the Sessions tab's own `Resume` button — a session with no process and no project,
+   * resumed in a tab (`docs/INTERFACE.md` § 5). Resolves once the fast-failure race settles, a
+   * few seconds at most (`main/session-resume-ipc.ts`'s own docstring). */
+  resumeSession(request: ResumeSessionRequest): Promise<ResumeSessionResponse>;
 }
 
 /**
@@ -334,6 +340,7 @@ const api: SeeyaApi = {
   pickDirectory: () => ipcRenderer.invoke(CHANNELS.pickDirectory),
   getAppVersion: () => ipcRenderer.invoke(CHANNELS.getAppVersion),
   getHomeDir: () => ipcRenderer.invoke(CHANNELS.getHomeDir),
+  resumeSession: (request) => ipcRenderer.invoke(CHANNELS.resumeSession, request),
 };
 
 contextBridge.exposeInMainWorld('seeya', api);

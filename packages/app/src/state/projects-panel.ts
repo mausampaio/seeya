@@ -204,8 +204,10 @@ export interface ProjectPanelOtherSessionRow extends ProjectPanelSessionRow {
 
 /** V2-T55 item 2 — one row per directory in "Other sessions", not one per session (with many
  * Claude Code sessions on a machine, a flat list was the exact problem the maintainer hit on
- * Ubuntu). Clicking a directory opens the modal (`electron/other-sessions-dir-dialog-view.ts`)
- * listing `sessions` (item 3: name, short id, state label, last activity, Adopt…). */
+ * Ubuntu). V2-T68: the directory modal this used to feed (`renderer/legacy/
+ * other-sessions-dir-dialog-view.ts`, apagado) is gone — `sessions` (name, short id, state label,
+ * last activity, Adopt…) now flattens straight into the Sessions tab's own table
+ * (`state/sessions-panel.ts#flattenSessionsPanelRows`) instead. */
 export interface OtherSessionDirectoryPanelRow {
   readonly dir: string;
   readonly sessionCount: number;

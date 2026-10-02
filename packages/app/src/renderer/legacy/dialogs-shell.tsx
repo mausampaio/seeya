@@ -104,13 +104,6 @@ export function DialogsShell() {
           <button id="adopt-result-close" type="button"></button>
         </div>
       </Dialog>
-      <Dialog id="other-sessions-dir-dialog" className="project-dialog">
-        <h3 id="other-sessions-dir-dialog-title"></h3>
-        <ul id="other-sessions-dir-dialog-sessions"></ul>
-        <div class="project-dialog-actions">
-          <button id="other-sessions-dir-dialog-close" type="button"></button>
-        </div>
-      </Dialog>
     </>
   );
 }

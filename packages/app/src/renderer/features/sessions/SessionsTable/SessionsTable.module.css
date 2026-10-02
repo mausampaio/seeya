@@ -1,0 +1,67 @@
+/* V2-T68 — the Sessions tab's own table. Same `table-layout: fixed` + explicit `<th>` `width`
+ * discipline as `ProjectsTable.module.css` — see that file's own top comment for the full
+ * reasoning (makes `Text`'s own `truncate` prop actually truncate). */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.headerCell {
+  box-sizing: border-box;
+  text-align: left;
+  padding: var(--seeya-space-2) var(--seeya-space-3);
+  border-bottom: 1px solid var(--seeya-border-strong);
+}
+
+.headerCell.alignRight {
+  text-align: right;
+}
+
+/* The action cell holds up to two buttons side by side (`Resume`+`Adopt…`), right-aligned within
+ * its own fixed-width column — `display: flex` (never `block`, unlike `ProjectsTable.module.css`'s
+ * own single-button `.actionCell`) is what lines the two up instead of stacking them.
+ * PO review round 1: `flex-wrap: nowrap` + `min-width: 0` on the cell itself (a flex item's default
+ * `min-width: auto` would otherwise refuse to shrink below its own content, which is exactly what
+ * let a disabled `Adopt…`'s title/tooltip-less text overflow the column before this review) keep
+ * this cell from ever growing past its own `<th>`-declared width, regardless of what the row's
+ * buttons contain. */
+.actionCell {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--seeya-space-2);
+  min-width: 0;
+}
+
+/* PO review round 1: a fixed `min-width`, not just whatever `Resume`/`Adopt…`/`Go to tab` each
+ * measure on their own — this is what keeps a single-button row (`Go to tab`) and a two-button row
+ * (`Resume`+`Adopt…`) right-aligned on the SAME edge, the "alinhados entre as linhas" the spec
+ * asks for, the same reasoning `ProjectsTable.module.css`'s own `.actionButton` already documents
+ * for its single-button case. */
+.actionButton {
+  min-width: 84px;
+}
+
+/* The short id/`Copied!` — a plain button, not `Button`/`IconButton` (neither fits a tiny
+ * monospace id label), styled close to a secondary, monospace `Text` (`variant="code"`). No hover
+ * decoration: PO review round 1 found a capture with the pointer still resting on the button right
+ * after a synthetic click, painting the (correct, hover-only) underline in every "Copied!"
+ * screenshot — simplest fix is not having one on this small a control at all. */
+.idCopyButton {
+  /* `display: block; width: 100%` — a `<button>` is inline-block by default, shrink-to-fit sized
+   * to its own content regardless of the `<td>`'s own fixed width; without this, the inner `Text`'s
+   * own `truncate` (`display: block` + `white-space: nowrap` + ellipsis) has no constrained box to
+   * clip against, and the id either wraps or bleeds into the next column instead of truncating —
+   * the same "give it the cell's own full width" fix every other truncating cell in this table
+   * already gets for free by being a bare `Text` directly inside the `<td>`. */
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+}
