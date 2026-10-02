@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render } from '@testing-library/preact';
+import { cleanup, fireEvent, render, type RenderResult } from '@testing-library/preact';
 import { ProjectsTable } from '../../../../../../packages/app/src/renderer/features/projects/ProjectsTable/index.js';
 import {
   formatSessionLastActivityText,
@@ -58,7 +58,7 @@ describe('ProjectsTable expanded sessions (V2-T77, docs/INTERFACE.md § 5a)', ()
   function renderExpanded(
     sessions: readonly ProjectPanelSessionRow[],
     handlers: Partial<typeof EXPANSION_PROPS.sessionsPanel> = {},
-  ): ReturnType<typeof render> {
+  ): RenderResult {
     return render(
       <ProjectsTable
         rows={[project({ sessions })]}
