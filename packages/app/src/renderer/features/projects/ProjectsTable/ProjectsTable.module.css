@@ -1,11 +1,50 @@
-/* V2-T67 — the Projects tab's own table. */
+/* V2-T67 — the Projects tab's own table. PO review round 1: `table-layout: fixed` plus an
+ * explicit `width` on every `<th>` but Name (`ProjectsTable.tsx`'s own `COLUMNS`) is what makes
+ * `Text`'s own `truncate` prop actually truncate instead of letting the table grow taller with
+ * wrapped lines — see that file's own top docstring for the full reasoning. */
 .table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
+/* `box-sizing: border-box` — same reasoning as `TableRow.module.css`'s own `.cell`: an explicit
+ * `width` on a `<th>` (`ProjectsTable.tsx`'s own `COLUMNS`) must include this padding, or every
+ * fixed column renders wider than declared and starves the one column (Name) left without one. */
 .headerCell {
+  box-sizing: border-box;
   text-align: left;
   padding: var(--seeya-space-2) var(--seeya-space-3);
   border-bottom: 1px solid var(--seeya-border-strong);
+}
+
+.headerCell.alignRight {
+  text-align: right;
+}
+
+/* Sessions/Repositories — bare counts, right-aligned within their own fixed-width column.
+ * `display: block` (never set by `Text`'s own base classes) is what makes `text-align` apply at
+ * all to this otherwise-inline `<span>`. */
+.numericCell {
+  display: block;
+  text-align: right;
+}
+
+/* The action button's own cell: right-aligned within its fixed-width column, same reasoning as
+ * `.numericCell` above but for an `inline-flex` `<button>` rather than a text span. */
+.actionCell {
+  display: block;
+  text-align: right;
+}
+
+/* PO review round 1: "Go to tab"/"Open"/"Read only…" used to measure three different widths,
+ * never lining up as a column. A real capture at `min-width: 95px` proved `min-width` can only
+ * ever raise a SHORTER label up to the floor — it never pulls a LONGER one back down, and both
+ * "Go to tab" and "Read only…" are naturally wider than 95px on their own, so the two of them
+ * still rendered at two different (and both larger) widths; only "Open", the shortest, ever
+ * actually sat at the floor. A true `width` (a ceiling as well as a floor, `ProjectsTable.tsx`'s
+ * own `COLUMNS` comment on `action` has the paired column-width reasoning) is what makes every
+ * action button in the column measure IDENTICALLY, regardless of which one a given row shows. */
+.actionButton {
+  width: 125px;
 }

@@ -520,7 +520,6 @@ export const MESSAGES = {
   projectsFilterAll: 'All',
   projectsFilterRunning: 'With a running session',
   projectsFilterLocked: 'Locked',
-  projectsTableHeaderFavorite: 'Favorite',
   projectsTableHeaderName: 'Name',
   projectsTableHeaderLock: 'Lock',
   projectsTableHeaderSessions: 'Sessions',
@@ -540,4 +539,9 @@ export const MESSAGES = {
   projectsEmptyDescription: 'Create a project to get started.',
   projectsNoMatchTitle: 'No projects match',
   projectsNoMatchDescription: 'Try a different search or filter.',
+  // PO review round 1: the raw enum-ish "unknown" read as an error, not an absence of data —
+  // a dash in secondary tone reads as "nothing recorded" instead, with the `title` saying so
+  // explicitly (D-025: never a guessed date, just a clearer way to say there isn't one).
+  projectsLastActivityUnknown: '—',
+  projectsLastActivityUnknownTitle: 'No activity recorded for this project yet.',
 } as const;

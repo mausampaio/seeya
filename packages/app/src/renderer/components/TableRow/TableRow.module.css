@@ -15,7 +15,15 @@
   background: var(--seeya-surface-subtle);
 }
 
+/* PO review round 1 (V2-T67): `box-sizing: border-box` — without it, a `<table>` using
+ * `table-layout: fixed` with explicit column widths on its `<th>`s (`ProjectsTable.module.css`'s
+ * own docstring) renders each column WIDER than specified by its own padding (the default
+ * `content-box` sizing adds padding ON TOP of the declared width), which starved the one column
+ * left without an explicit width (Name) down to almost nothing — the defect a real capture found,
+ * `docs/INTERFACE.md`'s own "o texto que não couber trunca... nunca quebra" having the opposite
+ * effect (truncated to a single character) instead of the intended one. */
 .cell {
+  box-sizing: border-box;
   padding: var(--seeya-space-2) var(--seeya-space-3);
   color: var(--seeya-text);
 }

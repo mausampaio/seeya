@@ -2,7 +2,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render } from '@testing-library/preact';
 import { ProjectsTable } from '../../../../../../packages/app/src/renderer/features/projects/ProjectsTable/index.js';
-import type { ProjectPanelRow } from '../../../../../../packages/app/src/state/projects-panel.js';
+import {
+  formatSessionLastActivityText,
+  type ProjectPanelRow,
+} from '../../../../../../packages/app/src/state/projects-panel.js';
 
 afterEach(cleanup);
 
@@ -101,6 +104,36 @@ describe('ProjectsTable (V2-T67)', () => {
     );
     expect(getByText('Open').closest('button')?.getAttribute('aria-busy')).toBe('true');
     expect(getByText('Go to tab').closest('button')?.getAttribute('aria-busy')).toBeNull();
+  });
+
+  it('PO review round 1: no activity shows a dash with a title, never raw "unknown"', () => {
+    const row = project({ lastActivity: null });
+    const { getByText } = render(
+      <ProjectsTable
+        rows={[row]}
+        onToggleFavorite={() => {}}
+        onRowAction={() => {}}
+        isRowActionPending={() => false}
+      />,
+    );
+    const dash = getByText('—');
+    expect(dash.getAttribute('title')).toBe('No activity recorded for this project yet.');
+  });
+
+  it('PO review round 1: a known last activity reuses the shared date/time format', () => {
+    const lastActivity = new Date('2026-10-02T00:16:44.000Z');
+    const row = project({ lastActivity });
+    const expected = formatSessionLastActivityText(lastActivity);
+    const { getByText } = render(
+      <ProjectsTable
+        rows={[row]}
+        onToggleFavorite={() => {}}
+        onRowAction={() => {}}
+        isRowActionPending={() => false}
+      />,
+    );
+    const cell = getByText(expected);
+    expect(cell.getAttribute('title')).toBe(expected);
   });
 
   it('clicking the star calls onToggleFavorite with the flipped value', () => {
