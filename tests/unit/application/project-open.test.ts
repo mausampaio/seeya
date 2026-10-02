@@ -70,6 +70,7 @@ function buildOpenDeps(
     cliEntryPath: '/fake/cli-entry.js',
     auditMarker: new FakeProjectAuditMarker(),
     lockFileName: '.seeya-lock',
+    platformHint: 'posix',
     ...overrides,
   };
 }
@@ -134,6 +135,7 @@ describe('openProject', () => {
       kind: 'opened',
       projectId: 'auth-hardening',
       harness: 'claude',
+      sessionLaunch: 'fresh',
       exitCode: 0,
       addedDirs: [],
       missing: [],
@@ -147,7 +149,7 @@ describe('openProject', () => {
       {
         cwd: PROJECT_DIR,
         addDirs: [],
-        sessionId: LAUNCHED_SESSION_ID,
+        launch: { kind: 'fresh', sessionId: LAUNCHED_SESSION_ID },
         systemPromptAppend: buildProjectWorkingRulesText('auth-hardening'),
       },
     ]);
@@ -186,7 +188,7 @@ describe('openProject', () => {
       {
         cwd: PROJECT_DIR,
         addDirs: [REPO_PATH],
-        sessionId: LAUNCHED_SESSION_ID,
+        launch: { kind: 'fresh', sessionId: LAUNCHED_SESSION_ID },
         systemPromptAppend: buildProjectWorkingRulesText('auth-hardening'),
       },
     ]);
@@ -224,7 +226,7 @@ describe('openProject', () => {
       {
         cwd: PROJECT_DIR,
         addDirs: [],
-        sessionId: LAUNCHED_SESSION_ID,
+        launch: { kind: 'fresh', sessionId: LAUNCHED_SESSION_ID },
         systemPromptAppend: buildProjectWorkingRulesText('auth-hardening'),
       },
     ]);
@@ -396,7 +398,7 @@ describe('openProject', () => {
       expect(harnessLauncher.calls[0]).toMatchObject({
         cwd: PROJECT_DIR,
         addDirs: [],
-        sessionId: LAUNCHED_SESSION_ID,
+        launch: { kind: 'fresh', sessionId: LAUNCHED_SESSION_ID },
       });
       expect(harnessLauncher.calls[0]?.systemPromptAppend).toContain(
         'locked by session other-session',

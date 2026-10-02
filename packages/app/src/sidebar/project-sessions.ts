@@ -22,6 +22,7 @@ import {
   normalizeCwdForComparison,
   type PathPlatformHint,
 } from '@seeya-ai/engine/core/cwd-normalization.js';
+import { sessionBelongsToProject } from '@seeya-ai/engine/core/project-session-membership.js';
 import type { AdoptionRecord, SessionState } from '@seeya-ai/engine/core/types.js';
 import type { SidebarRow } from './sidebar-data.js';
 
@@ -45,23 +46,24 @@ function forkSessionIdsByProject(
   return map;
 }
 
-function sessionBelongsToProject(
+function rowBelongsToProject(
   row: SidebarRow,
   project: ProjectDirectory,
   forksByProject: ReadonlyMap<string, ReadonlySet<string>>,
   lockSessionIdByProjectId: ReadonlyMap<string, string>,
   platform: PathPlatformHint,
 ): boolean {
-  if (
-    normalizeCwdForComparison(row.cwd, platform) ===
-    normalizeCwdForComparison(project.dir, platform)
-  ) {
-    return true;
-  }
-  if (forksByProject.get(project.projectId)?.has(row.sessionId) === true) {
-    return true;
-  }
-  return lockSessionIdByProjectId.get(project.projectId) === row.sessionId;
+  // The rule itself lives in `core/project-session-membership.ts` (V2-T77), shared with the
+  // engine's own `open --resume` refusal so the two can never disagree.
+  return sessionBelongsToProject(
+    row,
+    {
+      projectDir: project.dir,
+      forkSessionIds: forksByProject.get(project.projectId) ?? new Set<string>(),
+      lockSessionId: lockSessionIdByProjectId.get(project.projectId),
+    },
+    platform,
+  );
 }
 
 export interface ProjectSessionGrouping {
@@ -94,7 +96,7 @@ export function groupSessionsByProject(
   const otherSessions: SidebarRow[] = [];
   for (const row of rows) {
     const matched = projects.find((project) =>
-      sessionBelongsToProject(row, project, forksByProject, lockSessionIdByProjectId, platform),
+      rowBelongsToProject(row, project, forksByProject, lockSessionIdByProjectId, platform),
     );
     if (matched === undefined) {
       otherSessions.push(row);

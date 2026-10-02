@@ -118,7 +118,8 @@ function SessionIdCopyButton(props: {
 /** `docs/INTERFACE.md` § 5's own four action shapes: `Go to tab` (always alone), `Resume`+`Adopt…`
  * side by side (`standalone`, two independent facts about the same row, never alternatives — this
  * module's own `SessionRowAction` docstring in `state/sessions-table.ts` has the full reasoning),
- * or nothing at all (`runningElsewhere`/`projectResumePending`). */
+ * `Resume` alone (`projectResume`, V2-T77: through the project's own `open` flow), or nothing at all
+ * (`runningElsewhere`). */
 function ActionCell(props: {
   readonly row: SessionsPanelRow;
   readonly action: SessionRowAction;
@@ -140,24 +141,30 @@ function ActionCell(props: {
       </div>
     );
   }
-  if (action.kind === 'runningElsewhere' || action.kind === 'projectResumePending') {
-    // `projectResumePending`: retomar pelo fluxo do `open` é a V2-T77 (`docs/INTERFACE.md` § 5a) —
-    // célula vazia de propósito, nunca um texto citando a tarefa. `runningElsewhere`: a sessão está
-    // rodando mas não há aba desta janela para ir a ela (Q- registrada em `docs/QUESTOES.md`) —
+  if (action.kind === 'runningElsewhere') {
+    // `runningElsewhere`: a sessão está rodando mas não há aba desta janela para ir a ela (Q-106) —
     // nada clicável, nunca um `Resume` que abriria uma segunda cópia do que já está rodando.
     return <div class={cx(styles, 'actionCell')} />;
   }
+  const resumeButton = (
+    <Button
+      size="sm"
+      variant="secondary"
+      loading={props.resumePending}
+      className={cx(styles, 'actionButton')}
+      onClick={() => props.onRowAction(row)}
+    >
+      {MESSAGES.sessionsActionResume}
+    </Button>
+  );
+  if (action.kind === 'projectResume') {
+    // V2-T77: a session that already belongs to a project resumes through the project's own `open`
+    // flow and is never adoptable — `Resume` alone.
+    return <div class={cx(styles, 'actionCell')}>{resumeButton}</div>;
+  }
   return (
     <div class={cx(styles, 'actionCell')}>
-      <Button
-        size="sm"
-        variant="secondary"
-        loading={props.resumePending}
-        className={cx(styles, 'actionButton')}
-        onClick={() => props.onRowAction(row)}
-      >
-        {MESSAGES.sessionsActionResume}
-      </Button>
+      {resumeButton}
       {/* V2-T70's own `main/main.ts` verification instrumentation clicks the first
        * `[data-adopt-session-id] button` it finds — `Button.tsx`'s own `ButtonProps` is a closed
        * interface with no passthrough for an arbitrary `data-*` attribute (confirmed against a

@@ -54,6 +54,8 @@ import type {
   CreateProjectResponse,
   OpenProjectRequest,
   OpenProjectResponse,
+  ResumeProjectSessionRequest,
+  ResumeProjectSessionResponse,
   ConfirmProjectLockOpenRequestEvent,
   AnswerProjectLockOpenConfirmRequest,
   ConfirmLeftoverChangesOpenRequestEvent,
@@ -165,6 +167,8 @@ export interface SeeyaApi {
   createProject(request: CreateProjectRequest): Promise<CreateProjectResponse>;
   /** V2-T30 item 3: a project's "Open" button — resolves only once the tab closes. */
   openProject(request: OpenProjectRequest): Promise<OpenProjectResponse>;
+  /** V2-T77: `Resume` on a project's own session, through the `open` pipeline. */
+  resumeProjectSession(request: ResumeProjectSessionRequest): Promise<ResumeProjectSessionResponse>;
   /** V2-T30 item 3: the project is locked by another live session — one question at a time. */
   onConfirmProjectLockOpenRequest(
     listener: (event: ConfirmProjectLockOpenRequestEvent) => void,
@@ -302,6 +306,7 @@ const api: SeeyaApi = {
   getProjectsPanel: () => ipcRenderer.invoke(CHANNELS.getProjectsPanel),
   createProject: (request) => ipcRenderer.invoke(CHANNELS.createProject, request),
   openProject: (request) => ipcRenderer.invoke(CHANNELS.openProject, request),
+  resumeProjectSession: (request) => ipcRenderer.invoke(CHANNELS.resumeProjectSession, request),
   onConfirmProjectLockOpenRequest: (listener) => {
     ipcRenderer.on(
       CHANNELS.confirmProjectLockOpenRequest,

@@ -19,6 +19,7 @@
 import type {
   HarnessLauncher,
   HarnessOpenResult,
+  HarnessSessionLaunch,
   SessionAdoptionLauncher,
 } from '@seeya-ai/engine/core/ports.js';
 import { buildOpenArgs } from '@seeya-ai/engine/adapters/harness/args.js';
@@ -67,12 +68,12 @@ export class ProjectOpenTabLauncher implements HarnessLauncher {
   open(
     cwd: string,
     addDirs: readonly string[],
-    sessionId: string,
+    launch: HarnessSessionLaunch,
     systemPromptAppend: string | null,
   ): Promise<HarnessOpenResult> {
     return openTabAndAwaitExit(this.options.opener, {
       command: this.options.claudeCommand,
-      args: buildOpenArgs(addDirs, sessionId, systemPromptAppend),
+      args: buildOpenArgs(addDirs, launch, systemPromptAppend),
       cwd,
       label: this.options.label,
       kind: 'project',

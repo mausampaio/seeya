@@ -1,0 +1,48 @@
+/* V2-T77 — the expanded sessions of one project row. Indented under the project's name (the
+ * favorite column is 32px, the cell padding adds `space-3`), on a subtle background so it reads as
+ * belonging to the row above rather than as another project. Same measured widths as the columns
+ * above where they overlap: the id is 8 mono characters, the last activity is the full
+ * "02/10/2026, 00:16:44" (174px, `ProjectsTable.tsx`'s own `COLUMNS`), the action button is the same
+ * 125px as the row's own. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--seeya-space-1);
+  padding: var(--seeya-space-2) var(--seeya-space-3) var(--seeya-space-3) 44px;
+  background: var(--seeya-surface-subtle);
+}
+
+.empty {
+  padding: var(--seeya-space-3) 44px;
+  background: var(--seeya-surface-subtle);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+
+.sessionRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 90px 150px 174px 125px;
+  align-items: center;
+  column-gap: var(--seeya-space-3);
+  padding: var(--seeya-space-1) 0;
+  border-bottom: 1px solid var(--seeya-border);
+}
+
+.sessionRow:last-child {
+  border-bottom: none;
+}
+
+.actionCell {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.actionButton {
+  width: 125px;
+}

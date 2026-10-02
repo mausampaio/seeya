@@ -631,4 +631,15 @@ export const MESSAGES = {
   sessionsEmptyDescription: 'Discovered sessions will show up here.',
   sessionsNoMatchTitle: 'No sessions match',
   sessionsNoMatchDescription: 'Try a different search or filter.',
+
+  // V2-T77 (`docs/INTERFACE.md` § 5a) — a project's own sessions, listed under its row in the
+  // Projects tab, each with `Resume` (the project's `open` flow, not the simple resume).
+  projectSessionsExpandLabel: (projectName: string, expanded: boolean): string =>
+    `${expanded ? 'Hide' : 'Show'} sessions of ${projectName}`,
+  projectSessionsListLabel: (projectName: string): string => `Sessions of ${projectName}`,
+  projectSessionsNone: 'No sessions yet. Open the project to start one.',
+  projectSessionsShowAll: (totalCount: number): string => `Show all ${totalCount} in Sessions`,
+  projectSessionsResumeTitle:
+    'Resumes this session through the same flow as Open: lock, hooks, CLAUDE.md.',
+  projectSessionsDismissResult: 'Dismiss',
 } as const;

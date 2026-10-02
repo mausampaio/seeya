@@ -86,6 +86,9 @@ import { shouldMarkLinuxProtocolRegistered } from '../composition/linux-protocol
 import { resolveProtocolScheme, type ProtocolScheme } from '../composition/protocol-scheme.js';
 import { shouldRegisterProtocolScheme } from '../composition/protocol-registration-eligibility.js';
 import { resolveWindowIconPath } from '../composition/window-icon.js';
+import { resolveWindowSize } from '../composition/window-size.js';
+import { captureProjectResumeVerification } from './verify-project-resume.js';
+import { captureWindowMinVerification } from './verify-window-min.js';
 import {
   resolveApplicationMenuPolicy,
   type MenuEntry,
@@ -1564,12 +1567,17 @@ function createWindow(clock: Clock): BrowserWindow {
   // SEEYA_APP_WINDOW_WIDTH/SEEYA_APP_WINDOW_HEIGHT: same "instrumentação só do spike" class as
   // every other SEEYA_APP_* flag — a verification screenshot's own requested canvas size (e.g.
   // 1280×800), never read by `npm run app`. Falls back to the real app's own 1200×800 default
-  // when unset, which is every normal run.
-  const windowWidth = Number(process.env.SEEYA_APP_WINDOW_WIDTH ?? '1200');
-  const windowHeight = Number(process.env.SEEYA_APP_WINDOW_HEIGHT ?? '800');
+  // when unset, which is every normal run. V2-T77: the window also has a floor now
+  // (`composition/window-size.ts`) — an override below it is clamped up, never honored.
+  const windowSize = resolveWindowSize(
+    process.env.SEEYA_APP_WINDOW_WIDTH,
+    process.env.SEEYA_APP_WINDOW_HEIGHT,
+  );
   const window = new BrowserWindow({
-    width: Number.isFinite(windowWidth) ? windowWidth : 1200,
-    height: Number.isFinite(windowHeight) ? windowHeight : 800,
+    width: windowSize.width,
+    height: windowSize.height,
+    minWidth: windowSize.minWidth,
+    minHeight: windowSize.minHeight,
     title: MESSAGES.windowTitle,
     // V2-T11 item 2: the taskbar icon in dev (`npm run app`, Windows) and the window icon on
     // Linux, where the packaged executable's own icon resource (electron-builder.yml's own
@@ -1679,6 +1687,32 @@ function createWindow(clock: Clock): BrowserWindow {
   if (sessionsTabStatesDir !== undefined) {
     window.webContents.once('did-finish-load', () => {
       void captureSessionsTabStatesVerification(window, clock, sessionsTabStatesDir);
+    });
+  }
+  // SEEYA_APP_VERIFY_PROJECT_RESUME_DIR (V2-T77): same "a DIRECTORY, not a single file" shape — see
+  // `main/verify-project-resume.ts`'s own docstring. `SEEYA_APP_VERIFY_PROJECT_RESUME_SESSION_IDS`
+  // is `<id>,<id>`. Never set by `npm run app` or the README.
+  const projectResumeDir = process.env.SEEYA_APP_VERIFY_PROJECT_RESUME_DIR;
+  const projectResumeSessionIds = process.env.SEEYA_APP_VERIFY_PROJECT_RESUME_SESSION_IDS;
+  if (projectResumeDir !== undefined && projectResumeSessionIds !== undefined) {
+    window.webContents.once('did-finish-load', () => {
+      void captureProjectResumeVerification(
+        window,
+        clock,
+        projectResumeDir,
+        projectResumeSessionIds,
+        () => quitAfterConfiguredDelay(clock),
+      );
+    });
+  }
+  // SEEYA_APP_VERIFY_WINDOW_MIN_DIR (V2-T77): proof of the window's floor — see
+  // `main/verify-window-min.ts`'s own docstring. Never set by `npm run app` or the README.
+  const windowMinDir = process.env.SEEYA_APP_VERIFY_WINDOW_MIN_DIR;
+  if (windowMinDir !== undefined) {
+    window.webContents.once('did-finish-load', () => {
+      void captureWindowMinVerification(window, clock, windowMinDir, () =>
+        quitAfterConfiguredDelay(clock),
+      );
     });
   }
   // SEEYA_APP_VERIFY_CONFIRMATIONS_DIR (V2-T71): same "a DIRECTORY, not a single file" shape as

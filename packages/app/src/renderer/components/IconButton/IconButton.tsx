@@ -47,6 +47,9 @@ export interface IconButtonProps {
   readonly className?: string;
   readonly onClick?: (event: TargetedMouseEvent<HTMLButtonElement>) => void;
   readonly 'aria-label': string;
+  /** V2-T77: for a button that expands/collapses something (the Projects tab's own per-row
+   * sessions toggle) — omitted for every other `IconButton`, which then renders no attribute. */
+  readonly 'aria-expanded'?: boolean;
   readonly children: ComponentChildren;
   /** V2-T64: a plain DOM ref to the underlying `<button>` — never Preact's own `ref` prop (which
    * this project has no `forwardRef` for without `preact/compat`, D-051: no compatibility layer).
@@ -74,6 +77,7 @@ export function IconButton(props: IconButtonProps): JSX.Element {
       aria-busy={props.loading === true ? 'true' : undefined}
       hidden={props.hidden}
       aria-label={props['aria-label']}
+      aria-expanded={props['aria-expanded']}
       onClick={props.onClick}
     >
       {props.loading === true ? (

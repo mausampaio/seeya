@@ -26,6 +26,7 @@ import { MESSAGES } from '../../../text/messages.js';
 import { SessionsHeader } from './SessionsHeader/index.js';
 import { SessionsFilters } from './SessionsFilters/index.js';
 import { SessionsTable } from './SessionsTable/index.js';
+import { ProjectResumeNotice } from '../projects/ProjectResumeNotice/index.js';
 import { useSessions } from './useSessions.js';
 
 export function Sessions(): JSX.Element {
@@ -46,6 +47,12 @@ export function Sessions(): JSX.Element {
           directoryOptions={controls.directoryOptions}
           homeDir={controls.homeDir}
           platformHint={controls.platformHint}
+        />
+      )}
+      {controls.resumeResult !== null && (
+        <ProjectResumeNotice
+          result={controls.resumeResult}
+          onDismiss={controls.dismissResumeResult}
         />
       )}
       {!controls.hasAnySession ? (

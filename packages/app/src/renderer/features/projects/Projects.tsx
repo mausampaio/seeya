@@ -34,6 +34,7 @@ import { ProjectsHeader } from './ProjectsHeader/index.js';
 import { ProjectsFilters } from './ProjectsFilters/index.js';
 import { ProjectsTable } from './ProjectsTable/index.js';
 import { IgnoredProjectsSection } from './IgnoredProjectsSection/index.js';
+import { ProjectResumeNotice } from './ProjectResumeNotice/index.js';
 import { useProjects } from './useProjects.js';
 
 export function Projects(): JSX.Element {
@@ -49,6 +50,12 @@ export function Projects(): JSX.Element {
           onQueryChange={controls.setQuery}
           filter={controls.filter}
           onFilterChange={controls.setFilter}
+        />
+      )}
+      {controls.resumeResult !== null && (
+        <ProjectResumeNotice
+          result={controls.resumeResult}
+          onDismiss={controls.dismissResumeResult}
         />
       )}
       {panel.projects.length === 0 ? (
@@ -68,6 +75,9 @@ export function Projects(): JSX.Element {
           onToggleFavorite={controls.onToggleFavorite}
           onRowAction={controls.onRowAction}
           isRowActionPending={controls.isRowActionPending}
+          expandedProjectIds={controls.expandedProjectIds}
+          onToggleExpanded={controls.onToggleExpanded}
+          sessionsPanel={controls.sessionsPanel}
         />
       )}
       <IgnoredProjectsSection rows={panel.ignoredProjects} />

@@ -182,6 +182,12 @@ export const CHANNELS = {
    * never waits on this: the click handler doesn't block on it either, and the tab appears right
    * away via the reused `resumeTabOpened` push (`electron/project-ipc.ts`'s own docstring). */
   openProject: 'seeya:open-project',
+  /** Renderer → main: `Resume` on one of a PROJECT's own sessions (V2-T77, `docs/INTERFACE.md`
+   * § 5a) — the same `openProject` pipeline as `openProject` above (lock, hooks, `CLAUDE.md`, the
+   * same two questions), launching `claude --resume <id>` instead of a new session. Never the
+   * simple `resumeSession` below, which skips all of that. Same non-blocking shape as
+   * `openProject`: resolves only once the tab closes, or at once on a refusal. */
+  resumeProjectSession: 'seeya:resume-project-session',
   /** Main → renderer: the project is locked by another live session and needs a yes/no before
    * opening read-only (V2-T35's own three-answer confirmation, in a dialog instead of `readline`). */
   confirmProjectLockOpenRequest: 'seeya:confirm-project-lock-open-request',
@@ -666,7 +672,25 @@ export interface OpenProjectResponse {
   readonly outcomeText: string;
 }
 
-/** `CHANNELS.confirmProjectLockOpenRequest`'s payload (V2-T71, `docs/INTERFACE.md` § 9's own
+/** `CHANNELS.resumeProjectSession`'s payload (V2-T77) — by `sessionId`; the handler resolves the
+ * full session itself (window first, then the direct id lookup past `relevanceHours`, same as
+ * `adoptSession`'s). */
+export interface ResumeProjectSessionRequest {
+  readonly projectId: string;
+  readonly sessionId: string;
+}
+
+/** `CHANNELS.resumeProjectSession`'s response (V2-T77): `outcomeText` is `state/
+ * project-open-result.ts#formatProjectOpenOutcomeText`'s own sentence — and unlike a plain
+ * `openProject` click (which has no result area, Q-105), a resume ALWAYS shows it: a refusal
+ * (`resumed: false` — session running, not in the project, locked and declined, ...) must never be
+ * silent. `resumed: true` only when the harness tab actually opened and later closed. */
+export interface ResumeProjectSessionResponse {
+  readonly outcomeText: string;
+  readonly resumed: boolean;
+}
+
+/** `CHANNELS.confirmProjectLockOpenRequest`'s payload (V2-T71,`docs/INTERFACE.md` § 9's own
  * "quem segura o lock e desde quando"): the raw facts `@seeya-ai/engine/core/project-lock.js
  * #ProjectLockInfo` carries, not a pre-rendered sentence — `renderer/features/confirmations/
  * ProjectLockConfirmDialog.tsx` composes the title/context-line split § 9 asks for itself, the

@@ -8,6 +8,7 @@
  */
 import { formatLockHolderDescription } from '@seeya-ai/engine/core/project-lock-message.js';
 import type { OpenProjectResult } from '@seeya-ai/engine/application/project-open.js';
+import { formatSessionStateLabel } from '@seeya-ai/engine/core/session-state-label.js';
 import { formatLockText } from './projects-panel.js';
 
 /**
@@ -41,6 +42,16 @@ export function formatProjectOpenOutcomeText(result: OpenProjectResult): string 
       return (
         `Project "${result.projectId}" has ${result.changedFiles.length} uncommitted change(s) ` +
         'left by a previous session — refusing to open without confirmation.'
+      );
+    case 'sessionRunning':
+      return (
+        `Session "${result.name}" is running right now (${formatSessionStateLabel(result.state)}) — ` +
+        'resuming it would open a second copy.'
+      );
+    case 'sessionNotInProject':
+      return (
+        `Session "${result.name}" has no evidence of belonging to project "${result.projectId}" — ` +
+        'not resumed.'
       );
     case 'opened':
       return (

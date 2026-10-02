@@ -1,10 +1,11 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render } from '@testing-library/preact';
+import { cleanup, fireEvent, render, type RenderResult } from '@testing-library/preact';
 import { ProjectsTable } from '../../../../../../packages/app/src/renderer/features/projects/ProjectsTable/index.js';
 import {
   formatSessionLastActivityText,
   type ProjectPanelRow,
+  type ProjectPanelSessionRow,
 } from '../../../../../../packages/app/src/state/projects-panel.js';
 
 afterEach(cleanup);
@@ -23,10 +24,159 @@ function project(overrides: Partial<ProjectPanelRow> = {}): ProjectPanelRow {
   };
 }
 
+/** Every pre-V2-T77 test renders a table with nothing expanded. */
+const EXPANSION_PROPS = {
+  expandedProjectIds: new Set<string>(),
+  onToggleExpanded: () => {},
+  sessionsPanel: {
+    isResumePending: () => false,
+    onResume: () => {},
+    onGoToTab: () => {},
+    onShowAll: () => {},
+  },
+};
+
+function session(overrides: Partial<ProjectPanelSessionRow> = {}): ProjectPanelSessionRow {
+  return {
+    sessionId: '11111111-1111-4111-8111-111111111111',
+    displaySessionId: '11111111',
+    name: 'auth-hardening',
+    cwd: '/ws/auth-hardening',
+    state: 'ended',
+    stateLabel: 'ended',
+    lastActivity: new Date('2026-10-01T10:00:00.000Z'),
+    matchedTabId: null,
+    ...overrides,
+  };
+}
+
+describe('ProjectsTable expanded sessions (V2-T77, docs/INTERFACE.md § 5a)', () => {
+  const sessionIds = [1, 2, 3, 4, 5, 6, 7].map(
+    (n) => `${n}`.repeat(8) + '-1111-4111-8111-111111111111',
+  );
+
+  function renderExpanded(
+    sessions: readonly ProjectPanelSessionRow[],
+    handlers: Partial<typeof EXPANSION_PROPS.sessionsPanel> = {},
+  ): RenderResult {
+    return render(
+      <ProjectsTable
+        rows={[project({ sessions })]}
+        onToggleFavorite={() => {}}
+        onRowAction={() => {}}
+        isRowActionPending={() => false}
+        expandedProjectIds={new Set(['auth-hardening'])}
+        onToggleExpanded={() => {}}
+        sessionsPanel={{ ...EXPANSION_PROPS.sessionsPanel, ...handlers }}
+      />,
+    );
+  }
+
+  it('the expand button names its state and toggles the row', () => {
+    const onToggleExpanded = vi.fn();
+    const { getByRole } = render(
+      <ProjectsTable
+        {...EXPANSION_PROPS}
+        rows={[project()]}
+        onToggleFavorite={() => {}}
+        onRowAction={() => {}}
+        isRowActionPending={() => false}
+        onToggleExpanded={onToggleExpanded}
+      />,
+    );
+    const button = getByRole('button', { name: 'Show sessions of Auth hardening' });
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(button);
+    expect(onToggleExpanded).toHaveBeenCalledWith('auth-hardening');
+  });
+
+  it('a collapsed row renders no sessions at all', () => {
+    const { queryByText } = render(
+      <ProjectsTable
+        {...EXPANSION_PROPS}
+        rows={[project({ sessions: [session()] })]}
+        onToggleFavorite={() => {}}
+        onRowAction={() => {}}
+        isRowActionPending={() => false}
+      />,
+    );
+    expect(queryByText('11111111')).toBeNull();
+  });
+
+  it('an expanded row lists id, state and last activity, with Resume on one with no process', () => {
+    const onResume = vi.fn();
+    const { getByText, getByRole } = renderExpanded([session()], { onResume });
+    expect(getByText('11111111')).not.toBeNull();
+    expect(getByText('ended')).not.toBeNull();
+    fireEvent.click(getByText('Resume'));
+    expect(onResume).toHaveBeenCalledWith('auth-hardening', '11111111-1111-4111-8111-111111111111');
+    expect(getByRole('button', { name: 'Hide sessions of Auth hardening' })).not.toBeNull();
+  });
+
+  it('the session open in this window offers Go to tab, a running one elsewhere offers nothing', () => {
+    const onGoToTab = vi.fn();
+    const { getByText, queryAllByText } = renderExpanded(
+      [
+        session({
+          sessionId: 'aaaaaaaa-1111',
+          displaySessionId: 'aaaaaaaa',
+          matchedTabId: 'tab-9',
+          state: 'alive',
+        }),
+        session({ sessionId: 'bbbbbbbb-1111', displaySessionId: 'bbbbbbbb', state: 'alive' }),
+      ],
+      { onGoToTab },
+    );
+    fireEvent.click(getByText('Go to tab'));
+    expect(onGoToTab).toHaveBeenCalledWith('tab-9');
+    expect(queryAllByText('Resume')).toHaveLength(0);
+  });
+
+  it('shows at most five sessions, most recent first, and a link to the rest in Sessions', () => {
+    const onShowAll = vi.fn();
+    const many = sessionIds.map((sessionId, index) =>
+      session({
+        sessionId,
+        displaySessionId: sessionId.slice(0, 8),
+        lastActivity: new Date(Date.UTC(2026, 9, 1, index)),
+      }),
+    );
+    const { queryByText, getByText } = renderExpanded(many, { onShowAll });
+    expect(queryByText('11111111')).toBeNull();
+    expect(queryByText('22222222')).toBeNull();
+    expect(getByText('77777777')).not.toBeNull();
+    fireEvent.click(getByText('Show all 7 in Sessions'));
+    expect(onShowAll).toHaveBeenCalledWith('auth-hardening');
+  });
+
+  it('a project with no sessions says so instead of rendering an empty list', () => {
+    const { getByText } = renderExpanded([]);
+    expect(getByText('No sessions yet. Open the project to start one.')).not.toBeNull();
+  });
+
+  it('Resume shows loading for the pending session', () => {
+    const { container } = render(
+      <ProjectsTable
+        rows={[project({ sessions: [session()] })]}
+        onToggleFavorite={() => {}}
+        onRowAction={() => {}}
+        isRowActionPending={() => false}
+        expandedProjectIds={new Set(['auth-hardening'])}
+        onToggleExpanded={() => {}}
+        sessionsPanel={{ ...EXPANSION_PROPS.sessionsPanel, isResumePending: () => true }}
+      />,
+    );
+    expect(
+      container.querySelector('[data-resume-session-id] button[aria-busy="true"]'),
+    ).not.toBeNull();
+  });
+});
+
 describe('ProjectsTable (V2-T67)', () => {
   it('renders the headers and one row per project', () => {
     const { getByText } = render(
       <ProjectsTable
+        {...EXPANSION_PROPS}
         rows={[
           project({ projectId: 'a', name: 'Alpha' }),
           project({ projectId: 'b', name: 'Beta' }),
@@ -47,6 +197,7 @@ describe('ProjectsTable (V2-T67)', () => {
     const row = project({ lock: { kind: 'unlocked' } });
     const { getByText } = render(
       <ProjectsTable
+        {...EXPANSION_PROPS}
         rows={[row]}
         onToggleFavorite={() => {}}
         onRowAction={onRowAction}
@@ -62,6 +213,7 @@ describe('ProjectsTable (V2-T67)', () => {
     const row = project({ lock: { kind: 'openHere', tabId: 'tab-1' } });
     const { getByText } = render(
       <ProjectsTable
+        {...EXPANSION_PROPS}
         rows={[row]}
         onToggleFavorite={() => {}}
         onRowAction={() => {}}
@@ -78,6 +230,7 @@ describe('ProjectsTable (V2-T67)', () => {
     });
     const { getByText } = render(
       <ProjectsTable
+        {...EXPANSION_PROPS}
         rows={[row]}
         onToggleFavorite={() => {}}
         onRowAction={() => {}}
@@ -96,6 +249,7 @@ describe('ProjectsTable (V2-T67)', () => {
     });
     const { getByText } = render(
       <ProjectsTable
+        {...EXPANSION_PROPS}
         rows={[openRow, goToTabRow]}
         onToggleFavorite={() => {}}
         onRowAction={() => {}}
@@ -110,6 +264,7 @@ describe('ProjectsTable (V2-T67)', () => {
     const row = project({ lastActivity: null });
     const { getByText } = render(
       <ProjectsTable
+        {...EXPANSION_PROPS}
         rows={[row]}
         onToggleFavorite={() => {}}
         onRowAction={() => {}}
@@ -126,6 +281,7 @@ describe('ProjectsTable (V2-T67)', () => {
     const expected = formatSessionLastActivityText(lastActivity);
     const { getByText } = render(
       <ProjectsTable
+        {...EXPANSION_PROPS}
         rows={[row]}
         onToggleFavorite={() => {}}
         onRowAction={() => {}}
@@ -141,6 +297,7 @@ describe('ProjectsTable (V2-T67)', () => {
     const row = project({ favorite: false, name: 'Auth hardening' });
     const { getByRole } = render(
       <ProjectsTable
+        {...EXPANSION_PROPS}
         rows={[row]}
         onToggleFavorite={onToggleFavorite}
         onRowAction={() => {}}

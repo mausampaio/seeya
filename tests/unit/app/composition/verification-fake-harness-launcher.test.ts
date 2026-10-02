@@ -18,14 +18,14 @@ describe('VerificationFakeHarnessLauncher (V2-T82)', () => {
     const logPath = path.join(dir, 'harness.log');
     const launcher = new VerificationFakeHarnessLauncher(logPath);
 
-    const first = await launcher.open('/work/a', [], 'sid-1', null);
-    await launcher.open('/work/b', ['/x'], 'sid-2', 'append');
+    const first = await launcher.open('/work/a', [], { kind: 'fresh', sessionId: 'sid-1' }, null);
+    await launcher.open('/work/b', ['/x'], { kind: 'resume', sessionId: 'sid-2' }, 'append');
 
     expect(first).toEqual({ kind: 'opened', exitCode: 0 });
     const lines = (await readFile(logPath, 'utf8')).trim().split('\n');
     expect(lines.map((line) => JSON.parse(line) as unknown)).toEqual([
-      { opened: '/work/a', sessionId: 'sid-1' },
-      { opened: '/work/b', sessionId: 'sid-2' },
+      { opened: '/work/a', launch: 'fresh', sessionId: 'sid-1', systemPromptAppendSent: false },
+      { opened: '/work/b', launch: 'resume', sessionId: 'sid-2', systemPromptAppendSent: true },
     ]);
   });
 });

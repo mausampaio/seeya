@@ -190,9 +190,10 @@ export function buildSessionsDirectoryFilterOptions(
  *   no tab here (started outside this window, or in another one) — registered as a question
  *   (`docs/QUESTOES.md`); the minimal, honest answer is no action at all: offering `Resume` would
  *   open a second copy of something already running, and there is no tab here to go to.
- * - `projectResumePending` — a session with no process that BELONGS to a project: retomar pelo
- *   fluxo do `open` é a V2-T77 (`docs/INTERFACE.md` § 5a), ainda não implementada — a célula de
- *   ação fica vazia aqui de propósito, nunca um texto citando a tarefa.
+ * - `projectResume` — a session with no process that BELONGS to a project (V2-T77,
+ *   `docs/INTERFACE.md` § 5a): `Resume` goes through the project's own `open` flow (lock, hooks,
+ *   `CLAUDE.md`, questions), never the simple resume — and never offers `Adopt…`, the session is
+ *   already in a project.
  * - `standalone` — no process, no project: `Resume` (always offered) and `Adopt…` (per
  *   `adopt`'s own eligibility) both apply, side by side — the two are independent facts about the
  *   same row, not alternatives.
@@ -200,22 +201,44 @@ export function buildSessionsDirectoryFilterOptions(
 export type SessionRowAction =
   | { readonly kind: 'goToTab'; readonly tabId: string }
   | { readonly kind: 'runningElsewhere' }
-  | { readonly kind: 'projectResumePending' }
+  | { readonly kind: 'projectResume'; readonly projectId: string }
   | { readonly kind: 'standalone'; readonly adopt: AdoptEligibility };
+
+/**
+ * V2-T77: what a session's PROCESS state alone allows — shared by the Sessions tab and by the
+ * per-project session list in the Projects tab, so the two can never disagree about when a
+ * `Resume` is offered. `resumable` means "no process at all": the caller decides which flow
+ * (project `open` or the simple resume) a click goes through.
+ */
+export type SessionProcessAction =
+  | { readonly kind: 'goToTab'; readonly tabId: string }
+  | { readonly kind: 'runningElsewhere' }
+  | { readonly kind: 'resumable' };
+
+export function resolveSessionProcessAction(session: {
+  readonly matchedTabId: string | null;
+  readonly state: SessionsPanelRow['state'];
+}): SessionProcessAction {
+  if (session.matchedTabId !== null) {
+    return { kind: 'goToTab', tabId: session.matchedTabId };
+  }
+  if (session.state === 'alive' || session.state === 'idle') {
+    return { kind: 'runningElsewhere' };
+  }
+  return { kind: 'resumable' };
+}
 
 /**
  * @example
  * resolveSessionRowAction({ ...row, matchedTabId: 'tab-1' }) // { kind: 'goToTab', tabId: 'tab-1' }
  */
 export function resolveSessionRowAction(row: SessionsPanelRow): SessionRowAction {
-  if (row.matchedTabId !== null) {
-    return { kind: 'goToTab', tabId: row.matchedTabId };
-  }
-  if (isRunning(row)) {
-    return { kind: 'runningElsewhere' };
+  const processAction = resolveSessionProcessAction(row);
+  if (processAction.kind !== 'resumable') {
+    return processAction;
   }
   if (row.projectId !== null) {
-    return { kind: 'projectResumePending' };
+    return { kind: 'projectResume', projectId: row.projectId };
   }
   return { kind: 'standalone', adopt: row.adopt ?? { kind: 'available' } };
 }

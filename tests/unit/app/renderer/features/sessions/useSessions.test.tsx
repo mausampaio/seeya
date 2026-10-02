@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, renderHook, waitFor } from '@testing-library/preact';
 import { createFakeSeeyaApi } from '../../_fake-seeya-api.js';
 import { useSessions } from '../../../../../../packages/app/src/renderer/features/sessions/useSessions.js';
+import { showProjectSessionsInSessionsTab } from '../../../../../../packages/app/src/renderer/features/sessions/sessions-filter-bridge.js';
 import { registerTabSelector } from '../../../../../../packages/app/src/renderer/features/tabs/tab-select-bridge.js';
 import type { ProjectPanelOtherSessionRow } from '../../../../../../packages/app/src/state/projects-panel.js';
 import type { ProjectsPanelData } from '../../../../../../packages/app/src/state/projects-panel.js';
@@ -101,6 +102,67 @@ describe('useSessions (V2-T68)', () => {
     await waitFor(() => expect(result.current.isResumePending(row)).toBe(true));
     resolveResume?.();
     await waitFor(() => expect(result.current.isResumePending(row)).toBe(false));
+  });
+
+  it('a "projectResume" row action calls the project resume channel, never the simple resumeSession (V2-T77)', async () => {
+    const resumeSession = vi.fn();
+    const resumeProjectSession = vi.fn(() =>
+      Promise.resolve({ outcomeText: 'refused', resumed: false }),
+    );
+    const session = {
+      sessionId: '33333333-3333-4333-8333-333333333333',
+      displaySessionId: '33333333',
+      name: 'auth-hardening',
+      cwd: '/ws/auth-hardening',
+      state: 'ended' as const,
+      stateLabel: 'ended',
+      lastActivity: null,
+      matchedTabId: null,
+    };
+    const panel: ProjectsPanelData = {
+      projects: [
+        {
+          projectId: 'auth-hardening',
+          name: 'Auth hardening',
+          lockText: 'unlocked',
+          lock: { kind: 'unlocked' },
+          sessions: [session],
+          favorite: false,
+          repositoryCount: 0,
+          lastActivity: null,
+        },
+      ],
+      otherSessionsByDirectory: [],
+      ignoredProjects: [],
+    };
+    window.seeya = createFakeSeeyaApi({
+      getProjectsPanel: vi.fn(() => Promise.resolve(panel)),
+      resumeSession,
+      resumeProjectSession,
+    });
+    const { result } = renderHook(() => useSessions());
+    await waitFor(() => expect(result.current.rows).toHaveLength(1));
+    void act(() => result.current.onRowAction(result.current.rows[0]!));
+    expect(resumeProjectSession).toHaveBeenCalledWith({
+      projectId: 'auth-hardening',
+      sessionId: session.sessionId,
+    });
+    expect(resumeSession).not.toHaveBeenCalled();
+    await waitFor(() => expect(result.current.resumeResult?.text).toBe('refused'));
+  });
+
+  it('"Show all in Sessions" filters to the project and clears the query (V2-T77)', async () => {
+    window.seeya = createFakeSeeyaApi({
+      getProjectsPanel: vi.fn(() =>
+        Promise.resolve(panelWithOtherSessions([otherSession({ sessionId: 'a' })])),
+      ),
+    });
+    const { result } = renderHook(() => useSessions());
+    await waitFor(() => expect(result.current.rows).toHaveLength(1));
+    void act(() => result.current.setQuery('zzz'));
+    void act(() => showProjectSessionsInSessionsTab('auth-hardening'));
+    expect(result.current.filters.project).toBe('auth-hardening');
+    expect(result.current.query).toBe('');
   });
 
   it('onAdopt opens the single adoption dialog with the session card', async () => {

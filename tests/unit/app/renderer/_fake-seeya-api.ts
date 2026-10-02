@@ -100,6 +100,7 @@ export function createFakeSeeyaApi(overrides: Partial<SeeyaApi> = {}): SeeyaApi 
     toggleFavoriteProject: vi.fn(() => Promise.resolve()),
     pickDirectory: neverCalled('pickDirectory'),
     resumeSession: neverCalled('resumeSession'),
+    resumeProjectSession: neverCalled('resumeProjectSession'),
   };
   return { ...base, ...overrides };
 }

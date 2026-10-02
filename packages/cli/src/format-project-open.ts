@@ -21,6 +21,7 @@ import type {
 } from '@seeya-ai/engine/application/project-open.js';
 import type { ClaudeMdInstallOutcome } from '@seeya-ai/engine/application/claude-md-bridge.js';
 import type { ProjectAuditReport } from '@seeya-ai/engine/application/project-audit.js';
+import { formatSessionStateLabel } from '@seeya-ai/engine/core/session-state-label.js';
 import { formatInvalidIdLine, formatLockStatusLine } from './format-project-shared.js';
 import { formatEscapedCommitLine } from './format-project-audit.js';
 
@@ -77,6 +78,17 @@ export function renderReadOnlyOpenConfirmation(heldBy: ProjectLockInfo): string 
 export function parseReadOnlyOpenConfirmation(raw: string): boolean {
   const normalized = raw.trim().toLowerCase();
   return normalized === 'y' || normalized === 'yes';
+}
+
+/** V2-T77 (Q-069): `--append-system-prompt` never reaches a resumed session, so the working rules
+ * and lock/leftover notes `open` normally delivers that way are NOT delivered on `--resume` — said
+ * before the harness takes the screen, never silently dropped. */
+export function formatResumeLimitLines(projectId: string): string[] {
+  return [
+    `seeya: resuming — the working rules and notes "seeya project open ${projectId}" normally ` +
+      'passes to a NEW session (--append-system-prompt) do not reach a resumed one (measured, Q-069). ' +
+      "The project's generated CLAUDE.md, which Claude Code reads again, still applies.",
+  ];
 }
 
 export function formatMissingRepositoryLines(
@@ -202,6 +214,20 @@ export function formatOpenProjectReport(result: OpenProjectResult): string {
         'commit them now or proceed without committing (no interactive terminal attached). Run ' +
         'this from a real terminal.\n' +
         result.changedFiles.map((file) => `  ${file}`).join('\n')
+      );
+    // V2-T77: `--resume` refusals, both decided before anything was touched.
+    case 'sessionRunning':
+      return (
+        `seeya: session "${result.name}" (${result.sessionId}) is running right now ` +
+        `(${formatSessionStateLabel(result.state)}) — resuming it would open a second copy. Close ` +
+        'it first, then run this again.'
+      );
+    case 'sessionNotInProject':
+      return (
+        `seeya: session "${result.name}" (${result.sessionId}) has no evidence of belonging to ` +
+        `project "${result.projectId}" — it did not run in the project's directory (it ran in ` +
+        `"${result.cwd}"), it was not adopted into it, and it does not hold its lock. Refusing ` +
+        'to resume it here; use "seeya project adopt" to bring it into a project.'
       );
     case 'opened':
       return formatOpenedReport(result);

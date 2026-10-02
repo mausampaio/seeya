@@ -9,6 +9,7 @@ import type {
   Clock,
   DirectoryExistence,
   HarnessLauncher,
+  HarnessSessionLaunch,
   ManifestRestoreOutcome,
   ProcessControl,
   ProjectAuditMarker,
@@ -20,7 +21,15 @@ import type { ProjectLockInfo, ProjectOpenLockOutcome } from '../core/project-lo
 import { formatProjectLockWarningLines } from '../core/project-lock-message.js';
 import { buildProjectWorkingRulesText } from '../core/project-working-rules.js';
 import { buildProjectCommitMessage } from '../core/project-commit.js';
-import type { AssociatedRepository, ProjectManifest } from '../core/types.js';
+import type {
+  AssociatedRepository,
+  DiscoveredSession,
+  ProjectManifest,
+  SessionState,
+} from '../core/types.js';
+import type { PathPlatformHint } from '../core/cwd-normalization.js';
+import { classifyState } from '../core/classification.js';
+import { decideProjectResume } from '../core/project-session-membership.js';
 import { isValidProjectId } from '../core/project-id.js';
 import { findRepositoryMapEntry } from '../core/repository-map.js';
 import { resolveWorkspaceRoot } from './workspace.js';
@@ -98,7 +107,20 @@ export interface ProjectOpenDeps {
    * (`application/` cannot import `adapters/`) — `auditProject`'s own dependency, threaded through
    * here rather than duplicated as a bare literal. */
   readonly lockFileName: string;
+  /** V2-T77: how `cwd`s compare on this machine (`core/cwd-normalization.ts`) — the composition
+   * root reads the real platform, `application/` never does (same reasoning as
+   * `application/cwd-history.ts#readCwdHistory`'s own `platformHint`). Only read by a `resume`. */
+  readonly platformHint: PathPlatformHint;
 }
+
+/**
+ * V2-T77 (`docs/INTERFACE.md` § 5a): which session `openProject` starts — a discriminated union
+ * (D-024), never an optional id. `new` is the `open` of V2-T28/V2-T35; `resume` carries the
+ * already-resolved `DiscoveredSession` (the caller resolved it — name/prefix/direct id search —
+ * before this is ever called) and launches `claude --resume <its id>` through the SAME pipeline.
+ */
+export type OpenSessionRequest =
+  { readonly kind: 'new' } | { readonly kind: 'resume'; readonly session: DiscoveredSession };
 
 /** D-024: one repository `open` couldn't attach, and exactly why — never conflated with a
  * repository that WAS attached. */
@@ -198,10 +220,30 @@ export type OpenProjectResult =
       readonly projectId: string;
       readonly changedFiles: readonly string[];
     }
+  /** V2-T77: `resume` of a session running right now (`alive`/`idle`) — opening it again would
+   * start a second copy. Refused before anything is touched. */
+  | {
+      readonly kind: 'sessionRunning';
+      readonly projectId: string;
+      readonly sessionId: string;
+      readonly name: string;
+      readonly state: SessionState;
+    }
+  /** V2-T77: `resume` of a session with no evidence tying it to this project
+   * (`core/project-session-membership.ts`) — never guessed (D-025). */
+  | {
+      readonly kind: 'sessionNotInProject';
+      readonly projectId: string;
+      readonly sessionId: string;
+      readonly name: string;
+      readonly cwd: string;
+    }
   | {
       readonly kind: 'opened';
       readonly projectId: string;
       readonly harness: string;
+      /** V2-T77: whether the session this `open` started was a brand-new one or a resumed one. */
+      readonly sessionLaunch: HarnessSessionLaunch['kind'];
       readonly exitCode: number;
       readonly addedDirs: readonly string[];
       readonly missing: readonly MissingRepositoryRecord[];
@@ -260,18 +302,61 @@ async function acquireOpenLock(
   deps: ProjectOpenDeps,
   root: string,
   projectId: string,
+  launch: HarnessSessionLaunch,
 ): Promise<ProjectOpenLockOutcome> {
   const outcome = await acquireProjectLock(
     deps,
     root,
     projectId,
-    { pid: deps.pid, procStart: deps.procStart, sessionId: deps.launchedSessionId },
+    { pid: deps.pid, procStart: deps.procStart, sessionId: launch.sessionId },
     deps.clock.now(),
   );
   if (outcome.decision.kind === 'refuse') {
     return { kind: 'readOnly', heldBy: outcome.decision.heldBy };
   }
   return { kind: 'acquired', reclaimedStale: outcome.reclaimedStale };
+}
+
+/**
+ * V2-T77: the refusals of a `resume`, decided BEFORE any hook/lock/CLAUDE.md side effect. `null`
+ * means "go ahead" (always, for a `new` open). The membership evidence is the same one the
+ * sidebar's grouping uses: the project's own directory, the adoption forks registered for it, and
+ * whoever the project lock currently names.
+ */
+async function refuseResumeIfIneligible(
+  deps: ProjectOpenDeps,
+  root: string,
+  projectId: string,
+  request: OpenSessionRequest,
+): Promise<OpenProjectResult | null> {
+  if (request.kind === 'new') {
+    return null;
+  }
+  const { session } = request;
+  const config = await deps.storage.readConfig();
+  const state = classifyState(session, { now: deps.clock.now(), idleMinutes: config.idleMinutes });
+  const adoptions = await deps.storage.readAdoptions();
+  const lock = await deps.projectLock.read(root, projectId);
+  const decision = decideProjectResume(
+    session,
+    state,
+    {
+      projectDir: path.join(root, projectId),
+      forkSessionIds: new Set(
+        adoptions.filter((a) => a.projectId === projectId).map((a) => a.forkSessionId),
+      ),
+      lockSessionId: lock?.sessionId,
+    },
+    deps.platformHint,
+  );
+  const identity = { projectId, sessionId: session.sessionId, name: session.name };
+  if (decision.kind === 'sessionRunning') {
+    return { kind: 'sessionRunning', ...identity, state: decision.state };
+  }
+  if (decision.kind === 'notInProject') {
+    return { kind: 'sessionNotInProject', ...identity, cwd: session.cwd };
+  }
+  return null;
 }
 
 /** V2-T35 item 1: asks `callbacks.confirmReadOnlyOpen` when given, otherwise resolves
@@ -430,6 +515,7 @@ export async function openProject(
   projectId: string,
   harnessOverride?: string,
   callbacks?: OpenProjectCallbacks,
+  sessionRequest: OpenSessionRequest = { kind: 'new' },
 ): Promise<OpenProjectResult> {
   if (!isValidProjectId(projectId)) {
     return { kind: 'invalidId', projectId };
@@ -453,6 +539,15 @@ export async function openProject(
   if (harness !== SUPPORTED_HARNESS) {
     return { kind: 'unsupportedHarness', harness };
   }
+
+  const refusal = await refuseResumeIfIneligible(deps, root, projectId, sessionRequest);
+  if (refusal !== null) {
+    return refusal;
+  }
+  const launch: HarnessSessionLaunch =
+    sessionRequest.kind === 'resume'
+      ? { kind: 'resume', sessionId: sessionRequest.session.sessionId }
+      : { kind: 'fresh', sessionId: deps.launchedSessionId };
 
   await ensureWorkspaceHooksInstalled(
     deps.workspace,
@@ -484,7 +579,7 @@ export async function openProject(
   const audit = auditOutcome.kind === 'audited' ? auditOutcome.report : null;
 
   const { addDirs, missing } = await resolveRepositoryDirs(deps, projectId, manifest.repositories);
-  const lock = await acquireOpenLock(deps, root, projectId);
+  const lock = await acquireOpenLock(deps, root, projectId, launch);
   callbacks?.onBeforeLaunch?.({ missing, lock, audit, claudeMd, manifestRestore });
 
   // V2-T34 production defect (PO review, 2026-09-25): a `finally` around everything from here on,
@@ -514,10 +609,19 @@ export async function openProject(
     const result = await deps.harnessLauncher.open(
       projectDir,
       addDirs,
-      deps.launchedSessionId,
-      systemPromptAppendFor(projectId, lock, leftover.pendingFiles),
+      launch,
+      // Q-069: nothing in `--append-system-prompt` reaches a resumed session, so none is sent.
+      launch.kind === 'resume'
+        ? null
+        : systemPromptAppendFor(projectId, lock, leftover.pendingFiles),
     );
-    return await finishOpen(deps, root, projectId, { harness, addDirs, missing, lock }, result);
+    return await finishOpen(
+      deps,
+      root,
+      projectId,
+      { harness, addDirs, missing, lock, sessionLaunch: launch.kind },
+      result,
+    );
   } finally {
     await releaseProjectLock(deps, root, projectId, deps.pid);
   }
@@ -536,6 +640,7 @@ async function finishOpen(
     readonly addDirs: readonly string[];
     readonly missing: readonly MissingRepositoryRecord[];
     readonly lock: ProjectOpenLockOutcome;
+    readonly sessionLaunch: HarnessSessionLaunch['kind'];
   },
   result: Awaited<ReturnType<HarnessLauncher['open']>>,
 ): Promise<OpenProjectResult> {
@@ -557,6 +662,7 @@ async function finishOpen(
     kind: 'opened',
     projectId,
     harness: opened.harness,
+    sessionLaunch: opened.sessionLaunch,
     exitCode: result.exitCode,
     addedDirs: opened.addDirs,
     missing: opened.missing,

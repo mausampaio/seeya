@@ -88,12 +88,16 @@ describe('useProjects (V2-T67)', () => {
   });
 
   it('a tab opening for the project clears pending before the openProject promise ever settles', async () => {
-    let onResumeTabOpened: ((event: ResumeTabOpenedEvent) => void) | undefined;
+    // V2-T77: `useProjects` now registers TWO listeners (its own, plus `useProjectSessionResume`'s)
+    // — the tab event reaches every one of them, as the real `ipcRenderer.on` does.
+    const listeners: ((event: ResumeTabOpenedEvent) => void)[] = [];
+    const onResumeTabOpened = (event: ResumeTabOpenedEvent): void =>
+      listeners.forEach((listener) => listener(event));
     const openProject = vi.fn(() => new Promise<{ outcomeText: string }>(() => {}));
     window.seeya = createFakeSeeyaApi({
       openProject,
       onResumeTabOpened: vi.fn((listener: (event: ResumeTabOpenedEvent) => void) => {
-        onResumeTabOpened = listener;
+        listeners.push(listener);
       }),
     });
     const { result } = renderHook(() => useProjects());

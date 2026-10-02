@@ -27,6 +27,7 @@ import type { AdoptSessionDeps } from '@seeya-ai/engine/application/project-adop
 import type { ProjectAuditDeps } from '@seeya-ai/engine/application/project-audit.js';
 import type { VerifyCommitDeps } from '@seeya-ai/engine/application/verify-commit.js';
 import type { DiscoveredSession } from '@seeya-ai/engine/core/types.js';
+import { createSessionWithPid } from '../core/_fixtures.js';
 import { buildProjectWorkingRulesText } from '@seeya-ai/engine/core/project-working-rules.js';
 import {
   ControllableProcessControl,
@@ -68,6 +69,7 @@ function buildContext(overrides: Partial<ProjectContext> = {}): ProjectContext {
     cliEntryPath: '/fake/cli-entry.js',
     auditMarker: new FakeProjectAuditMarker(),
     lockFileName: '.seeya-lock',
+    platformHint: 'posix',
     hookEnv: {},
     ...overrides,
   };
@@ -268,7 +270,7 @@ describe('runProjectOpenCommand', () => {
       {
         cwd: path.join(SEEYA_HOME, 'workspace', 'auth-hardening'),
         addDirs: [REPO_PATH],
-        sessionId: LAUNCHED_SESSION_ID,
+        launch: { kind: 'fresh', sessionId: LAUNCHED_SESSION_ID },
         systemPromptAppend: buildProjectWorkingRulesText('auth-hardening'),
       },
     ]);
@@ -808,5 +810,114 @@ describe('runProjectVerifyBashCommandCommand (V2-T34 item 2, PO review)', () => 
 
     expect(exitCode).toBe(0);
     expect(output()).toBe('');
+  });
+});
+
+describe('runProjectOpenCommand --resume (V2-T77)', () => {
+  const RESUMED_ID = '66666666-6666-4666-8666-666666666666';
+  const PROJECT_DIR = path.join(SEEYA_HOME, 'workspace', 'auth-hardening');
+
+  async function setup(session: DiscoveredSession | null, lookupSession: DiscoveredSession | null) {
+    const harnessLauncher = new FakeHarnessLauncher();
+    const context = buildContext({ harnessLauncher });
+    await runProjectCreateCommand(context, 'auth-hardening');
+    const resume = {
+      sessionRef: RESUMED_ID.slice(0, 8),
+      sessionProvider: new FakeSessionProvider({
+        sessions: session === null ? [] : [session],
+        rejected: [],
+      }),
+      sessionIdLookup: new FakeSessionIdLookup(
+        lookupSession === null ? { kind: 'notFound' } : { kind: 'found', session: lookupSession },
+      ),
+    };
+    const { stdout, output } = collectStdout();
+    return { harnessLauncher, context, resume, stdout, output };
+  }
+
+  const endedInProject = createSessionWithPid({
+    sessionId: RESUMED_ID,
+    cwd: PROJECT_DIR,
+    name: 'auth-hardening',
+    processIsAlive: false,
+  });
+
+  it('resumes a session found in the window, saying up front that the system prompt does not reach it (Q-069)', async () => {
+    const { harnessLauncher, context, resume, stdout, output } = await setup(endedInProject, null);
+    const exitCode = await runProjectOpenCommand(
+      buildOpenDeps(context),
+      'auth-hardening',
+      'claude',
+      buildOpenIo(stdout),
+      resume,
+    );
+    expect(exitCode).toBe(0);
+    expect(harnessLauncher.calls.map((call) => call.launch)).toEqual([
+      { kind: 'resume', sessionId: RESUMED_ID },
+    ]);
+    expect(output()).toContain('do not reach a resumed one');
+  });
+
+  it('finds a session closed longer ago than the window through the direct id lookup (V2-T55)', async () => {
+    const { harnessLauncher, context, resume, stdout } = await setup(null, endedInProject);
+    const exitCode = await runProjectOpenCommand(
+      buildOpenDeps(context),
+      'auth-hardening',
+      'claude',
+      buildOpenIo(stdout),
+      resume,
+    );
+    expect(exitCode).toBe(0);
+    expect(harnessLauncher.calls).toHaveLength(1);
+  });
+
+  it('reports a reference that matches nothing and launches nothing', async () => {
+    const { harnessLauncher, context, resume, stdout, output } = await setup(null, null);
+    const exitCode = await runProjectOpenCommand(
+      buildOpenDeps(context),
+      'auth-hardening',
+      'claude',
+      buildOpenIo(stdout),
+      resume,
+    );
+    expect(exitCode).toBe(1);
+    expect(output()).toContain('No discovered session matches');
+    expect(harnessLauncher.calls).toHaveLength(0);
+  });
+
+  it('reports a session running right now as a refusal with the reason', async () => {
+    const running = createSessionWithPid({
+      sessionId: RESUMED_ID,
+      cwd: PROJECT_DIR,
+      name: 'auth-hardening',
+      processIsAlive: true,
+      lastTranscriptWrite: new Date('2026-09-22T10:00:00.000Z'),
+    });
+    const { harnessLauncher, context, resume, stdout, output } = await setup(running, null);
+    const exitCode = await runProjectOpenCommand(
+      buildOpenDeps(context),
+      'auth-hardening',
+      'claude',
+      buildOpenIo(stdout),
+      resume,
+    );
+    expect(exitCode).toBe(1);
+    expect(output()).toContain('is running right now (alive)');
+    expect(output()).toContain('would open a second copy');
+    expect(harnessLauncher.calls).toHaveLength(0);
+  });
+
+  it('a plain open prints no resume note at all', async () => {
+    const harnessLauncher = new FakeHarnessLauncher();
+    const context = buildContext({ harnessLauncher });
+    await runProjectCreateCommand(context, 'auth-hardening');
+    const { stdout, output } = collectStdout();
+    await runProjectOpenCommand(
+      buildOpenDeps(context),
+      'auth-hardening',
+      'claude',
+      buildOpenIo(stdout),
+    );
+    expect(output()).not.toContain('resumed one');
   });
 });

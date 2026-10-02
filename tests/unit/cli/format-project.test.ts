@@ -287,6 +287,34 @@ describe('formatMissingRepositoryLines', () => {
   });
 });
 
+describe('formatOpenProjectReport resume refusals (V2-T77)', () => {
+  it('sessionRunning names the session, its state, and why it is refused', () => {
+    const text = formatOpenProjectReport({
+      kind: 'sessionRunning',
+      projectId: 'auth-hardening',
+      sessionId: '11111111-1111-4111-8111-111111111111',
+      name: 'auth-hardening',
+      state: 'alive',
+    });
+    expect(text).toContain('"auth-hardening" (11111111-1111-4111-8111-111111111111)');
+    expect(text).toContain('running right now (alive)');
+    expect(text).toContain('second copy');
+  });
+
+  it('sessionNotInProject lists what was checked and points at adopt', () => {
+    const text = formatOpenProjectReport({
+      kind: 'sessionNotInProject',
+      projectId: 'auth-hardening',
+      sessionId: '11111111-1111-4111-8111-111111111111',
+      name: 'elsewhere',
+      cwd: '/code/elsewhere',
+    });
+    expect(text).toContain('no evidence of belonging to project "auth-hardening"');
+    expect(text).toContain('/code/elsewhere');
+    expect(text).toContain('seeya project adopt');
+  });
+});
+
 describe('formatOpenProjectReport', () => {
   it('invalidId names the id', () => {
     const text = formatOpenProjectReport({ kind: 'invalidId', projectId: 'Not Valid' });
@@ -326,6 +354,7 @@ describe('formatOpenProjectReport', () => {
       kind: 'opened',
       projectId: 'auth-hardening',
       harness: 'claude',
+      sessionLaunch: 'fresh',
       exitCode: 0,
       addedDirs: ['C:\\code\\app-api'],
       missing: [],
@@ -343,6 +372,7 @@ describe('formatOpenProjectReport', () => {
       kind: 'opened',
       projectId: 'auth-hardening',
       harness: 'claude',
+      sessionLaunch: 'fresh',
       exitCode: 0,
       addedDirs: [],
       missing: [],
