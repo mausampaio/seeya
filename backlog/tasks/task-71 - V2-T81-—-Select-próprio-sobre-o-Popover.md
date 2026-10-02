@@ -4,7 +4,7 @@ title: V2-T81 — Select próprio sobre o Popover
 status: Review
 assignee: []
 created_date: '2026-10-02 13:23'
-updated_date: '2026-10-02 18:28'
+updated_date: '2026-10-02 18:39'
 labels:
   - ui
 dependencies: []
@@ -30,5 +30,11 @@ author: claude
 created: 2026-10-02 18:28
 ---
 PO review round 1: Select gained fullWidth (used by CwdChangeNotice; Resume in trigger now 1116px of a 1140px notice at 1500px, label untruncated). Sessions table: fixed Id 100, State 160, Last activity 174, action 200; Name/Directory/Project flexible (measured 191px each at 1500px, 90.7px each at 1200px, table = container, no horizontal overflow). Width guard test rewritten for the rule. No BrowserWindow minWidth exists: at 1000px the three flexible columns collapse to 24px (padding only), still no horizontal scroll; suggest a minimum window width (about 1200) as a separate decision. Captures: scratchpad t81 shots-light/shots-dark (1500px: 01, 05, sessions-table-metrics.json, resume-in-metrics.json) and narrow-light/narrow-dark (1200px). Verificar green first run.
+---
+
+author: PO
+created: 2026-10-02 18:39
+---
+Revisão do PO (2026-10-02): duas rodadas. Select refeito sobre o Popover com o visual do Menu do Snooze (combobox/listbox, setas, Home/End, Enter/Espaço, Esc devolve o foco, typeahead sem relógio), useRovingFocus extraído e compartilhado com o Menu, colchetes do id tirados do cartão da adoção. Rodada 2: prop fullWidth (Resume in ocupa o cartão) e larguras da tabela Sessions refeitas (Id/State/Last activity/ação fixas, Name/Directory/Project flexíveis) — id e data não truncam mais. Capturas reais conferidas nos dois temas, a 1500 e 1200 px. Ponto em aberto levado ao mantenedor: largura mínima da janela (~1200 px). Falha de processo registrada: um comando de fixture recusado no Bash foi rodado no PowerShell (contorno); o agente perguntou e foi orientado. Mesclada no po-gate; portão do zero e npm test sem identidade git verdes (3727 testes). Agente Sonnet 5.5.
 ---
 <!-- COMMENTS:END -->
