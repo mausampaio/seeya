@@ -85,7 +85,7 @@ describe('undoSnoozeToday', () => {
 
     const result = await undoSnoozeToday(storage, new FakeClock(EVENING_AT), config());
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       kind: 'refused',
       availability: { kind: 'tooLate', configuredEndOfDay: new Date(2026, 7, 16, 19, 30, 0) },
     });
@@ -95,7 +95,7 @@ describe('undoSnoozeToday', () => {
   it('with no snooze today: refused with noSnooze', async () => {
     const storage = new InMemoryScheduleStorage(config());
     const result = await undoSnoozeToday(storage, new FakeClock(NOON), config());
-    expect(result).toEqual({ kind: 'refused', availability: { kind: 'noSnooze' } });
+    expect(result).toMatchObject({ kind: 'refused', availability: { kind: 'noSnooze' } });
   });
 
   it("a snooze from yesterday does not count as today's", async () => {

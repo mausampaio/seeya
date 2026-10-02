@@ -17,7 +17,7 @@ describe('useSidebarFooter (D-052, V2-T75)', () => {
       secondary: '',
       canSnooze: false,
       canSkip: false,
-      undoSnooze: { kind: 'hidden' },
+      undoSnooze: { kind: 'hidden' as const },
     });
     expect(result.current.daemon).toEqual({ kind: 'idle', availability: { kind: 'unknown' } });
   });
@@ -29,7 +29,7 @@ describe('useSidebarFooter (D-052, V2-T75)', () => {
         secondary: '',
         canSnooze: true,
         canSkip: true,
-        undoSnooze: { kind: 'hidden' },
+        undoSnooze: { kind: 'hidden' as const },
       }),
     );
     window.seeya = createFakeSeeyaApi({ snoozeToday });
@@ -45,7 +45,7 @@ describe('useSidebarFooter (D-052, V2-T75)', () => {
         secondary: '',
         canSnooze: false,
         canSkip: false,
-        undoSnooze: { kind: 'hidden' },
+        undoSnooze: { kind: 'hidden' as const },
       }),
     );
     window.seeya = createFakeSeeyaApi({ skipToday });
@@ -69,7 +69,7 @@ describe('useSidebarFooter (D-052, V2-T75)', () => {
         secondary: 'today',
         canSnooze: false,
         canSkip: false,
-        undoSnooze: { kind: 'hidden' },
+        undoSnooze: { kind: 'hidden' as const },
       }),
     );
     window.seeya = createFakeSeeyaApi({ skipToday });
@@ -85,7 +85,7 @@ describe('useSidebarFooter (D-052, V2-T75)', () => {
       secondary: 'today',
       canSnooze: false,
       canSkip: false,
-      undoSnooze: { kind: 'hidden' },
+      undoSnooze: { kind: 'hidden' as const },
     });
   });
 
@@ -96,7 +96,7 @@ describe('useSidebarFooter (D-052, V2-T75)', () => {
         secondary: 'until later',
         canSnooze: true,
         canSkip: true,
-        undoSnooze: { kind: 'hidden' },
+        undoSnooze: { kind: 'hidden' as const },
       }),
     );
     window.seeya = createFakeSeeyaApi({ snoozeToday });
@@ -134,7 +134,7 @@ describe('useSidebarFooter (D-052, V2-T75)', () => {
         secondary: '',
         canSnooze: false,
         canSkip: false,
-        undoSnooze: { kind: 'hidden' },
+        undoSnooze: { kind: 'hidden' as const },
       });
       await Promise.resolve();
     });
@@ -179,7 +179,7 @@ describe('useSidebarFooter (D-052, V2-T75)', () => {
         secondary: 'in 2 h 10 min',
         canSnooze: true,
         canSkip: true,
-        undoSnooze: { kind: 'hidden' },
+        undoSnooze: { kind: 'hidden' as const },
       });
     });
     expect(result.current.schedule.primary).toBe('End of day');

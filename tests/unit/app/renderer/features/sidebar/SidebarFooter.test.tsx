@@ -125,7 +125,7 @@ describe('SidebarFooter (D-052, V2-T75/V2-T69)', () => {
           secondary: 'in 2 h',
           canSnooze: false,
           canSkip: false,
-          undoSnooze: { kind: 'hidden' },
+          undoSnooze: { kind: 'hidden' as const },
         });
         return () => {};
       },
@@ -143,7 +143,7 @@ describe('SidebarFooter (D-052, V2-T75/V2-T69)', () => {
           secondary: 'in 2 h',
           canSnooze: true,
           canSkip: true,
-          undoSnooze: { kind: 'hidden' },
+          undoSnooze: { kind: 'hidden' as const },
         });
         return () => {};
       },
@@ -160,7 +160,7 @@ describe('SidebarFooter (D-052, V2-T75/V2-T69)', () => {
           secondary: 'skipped today',
           canSnooze: false,
           canSkip: false,
-          undoSnooze: { kind: 'hidden' },
+          undoSnooze: { kind: 'hidden' as const },
         });
         return () => {};
       },
@@ -177,7 +177,7 @@ describe('SidebarFooter (D-052, V2-T75/V2-T69)', () => {
         secondary: '',
         canSnooze: true,
         canSkip: true,
-        undoSnooze: { kind: 'hidden' },
+        undoSnooze: { kind: 'hidden' as const },
       }),
     );
     window.seeya = createFakeSeeyaApi({
@@ -187,7 +187,7 @@ describe('SidebarFooter (D-052, V2-T75/V2-T69)', () => {
           secondary: '',
           canSnooze: true,
           canSkip: true,
-          undoSnooze: { kind: 'hidden' },
+          undoSnooze: { kind: 'hidden' as const },
         });
         return () => {};
       },
@@ -211,7 +211,7 @@ describe('SidebarFooter (D-052, V2-T75/V2-T69)', () => {
     it('is absent when there is nothing to undo', () => {
       window.seeya = createFakeSeeyaApi({
         onScheduleUpdate: (listener) => {
-          listener({ ...lines, undoSnooze: { kind: 'hidden' } });
+          listener({ ...lines, undoSnooze: { kind: 'hidden' as const } });
           return () => {};
         },
       });
@@ -285,7 +285,7 @@ describe('SidebarFooter (D-052, V2-T75/V2-T69)', () => {
           secondary: 'in 2 h',
           canSnooze: false,
           canSkip: true,
-          undoSnooze: { kind: 'hidden' },
+          undoSnooze: { kind: 'hidden' as const },
         });
         return () => {};
       },
