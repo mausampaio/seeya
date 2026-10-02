@@ -9515,3 +9515,49 @@ caminho comum. A linha ainda aparece na revisão (tipo `M`, caminho com a seta, 
 linhas) — nunca desaparece nem quebra a lista.
 
 **Resposta:** (preenchida pelo PO)
+
+## Q-109 — V2-T77: escolhas de desenho que a § 5a não fecha, e o que a retomada não entrega
+
+**Bloqueia:** não — registro, solução mínima já aplicada.
+
+**1. Onde ficam as sessões de um projeto na aba Projects.** A § 5a diz que "a linha de cada projeto
+mostra as sessões recentes dele com **Resume**", sem desenhar. Segui o que o despacho propôs: um
+botão de expandir (chevron, `aria-expanded`) antes do nome do projeto; expandida, a linha ganha um
+painel recuado com **no máximo cinco** sessões, da mais recente para a mais antiga (sem atividade
+conhecida sempre por último, D-025), cada uma com nome, id curto em mono, estado
+(`core/session-state-label.ts`), última atividade e a ação do estado de processo — **Go to tab**
+(aberta nesta janela), **Resume** (sem processo) ou nada (rodando noutro lugar, a mesma regra da
+Q-106, que `state/sessions-table.ts#resolveSessionProcessAction` agora compartilha entre as duas
+abas). Todas as sessões que o `open` abre têm o mesmo nome (o do diretório do projeto): o id curto
+e a última atividade são o que as distingue — não inventei um resumo. O link **Show all N in
+Sessions** aparece sempre que há ao menos uma sessão (não só quando passa de cinco): abre a aba
+Sessions já filtrada por aquele projeto (e limpa a busca e os outros filtros, para que "todas as
+sessões do projeto" não fiquem escondidas por um filtro antigo). Linhas começam recolhidas; o estado
+de expandido é só de visualização, nada em disco.
+
+**2. O resultado de um Resume nunca é silencioso.** Ao contrário do **Open** (Q-105, sem área de
+resultado), uma retomada pode ser recusada por um motivo que a pessoa precisa ler — "a sessão está
+rodando agora", "não há evidência de que pertença a este projeto". Cada aba que pode iniciar um
+Resume (Projects e Sessions) mostra, acima da tabela, um aviso dispensável com a frase do motor
+(`state/project-open-result.ts#formatProjectOpenOutcomeText`): `warning` para recusa, `info` para
+"a sessão rodou e fechou". Um clique no **Resume** que cai numa pergunta (lock, mudanças pendentes)
+usa os mesmos diálogos do **Open** (V2-T71).
+
+**3. O que `--resume` não entrega (Q-069, não remedido).** `--append-system-prompt` não chega a uma
+sessão retomada — medido na Q-069, só com `-p`; o modo interativo ficou sem medir lá e **continua sem
+medir aqui** (esta tarefa não tinha uma sessão `haiku` interativa à mão). Por isso `openProject`
+não envia `systemPromptAppend` numa retomada (passa `null`, não finge), e a CLI diz isso antes de
+lançar. Duas coisas deixam de chegar à sessão retomada: as regras de trabalho do projeto
+(`core/project-working-rules.ts`) e o aviso de lock / a lista de pendências. O que vale é o
+`CLAUDE.md` gerado (D-050), que importa o `AGENTS.md` e o Claude Code relê. Fica aberto: se uma
+medição interativa mostrar que a flag chega sim, a retomada pode voltar a mandá-la (uma linha em
+`application/project-open.ts`).
+
+**4. Sessão do projeto que não aparece na janela de tempo.** `seeya project open <id> --resume
+<sessão>` resolve a sessão como o `adopt` (V2-T55: nome, prefixo, `cwd`, e a busca direta fora de
+`relevanceHours` para algo com forma de id). A janela só liga uma sessão a um projeto pelo que o
+ciclo já descobre: uma sessão de projeto mais antiga que `relevanceHours` só se retoma pelo fluxo do
+`open` na CLI. Achada pela busca por id da aba Sessions, a linha vem sem projeto (o resultado da
+busca direta nunca carrega um, D-025) e oferece a retomada simples e **Adopt…**, não este fluxo.
+
+**Resposta:** (preenchida pelo PO)
