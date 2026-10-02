@@ -37,6 +37,31 @@ describe('ProjectLockConfirmDialog (V2-T71)', () => {
     expect(getByText(/Session abc123 \(pid 456\) has held this lock since/)).not.toBeNull();
   });
 
+  // PO review, round 1: the Projects tab's own lock column shows the SHORT session id
+  // ("Locked by session 33333333") — this dialog used to show the full one, a real inconsistency
+  // between the two screens for the identical fact.
+  it('shows the SHORT session id (same scheme as the Projects tab lock column), full id on hover', async () => {
+    const fullSessionId = '33333333-3333-4333-8333-333333333333';
+    const onConfirmProjectLockOpenRequest = vi.fn();
+    window.seeya = createFakeSeeyaApi({ onConfirmProjectLockOpenRequest });
+    const { getByText } = render(<ProjectLockConfirmDialog />);
+    const dialog = document.getElementById('project-lock-confirm-dialog') as HTMLDialogElement;
+
+    emitRequest(onConfirmProjectLockOpenRequest, {
+      requestId: 'req-1',
+      projectId: 'auth-hardening',
+      heldBySessionId: fullSessionId,
+      heldByPid: 456,
+      heldByAcquiredAt: new Date('2026-01-01T00:00:00.000Z'),
+    });
+    await waitFor(() => expect(dialog.open).toBe(true));
+
+    const context = getByText(/Session 33333333 \(pid 456\) has held this lock since/);
+    expect(context).not.toBeNull();
+    expect(context.textContent).not.toContain(fullSessionId);
+    expect(context.getAttribute('title')).toBe(fullSessionId);
+  });
+
   it('Open read-only answers "proceed" and closes', async () => {
     const onConfirmProjectLockOpenRequest = vi.fn();
     const answerProjectLockOpenConfirm = vi.fn();

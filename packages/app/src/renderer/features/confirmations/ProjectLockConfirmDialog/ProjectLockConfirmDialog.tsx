@@ -77,7 +77,17 @@ export function ProjectLockConfirmDialog(): JSX.Element {
     >
       {request !== null && (
         <Stack gap="md">
-          <Text as="p" variant="body-md" id="project-lock-confirm-context">
+          {/* PO review, round 1: the context line shows the SHORT session id (same scheme the
+           * Projects tab's own lock column already uses, `formatLockHolderLine`'s own docstring)
+           * — the full id never disappears, it moves to this line's own `title` (a hover
+           * tooltip), the same "short text, full fact on hover" shape `shortenDirectoryPath`
+           * already established for a truncated path. */}
+          <Text
+            as="p"
+            variant="body-md"
+            id="project-lock-confirm-context"
+            title={request.heldBySessionId ?? undefined}
+          >
             {formatLockHolderLine(request)}
           </Text>
           <Stack gap="xs">

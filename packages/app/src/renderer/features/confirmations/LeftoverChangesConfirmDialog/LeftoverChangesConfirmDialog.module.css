@@ -4,11 +4,10 @@
   width: min(560px, calc(100vw - var(--seeya-space-8)));
 }
 
-/* Each footer option (explanation + its own button, `LeftoverChangesConfirmDialog.tsx`'s own
- * docstring on why these live in the footer, not the scrollable body) gets half the footer's own
- * width, right-aligned text over a right-aligned button — a caption this narrow still reads as
- * "belonging to" the button under it instead of drifting into the other option's column. */
-.footerOption {
-  max-width: 220px;
-  text-align: right;
+/* PO review, round 1: the whole footer (both explanations, THEN the button row) takes the full
+ * width `Dialog`'s own `.footer` flex row has available — `Dialog.module.css#.footer` is
+ * `justify-content: flex-end`, which would otherwise shrink a single child to its own content
+ * width instead of filling the row the way the dialog's body/file-list above it already does. */
+.footerStack {
+  width: 100%;
 }
