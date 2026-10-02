@@ -22,12 +22,14 @@
 import { mkdir, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import type {
+  ChangedFileStatsEntry,
   ManifestRestoreOutcome,
   RejectedDiscoveryRecord,
   RevertCommitInfo,
   RevertExecutionOutcome,
   WorkspaceRepository,
 } from '../../core/ports.js';
+import { listChangedFilesWithStats as listChangedFilesWithStatsImpl } from './changed-file-stats.js';
 import type { AuditableCommit } from '../../core/project-audit.js';
 import type { ProjectManifest, ProjectSkeleton } from '../../core/types.js';
 import type { LockHolderProcess } from '../../core/lock-holder-process.js';
@@ -197,6 +199,17 @@ export class FsWorkspaceRepository implements WorkspaceRepository {
       .split('\n')
       .filter((line) => line.trim().length > 0)
       .map(parseChangedFileStatusLine);
+  }
+
+  /** V2-T70: same scoping/git calls as `listChangedFiles` above, structured instead of raw
+   * porcelain lines — `adapters/workspace/changed-file-stats.ts`'s own docstring has the mechanics
+   * (V2-T73 rebase: its ONE `git status` call reuses V2-T71's own `parseChangedFileStatusLine`
+   * above, never a second parser of the same porcelain code). */
+  listChangedFilesWithStats(
+    root: string,
+    projectId: string,
+  ): Promise<readonly ChangedFileStatsEntry[]> {
+    return listChangedFilesWithStatsImpl(root, projectId);
   }
 
   /** V2-T32: `seeya project remove`'s own physical deletion — `root/projectId` only, `commitAll`
