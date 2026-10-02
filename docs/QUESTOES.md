@@ -9424,3 +9424,71 @@ na lista de capturas obrigatórias da tarefa (`docs/INTERFACE.md` § 5 nomeia s�
 ação: `Go to tab`, `Resume`, `Adopt…` habilitado/desabilitado, mais a célula vazia de projeto).
 
 **Resposta:** (preenchida pelo PO)
+
+---
+
+## Q-107 — V2-T78: `eslint-restrictions.test.ts`/`app-eslint-restrictions.test.ts` ainda estouram
+## sob carga do conjunto inteiro — o mesmo residual que Q-063/Q-064 já deixaram em aberto, visto de
+## novo nesta máquina
+
+**Tarefa:** V2-T78 — estabilizar `workspace-boundary.test.ts` no Windows; o despacho pediu para
+tratar um timeout em `tests/integration/guards/eslint-restrictions.test.ts`, visto na mesma carga,
+como um segundo achado, e registrar questão em vez de "corrigir" se a causa não for a mesma (ou
+trivialmente parecida) da do `workspace-boundary`.
+
+**Bloqueia:** não — nenhuma correção de produto pendente; é confirmação de um residual já
+conhecido, não um defeito novo.
+
+**1) Reproduzido nesta máquina, sem carga artificial nenhuma.** `npm test` (que roda `unit` +
+`integration` + `integration-process` + `guards` ao mesmo tempo, quatro projetos vitest
+concorrentes) falhou na primeira execução desta tarefa com exatamente o padrão que Q-063/Q-064 já
+descreveram: `tests/integration/guards/eslint-restrictions.test.ts > approves a clean file in
+src/core/ (control)` e `tests/integration/guards/app-eslint-restrictions.test.ts > rejects electron
+imported outside packages/app/src/main/**...` — os dois mortos pelo próprio orçamento interno do
+processo filho (`CHILD_PROCESS_BUDGET_MS`, 30000ms, `tests/integration/guards/_support.ts`), com a
+mensagem `[guard child process exceeded its own 30000ms budget (CHILD_PROCESS_BUDGET_MS) and was
+killed (SIGTERM) before finishing]`. Uma segunda execução do `npm test`, minutos depois, passou
+limpa (375 arquivos). Uma terceira execução, só `integration-process` + `guards` juntos (sem
+`unit`/`integration`), também passou, mas com o `eslint` real levando 6-22s por caso (contra o
+"~12s sob carga" já medido e documentado nesse mesmo arquivo) — consistente com "degradação de
+vazão sob carga", não com paralisação total.
+
+**2) Por que não é a mesma causa do `workspace-boundary`, e por que não mexi no código de
+produção nem no orçamento deste arquivo.** A causa medida do `workspace-boundary` (ver as notas de
+implementação da V2-T78 na própria tarefa) é um teste cujo próprio trabalho real (vários `git`
+mais um `node` inteiro) já consome mais da metade do prazo padrão do vitest SEM carga nenhuma, e
+cuja falha por timeout abandona (porque não existe cancelamento real de uma `Promise` em
+JavaScript) uma cadeia de processo filho ainda viva, que então disputa com o `afterEach` pelo
+mesmo diretório no Windows. `eslint-restrictions.test.ts` é diferente em TODOS os três pontos: já
+tem um orçamento próprio generoso (30s, mais 15s de folga no teste, `TEST_TIMEOUT_MS` =
+`CHILD_PROCESS_BUDGET_MS + 15_000` = 45s) que a Q-063/Q-064 já mediram e justificaram para esta
+exata operação; o processo filho que estourou já é `kill`ado explicitamente (`SIGTERM`,
+`_support.ts#runEslint`), sem deixar um handle de arquivo aberto no lugar que algum `rm` precise
+disputar depois; e o sintoma observado nunca foi `EBUSY` — foi só o próprio orçamento interno
+sendo insuficiente na hora exata em que outro projeto vitest (aqui, provavelmente `unit`/
+`integration` competindo pelas 8 CPUs desta máquina ao mesmo tempo que `guards`) consumiu CPU o
+bastante para empurrar um ESLint real além de 30s. Aumentar ainda mais um orçamento já generoso e
+já medido duas vezes (Q-063, Q-064) sem uma medição nova que justifique o número seria exatamente
+o "aumentar o timeout sem medir" que `AGENTS.md` proíbe — e o item 4 de Q-063 e o item 5 de Q-064
+já registraram, nos dois, que a causa RAIZ (por que o runner fica mais carregado numa hora e não
+noutra) está fora do que `vitest.config.ts` consegue controlar a partir de dentro de um projeto
+vitest.
+
+**3) O que registro aqui que Q-063/Q-064 ainda não tinham.** Esta é a primeira vez, depois
+daquelas duas tarefas, que o sintoma volta a aparecer de forma reproduzida (não só relatada por um
+despacho) nesta mesma máquina, numa execução comum de `npm test` sem nenhuma carga artificial
+acrescentada por mim — evidência de que o residual que as duas deixaram em aberto ("se a máquina
+ficar mais carregada de outra forma no futuro, o mesmo sintoma pode voltar") continua vivo, não
+foi uma coincidência de uma CI específica. Não propus mudança nenhuma em `vitest.config.ts` para
+isto: nenhum arquivo novo entrou em `SERIALIZED_RESOURCE_HEAVY_FILES`, porque o recurso disputado
+aqui (CPU do runner inteiro, entre PROJETOS vitest diferentes) é exatamente o que aquele mecanismo
+já documenta não alcançar.
+
+**Opções que enxergo:** A) aceitar como está — o residual continua registrado (agora com uma nova
+observação e números desta data), sem ação de código; a próxima vez que alguém vir isso decide se
+vale investir numa mudança de escopo maior (ex.: `--pool=forks` com `--maxWorkers` mais baixo para
+`npm test`, ou um limite de CPU por projeto vitest) que Q-064 item 4 já apontou como fora do
+alcance de um ajuste dentro de `vitest.config.ts`. B) abrir uma tarefa dedicada a essa investigação
+de agendamento entre projetos, já que ela se repete.
+
+**Resposta:** (preenchida pelo PO)
