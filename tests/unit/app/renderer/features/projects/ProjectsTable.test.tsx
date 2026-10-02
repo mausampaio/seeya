@@ -28,6 +28,7 @@ function project(overrides: Partial<ProjectPanelRow> = {}): ProjectPanelRow {
 const EXPANSION_PROPS = {
   expandedProjectIds: new Set<string>(),
   onToggleExpanded: () => {},
+  onManage: () => {},
   sessionsPanel: {
     isResumePending: () => false,
     onResume: () => {},
@@ -66,6 +67,7 @@ describe('ProjectsTable expanded sessions (V2-T77, docs/INTERFACE.md § 5a)', ()
         onRowAction={() => {}}
         isRowActionPending={() => false}
         expandedProjectIds={new Set(['auth-hardening'])}
+        onManage={() => {}}
         onToggleExpanded={() => {}}
         sessionsPanel={{ ...EXPANSION_PROPS.sessionsPanel, ...handlers }}
       />,
@@ -162,6 +164,7 @@ describe('ProjectsTable expanded sessions (V2-T77, docs/INTERFACE.md § 5a)', ()
         onRowAction={() => {}}
         isRowActionPending={() => false}
         expandedProjectIds={new Set(['auth-hardening'])}
+        onManage={() => {}}
         onToggleExpanded={() => {}}
         sessionsPanel={{ ...EXPANSION_PROPS.sessionsPanel, isResumePending: () => true }}
       />,
@@ -184,7 +187,7 @@ describe('ProjectsTable (V2-T67)', () => {
         onToggleFavorite={() => {}}
         onRowAction={() => {}}
         isRowActionPending={() => false}
-        onManage={() => {}}
+        {...EXPANSION_PROPS}
       />,
     );
     expect(getByText('Name')).not.toBeNull();
@@ -203,7 +206,7 @@ describe('ProjectsTable (V2-T67)', () => {
         onToggleFavorite={() => {}}
         onRowAction={onRowAction}
         isRowActionPending={() => false}
-        onManage={() => {}}
+        {...EXPANSION_PROPS}
       />,
     );
     expect(getByText('Unlocked')).not.toBeNull();
@@ -220,7 +223,7 @@ describe('ProjectsTable (V2-T67)', () => {
         onToggleFavorite={() => {}}
         onRowAction={() => {}}
         isRowActionPending={() => false}
-        onManage={() => {}}
+        {...EXPANSION_PROPS}
       />,
     );
     expect(getByText('Open in this window')).not.toBeNull();
@@ -238,7 +241,7 @@ describe('ProjectsTable (V2-T67)', () => {
         onToggleFavorite={() => {}}
         onRowAction={() => {}}
         isRowActionPending={() => false}
-        onManage={() => {}}
+        {...EXPANSION_PROPS}
       />,
     );
     expect(getByText('Locked by session abcd1234')).not.toBeNull();
@@ -274,7 +277,7 @@ describe('ProjectsTable (V2-T67)', () => {
         onToggleFavorite={() => {}}
         onRowAction={() => {}}
         isRowActionPending={() => false}
-        onManage={() => {}}
+        {...EXPANSION_PROPS}
       />,
     );
     const dash = getByText('—');
@@ -292,7 +295,7 @@ describe('ProjectsTable (V2-T67)', () => {
         onToggleFavorite={() => {}}
         onRowAction={() => {}}
         isRowActionPending={() => false}
-        onManage={() => {}}
+        {...EXPANSION_PROPS}
       />,
     );
     const cell = getByText(expected);
@@ -309,7 +312,7 @@ describe('ProjectsTable (V2-T67)', () => {
         onToggleFavorite={onToggleFavorite}
         onRowAction={() => {}}
         isRowActionPending={() => false}
-        onManage={() => {}}
+        {...EXPANSION_PROPS}
       />,
     );
     fireEvent.click(getByRole('button', { name: /Star Auth hardening/i }));
@@ -328,6 +331,7 @@ describe('ProjectsTable (V2-T67)', () => {
         onToggleFavorite={() => {}}
         onRowAction={onRowAction}
         isRowActionPending={() => false}
+        {...EXPANSION_PROPS}
         onManage={onManage}
       />,
     );
@@ -346,7 +350,7 @@ describe('ProjectsTable (V2-T67)', () => {
         onToggleFavorite={() => {}}
         onRowAction={() => {}}
         isRowActionPending={() => false}
-        onManage={() => {}}
+        {...EXPANSION_PROPS}
       />,
     );
     const button = getByRole('button', { name: /Manage project/ }) as HTMLButtonElement;

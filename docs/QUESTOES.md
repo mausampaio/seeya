@@ -9516,7 +9516,6 @@ linhas) — nunca desaparece nem quebra a lista.
 
 **Resposta:** (preenchida pelo PO)
 
-<<<<<<< HEAD
 ## Q-109 — V2-T77: escolhas de desenho que a § 5a não fecha, e o que a retomada não entrega
 
 **Bloqueia:** não — registro, solução mínima já aplicada.
@@ -9576,10 +9575,7 @@ encerrado): o item não existe. Com adiamento mas já depois do horário configu
 desabilitado, com o motivo numa segunda linha ("09:30 has already passed"). O layout do rodapé não
 muda. `Menu` ganhou `disabledReason`/`separatorBefore` por item (nada muda para quem não os usa; o
 `Select` compartilha só o `useRovingFocus`, não o `Menu`).
-## Q-109 — V2-T83: o que a § 4a não diz sobre o diálogo de detalhes do projeto
-=======
 ## Q-111 — V2-T83: o que a § 4a não diz sobre o diálogo de detalhes do projeto
->>>>>>> 71739ac (fix: rewrite the delete-adopted-copy question, renumber question to Q-111)
 
 **Bloqueia:** não — registro, solução mínima já aplicada.
 

@@ -100,7 +100,7 @@ const COLUMNS: readonly {
   // 135px of actual text; "Billing reconciliation", 132px) is exactly the case the PO's own report
   // named as wrapping for no reason; truncation is still correct (and expected) for a genuinely
   // long name, `02-search-active.png`'s own fixture proves that case separately.
-  { key: 'lock', headerKey: 'projectsTableHeaderLock', width: '217px' },
+  { key: 'lock', headerKey: 'projectsTableHeaderLock', width: '205px' },
   {
     key: 'sessions',
     headerKey: 'projectsTableHeaderSessions',
@@ -116,7 +116,7 @@ const COLUMNS: readonly {
   // `toLocaleString()` (`formatSessionLastActivityText`) renders a full date AND time
   // ("02/10/2026, 00:16:44", 21 characters in the pt-BR locale this was measured against, 147px of
   // actual text at this column's own font) — 174px is this column's measured minimum plus margin.
-  { key: 'lastActivity', headerKey: 'projectsTableHeaderLastActivity', width: '174px' },
+  { key: 'lastActivity', headerKey: 'projectsTableHeaderLastActivity', width: '152px' },
   // Paired with `.actionButton`'s own fixed (not minimum) width below — a real capture at
   // 115px/min-width:95px showed the three action labels at three DIFFERENT rendered widths
   // ("Go to tab" and "Read only…" are both naturally wider than the 95px floor, so `min-width`
@@ -124,9 +124,12 @@ const COLUMNS: readonly {
   // only ever raise a shorter label up to it, never pull a longer one back down — only a true
   // `width` (a ceiling AND a floor) makes every label render at the identical size this column
   // needs to actually read as a column.
-  { key: 'action', width: '151px', align: 'right' },
+  { key: 'action', width: '145px', align: 'right' },
   // V2-T83: the `Manage project` icon button — headerless, like Favorite/Action; 32px holds a 24px
   // `IconButton` with a few px of air.
+  // V2-T83: the width this column adds was taken back from Lock/Sessions/Repositories/Last activity
+  // (measured: Name was truncating "Payments API" once the expand chevron and this button both
+  // landed in the row).
   { key: 'manage', width: '32px' },
 ];
 

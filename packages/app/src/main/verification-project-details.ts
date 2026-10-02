@@ -66,6 +66,12 @@ export async function captureProjectDetailsVerification(
   // The Projects tab itself: the `Manage project` icon button sits beside each row's main action.
   await shoot('00-projects-tab-manage-button.png');
 
+  // V2-T77's expand button and V2-T83's Manage button, side by side on an expanded row.
+  await click('button[aria-label="Show sessions of Payments API"]');
+  await waitUntil(`document.querySelector('button[aria-label="Hide sessions of Payments API"]')`);
+  await shoot('00b-projects-tab-row-expanded.png');
+  await click('button[aria-label="Hide sessions of Payments API"]');
+
   // A project locked by another live session: reading works, every write is disabled with the reason.
   await click('button[aria-label="Manage project Billing ledger"]');
   await waitUntil(`document.getElementById('project-details-locked-notice')`);
