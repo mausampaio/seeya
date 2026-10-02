@@ -7,7 +7,7 @@ afterEach(cleanup);
 
 describe('ProjectsFilters (V2-T67)', () => {
   it('shows the three filter options, with the current one pressed', () => {
-    const { getByRole } = render(
+    const { getByRole, container } = render(
       <ProjectsFilters
         query=""
         onQueryChange={() => {}}
@@ -20,6 +20,10 @@ describe('ProjectsFilters (V2-T67)', () => {
       getByRole('radio', { name: 'With a running session' }).getAttribute('aria-pressed'),
     ).toBe('true');
     expect(getByRole('radio', { name: 'Locked' })).not.toBeNull();
+    // Stable ids — this tab's own verification instrumentation (`main/main.ts`) targets these.
+    expect(container.querySelector('#projects-filter-all')).not.toBeNull();
+    expect(container.querySelector('#projects-filter-running')).not.toBeNull();
+    expect(container.querySelector('#projects-filter-locked')).not.toBeNull();
   });
 
   it('typing in the search field calls onQueryChange', () => {

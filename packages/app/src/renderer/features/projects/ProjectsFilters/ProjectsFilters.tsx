@@ -14,10 +14,17 @@ import { SegmentedControl } from '../../../components/SegmentedControl/index.js'
 import { MESSAGES } from '../../../../text/messages.js';
 import type { ProjectsTableFilter } from '../../../../state/projects-table.js';
 
-const FILTER_OPTIONS: readonly { readonly value: ProjectsTableFilter; readonly label: string }[] = [
-  { value: 'all', label: MESSAGES.projectsFilterAll },
-  { value: 'running', label: MESSAGES.projectsFilterRunning },
-  { value: 'locked', label: MESSAGES.projectsFilterLocked },
+// `id` on each option (`SegmentedControlOption`'s own docstring: "lets a caller target one
+// specific segment... without reaching for a brittle `nth-child` selector") — this tab's own
+// verification instrumentation (`main/main.ts`) targets these by id.
+const FILTER_OPTIONS: readonly {
+  readonly value: ProjectsTableFilter;
+  readonly id: string;
+  readonly label: string;
+}[] = [
+  { value: 'all', id: 'projects-filter-all', label: MESSAGES.projectsFilterAll },
+  { value: 'running', id: 'projects-filter-running', label: MESSAGES.projectsFilterRunning },
+  { value: 'locked', id: 'projects-filter-locked', label: MESSAGES.projectsFilterLocked },
 ];
 
 export interface ProjectsFiltersProps {

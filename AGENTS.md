@@ -661,10 +661,22 @@ própria, lido no pacote instalado antes de escrever a instrumentação), `SEEYA
 e rola a aba Today o suficiente para três cartões caberem numa única captura), `SEEYA_APP_RESUME_RESULT_SCREENSHOT_PATH`
 (V2-T66: combinada com `SEEYA_APP_SCREENSHOT_PATH` e `SEEYA_APP_AUTO_RESUME_ALL`, troca a captura
 única por `captureResumeProgressThenResult` — "Resuming i of N..." ainda em andamento, depois o
-resultado já aplicado, as duas sem reiniciar a janela) e `SEEYA_APP_DEBUG_CONSOLE` (V2-T66:
+resultado já aplicado, as duas sem reiniciar a janela), `SEEYA_APP_DEBUG_CONSOLE` (V2-T66:
 encaminha `console.*`/uma exceção não tratada/uma falha de navegação do renderer para o stdout
 deste processo — achou dois defeitos de produção reais durante a verificação desta própria tarefa,
-nenhum visível de outro jeito sem abrir o DevTools que um agente sem tela não tem como abrir) —
+nenhum visível de outro jeito sem abrir o DevTools que um agente sem tela não tem como abrir) e
+`SEEYA_APP_VERIFY_PROJECTS_TAB_STATES_DIR` (V2-T67: uma PASTA, não um arquivo — a única
+instrumentação deste arquivo que grava mais de dois PNGs. Combinada com
+`SEEYA_APP_AUTO_OPEN_SHELL_TAB=1`/`SEEYA_APP_VERIFICATION_TAB_PID_PATH` (mecanismo pré-existente,
+V2-T75 PO review round 3, item 4): a primeira espera longa dá tempo para um script externo ler o
+pid que o handler de `CHANNELS.createTab` acabou de gravar, dobrá-lo numa sessão fictícia no disco
+(`cwd` apontando para o diretório de UM projeto — `matchingTabId` só compara `pid`, nunca o `cwd`
+que a sessão alega) e esperar o próximo ciclo ambiente (`REFRESH_INTERVAL_MS`, 10s) — só então a
+linha daquele projeto lê `openHere` na primeira captura. Seis capturas nomeadas em sequência: a
+tabela inteira (três estados de lock, um favorito, "Ignored projects"), busca ativa, busca sem
+resultado, cada filtro, e o diálogo "New project" aberto por cima — `ProjectsFilters.tsx`'s own
+`id`s estáveis por opção (`projects-filter-all/running/locked`, acrescentados por esta tarefa) são
+o que esta instrumentação clica) —
 mesma categoria de `SEEYA_DAEMON_CHILD`
 acima (nunca vão para disco, ninguém digita), mas nenhuma delas é lida por `npm run app` nem
 documentada no `README.md`: existem só para um agente sem tela/teclado próprios provar a janela
