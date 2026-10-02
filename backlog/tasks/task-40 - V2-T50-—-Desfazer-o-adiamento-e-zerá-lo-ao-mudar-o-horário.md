@@ -1,7 +1,7 @@
 ---
 id: TASK-40
 title: V2-T50 — Desfazer o adiamento e zerá-lo ao mudar o horário
-status: To Do
+status: Review
 assignee: []
 created_date: '2026-09-24 18:04'
 labels: []
@@ -52,3 +52,17 @@ mudar o horário com adiamento feito (zera) e salvar outra chave (não zera); a 
 **Aceite do mantenedor:** com um Snooze +1h feito, (a) desfazer pela janela e o horário voltar ao
 configurado; (b) fazer outro Snooze, mudar o horário em Settings… e o horário novo valer sem +1h.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+**Motor.** `core/schedule.ts`: `resetSnooze` e `decideUndoSnooze` (união `UndoSnoozeAvailability`: `noSnooze`/`notAdjustable`/`tooLate`/`available`). `application/schedule-adjustments.ts`: `undoSnoozeToday` (recusa devolve o motivo e a decisão atual, nunca grava) e `readUndoSnoozeAvailability`. `application/config-update.ts#saveConfigChange`: caminho compartilhado de gravar config; zera o adiamento de hoje só quando `endOfDayTime` muda (validacao fica no chamador, pois `application/` nao importa `adapters/`).
+
+**CLI.** `seeya config set` usa `saveConfigChange` (contexto de `set` ganhou `clock`) e acrescenta "Today's snooze was cleared." quando zerou. Nenhum comando novo de desfazer.
+
+**Janela.** Item **Undo snooze** no menu do Snooze, abaixo de um divisor (`hidden`/`available`/`disabled` com motivo; IPC `undoSnoozeToday`; Q-110). `Menu` ganhou `disabledReason`/`separatorBefore`. `saveSetting` usa o mesmo `saveConfigChange` e recomputa a faixa ja sem o adiamento. Instrumentacao nova: `SEEYA_APP_AUTO_UNDO_SNOOZE`, `SEEYA_APP_AUTO_SET_END_OF_DAY` (AGENTS.md).
+
+**Rearme dos avisos previos (item 3).** Ja coberto pela S4-T7 (`firedLeadTimesEffectiveEndOfDay` difere do horario efetivo novo, entao `resolveFiredLeadTimes` ignora os avisos ja marcados): so teste, nenhum codigo (`tests/unit/application/undo-snooze.test.ts`, desfazer e mudar o horario).
+
+**Prova visual.** Janela real, offscreen, home descartavel, nos temas claro e escuro: menu com Undo snooze apos um adiamento; faixa de volta ao horario configurado apos desfazer (estado.json snooze 60 -> 0); Settings mudando endOfDayTime (snooze 60 -> 0, faixa no horario novo); item desabilitado com motivo depois do horario.
+<!-- SECTION:NOTES:END -->

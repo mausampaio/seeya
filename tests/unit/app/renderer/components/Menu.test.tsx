@@ -59,3 +59,50 @@ describe('Menu (D-052, V2-T75, PO review 2026-10-01 — the Snooze menu)', () =>
     expect(document.activeElement).toBe(items[2]);
   });
 });
+
+describe('Menu disabled item and separator (V2-T50)', () => {
+  function WithDisabled(props: { readonly onSelect: (value: string) => void }) {
+    const anchorRef = useRef<HTMLButtonElement>(null);
+    return (
+      <>
+        <button ref={anchorRef}>Snooze</button>
+        <Menu
+          id="test-menu-disabled"
+          open
+          anchorRef={anchorRef}
+          ariaLabel="Snooze"
+          items={[
+            ...ITEMS,
+            {
+              value: 'undo',
+              label: 'Undo snooze',
+              separatorBefore: true,
+              disabledReason: 'too late',
+            },
+          ]}
+          onSelect={props.onSelect}
+          onRequestClose={() => {}}
+        />
+      </>
+    );
+  }
+
+  it('a disabledReason item is aria-disabled, shows the reason, stays focusable and never selects', () => {
+    const onSelect = vi.fn();
+    const { getByRole, getByText } = render(<WithDisabled onSelect={onSelect} />);
+    const item = getByRole('menuitem', { name: /Undo snooze/ });
+    expect(item.getAttribute('aria-disabled')).toBe('true');
+    expect(getByText('too late')).not.toBeNull();
+    item.focus();
+    expect(document.activeElement).toBe(item);
+    fireEvent.click(item);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('an ordinary item next to it still selects', () => {
+    const onSelect = vi.fn();
+    const { getByRole } = render(<WithDisabled onSelect={onSelect} />);
+    fireEvent.click(getByRole('menuitem', { name: '+15m' }));
+    expect(onSelect).toHaveBeenCalledWith('15');
+  });
+});

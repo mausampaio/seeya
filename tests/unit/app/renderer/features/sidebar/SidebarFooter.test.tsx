@@ -120,7 +120,13 @@ describe('SidebarFooter (D-052, V2-T75/V2-T69)', () => {
   it('shows the schedule primary/secondary row with the clock icon', () => {
     window.seeya = createFakeSeeyaApi({
       onScheduleUpdate: (listener) => {
-        listener({ primary: 'End of day', secondary: 'in 2 h', canSnooze: false, canSkip: false });
+        listener({
+          primary: 'End of day',
+          secondary: 'in 2 h',
+          canSnooze: false,
+          canSkip: false,
+          undoSnooze: { kind: 'hidden' as const },
+        });
         return () => {};
       },
     });
@@ -132,7 +138,13 @@ describe('SidebarFooter (D-052, V2-T75/V2-T69)', () => {
   it('renders the Snooze trigger and Skip button only when the schedule allows them', () => {
     window.seeya = createFakeSeeyaApi({
       onScheduleUpdate: (listener) => {
-        listener({ primary: 'End of day', secondary: 'in 2 h', canSnooze: true, canSkip: true });
+        listener({
+          primary: 'End of day',
+          secondary: 'in 2 h',
+          canSnooze: true,
+          canSkip: true,
+          undoSnooze: { kind: 'hidden' as const },
+        });
         return () => {};
       },
     });
@@ -148,6 +160,7 @@ describe('SidebarFooter (D-052, V2-T75/V2-T69)', () => {
           secondary: 'skipped today',
           canSnooze: false,
           canSkip: false,
+          undoSnooze: { kind: 'hidden' as const },
         });
         return () => {};
       },
@@ -159,11 +172,23 @@ describe('SidebarFooter (D-052, V2-T75/V2-T69)', () => {
 
   it('choosing a snooze option from the menu calls onSnooze with that many minutes', () => {
     const snoozeToday = vi.fn(() =>
-      Promise.resolve({ primary: '', secondary: '', canSnooze: true, canSkip: true }),
+      Promise.resolve({
+        primary: '',
+        secondary: '',
+        canSnooze: true,
+        canSkip: true,
+        undoSnooze: { kind: 'hidden' as const },
+      }),
     );
     window.seeya = createFakeSeeyaApi({
       onScheduleUpdate: (listener) => {
-        listener({ primary: '', secondary: '', canSnooze: true, canSkip: true });
+        listener({
+          primary: '',
+          secondary: '',
+          canSnooze: true,
+          canSkip: true,
+          undoSnooze: { kind: 'hidden' as const },
+        });
         return () => {};
       },
       snoozeToday,
@@ -172,6 +197,75 @@ describe('SidebarFooter (D-052, V2-T75/V2-T69)', () => {
     fireEvent.click(getByRole('button', { name: /Snooze/ }));
     fireEvent.click(getByRole('menuitem', { name: '+30m' }));
     expect(snoozeToday).toHaveBeenCalledWith({ minutes: 30 });
+  });
+
+  // V2-T50: "Undo snooze" inside the Snooze menu — three states (D-024), one rendered test each.
+  describe('Undo snooze item (V2-T50)', () => {
+    const lines = {
+      primary: 'End of day 12:00',
+      secondary: 'in 3 h',
+      canSnooze: true,
+      canSkip: true,
+    };
+
+    it('is absent when there is nothing to undo', () => {
+      window.seeya = createFakeSeeyaApi({
+        onScheduleUpdate: (listener) => {
+          listener({ ...lines, undoSnooze: { kind: 'hidden' as const } });
+          return () => {};
+        },
+      });
+      const { getByRole, queryByRole } = render(<SidebarFooter />);
+      fireEvent.click(getByRole('button', { name: /Snooze/ }));
+      expect(queryByRole('menuitem', { name: /Undo snooze/ })).toBeNull();
+      expect(getByRole('menuitem', { name: '+15m' })).not.toBeNull();
+    });
+
+    it('is present when available, and clicking it applies the returned strip at once', async () => {
+      const undoSnoozeToday = vi.fn(() =>
+        Promise.resolve({
+          ...lines,
+          primary: 'End of day 11:00',
+          undoSnooze: { kind: 'hidden' as const },
+        }),
+      );
+      window.seeya = createFakeSeeyaApi({
+        onScheduleUpdate: (listener) => {
+          listener({ ...lines, undoSnooze: { kind: 'available' } });
+          return () => {};
+        },
+        undoSnoozeToday,
+      });
+      const { getByRole, getByText } = render(<SidebarFooter />);
+      fireEvent.click(getByRole('button', { name: /Snooze/ }));
+      fireEvent.click(getByRole('menuitem', { name: /Undo snooze/ }));
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(undoSnoozeToday).toHaveBeenCalledTimes(1);
+      expect(getByText('End of day 11:00')).not.toBeNull();
+    });
+
+    it('is disabled with its reason when the configured time has passed, and does nothing', () => {
+      const undoSnoozeToday = vi.fn(() => Promise.reject(new Error('must not be called')));
+      window.seeya = createFakeSeeyaApi({
+        onScheduleUpdate: (listener) => {
+          listener({
+            ...lines,
+            undoSnooze: { kind: 'disabled', reason: '09:30 has already passed' },
+          });
+          return () => {};
+        },
+        undoSnoozeToday,
+      });
+      const { getByRole, getByText } = render(<SidebarFooter />);
+      fireEvent.click(getByRole('button', { name: /Snooze/ }));
+      const item = getByRole('menuitem', { name: /Undo snooze/ });
+      expect(item.getAttribute('aria-disabled')).toBe('true');
+      expect(getByText('09:30 has already passed')).not.toBeNull();
+      fireEvent.click(item);
+      expect(undoSnoozeToday).not.toHaveBeenCalled();
+    });
   });
 
   /**
@@ -186,7 +280,13 @@ describe('SidebarFooter (D-052, V2-T75/V2-T69)', () => {
     const skipToday = vi.fn(() => new Promise<never>(() => {}));
     window.seeya = createFakeSeeyaApi({
       onScheduleUpdate: (listener) => {
-        listener({ primary: 'End of day', secondary: 'in 2 h', canSnooze: false, canSkip: true });
+        listener({
+          primary: 'End of day',
+          secondary: 'in 2 h',
+          canSnooze: false,
+          canSkip: true,
+          undoSnooze: { kind: 'hidden' as const },
+        });
         return () => {};
       },
       skipToday,

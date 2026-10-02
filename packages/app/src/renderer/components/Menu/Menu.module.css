@@ -29,3 +29,25 @@
 .item:hover {
   background: var(--seeya-surface-hover);
 }
+
+/* V2-T50: a divider above an action that is not one of the choices listed before it. */
+.separated {
+  margin-top: var(--seeya-space-1);
+  padding-top: var(--seeya-space-1);
+  border-top: 1px solid var(--seeya-border);
+}
+
+/* V2-T50: disabled but still focusable (aria-disabled), so the reason line can be read by
+ * keyboard — the visual cue is muted text and a default cursor, never a missing item. */
+.itemDisabled {
+  cursor: default;
+  color: var(--seeya-text-tertiary);
+}
+
+.itemDisabled:hover {
+  background: transparent;
+}
+
+.reason {
+  display: block;
+}

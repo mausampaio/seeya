@@ -8,6 +8,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { runStatusCommand } from '../../../packages/cli/src/status-command.js';
+import { runConfigSetCommand } from '../../../packages/cli/src/config-command.js';
 import type { ProcessControl } from '@seeya-ai/engine/core/ports.js';
 import { emptyDayState } from '@seeya-ai/engine/core/schedule.js';
 import { createConfig } from '../core/_fixtures.js';
@@ -113,6 +114,23 @@ describe('runStatusCommand — schedule shapes (S4-T13)', () => {
     expect(report).toContain(
       `End-of-day time: ${nominal} local (today: ${effective}, after snoozing)`,
     );
+  });
+
+  it('V2-T50: after `config set endOfDayTime`, status shows the new time with no leftover snooze', async () => {
+    const storage = new InMemoryDaemonStorage(
+      createConfig({ endOfDayTime: localTimeOffsetFromNow(15) }),
+    );
+    await storage.saveState({ ...emptyDayState('2026-09-05'), snoozeMinutesTotal: 60 });
+    const newTime = localTimeOffsetFromNow(120);
+
+    await runConfigSetCommand({ storage, clock: new FakeClock(NOW) }, 'endOfDayTime', newTime);
+    const report = await runStatusCommand(await buildContext(storage, new FixedAliveness(false)));
+
+    expect(report).toContain(`End-of-day: scheduled for ${newTime}, not reached yet.`);
+    expect(report).toContain(`End-of-day time: ${newTime} local
+`);
+    expect(report).not.toContain('Snoozed today');
+    expect(report).not.toContain('after snoozing');
   });
 
   it('no snooze today: the first line shows only the configured time, nothing to disambiguate', async () => {

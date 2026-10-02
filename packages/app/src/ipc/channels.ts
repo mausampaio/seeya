@@ -117,6 +117,10 @@ export const CHANNELS = {
    * `@seeya-ai/engine/application/schedule-adjustments.js#skipToday`, same immediate-update shape
    * as `snoozeToday` above. */
   skipToday: 'seeya:skip-today',
+  /** Renderer → main: the Snooze menu's "Undo snooze" (V2-T50) — runs
+   * `@seeya-ai/engine/application/schedule-adjustments.js#undoSnoozeToday` and returns the freshly
+   * recomputed strip, same immediate-update shape as `snoozeToday` above. */
+  undoSnoozeToday: 'seeya:undo-snooze-today',
   /** Main → renderer, pushed on the same refresh tick as `statusUpdate`/`scheduleUpdate`
    * (V2-T5b item 3): the daemon's own liveness, projected by
    * `state/daemon-control-panel.ts#resolveDaemonControlAvailability` from the SAME

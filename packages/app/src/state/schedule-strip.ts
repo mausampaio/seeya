@@ -18,14 +18,47 @@
  * renders them through `Text` with the weight/tone the identity asks for; this module only decides
  * the WORDS, never how they're styled.
  */
-import { minutesRemaining, type ScheduleDecision } from '@seeya-ai/engine/core/schedule.js';
+import {
+  minutesRemaining,
+  type ScheduleDecision,
+  type UndoSnoozeAvailability,
+} from '@seeya-ai/engine/core/schedule.js';
 import { MESSAGES } from '../text/messages.js';
+
+/**
+ * V2-T50: "Undo snooze" inside the Snooze menu (D-006 amendment of 2026-09-24). Three states, never
+ * a boolean (D-024): `hidden` — nothing snoozed (or the day no longer moves), so the item does not
+ * exist; `available` — there is a snooze and the configured time is still ahead; `disabled` — there
+ * IS a snooze but the configured time already passed, so it says why instead of vanishing.
+ */
+export type UndoSnoozeControl =
+  | { readonly kind: 'hidden' }
+  | { readonly kind: 'available' }
+  | { readonly kind: 'disabled'; readonly reason: string };
 
 export interface ScheduleStripData {
   readonly primary: string;
   readonly secondary: string;
   readonly canSnooze: boolean;
   readonly canSkip: boolean;
+  readonly undoSnooze: UndoSnoozeControl;
+}
+
+export function buildUndoSnoozeControl(availability: UndoSnoozeAvailability): UndoSnoozeControl {
+  switch (availability.kind) {
+    case 'noSnooze':
+    case 'notAdjustable':
+      return { kind: 'hidden' };
+    case 'available':
+      return { kind: 'available' };
+    case 'tooLate':
+      return {
+        kind: 'disabled',
+        reason: MESSAGES.scheduleStripUndoSnoozeTooLate(
+          formatLocalTime(availability.configuredEndOfDay),
+        ),
+      };
+  }
 }
 
 function pad2(value: number): string {
@@ -54,7 +87,21 @@ function formatRemaining(totalMinutes: number): string {
 const ADJUSTABLE = { canSnooze: true, canSkip: true } as const;
 const FIXED = { canSnooze: false, canSkip: false } as const;
 
-export function buildScheduleStripData(decision: ScheduleDecision, now: Date): ScheduleStripData {
+export function buildScheduleStripData(
+  decision: ScheduleDecision,
+  now: Date,
+  undoAvailability: UndoSnoozeAvailability,
+): ScheduleStripData {
+  return {
+    ...buildScheduleStripLines(decision, now),
+    undoSnooze: buildUndoSnoozeControl(undoAvailability),
+  };
+}
+
+function buildScheduleStripLines(
+  decision: ScheduleDecision,
+  now: Date,
+): Omit<ScheduleStripData, 'undoSnooze'> {
   switch (decision.kind) {
     case 'disabled':
       return {

@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 import {
   snoozeTodayNow,
   skipTodayNow,
+  undoSnoozeTodayNow,
 } from '../../../../packages/app/src/state/schedule-actions.js';
 import { createConfig } from '../../core/_fixtures.js';
 import { FakeClock } from '../../application/_fakes.js';
@@ -74,7 +75,36 @@ describe('skipTodayNow', () => {
       secondary: 'skipped today',
       canSnooze: false,
       canSkip: false,
+      undoSnooze: { kind: 'hidden' },
     });
     expect((await storage.readState())?.skipped).toBe(true);
+  });
+});
+
+describe('undoSnoozeTodayNow (V2-T50)', () => {
+  it('a snooze offers "undo"; undoing returns the strip at the configured time, with no undo left', async () => {
+    const storage = new InMemoryDaemonStorage(createConfig({ endOfDayTime: '11:00' }));
+    const clock = new FakeClock(NOW);
+
+    const snoozed = await snoozeTodayNow(storage, clock, 60);
+    expect(snoozed.primary).toBe('End of day 12:00');
+    expect(snoozed.undoSnooze).toEqual({ kind: 'available' });
+
+    const undone = await undoSnoozeTodayNow(storage, clock);
+    expect(undone.primary).toBe('End of day 11:00');
+    expect(undone.undoSnooze).toEqual({ kind: 'hidden' });
+    expect((await storage.readState())?.snoozeMinutesTotal).toBe(0);
+  });
+
+  it('after the configured time: refused, the current strip comes back with the item disabled and why', async () => {
+    const storage = new InMemoryDaemonStorage(createConfig({ endOfDayTime: '09:30' }));
+    const clock = new FakeClock(new Date(2026, 8, 17, 9, 45, 0));
+    await snoozeTodayNow(storage, new FakeClock(NOW), 60);
+
+    const refused = await undoSnoozeTodayNow(storage, clock);
+
+    expect(refused.primary).toBe('End of day 10:30');
+    expect(refused.undoSnooze).toEqual({ kind: 'disabled', reason: '09:30 has already passed' });
+    expect((await storage.readState())?.snoozeMinutesTotal).toBe(60);
   });
 });

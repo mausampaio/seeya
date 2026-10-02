@@ -52,10 +52,17 @@ export function createFakeSeeyaApi(overrides: Partial<SeeyaApi> = {}): SeeyaApi 
     // (`fetchInitial`, the same first-paint fix `getProjectsPanel`/`getTodayPanel` already needed
     // above) — a real resolving value, not `neverCalled`.
     getScheduleStrip: vi.fn(() =>
-      Promise.resolve({ primary: '', secondary: '', canSnooze: false, canSkip: false }),
+      Promise.resolve({
+        primary: '',
+        secondary: '',
+        canSnooze: false,
+        canSkip: false,
+        undoSnooze: { kind: 'hidden' as const },
+      }),
     ),
     snoozeToday: neverCalled('snoozeToday'),
     skipToday: neverCalled('skipToday'),
+    undoSnoozeToday: neverCalled('undoSnoozeToday'),
     onDaemonAvailabilityUpdate: vi.fn(noopUnsubscribe),
     // V2-T75 PO review (round 3): same reasoning as `getScheduleStrip` above.
     getDaemonAvailability: vi.fn(() => Promise.resolve({ kind: 'unknown' as const })),

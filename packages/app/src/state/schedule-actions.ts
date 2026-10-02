@@ -23,8 +23,10 @@
  * // event.text reflects whatever endOfDayTime is in config.json RIGHT NOW, not at window startup
  */
 import {
+  readUndoSnoozeAvailability,
   skipToday as skipTodayInEngine,
   snoozeToday as snoozeTodayInEngine,
+  undoSnoozeToday as undoSnoozeTodayInEngine,
 } from '@seeya-ai/engine/application/schedule-adjustments.js';
 import type { Clock, Storage } from '@seeya-ai/engine/core/ports.js';
 import type { ScheduleUpdateEvent } from '../ipc/channels.js';
@@ -38,12 +40,40 @@ export async function snoozeTodayNow(
   const now = clock.now();
   const config = await storage.readConfig();
   const result = await snoozeTodayInEngine(storage, clock, config, minutes);
-  return buildScheduleStripData(result.decision, now);
+  return buildScheduleStripData(
+    result.decision,
+    now,
+    await readUndoSnoozeAvailability(storage, clock, config),
+  );
 }
 
 export async function skipTodayNow(storage: Storage, clock: Clock): Promise<ScheduleUpdateEvent> {
   const now = clock.now();
   const config = await storage.readConfig();
   const result = await skipTodayInEngine(storage, clock, config);
-  return buildScheduleStripData(result.decision, now);
+  return buildScheduleStripData(
+    result.decision,
+    now,
+    await readUndoSnoozeAvailability(storage, clock, config),
+  );
+}
+
+/**
+ * "Undo snooze" (V2-T50): zeroes today's snooze while the configured time is still ahead, and
+ * hands back the recomputed strip either way. A refusal (the configured time passed in the
+ * meantime — the strip the person clicked on was stale) returns the CURRENT strip, which already
+ * shows the item disabled with the reason, so the window never needs a separate error path.
+ */
+export async function undoSnoozeTodayNow(
+  storage: Storage,
+  clock: Clock,
+): Promise<ScheduleUpdateEvent> {
+  const now = clock.now();
+  const config = await storage.readConfig();
+  const result = await undoSnoozeTodayInEngine(storage, clock, config);
+  return buildScheduleStripData(
+    result.decision,
+    now,
+    await readUndoSnoozeAvailability(storage, clock, config),
+  );
 }

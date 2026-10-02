@@ -62,13 +62,14 @@ import {
   applyConfigFieldUpdate,
   parseConfigFieldUpdate,
 } from '@seeya-ai/engine/adapters/storage/config-schema.js';
+import { saveConfigChange } from '@seeya-ai/engine/application/config-update.js';
 import { checkLiveLock } from '@seeya-ai/engine/scheduler/daemon-state.js';
 import { findPendingBriefing } from '@seeya-ai/engine/application/find-pending-briefing.js';
 import { readCwdHistory } from '@seeya-ai/engine/application/cwd-history.js';
 import { resumeSessions } from '@seeya-ai/engine/application/start-day.js';
 import { endDay } from '@seeya-ai/engine/application/end-day.js';
 import { buildEndDayNotice } from '@seeya-ai/engine/application/end-day-notice.js';
-import { decideSchedule, emptyDayState } from '@seeya-ai/engine/core/schedule.js';
+import { decideSchedule, decideUndoSnooze, emptyDayState } from '@seeya-ai/engine/core/schedule.js';
 import { localDayString } from '@seeya-ai/engine/core/day.js';
 import type { Config, Handoff } from '@seeya-ai/engine/core/types.js';
 import {
@@ -102,7 +103,7 @@ import { buildScheduleStripData } from '../state/schedule-strip.js';
 import { resolveDaemonControlAvailability } from '../state/daemon-control-panel.js';
 import { resolveAutostartControlAvailability } from '../state/autostart-control-panel.js';
 import { buildSettingsRows, buildProjectPolicyLines } from '../state/settings-panel.js';
-import { snoozeTodayNow, skipTodayNow } from '../state/schedule-actions.js';
+import { snoozeTodayNow, skipTodayNow, undoSnoozeTodayNow } from '../state/schedule-actions.js';
 import {
   addTab,
   createTab,
@@ -351,6 +352,12 @@ async function captureVerificationScreenshot(
   // banner, type, switch to a page tab, collapse, expand, switch back) sums to roughly 5.2s of
   // scheduled sleeps alone, each followed by a real `executeJavaScript` round trip on top.
   const usesTerminalResizeRepro = process.env.SEEYA_APP_AUTO_TERMINAL_RESIZE_REPRO === '1';
+  // V2-T50: both flags below wait on a real IPC round trip or two (open menu, click, save) before
+  // the strip they exist to show has settled — longer than the default 2500ms, shorter than the
+  // daemon-ownership bucket, which they do not need.
+  const usesSnoozeUndoInstrumentation =
+    process.env.SEEYA_APP_AUTO_UNDO_SNOOZE === '1' ||
+    process.env.SEEYA_APP_AUTO_SET_END_OF_DAY !== undefined;
   // PO review (V2-T75, 2026-10-01, round 2): `usesV2T55Instrumentation`'s own bucket was bumped
   // from 7000ms to 22000ms here as a band-aid for a real production defect — `useSidebar.ts`'s own
   // `projects`/`today` state used to be driven ONLY by the `CHANNELS.projectsUpdate`/`todayUpdate`
@@ -379,9 +386,11 @@ async function captureVerificationScreenshot(
             ? 8000
             : usesV2T55Instrumentation
               ? 7000
-              : usesTabStripDemo
-                ? 4500
-                : 2500),
+              : usesSnoozeUndoInstrumentation
+                ? 6000
+                : usesTabStripDemo
+                  ? 4500
+                  : 2500),
   );
   const image = await window.webContents.capturePage();
   const { writeFile } = await import('node:fs/promises');
@@ -2108,6 +2117,70 @@ function createWindow(clock: Clock): BrowserWindow {
         .then(() => clock.sleep(2000));
     });
   }
+  // SEEYA_APP_AUTO_UNDO_SNOOZE (V2-T50): opens the real Snooze menu and clicks its "Undo snooze"
+  // item, for a screenshot of the faixa de horário back at the configured time — the person-level
+  // action the task's acceptance criterion (a) describes, with no mouse of its own for an agent.
+  // The first click needs `getScheduleStrip` to have landed (the button does not exist before it).
+  // Never set by `npm run app` or the README.
+  if (process.env.SEEYA_APP_AUTO_UNDO_SNOOZE === '1') {
+    window.webContents.once('did-finish-load', () => {
+      void clock
+        .sleep(1500)
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('schedule-strip-snooze-button')?.click();",
+          ),
+        )
+        .then(() => clock.sleep(500))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "Array.from(document.querySelectorAll('[role=menuitem]'))" +
+              ".find((item) => item.textContent.includes('Undo snooze'))?.click();",
+          ),
+        )
+        .then(() => clock.sleep(1500));
+    });
+  }
+  // SEEYA_APP_AUTO_SET_END_OF_DAY (V2-T50): the value is an "HH:MM" string. Opens Settings, goes
+  // to Schedule, types that value into `endOfDayTime`, blurs (the same event a person tabbing
+  // away fires — see SEEYA_APP_AUTO_EDIT_SETTINGS above for why a dispatched event rather than
+  // `.blur()`), waits for the real `saveSetting` round trip, then clicks `Done` so the screenshot
+  // shows the faixa de horário behind it: the item 2 proof (the new time with no leftover snooze).
+  // Never set by `npm run app` or the README.
+  if (process.env.SEEYA_APP_AUTO_SET_END_OF_DAY !== undefined) {
+    const newTime = JSON.stringify(process.env.SEEYA_APP_AUTO_SET_END_OF_DAY);
+    window.webContents.once('did-finish-load', () => {
+      void clock
+        .sleep(1500)
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('settings-button').click();",
+          ),
+        )
+        .then(() => clock.sleep(400))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('settings-nav-schedule').click();",
+          ),
+        )
+        .then(() => clock.sleep(300))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "const timeInput = document.getElementById('endOfDayTime'); " +
+              `timeInput.value = ${newTime}; ` +
+              "timeInput.dispatchEvent(new Event('input', { bubbles: true })); " +
+              "timeInput.dispatchEvent(new FocusEvent('blur'));",
+          ),
+        )
+        .then(() => clock.sleep(1500))
+        .then(() =>
+          window.webContents.executeJavaScript(
+            "document.getElementById('settings-dialog-done').click();",
+          ),
+        )
+        .then(() => clock.sleep(500));
+    });
+  }
   // SEEYA_APP_AUTO_CLICK_SKIP_TODAY (maintainer-found defect, V2-T65-estado-na-tela item 2): clicks
   // the real "Skip today" button in the faixa de horário, for an agent with no mouse of its own to
   // prove the fix — before this round, `onSkip` fired `skipToday` and threw the response away, so
@@ -2506,7 +2579,7 @@ async function computeScheduleEvent(
   const today = localDayString(now);
   const dayState = (await context.storage.readState()) ?? emptyDayState(today);
   const { decision } = decideSchedule(config, dayState, now);
-  return buildScheduleStripData(decision, now);
+  return buildScheduleStripData(decision, now, decideUndoSnooze(config, dayState, now));
 }
 
 /**
@@ -3014,6 +3087,11 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
     return result;
   });
 
+  // V2-T50: the Snooze menu's "Undo snooze" — same immediate-update shape as the two above.
+  ipcMain.handle(CHANNELS.undoSnoozeToday, async (): Promise<ScheduleUpdateEvent> =>
+    undoSnoozeTodayNow(context.storage, context.clock),
+  );
+
   // V2-T5b item 3: "Start daemon"/"Stop daemon" — the renderer decides WHICH action from its own
   // last-known `DaemonControlAvailability` (never re-derived here, D-041); this handler just runs
   // it and hands back the literal result text.
@@ -3065,9 +3143,14 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
       if (!parsed.ok) {
         return { ok: false, error: parsed.error };
       }
-      const current = await context.storage.readConfig();
-      const updated = applyConfigFieldUpdate(current, parsed.key, parsed.value);
-      await context.storage.saveConfig(updated);
+      // V2-T50: the shared write path (`application/config-update.ts`, also used by `seeya config
+      // set`) — a changed `endOfDayTime` zeroes today's snooze, and the recompute below reads the
+      // already-cleared day state, so the strip comes back without the old "+1h".
+      const { config: updated } = await saveConfigChange(
+        context.storage,
+        context.clock,
+        (current) => applyConfigFieldUpdate(current, parsed.key, parsed.value),
+      );
 
       const scheduleEvent = await computeScheduleEvent(context, updated);
       // D-052 (V2-T75): pushed too, not just returned in the response — the lateral's own

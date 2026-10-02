@@ -21,6 +21,7 @@ const NO_SCHEDULE_YET: ScheduleUpdateEvent = {
   secondary: '',
   canSnooze: false,
   canSkip: false,
+  undoSnooze: { kind: 'hidden' },
 };
 
 const INITIAL_DAEMON_CONTROL_STATE: DaemonControlState = {
@@ -32,13 +33,14 @@ const INITIAL_DAEMON_CONTROL_STATE: DaemonControlState = {
  * (never two separate booleans that could both read `true` at once: the two actions both rewrite
  * the SAME `estado.json`, so this hook only ever lets one run at a time, see `onSnooze`/`onSkip`
  * below). */
-export type ScheduleActionPending = 'snooze' | 'skip' | null;
+export type ScheduleActionPending = 'snooze' | 'skip' | 'undo' | null;
 
 export interface SidebarFooterControls {
   readonly schedule: ScheduleUpdateEvent;
   readonly scheduleActionPending: ScheduleActionPending;
   readonly onSnooze: (minutes: 15 | 30 | 60) => void;
   readonly onSkip: () => void;
+  readonly onUndoSnooze: () => void;
   readonly daemon: DaemonControlState;
   readonly onDaemonControlClicked: () => void;
 }
@@ -128,6 +130,19 @@ export function useSidebarFooter(): SidebarFooterControls {
     });
   }, [api, scheduleActionPending]);
 
+  // V2-T50: "Undo snooze" — same shape as the two above: ignored while another schedule action is
+  // in flight, and the response (the freshly recomputed strip) is applied on the spot.
+  const onUndoSnooze = useCallback(() => {
+    if (scheduleActionPending !== null) {
+      return;
+    }
+    setScheduleActionPending('undo');
+    void api.undoSnoozeToday().then((response) => {
+      setSchedule(response);
+      setScheduleActionPending(null);
+    });
+  }, [api, scheduleActionPending]);
+
   const onDaemonControlClicked = useCallback(() => {
     if (
       (daemon.kind !== 'idle' && daemon.kind !== 'result') ||
@@ -151,6 +166,7 @@ export function useSidebarFooter(): SidebarFooterControls {
     scheduleActionPending,
     onSnooze,
     onSkip,
+    onUndoSnooze,
     daemon,
     onDaemonControlClicked,
   };

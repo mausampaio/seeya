@@ -256,6 +256,11 @@ export const MESSAGES = {
   scheduleStripSnooze30: '+30m',
   scheduleStripSnooze1h: '+1h',
   scheduleStripSkipToday: 'Skip today',
+  // V2-T50 (D-006 amendment of 2026-09-24): the item inside the Snooze menu that zeroes today's
+  // snooze. `docs/INTERFACE.md` § 1 does not place it; Q-NNN records the choice.
+  scheduleStripUndoSnooze: 'Undo snooze',
+  scheduleStripUndoSnoozeTooLate: (configuredTime: string): string =>
+    `${configuredTime} has already passed`,
 
   // V2-T5b item 3 — Start/Stop daemon (state/daemon-control-panel.ts). `resultText` is whatever
   // the composition root's own start orchestration or

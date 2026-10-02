@@ -124,6 +124,8 @@ export interface SeeyaApi {
   snoozeToday(request: SnoozeTodayRequest): Promise<ScheduleUpdateEvent>;
   /** V2-T5b item 1: "Skip today" — resolves with the freshly recomputed strip. */
   skipToday(): Promise<ScheduleUpdateEvent>;
+  /** V2-T50: "Undo snooze" — resolves with the freshly recomputed strip. */
+  undoSnoozeToday(): Promise<ScheduleUpdateEvent>;
   /** V2-T5b item 3: the daemon's own liveness, pushed on the same refresh tick. D-052 (V2-T75):
    * unsubscribe function, same reasoning as `onProjectsUpdate` above. */
   onDaemonAvailabilityUpdate(listener: (event: DaemonAvailabilityUpdateEvent) => void): () => void;
@@ -289,6 +291,7 @@ const api: SeeyaApi = {
   getScheduleStrip: () => ipcRenderer.invoke(CHANNELS.getScheduleStrip),
   snoozeToday: (request) => ipcRenderer.invoke(CHANNELS.snoozeToday, request),
   skipToday: () => ipcRenderer.invoke(CHANNELS.skipToday),
+  undoSnoozeToday: () => ipcRenderer.invoke(CHANNELS.undoSnoozeToday),
   onDaemonAvailabilityUpdate: (listener) => subscribe(CHANNELS.daemonAvailabilityUpdate, listener),
   getDaemonAvailability: () => ipcRenderer.invoke(CHANNELS.getDaemonAvailability),
   daemonControl: (request) => ipcRenderer.invoke(CHANNELS.daemonControl, request),

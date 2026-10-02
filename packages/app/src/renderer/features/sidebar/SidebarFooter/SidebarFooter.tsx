@@ -39,10 +39,11 @@ import { Stack } from '../../../components/Stack/index.js';
 import { Grid, GridItem } from '../../../components/Grid/index.js';
 import { Button } from '../../../components/Button/index.js';
 import { IconButton } from '../../../components/IconButton/index.js';
-import { Menu } from '../../../components/Menu/index.js';
+import { Menu, type MenuItem } from '../../../components/Menu/index.js';
 import { Text } from '../../../components/Text/index.js';
 import { ChevronDownIcon, ClockIcon, PlayIcon, StopIcon } from '../../../components/Icon/index.js';
 import { MESSAGES } from '../../../../text/messages.js';
+import type { UndoSnoozeControl } from '../../../../state/schedule-strip.js';
 import { describeEndDayFooterLabel } from '../../../../state/end-day-panel.js';
 import { EndDayDialog, useEndDay } from '../../end-day/index.js';
 import { useSidebarFooter } from './useSidebarFooter.js';
@@ -53,14 +54,52 @@ const SNOOZE_OPTIONS: readonly [15 | 30 | 60, string][] = [
   [60, MESSAGES.scheduleStripSnooze1h],
 ];
 
-const SNOOZE_MENU_ITEMS = SNOOZE_OPTIONS.map(([minutes, label]) => ({
+const SNOOZE_MENU_ITEMS: readonly MenuItem[] = SNOOZE_OPTIONS.map(([minutes, label]) => ({
   value: String(minutes),
   label,
 }));
 
+const UNDO_SNOOZE_VALUE = 'undo';
+
+/** V2-T50: "Undo snooze" below a divider — it is an action over the choices above it, not one of
+ * them. Absent when there is nothing to undo; disabled with the reason once the configured time
+ * has passed (D-006 amendment of 2026-09-24). */
+function buildSnoozeMenuItems(undo: UndoSnoozeControl): readonly MenuItem[] {
+  switch (undo.kind) {
+    case 'hidden':
+      return SNOOZE_MENU_ITEMS;
+    case 'available':
+      return [
+        ...SNOOZE_MENU_ITEMS,
+        {
+          value: UNDO_SNOOZE_VALUE,
+          label: MESSAGES.scheduleStripUndoSnooze,
+          separatorBefore: true,
+        },
+      ];
+    case 'disabled':
+      return [
+        ...SNOOZE_MENU_ITEMS,
+        {
+          value: UNDO_SNOOZE_VALUE,
+          label: MESSAGES.scheduleStripUndoSnooze,
+          separatorBefore: true,
+          disabledReason: undo.reason,
+        },
+      ];
+  }
+}
+
 export function SidebarFooter(): JSX.Element {
-  const { schedule, scheduleActionPending, onSnooze, onSkip, daemon, onDaemonControlClicked } =
-    useSidebarFooter();
+  const {
+    schedule,
+    scheduleActionPending,
+    onSnooze,
+    onSkip,
+    onUndoSnooze,
+    daemon,
+    onDaemonControlClicked,
+  } = useSidebarFooter();
   const endDay = useEndDay();
   const [snoozeMenuOpen, setSnoozeMenuOpen] = useState(false);
   const snoozeTriggerRef = useRef<HTMLButtonElement>(null);
@@ -81,6 +120,10 @@ export function SidebarFooter(): JSX.Element {
     : MESSAGES.daemonControlStartAction;
 
   function handleSnoozeSelect(value: string): void {
+    if (value === UNDO_SNOOZE_VALUE) {
+      onUndoSnooze();
+      return;
+    }
     const minutes = Number(value);
     if (minutes === 15 || minutes === 30 || minutes === 60) {
       onSnooze(minutes);
@@ -120,7 +163,7 @@ export function SidebarFooter(): JSX.Element {
                     variant="secondary"
                     size="sm"
                     fullWidth
-                    loading={scheduleActionPending === 'snooze'}
+                    loading={scheduleActionPending === 'snooze' || scheduleActionPending === 'undo'}
                     disabled={scheduleActionPending === 'skip'}
                     buttonRef={snoozeTriggerRef}
                     onClick={() => setSnoozeMenuOpen((open) => !open)}
@@ -135,7 +178,7 @@ export function SidebarFooter(): JSX.Element {
                     open={snoozeMenuOpen}
                     anchorRef={snoozeTriggerRef}
                     ariaLabel={MESSAGES.scheduleStripSnoozeMenuLabel}
-                    items={SNOOZE_MENU_ITEMS}
+                    items={buildSnoozeMenuItems(schedule.undoSnooze)}
                     onSelect={handleSnoozeSelect}
                     onRequestClose={() => setSnoozeMenuOpen(false)}
                   />
@@ -149,7 +192,9 @@ export function SidebarFooter(): JSX.Element {
                     size="sm"
                     fullWidth
                     loading={scheduleActionPending === 'skip'}
-                    disabled={scheduleActionPending === 'snooze'}
+                    disabled={
+                      scheduleActionPending === 'snooze' || scheduleActionPending === 'undo'
+                    }
                     onClick={onSkip}
                   >
                     {MESSAGES.scheduleStripSkipToday}
