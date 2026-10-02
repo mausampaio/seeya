@@ -4,7 +4,7 @@ title: V2-T68 — Aba Sessions
 status: Review
 assignee: []
 created_date: '2026-09-30 10:34'
-updated_date: '2026-10-02 11:23'
+updated_date: '2026-10-02 11:51'
 labels: []
 milestone: m-2
 dependencies:
@@ -150,5 +150,11 @@ uma janela offscreen, como esperado — a prova do atributo `title` é o teste u
 também confere que o motivo NUNCA aparece como texto visível na linha).
 
 `npm run verificar` do zero: verde — detalhes no relatório desta rodada.
+---
+
+author: PO
+created: 2026-10-02 11:51
+---
+Revisão do PO (2026-10-02): duas rodadas. Rodada 1 devolveu texto do Resume deslocado (rebase sobre a V2-T79), sessão aberta numa aba lida como 'ended' com '0 running' (defeito da fixture — procStart inventado; produto correto), motivo do Adopt… desabilitado como bloco de texto na linha, coluna de ação cortando a data, id e estado quebrando linha. Rodada 2 corrigiu os cinco. Q-106 aceita (sessão viva em outro lugar fica sem ação). Capturas reais conferidas nos dois temas contra docs/INTERFACE.md § 5. Mesclada no po-gate; npm run verificar do zero verde na segunda execução (a primeira teve só o timeout conhecido do guard do eslint sob carga, investigado na V2-T78) e npm test sem identidade git verde (3628 testes). Publicada; aguarda aceite do mantenedor pelo instalador.
 ---
 <!-- COMMENTS:END -->
