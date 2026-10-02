@@ -999,7 +999,6 @@ async function captureConfirmationsVerification(
   await quitAfterConfiguredDelay(clock);
 }
 
-
 /**
  * SEEYA_APP_VERIFY_DAEMON_OWNERSHIP_DIR (V2-T71, `docs/INTERFACE.md` § 9): a DIRECTORY, not a
  * single file — two screenshots, "em repouso" and "em `loading`", of the REAL daemon-ownership
