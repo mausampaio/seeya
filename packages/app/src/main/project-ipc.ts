@@ -168,6 +168,9 @@ export function wireProjectIpc(
       context.platformHint,
       rejected,
       favoriteProjectIds,
+      // V2-T67 PO review round 1: abbreviates an ignored project's own error message the same way
+      // End day already does (`state/error-reason-summary.ts`).
+      context.homeDir,
     );
   }
 

@@ -14,6 +14,7 @@ import type { AdoptionRecord, ProjectManifest, SessionState } from '@seeya-ai/en
 import type { RejectedDiscoveryRecord } from '@seeya-ai/engine/core/ports.js';
 import type { ProjectLockStatus } from '@seeya-ai/engine/application/project-lock.js';
 import { computeDisplaySessionIds } from '@seeya-ai/engine/application/session-id-display.js';
+import { summarizeErrorReason } from './error-reason-summary.js';
 import {
   groupOtherSessionsByDirectory,
   groupSessionsByProject,
@@ -215,10 +216,20 @@ export interface OtherSessionDirectoryPanelRow {
  * (`WorkspaceRepository.listProjects`'s own `rejected: RejectedDiscoveryRecord[]`, D-022's "both
  * sides"). The CLI already shows this (`cli/format-project.ts`'s own "Ignored entries:"); before
  * this task the window showed nothing at all for it — the maintainer's own "o projeto some" —
- * because `computeProjectsPanelData` only ever read `manifests`, never `rejected`. */
+ * because `computeProjectsPanelData` only ever read `manifests`, never `rejected`.
+ *
+ * V2-T67 PO review round 1: `reason` is a raw `zod`/`JSON.parse` error message, often with an
+ * absolute path baked in — exactly the shape `state/error-reason-summary.ts#summarizeErrorReason`
+ * already exists for (moved here from `state/end-day-failure-reason.ts` by this same review, so
+ * End day and this row read the identical `~`-abbreviated, length-capped line, never two
+ * implementations of the same three rules). `reason` is that SHORT line; `fullReason` is the
+ * untouched original, for a `title` tooltip — identical to `reason` when nothing was abbreviated
+ * or truncated, so a caller never needs a second boolean to know whether a tooltip is worth
+ * attaching (`reason !== fullReason`, the same convention `EndDayReasonRow` already uses). */
 export interface IgnoredProjectPanelRow {
   readonly projectId: string;
   readonly reason: string;
+  readonly fullReason: string;
 }
 
 export interface ProjectsPanelData {
@@ -242,8 +253,17 @@ function deriveIgnoredProjectId(manifestFilePath: string): string {
   return candidate ?? manifestFilePath;
 }
 
-function toIgnoredProjectRow(rejection: RejectedDiscoveryRecord): IgnoredProjectPanelRow {
-  return { projectId: deriveIgnoredProjectId(rejection.file), reason: rejection.reason };
+function toIgnoredProjectRow(
+  rejection: RejectedDiscoveryRecord,
+  homeDir: string,
+  platform: PathPlatformHint,
+): IgnoredProjectPanelRow {
+  const summary = summarizeErrorReason(rejection.reason, homeDir, platform);
+  return {
+    projectId: deriveIgnoredProjectId(rejection.file),
+    reason: summary.text,
+    fullReason: summary.fullText,
+  };
 }
 
 function toSessionRow(row: SidebarRow): ProjectPanelSessionRow {
@@ -324,6 +344,13 @@ export function buildProjectsPanelData(
    * Defaults to empty so every call site that predates favorites (every test above) keeps
    * compiling and behaving exactly as before: no project favorited. */
   favoriteProjectIds: ReadonlySet<string> = new Set(),
+  /** V2-T67 PO review round 1 — `AppContext.homeDir`, for abbreviating an ignored project's own
+   * error message the same way `error-reason-summary.ts` already does for End day. Defaults to
+   * `''`, which `summarizeErrorReason`/`collapseHomeDirectory` both treat as "never abbreviate"
+   * (an empty string is never a real prefix of anything) — every call site that predates this
+   * field (every test above) keeps compiling and behaving exactly as before: the raw reason,
+   * unabbreviated. */
+  homeDir: string = '',
 ): ProjectsPanelData {
   const grouping = groupSessionsByProject(
     rows,
@@ -367,6 +394,6 @@ export function buildProjectsPanelData(
   return {
     projects: projectRows,
     otherSessionsByDirectory,
-    ignoredProjects: rejected.map(toIgnoredProjectRow),
+    ignoredProjects: rejected.map((rejection) => toIgnoredProjectRow(rejection, homeDir, platform)),
   };
 }

@@ -22,10 +22,22 @@ import type { IgnoredProjectPanelRow } from '../../state/projects-panel.js';
 import type { ProjectsUpdateEvent } from '../../ipc/channels.js';
 
 /** V2-T72 item 2 — a project whose `seeya.json` failed to parse/validate, id and reason, the same
- * information `seeya project list`'s own "Ignored entries" already prints. */
+ * information `seeya project list`'s own "Ignored entries" already prints.
+ *
+ * PO review round 1 (V2-T67): `row.reason` already arrives short and `~`-abbreviated
+ * (`state/projects-panel.ts#toIgnoredProjectRow`, `state/error-reason-summary.ts`) — this row used
+ * to show the RAW, often path-laden message, turning into an eight-line block in the narrow
+ * sidebar. `title` carries `row.fullReason` (the untouched original), only when it actually
+ * differs — the same `text !== fullText` convention the Projects tab's own
+ * `IgnoredProjectsSection.tsx` uses for the identical fact. */
 function renderIgnoredProjectRow(row: IgnoredProjectPanelRow): HTMLLIElement {
   const item = document.createElement('li');
-  item.textContent = MESSAGES.ignoredProjectRowLabel(row.projectId, row.reason);
+  const label = MESSAGES.ignoredProjectRowLabel(row.projectId, row.reason);
+  const fullLabel = MESSAGES.ignoredProjectRowLabel(row.projectId, row.fullReason);
+  item.textContent = label;
+  if (label !== fullLabel) {
+    item.title = fullLabel;
+  }
   return item;
 }
 

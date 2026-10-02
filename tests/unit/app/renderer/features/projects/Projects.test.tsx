@@ -81,7 +81,9 @@ describe('Projects (V2-T67)', () => {
         Promise.resolve({
           projects: [],
           otherSessionsByDirectory: [],
-          ignoredProjects: [{ projectId: 'broken', reason: 'invalid JSON' }],
+          ignoredProjects: [
+            { projectId: 'broken', reason: 'invalid JSON', fullReason: 'invalid JSON' },
+          ],
         }),
       ),
     });

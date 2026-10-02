@@ -6,6 +6,16 @@
  * exact same text the lateral (`renderer/features/sidebar/NavList/`) and `seeya project list`'s
  * own "Ignored entries" already show, never a second redaction of the same fact.
  *
+ * PO review round 1: the raw `reason` used to be a `zod`/`JSON.parse` message with a full absolute
+ * path baked in, long enough to wrap the row across several lines — `row.reason` is already the
+ * short, `~`-abbreviated line by the time it reaches here
+ * (`state/projects-panel.ts#toIgnoredProjectRow`, `state/error-reason-summary.ts`), and `Text`'s
+ * own `truncate` prop (`white-space: nowrap; overflow: hidden; text-overflow: ellipsis`) is the
+ * second, CSS-level backstop for whatever abbreviation alone doesn't shorten enough at a narrow
+ * window width. The untouched `row.fullReason` is one hover away via `title`, never hidden
+ * outright — only attached when it actually differs from the visible line (the same
+ * `text !== fullText` convention `ResultPane.tsx#toReasonItem` already uses for End day).
+ *
  * Renders nothing at all when `rows` is empty — this section is noise in the ordinary case
  * (`IgnoredProjectPanelRow`'s own docstring).
  *
@@ -35,13 +45,23 @@ export function IgnoredProjectsSection(props: IgnoredProjectsSectionProps): JSX.
       className={cx(styles, 'section')}
     >
       <ul class={cx(styles, 'list')}>
-        {props.rows.map((row) => (
-          <li key={row.projectId}>
-            <Text as="span" variant="body-sm" tone="secondary">
-              {MESSAGES.ignoredProjectRowLabel(row.projectId, row.reason)}
-            </Text>
-          </li>
-        ))}
+        {props.rows.map((row) => {
+          const label = MESSAGES.ignoredProjectRowLabel(row.projectId, row.reason);
+          const fullLabel = MESSAGES.ignoredProjectRowLabel(row.projectId, row.fullReason);
+          return (
+            <li key={row.projectId} class={cx(styles, 'item')}>
+              <Text
+                as="span"
+                variant="body-sm"
+                tone="secondary"
+                truncate
+                title={label !== fullLabel ? fullLabel : undefined}
+              >
+                {label}
+              </Text>
+            </li>
+          );
+        })}
       </ul>
     </Section>
   );

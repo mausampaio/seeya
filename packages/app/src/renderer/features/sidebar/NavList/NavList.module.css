@@ -31,3 +31,16 @@
   font-size: 12px;
   line-height: 16px;
 }
+
+/* PO review round 1 (V2-T67): each ignored project's own reason used to be the RAW, often
+ * path-laden error message — even abbreviated by `~` (`state/error-reason-summary.ts`), a long
+ * one still wrapped into a multi-line block in this ~280px-wide sidebar ("um bloco de oito
+ * linhas"). `other-sessions-and-ignored-view.ts#renderIgnoredProjectRow` already carries the
+ * complete message in `title` (a real tooltip on hover), so truncating the visible line here loses
+ * nothing. A minimal CSS addition, not a redesign of this legacy-owned region: same anchors, same
+ * imperative fill, just a line that no longer wraps. */
+.ignoredList li {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

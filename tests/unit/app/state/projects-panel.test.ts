@@ -416,6 +416,7 @@ describe('buildProjectsPanelData (V2-T30 item 1)', () => {
         {
           projectId: 'broken-project',
           reason: 'repositories: expected array, received object',
+          fullReason: 'repositories: expected array, received object',
         },
       ]);
     });
@@ -429,8 +430,33 @@ describe('buildProjectsPanelData (V2-T30 item 1)', () => {
         },
       ]);
       expect(data.ignoredProjects).toEqual([
-        { projectId: 'broken-project', reason: 'invalid JSON' },
+        { projectId: 'broken-project', reason: 'invalid JSON', fullReason: 'invalid JSON' },
       ]);
+    });
+
+    it('PO review round 1: abbreviates a home-rooted reason with ~ and keeps the full message for a tooltip', () => {
+      const data = buildProjectsPanelData(
+        [],
+        [],
+        [],
+        new Map(),
+        'posix',
+        [
+          {
+            file: '/seeya/workspace/broken-project/seeya.json',
+            raw: undefined,
+            reason: '/home/x/.seeya/workspace/broken-project/seeya.json is not valid JSON',
+          },
+        ],
+        new Set(),
+        '/home/x',
+      );
+      expect(data.ignoredProjects[0]?.reason).toBe(
+        '~/.seeya/workspace/broken-project/seeya.json is not valid JSON',
+      );
+      expect(data.ignoredProjects[0]?.fullReason).toBe(
+        '/home/x/.seeya/workspace/broken-project/seeya.json is not valid JSON',
+      );
     });
 
     it('reports every rejected entry, not just the first', () => {
