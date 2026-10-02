@@ -352,6 +352,7 @@ export async function buildSnoozeContext(homeDir: string = os.homedir()): Promis
 
 export interface ConfigContext {
   readonly storage: Storage;
+  readonly clock: Clock;
 }
 
 /**
@@ -366,7 +367,7 @@ export interface ConfigContext {
  */
 export function buildConfigContext(homeDir: string = os.homedir()): ConfigContext {
   const home = resolveCliHome(homeDir);
-  return { storage: buildStorage(home) };
+  return { storage: buildStorage(home), clock: systemClock };
 }
 
 /**

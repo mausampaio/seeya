@@ -15,7 +15,11 @@ import {
 } from '../../../packages/cli/src/config-command.js';
 import { normalizeCwdForComparison } from '@seeya-ai/engine/core/cwd-normalization.js';
 import { InMemoryScheduleStorage } from './_fakes.js';
+import { FakeClock } from '../application/_fakes.js';
+import { emptyDayState } from '@seeya-ai/engine/core/schedule.js';
 import type { Config } from '@seeya-ai/engine/core/types.js';
+
+const CLOCK = new FakeClock(new Date(2026, 9, 2, 10, 0, 0, 0));
 
 function config(overrides: Partial<Config> = {}): Config {
   return {
@@ -114,7 +118,7 @@ describe('runConfigGetCommand', () => {
 describe('runConfigSetCommand', () => {
   it('sets a valid scalar field and persists it via Storage#saveConfig', async () => {
     const storage = new InMemoryScheduleStorage(config());
-    const message = await runConfigSetCommand({ storage }, 'relevanceHours', '6');
+    const message = await runConfigSetCommand({ storage, clock: CLOCK }, 'relevanceHours', '6');
 
     expect(message).toBe('relevanceHours set to 6.');
     expect(storage.savedConfigs).toHaveLength(1);
@@ -123,22 +127,62 @@ describe('runConfigSetCommand', () => {
     expect(storage.savedConfigs[0]?.captureModel).toBe('sonnet');
   });
 
+  // V2-T50 (D-006 amendment of 2026-09-24, rule 2): the shared write path zeroes today's snooze.
+  it("changing endOfDayTime zeroes today's snooze and says so", async () => {
+    const storage = new InMemoryScheduleStorage(config({ endOfDayTime: '19:30' }));
+    await storage.saveState({ ...emptyDayState('2026-10-02'), snoozeMinutesTotal: 60 });
+
+    const message = await runConfigSetCommand({ storage, clock: CLOCK }, 'endOfDayTime', '18:00');
+
+    expect(message).toBe("endOfDayTime set to 18:00. Today's snooze was cleared.");
+    expect((await storage.readState())?.snoozeMinutesTotal).toBe(0);
+  });
+
+  it('setting the SAME endOfDayTime keeps the snooze', async () => {
+    const storage = new InMemoryScheduleStorage(config({ endOfDayTime: '19:30' }));
+    await storage.saveState({ ...emptyDayState('2026-10-02'), snoozeMinutesTotal: 60 });
+
+    const message = await runConfigSetCommand({ storage, clock: CLOCK }, 'endOfDayTime', '19:30');
+
+    expect(message).toBe('endOfDayTime set to 19:30.');
+    expect((await storage.readState())?.snoozeMinutesTotal).toBe(60);
+  });
+
+  it("saving another key leaves today's snooze alone", async () => {
+    const storage = new InMemoryScheduleStorage(config());
+    await storage.saveState({ ...emptyDayState('2026-10-02'), snoozeMinutesTotal: 60 });
+
+    await runConfigSetCommand({ storage, clock: CLOCK }, 'relevanceHours', '6');
+
+    expect((await storage.readState())?.snoozeMinutesTotal).toBe(60);
+  });
+
+  it('a snooze left over from another day is not touched', async () => {
+    const storage = new InMemoryScheduleStorage(config());
+    await storage.saveState({ ...emptyDayState('2026-10-01'), snoozeMinutesTotal: 60 });
+
+    const message = await runConfigSetCommand({ storage, clock: CLOCK }, 'endOfDayTime', '18:00');
+
+    expect(message).toBe('endOfDayTime set to 18:00.');
+    expect((await storage.readState())?.day).toBe('2026-10-01');
+  });
+
   it('parses a comma-separated list field', async () => {
     const storage = new InMemoryScheduleStorage(config());
-    await runConfigSetCommand({ storage }, 'leadTimesInMinutes', '45, 20');
+    await runConfigSetCommand({ storage, clock: CLOCK }, 'leadTimesInMinutes', '45, 20');
     expect(storage.savedConfigs[0]?.leadTimesInMinutes).toEqual([45, 20]);
   });
 
   it('the literal "null" disables endOfDayTime', async () => {
     const storage = new InMemoryScheduleStorage(config({ endOfDayTime: '19:30' }));
-    const message = await runConfigSetCommand({ storage }, 'endOfDayTime', 'null');
+    const message = await runConfigSetCommand({ storage, clock: CLOCK }, 'endOfDayTime', 'null');
     expect(storage.savedConfigs[0]?.endOfDayTime).toBeNull();
     expect(message).toBe('endOfDayTime set to null.');
   });
 
   it('refuses an unknown key WITHOUT writing anything (D-027)', async () => {
     const storage = new InMemoryScheduleStorage(config());
-    const message = await runConfigSetCommand({ storage }, 'notARealKey', '5');
+    const message = await runConfigSetCommand({ storage, clock: CLOCK }, 'notARealKey', '5');
 
     expect(message).toContain('"notARealKey"');
     expect(storage.savedConfigs).toHaveLength(0);
@@ -151,7 +195,7 @@ describe('runConfigSetCommand', () => {
   // for `schemaVersion`: "exists, wrong tool" is not "unknown".
   it('refuses projectPolicy through `set` — it has its own sub-action, and is never called "unknown"', async () => {
     const storage = new InMemoryScheduleStorage(config());
-    const message = await runConfigSetCommand({ storage }, 'projectPolicy', '{}');
+    const message = await runConfigSetCommand({ storage, clock: CLOCK }, 'projectPolicy', '{}');
     expect(message).toContain('projectPolicy');
     expect(message).not.toContain('unknown');
     expect(message).toContain('seeya config policy');
@@ -162,7 +206,7 @@ describe('runConfigSetCommand', () => {
   // from "exists, isn't editable" — schemaVersion is the latter, and must never say "unknown".
   it('refuses "schemaVersion" WITHOUT writing anything, and never calls it unknown (D-025)', async () => {
     const storage = new InMemoryScheduleStorage(config());
-    const message = await runConfigSetCommand({ storage }, 'schemaVersion', '2');
+    const message = await runConfigSetCommand({ storage, clock: CLOCK }, 'schemaVersion', '2');
 
     expect(message).toContain('schemaVersion');
     expect(message).not.toContain('unknown');
@@ -171,7 +215,11 @@ describe('runConfigSetCommand', () => {
 
   it('refuses a value the schema would reject, naming both the value and why (AGENTS.md § "Mensagens de erro")', async () => {
     const storage = new InMemoryScheduleStorage(config());
-    const message = await runConfigSetCommand({ storage }, 'relevanceHours', 'not-a-number');
+    const message = await runConfigSetCommand(
+      { storage, clock: CLOCK },
+      'relevanceHours',
+      'not-a-number',
+    );
 
     expect(message).toContain('"not-a-number"');
     expect(message).toContain('relevanceHours');
@@ -180,7 +228,7 @@ describe('runConfigSetCommand', () => {
 
   it('refuses an out-of-range value (endOfDayTime must be 24h "HH:MM")', async () => {
     const storage = new InMemoryScheduleStorage(config());
-    const message = await runConfigSetCommand({ storage }, 'endOfDayTime', '25:99');
+    const message = await runConfigSetCommand({ storage, clock: CLOCK }, 'endOfDayTime', '25:99');
 
     expect(message).toContain('"25:99"');
     expect(storage.savedConfigs).toHaveLength(0);
@@ -190,7 +238,7 @@ describe('runConfigSetCommand', () => {
   // the canonical two-digit form, not the single-digit spelling the person typed.
   it('normalizes a single-digit hour to two digits before persisting (S4-T8 item 1)', async () => {
     const storage = new InMemoryScheduleStorage(config());
-    const message = await runConfigSetCommand({ storage }, 'endOfDayTime', '9:30');
+    const message = await runConfigSetCommand({ storage, clock: CLOCK }, 'endOfDayTime', '9:30');
 
     expect(message).toBe('endOfDayTime set to 09:30.');
     expect(storage.savedConfigs[0]?.endOfDayTime).toBe('09:30');
@@ -198,14 +246,14 @@ describe('runConfigSetCommand', () => {
 
   it('refuses captureConcurrency: 0 — the schema requires at least 1', async () => {
     const storage = new InMemoryScheduleStorage(config());
-    const message = await runConfigSetCommand({ storage }, 'captureConcurrency', '0');
+    const message = await runConfigSetCommand({ storage, clock: CLOCK }, 'captureConcurrency', '0');
     expect(message).toContain('captureConcurrency');
     expect(storage.savedConfigs).toHaveLength(0);
   });
 
   it('accepts the permitted case: a valid captureConcurrency of 1 (AGENTS.md: "teste o caso permitido, não só o proibido")', async () => {
     const storage = new InMemoryScheduleStorage(config());
-    const message = await runConfigSetCommand({ storage }, 'captureConcurrency', '1');
+    const message = await runConfigSetCommand({ storage, clock: CLOCK }, 'captureConcurrency', '1');
     expect(message).toBe('captureConcurrency set to 1.');
     expect(storage.savedConfigs[0]?.captureConcurrency).toBe(1);
   });
@@ -215,7 +263,7 @@ describe('runConfigSetCommand', () => {
   it('sets terminalFontFamily to an arbitrary CSS font-family stack', async () => {
     const storage = new InMemoryScheduleStorage(config());
     const message = await runConfigSetCommand(
-      { storage },
+      { storage, clock: CLOCK },
       'terminalFontFamily',
       "'Cascadia Code', monospace",
     );
@@ -225,21 +273,21 @@ describe('runConfigSetCommand', () => {
 
   it('refuses an empty terminalFontFamily', async () => {
     const storage = new InMemoryScheduleStorage(config());
-    const message = await runConfigSetCommand({ storage }, 'terminalFontFamily', '');
+    const message = await runConfigSetCommand({ storage, clock: CLOCK }, 'terminalFontFamily', '');
     expect(message).toContain('terminalFontFamily');
     expect(storage.savedConfigs).toHaveLength(0);
   });
 
   it('sets terminalFontSize to a valid pixel size', async () => {
     const storage = new InMemoryScheduleStorage(config());
-    const message = await runConfigSetCommand({ storage }, 'terminalFontSize', '16');
+    const message = await runConfigSetCommand({ storage, clock: CLOCK }, 'terminalFontSize', '16');
     expect(message).toBe('terminalFontSize set to 16.');
     expect(storage.savedConfigs[0]?.terminalFontSize).toBe(16);
   });
 
   it('refuses terminalFontSize: 0 — the schema requires a positive size', async () => {
     const storage = new InMemoryScheduleStorage(config());
-    const message = await runConfigSetCommand({ storage }, 'terminalFontSize', '0');
+    const message = await runConfigSetCommand({ storage, clock: CLOCK }, 'terminalFontSize', '0');
     expect(message).toContain('terminalFontSize');
     expect(storage.savedConfigs).toHaveLength(0);
   });
@@ -247,14 +295,14 @@ describe('runConfigSetCommand', () => {
   // V2-T62 (D-051): "theme" sets like any other scalar field.
   it('sets theme to a valid value', async () => {
     const storage = new InMemoryScheduleStorage(config());
-    const message = await runConfigSetCommand({ storage }, 'theme', 'light');
+    const message = await runConfigSetCommand({ storage, clock: CLOCK }, 'theme', 'light');
     expect(message).toBe('theme set to light.');
     expect(storage.savedConfigs[0]?.theme).toBe('light');
   });
 
   it('refuses a made-up theme name', async () => {
     const storage = new InMemoryScheduleStorage(config());
-    const message = await runConfigSetCommand({ storage }, 'theme', 'solarized');
+    const message = await runConfigSetCommand({ storage, clock: CLOCK }, 'theme', 'solarized');
     expect(message).toContain('theme');
     expect(storage.savedConfigs).toHaveLength(0);
   });

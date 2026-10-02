@@ -19,8 +19,11 @@ import {
   applySkipToday,
   applySnooze,
   decideSchedule,
+  decideUndoSnooze,
   emptyDayState,
+  resetSnooze,
   type ScheduleDecision,
+  type UndoSnoozeAvailability,
 } from '../core/schedule.js';
 import type { Clock, Storage } from '../core/ports.js';
 import type { Config } from '../core/types.js';
@@ -100,4 +103,51 @@ export async function skipToday(
   await storage.saveState(next);
   const { decision } = decideSchedule(config, next, now);
   return { decision };
+}
+
+/**
+ * `undone` carries the recomputed decision like its sisters; `refused` carries the availability
+ * that said no (D-024 — `available` can never appear there, the type excludes it) AND the
+ * unchanged current decision, so a caller that renders the strip has one answer in both cases.
+ */
+export type UndoSnoozeResult =
+  | { readonly kind: 'undone'; readonly decision: ScheduleDecision }
+  | {
+      readonly kind: 'refused';
+      readonly availability: Exclude<UndoSnoozeAvailability, { kind: 'available' }>;
+      readonly decision: ScheduleDecision;
+    };
+
+/**
+ * "Desfazer o adiamento" (D-006 amendment of 2026-09-24): zeroes today's snooze, only while the
+ * configured time (without it) is still ahead. Refuses with the reason otherwise and writes
+ * nothing. No CLI command calls this on purpose (V2-T50): the window is the interface for it.
+ */
+export async function undoSnoozeToday(
+  storage: Storage,
+  clock: Clock,
+  config: Config,
+): Promise<UndoSnoozeResult> {
+  const now = clock.now();
+  const today = localDayString(now);
+  const stored = (await storage.readState()) ?? emptyDayState(today);
+  const availability = decideUndoSnooze(config, stored, now);
+  if (availability.kind === 'available') {
+    const next = resetSnooze(stored, today);
+    await storage.saveState(next);
+    return { kind: 'undone', decision: decideSchedule(config, next, now).decision };
+  }
+  return { kind: 'refused', availability, decision: decideSchedule(config, stored, now).decision };
+}
+
+/** The availability alone, for a caller that renders it (the interface's schedule strip) —
+ * reads the same `estado.json` the actions above do. */
+export async function readUndoSnoozeAvailability(
+  storage: Storage,
+  clock: Clock,
+  config: Config,
+): Promise<UndoSnoozeAvailability> {
+  const now = clock.now();
+  const stored = (await storage.readState()) ?? emptyDayState(localDayString(now));
+  return decideUndoSnooze(config, stored, now);
 }

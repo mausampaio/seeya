@@ -18,6 +18,10 @@ import {
   type DiscoveryFixture,
 } from '../discovery/_fixtures.js';
 
+import { FakeClock } from '../discovery/_fake-clock.js';
+
+const CLOCK = new FakeClock(new Date(2026, 9, 2, 10, 0, 0, 0));
+
 let fixture: DiscoveryFixture | undefined;
 
 afterEach(async () => {
@@ -39,7 +43,7 @@ describe('config-command against a real StorageAdapter', () => {
   it('a value set by one Storage instance is read back by a brand-new one', async () => {
     fixture = await createDiscoveryFixture();
     await runConfigSetCommand(
-      { storage: new StorageAdapter(fixture.seeyaHome) },
+      { storage: new StorageAdapter(fixture.seeyaHome), clock: CLOCK },
       'relevanceHours',
       '6',
     );
@@ -54,12 +58,12 @@ describe('config-command against a real StorageAdapter', () => {
   it('a second `set` on a different key does not clobber the first one already on disk', async () => {
     fixture = await createDiscoveryFixture();
     await runConfigSetCommand(
-      { storage: new StorageAdapter(fixture.seeyaHome) },
+      { storage: new StorageAdapter(fixture.seeyaHome), clock: CLOCK },
       'relevanceHours',
       '6',
     );
     await runConfigSetCommand(
-      { storage: new StorageAdapter(fixture.seeyaHome) },
+      { storage: new StorageAdapter(fixture.seeyaHome), clock: CLOCK },
       'captureModel',
       'opus',
     );
@@ -75,7 +79,7 @@ describe('config-command against a real StorageAdapter', () => {
   it('an invalid `set` never creates config.json at all', async () => {
     fixture = await createDiscoveryFixture();
     await runConfigSetCommand(
-      { storage: new StorageAdapter(fixture.seeyaHome) },
+      { storage: new StorageAdapter(fixture.seeyaHome), clock: CLOCK },
       'relevanceHours',
       'not-a-number',
     );

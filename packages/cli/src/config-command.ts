@@ -41,12 +41,19 @@ import {
   schemaVersionNotEditableMessage,
   unknownConfigKeyMessage,
 } from '@seeya-ai/engine/adapters/storage/config-schema.js';
+import { saveConfigChange } from '@seeya-ai/engine/application/config-update.js';
 import { projectPolicyFor } from '@seeya-ai/engine/application/eligibility-assembly.js';
-import type { Storage } from '@seeya-ai/engine/core/ports.js';
+import type { Clock, Storage } from '@seeya-ai/engine/core/ports.js';
 import type { Config, ProjectPolicy } from '@seeya-ai/engine/core/types.js';
 
 export interface ConfigCommandContext {
   readonly storage: Storage;
+}
+
+/** `set` also needs the clock (V2-T50): changing `endOfDayTime` zeroes TODAY's snooze, and "today"
+ * comes from the `Clock` port (D-019). `get`/`policy` never touch the day state. */
+export interface ConfigSetContext extends ConfigCommandContext {
+  readonly clock: Clock;
 }
 
 function renderProjectPolicyLine(cwd: string, policy: ProjectPolicy): string {
@@ -98,7 +105,7 @@ export async function runConfigGetCommand(
 }
 
 export async function runConfigSetCommand(
-  context: ConfigCommandContext,
+  context: ConfigSetContext,
   key: string,
   rawValue: string,
 ): Promise<string> {
@@ -115,14 +122,17 @@ export async function runConfigSetCommand(
   if (key === 'projectPolicy') {
     return `seeya config set: ${projectPolicyNotEditableMessage()}`;
   }
+  // V2-T50: the write goes through the shared path the Settings dialog also uses, which is what
+  // zeroes today's snooze when `endOfDayTime` changes (D-006 amendment of 2026-09-24).
   const parsed = parseConfigFieldUpdate(key, rawValue);
   if (!parsed.ok) {
     return `seeya config set: ${parsed.error}`;
   }
-  const current = await context.storage.readConfig();
-  const updated = applyConfigFieldUpdate(current, parsed.key, parsed.value);
-  await context.storage.saveConfig(updated);
-  return `${parsed.key} set to ${formatConfigValue(updated[parsed.key])}.`;
+  const saved = await saveConfigChange(context.storage, context.clock, (current) =>
+    applyConfigFieldUpdate(current, parsed.key, parsed.value),
+  );
+  const line = `${parsed.key} set to ${formatConfigValue(saved.config[parsed.key])}.`;
+  return saved.snoozeCleared ? `${line} Today's snooze was cleared.` : line;
 }
 
 type BooleanFlagResult =

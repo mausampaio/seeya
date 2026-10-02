@@ -182,6 +182,54 @@ export function applySnooze(state: DayState, today: Day, minutesToAdd: number): 
   return { ...current, snoozeMinutesTotal: current.snoozeMinutesTotal + minutesToAdd };
 }
 
+/**
+ * Zeroes today's accumulated snooze (D-006 amendment of 2026-09-24, both rules: "desfazer" and
+ * "mudar o horário zera o adiamento do dia"). Touches nothing else: `skipped`/`endOfDayFired` stay
+ * as they are, and `firedLeadTimesInMinutes` is left alone on purpose — S4-T7 Part 3's
+ * `resolveFiredLeadTimes` already treats a changed effective deadline
+ * (`firedLeadTimesEffectiveEndOfDay`) as "nothing fired yet", so the advance notices that still
+ * fit before the new deadline re-arm by themselves.
+ */
+export function resetSnooze(state: DayState, today: Day): DayState {
+  const current = resetIfNewDay(state, today);
+  return { ...current, snoozeMinutesTotal: 0 };
+}
+
+/**
+ * Whether "desfazer o adiamento" makes sense right now (D-006 amendment, rule 1), named instead of
+ * a boolean (D-024) so a caller can say WHY it is not offered:
+ *
+ * - `noSnooze` — nothing is snoozed today (or the schedule is off), so there is nothing to undo.
+ * - `notAdjustable` — today was skipped or already closed; the schedule no longer moves.
+ * - `tooLate` — the configured time (without the snooze) has already passed: undoing would put the
+ *   closure in the past. `configuredEndOfDay` is that instant, for the caller's message.
+ * - `available` — there is a snooze and the configured time is still ahead.
+ */
+export type UndoSnoozeAvailability =
+  | { readonly kind: 'noSnooze' }
+  | { readonly kind: 'notAdjustable' }
+  | { readonly kind: 'tooLate'; readonly configuredEndOfDay: Date }
+  | { readonly kind: 'available'; readonly configuredEndOfDay: Date };
+
+export function decideUndoSnooze(
+  config: Config,
+  state: DayState,
+  now: Date,
+): UndoSnoozeAvailability {
+  const current = resetIfNewDay(state, localDayString(now));
+  if (config.endOfDayTime === null || current.snoozeMinutesTotal <= 0) {
+    return { kind: 'noSnooze' };
+  }
+  if (current.skipped || current.endOfDayFired) {
+    return { kind: 'notAdjustable' };
+  }
+  const configuredEndOfDay = resolveEndOfDayInstant(config.endOfDayTime, now);
+  if (now.getTime() >= configuredEndOfDay.getTime()) {
+    return { kind: 'tooLate', configuredEndOfDay };
+  }
+  return { kind: 'available', configuredEndOfDay };
+}
+
 /** Applies "pular hoje" (D-006). Idempotent, and independent of any snooze already applied today
  * (`docs/TESTES.md`'s "pular depois de já ter adiado" — the accumulated `snoozeMinutesTotal` is
  * left untouched; it simply stops mattering once `decideSchedule` sees `skipped: true`). */
