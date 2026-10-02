@@ -4,6 +4,7 @@ title: 'V2-T82 — Adoção: correções do aceite do mantenedor'
 status: Review
 assignee: []
 created_date: '2026-10-02 17:29'
+updated_date: '2026-10-02 18:29'
 labels:
   - ui
 dependencies: []
@@ -29,3 +30,13 @@ Aceite do mantenedor da V2-T70 (2026-10-02, instalador 13:40, adoção real). (1
 
 Instrumentação nova (em AGENTS.md): `SEEYA_APP_VERIFY_FAKE_HARNESS_LOG`, `SEEYA_APP_VERIFY_ADOPTION_RESULT_BUTTON`.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: Claude
+created: 2026-10-02 18:29
+---
+PO pediu conferir os diálogos do V2-T71 contra o Dialog compartilhado alterado. Capturas reais nos dois temas (projeto travado com processo-isca real e procStart lido pelo adaptador, mudanças pendentes com 18 arquivos, retomada que falhou nas duas formas, transição do daemon em repouso e em loading) e a 04-result clara da adoção, todas abertas e olhadas: nenhum diálogo ficou cortado pelo teto 80vh/720px nem com espaço dobrado; os três cartões da retomada cabem sem rolagem; a lista longa rola por dentro com título e rodapé fixos. Observação: o espaço entre o último parágrafo e os botões soma a margem padrão de p com os 16px do rodapé, legível e coerente nos cinco diálogos; a folga entre parágrafos dentro dos corpos é anterior a esta tarefa. Ajuste de instrumentação: a espera da captura em repouso da transição do daemon subiu de 4s para 7s (aos 4s o diálogo ainda não tinha aparecido).
+---
+<!-- COMMENTS:END -->
