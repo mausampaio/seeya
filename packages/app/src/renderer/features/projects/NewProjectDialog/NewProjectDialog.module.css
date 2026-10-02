@@ -1,0 +1,5 @@
+/* V2-T67 — the base `.seeya-dialog` chrome (`renderer/legacy/components.css`) already gives
+ * border/background/shadow/padding; this only sets a sensible form width. */
+.dialog {
+  width: min(360px, calc(100vw - var(--seeya-space-8)));
+}

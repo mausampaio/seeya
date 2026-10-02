@@ -1,0 +1,13 @@
+/* V2-T67 — the Projects tab's own "Ignored projects" section, below the table. */
+.section {
+  margin-top: var(--seeya-space-6);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--seeya-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

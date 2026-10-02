@@ -1,0 +1,7 @@
+/* V2-T67 — the Projects tab's own root. `.page-pane` (the ancestor `#page-projects` already has,
+ * `renderer/legacy/legacy.css`) already gives `overflow-y: auto`/padding, same split
+ * `Today.module.css`'s own docstring explains for an identical ancestor-owned concern. */
+.projects {
+  display: flex;
+  flex-direction: column;
+}

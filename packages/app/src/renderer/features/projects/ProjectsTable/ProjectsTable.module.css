@@ -1,0 +1,11 @@
+/* V2-T67 — the Projects tab's own table. */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.headerCell {
+  text-align: left;
+  padding: var(--seeya-space-2) var(--seeya-space-3);
+  border-bottom: 1px solid var(--seeya-border-strong);
+}

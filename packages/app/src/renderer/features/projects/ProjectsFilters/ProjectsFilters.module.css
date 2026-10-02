@@ -1,0 +1,13 @@
+/* V2-T67 — the search field + filter row. */
+.filters {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--seeya-space-4);
+  margin-bottom: var(--seeya-space-4);
+}
+
+.search {
+  flex: 1;
+  min-width: 200px;
+}
