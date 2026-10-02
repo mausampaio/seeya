@@ -118,3 +118,58 @@ por um fork) deu a forma ERRADA do `seeya.json` para um repositório sem remoto
 a fixture da prova visual (corrigido antes da captura final), nenhum código de produção usou a
 forma errada.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: Claude (agente)
+created: 2026-10-02 00:50
+---
+Revisão do PO, rodada 1: estrutura aprovada (os três estados de lock, as ações por linha, filtros,
+busca, lista vazia, diálogo). Q-104 (lock stale lê como "Unlocked") e Q-105 (sem texto de resultado
+após Open/Read only) aceitas como resolvidas nas notas de implementação acima — fechadas.
+
+Quatro defeitos de tela corrigidos antes do merge, em três commits:
+
+1. **Ignored projects mostrava o erro cru** (caminho absoluto inteiro), na aba e, em oito linhas,
+   na lateral. `state/end-day-failure-reason.ts#summarizeFailureReason` (da V2-T69) foi movida para
+   um nome/lugar neutro, `state/error-reason-summary.ts#summarizeErrorReason`, e passou a servir os
+   dois lados — End day e Projects. A lateral (`other-sessions-and-ignored-view.ts`, legado) ganhou
+   só o mesmo resumo + `title`, sem redesenho da região.
+2. **Colunas quebrando linha sem necessidade** ("Payments webhooks", "Locked by session 33333333",
+   a data de última atividade). Causa raiz: `table-layout: fixed` com `width` explícito em cada
+   `<th>` usa `content-box` por padrão, então o padding de cada célula (`TableRow.module.css`'s own
+   `.cell`) somava ALÉM da largura declarada, faminto a única coluna sem largura própria (Name) a
+   poucos caracteres — corrigido com `box-sizing: border-box` nas duas folhas de estilo envolvidas.
+   As larguras de cada coluna foram remedidas com uma ferramenta própria (CDP `Runtime.evaluate`
+   contra o bundle real, script descartável, não commitado) em vez de régua de captura de tela: a
+   rodada anterior tinha medido pixels FÍSICOS de uma captura (escala de tela 1.25x desta máquina)
+   e escrito esse número como se já fosse px lógico de CSS, superalocando cada coluna fixa em ~25%
+   e sufocando a coluna Name.
+3. **"unknown" cru e minúsculo na última atividade.** Vira um traço "—" em tom secundário com
+   `title` explicando a ausência (D-025); uma data conhecida continua reusando
+   `formatSessionLastActivityText`, o mesmo formato que o resto da janela já mostra.
+4. **Coluna de ação desalinhada** ("Go to tab"/"Open"/"Read only…" com três larguras diferentes).
+   Um `min-width` compartilhado só eleva um rótulo mais curto até o piso — nunca baixa um mais
+   longo até ele, e tanto "Go to tab" quanto "Read only…" são naturalmente mais largos que o piso
+   anterior. Trocado por um `width` fixo verdadeiro: os três rótulos agora renderizam exatamente do
+   mesmo tamanho.
+
+Capturas refeitas nos dois temas (`01-table`, `02-search-active`, `03-no-match`, `04-filter-running`,
+`05-filter-locked`, `06-new-project-dialog`), incluindo um projeto de nome bem longo
+("Payments and billing reconciliation pipeline integration service") provando que a truncagem com
+reticências continua correta — nunca quebra, nunca estoura a linha.
+
+`npm run verificar` do zero (dist apagado antes): verde — 375 arquivos de teste, 3579 testes
+passando (4 pulados, pré-existentes), cobertura 95.86%/91.61%/95.45%/96.06%
+(stmts/branch/funcs/lines), `dependency-cruiser` sem violação. Registro do Windows
+(`HKCU:\Software\Classes\seeya`/`seeya-dev`) e hash de `~/.seeya/protocol-handler.json`
+(`E3D8A283D81E8FEEF088CBD050C06100CED744F976A2845DC1C3B842EA013072`) conferidos antes e depois,
+sem mudança.
+
+Recusas encontradas: o comando `backlog task edit --comment` foi recusado pelo ambiente (texto
+longo demais para o verificador de isolamento de worktree confirmar que não é um comando git) —
+este comentário foi escrito editando o markdown da tarefa diretamente, como a própria
+`AGENTS.md` manda nesse caso, em vez de contornar a recusa.
+---
+<!-- COMMENTS:END -->
