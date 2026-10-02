@@ -96,10 +96,14 @@ describe('SessionsTable (V2-T68)', () => {
 
   it('Adopt… is disabled with the reason as a dica when ineligible', () => {
     const r = row({ adopt: { kind: 'unavailable', reason: 'already adopted into project "x"' } });
-    const { getByText } = render(<SessionsTable {...BASE_PROPS} rows={[r]} />);
+    const { getByText, queryByText } = render(<SessionsTable {...BASE_PROPS} rows={[r]} />);
     const button = getByText('Adopt…').closest('button') as HTMLButtonElement;
     expect(button.disabled).toBe(true);
     expect(button.title).toBe('already adopted into project "x"');
+    // PO review round 1 (regression): the reason is a `title` tooltip ONLY, never a visible line
+    // of text in the row — `disabledReason` used to render a sibling `<p>`, doubling the row's
+    // height and pushing `lastActivity` out of its own column.
+    expect(queryByText('already adopted into project "x"')).toBeNull();
   });
 
   describe('copying the short id', () => {
@@ -116,7 +120,7 @@ describe('SessionsTable (V2-T68)', () => {
     it('copies the short id and shows a visible "Copied!" confirmation', async () => {
       const r = row({ displaySessionId: 'abcd1234' });
       const { getByText, findByText } = render(<SessionsTable {...BASE_PROPS} rows={[r]} />);
-      fireEvent.click(getByText('[abcd1234]'));
+      fireEvent.click(getByText('abcd1234'));
       expect(writeText).toHaveBeenCalledWith('abcd1234');
       expect(await findByText('Copied!')).not.toBeNull();
     });

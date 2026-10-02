@@ -605,6 +605,9 @@ async function captureButtonCenteringVerification(
  * prefix matching only the direct lookup. `08-search-id-ambiguous.png`: a prefix matching two.
  * `09-search-no-result.png`: a hex-shaped prefix matching nothing anywhere. `10-copy-id.png`: the
  * short id button after a real clipboard copy, showing `Copied!` in place of the id.
+ * `11-adopt-tooltip.png`: best-effort — a real, hovered (not clicked) pointer over the disabled
+ * `Adopt…`, long enough for Chromium's own tooltip delay; see this function's own body for why
+ * this one specific capture isn't guaranteed to show anything on an offscreen window.
  */
 async function captureSessionsTabStatesVerification(
   window: BrowserWindow,
@@ -744,6 +747,34 @@ async function captureSessionsTabStatesVerification(
   await clickCopyButtonFor('22222222-2222-4222-8222-222222222222');
   await clock.sleep(300);
   await shoot('10-copy-id.png');
+
+  // PO review round 1: a best-effort attempt at the disabled `Adopt…`'s own native `title`
+  // tooltip — `sendInputEvent({ type: 'mouseMove', ... })` is the same trusted-input path
+  // `clickCopyButtonFor` above already uses for the Clipboard API, hovered long enough for
+  // Chromium's own tooltip delay. Native tooltips are an OS-level overlay outside the page's own
+  // compositor surface; whether `capturePage()` (an offscreen window to begin with) ever includes
+  // one is unconfirmed as of writing — `11-adopt-tooltip.png` is written either way, and the
+  // row/button's own `title` attribute (asserted directly in `SessionsTable.test.tsx`) is the
+  // guaranteed proof this capture is only a bonus attempt at.
+  const disabledAdoptRect = (await window.webContents.executeJavaScript(`
+    (() => {
+      const button = [...document.querySelectorAll('button')].find(
+        (b) => b.disabled && b.textContent.includes('Adopt')
+      );
+      if (!button) { return null; }
+      const r = button.getBoundingClientRect();
+      return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+    })();
+  `)) as { x: number; y: number } | null;
+  if (disabledAdoptRect !== null) {
+    window.webContents.sendInputEvent({
+      type: 'mouseMove',
+      x: disabledAdoptRect.x,
+      y: disabledAdoptRect.y,
+    });
+    await clock.sleep(1500); // typical native tooltip delay
+    await shoot('11-adopt-tooltip.png');
+  }
 
   await quitAfterConfiguredDelay(clock);
 }

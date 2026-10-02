@@ -43,21 +43,35 @@ const COLUMNS: readonly {
   readonly align?: 'right';
 }[] = [
   { key: 'name', headerKey: 'sessionsTableHeaderName' },
-  { key: 'id', headerKey: 'sessionsTableHeaderId', width: '110px' },
-  { key: 'state', headerKey: 'sessionsTableHeaderState', width: '130px' },
-  { key: 'directory', headerKey: 'sessionsTableHeaderDirectory', width: '220px' },
-  { key: 'project', headerKey: 'sessionsTableHeaderProject', width: '160px' },
+  { key: 'id', headerKey: 'sessionsTableHeaderId', width: '130px' },
+  // PO review round 1: `formatSessionStateLabel`'s own longest value ("no running process", the
+  // `unknown` label) needs this much room on one line — `truncate` below is only a backstop for a
+  // future, longer label, never the common case for this column.
+  { key: 'state', headerKey: 'sessionsTableHeaderState', width: '160px' },
+  { key: 'directory', headerKey: 'sessionsTableHeaderDirectory', width: '200px' },
+  { key: 'project', headerKey: 'sessionsTableHeaderProject', width: '150px' },
   { key: 'lastActivity', headerKey: 'sessionsTableHeaderLastActivity', width: '174px' },
-  { key: 'action', width: '230px', align: 'right' },
+  // PO review round 1: wide enough for `Resume`+`Adopt…` side by side (`.actionButton`'s own
+  // `min-width` below) without the row's own content pushing into `lastActivity` — the defect a
+  // real capture found: the disabled `Adopt…`'s OLD `disabledReason` text (removed below, title-only
+  // now) used to double this cell's height and invade the date column.
+  { key: 'action', width: '240px', align: 'right' },
 ];
 
-/** The short id, shown as `[id]` and copyable (`docs/INTERFACE.md` § 5's own "id curto copiável;
- * copiar dá retorno visível") — same clipboard call `renderer/legacy/session-row-view.ts`'s now-
- * deleted `renderCopyableId` used, as a real component with its own state instead of mutating a
- * DOM node's `title` by hand. **No auto-revert** (D-019 bans `setTimeout` in this renderer,
- * `TabStrip.tsx`'s own docstring already measured "no renderer exemption") — once copied, the
- * label simply stays `Copied!` for this row's own lifetime, same end state the deleted legacy
- * version left behind (it only ever changed the `title`, never reverted either). */
+/** The short id, copyable (`docs/INTERFACE.md` § 5's own "id curto copiável; copiar dá retorno
+ * visível") — same clipboard call `renderer/legacy/session-row-view.ts`'s now-deleted
+ * `renderCopyableId` used, as a real component with its own state instead of mutating a DOM node's
+ * `title` by hand. **No auto-revert** (D-019 bans `setTimeout` in this renderer, `TabStrip.tsx`'s
+ * own docstring already measured "no renderer exemption") — once copied, the label simply stays
+ * `Copied!` for this row's own lifetime, same end state the deleted legacy version left behind (it
+ * only ever changed the `title`, never reverted either).
+ *
+ * PO review round 1: no more `[id]` brackets (`variant="code"`'s own monospace already sets it
+ * apart from the surrounding `body-sm` cells, the brackets were redundant) and no hover underline
+ * on the `Copied!` state — a capture taken right after the instrumentation's own synthetic click
+ * left the pointer resting on the button, so the (correct, hover-only) underline rule painted in
+ * every capture of this state; simplest fix is not having one at all for this small, already-
+ * visually-distinct button. */
 function SessionIdCopyButton(props: {
   readonly sessionId: string;
   readonly displaySessionId: string;
@@ -86,8 +100,8 @@ function SessionIdCopyButton(props: {
           .catch(() => {});
       }}
     >
-      <Text as="span" variant="body-sm" tone="secondary">
-        {copied ? MESSAGES.otherSessionsSessionCopyIdCopied : `[${props.displaySessionId}]`}
+      <Text as="span" variant="code" truncate>
+        {copied ? MESSAGES.otherSessionsSessionCopyIdCopied : props.displaySessionId}
       </Text>
     </button>
   );
@@ -108,7 +122,11 @@ function ActionCell(props: {
   if (action.kind === 'goToTab') {
     return (
       <div class={cx(styles, 'actionCell')}>
-        <Button size="sm" onClick={() => props.onRowAction(row)}>
+        <Button
+          size="sm"
+          className={cx(styles, 'actionButton')}
+          onClick={() => props.onRowAction(row)}
+        >
           {MESSAGES.projectsActionGoToTab}
         </Button>
       </div>
@@ -127,6 +145,7 @@ function ActionCell(props: {
         size="sm"
         variant="secondary"
         loading={props.resumePending}
+        className={cx(styles, 'actionButton')}
         onClick={() => props.onRowAction(row)}
       >
         {MESSAGES.sessionsActionResume}
@@ -134,13 +153,16 @@ function ActionCell(props: {
       <Button
         size="sm"
         disabled={action.adopt.kind === 'unavailable'}
+        className={cx(styles, 'actionButton')}
+        // PO review round 1 (`docs/INTERFACE.md` § 5's own "dica no botão desabilitado"): `title`
+        // ONLY, never `disabledReason` — that prop renders a sibling line of text IN the table
+        // cell, doubling the row's height and pushing `lastActivity` out of its own column, exactly
+        // the defect a real capture found. A tooltip is the dica the spec actually asks for.
         // Conditional spread, not `title={... : undefined}` — `Button.tsx`'s own `title?: string`
-        // (unlike `disabledReason?: string | undefined`) has no `| undefined` escape hatch, and
-        // this package's `exactOptionalPropertyTypes` refuses a present-but-`undefined` value for
-        // it (same reasoning `Button.tsx`'s own `buttonRef` conditional spread already documents).
-        {...(action.adopt.kind === 'unavailable'
-          ? { disabledReason: action.adopt.reason, title: action.adopt.reason }
-          : {})}
+        // has no `| undefined` escape hatch, and this package's `exactOptionalPropertyTypes`
+        // refuses a present-but-`undefined` value for it (same reasoning `Button.tsx`'s own
+        // `buttonRef` conditional spread already documents).
+        {...(action.adopt.kind === 'unavailable' ? { title: action.adopt.reason } : {})}
         onClick={() => props.onAdopt(row)}
       >
         {MESSAGES.adoptButton}
@@ -151,7 +173,7 @@ function ActionCell(props: {
 
 function StateCell(props: { readonly row: SessionsPanelRow }): JSX.Element {
   return (
-    <Text as="span" variant="body-sm" tone="secondary">
+    <Text as="span" variant="body-sm" tone="secondary" truncate title={props.row.stateLabel}>
       {props.row.stateLabel}
     </Text>
   );
