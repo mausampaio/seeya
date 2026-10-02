@@ -4,7 +4,7 @@ title: V2-T70 — Adoção em dois passos
 status: Review
 assignee: []
 created_date: '2026-09-30 10:34'
-updated_date: '2026-10-02 15:10'
+updated_date: '2026-10-02 16:28'
 labels: []
 milestone: m-2
 dependencies:
@@ -115,3 +115,28 @@ registrada aqui para quem revisar ou continuar.
 
 **Sem questões novas em `docs/QUESTOES.md`** além da Q-108 (já registrada no commit `0c3f622`).
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: Claude Sonnet 5
+created: 2026-10-02 16:28
+---
+Resposta a revisao do PO (rodada 2), commits 1a7552b->rebase->64cef07/1df885b em tarefa/V2-T70-adocao.
+
+Itens 1-6 corrigidos, com prova visual refeita nos dois temas (v2t70-verify/screenshots-final/{light,dark}/, scratchpad do agente):
+
+1. Rolagem horizontal eliminada nos tres lugares. Causa raiz: o SessionsTable.tsx tinha larguras de coluna nunca medidas (soma 1054px) - com table-layout: fixed, a tabela cresce alem do conteiner em vez de encolher as colunas, e a coluna Name media 0px de verdade (getBoundingClientRect() contra o bundle real). Larguras remedidas (soma 800px), guarda unitario novo travando o orcamento. No dialogo de adocao: o cartao da sessao (nome+id+chip) agora quebra linha (Stack wrap) em vez de forcar o dialogo a abrir mais largo que os outros; PickPane.module.css#.pane ganhou overflow-x: hidden escopado (achado: a mesma regra no Dialog.module.css compartilhado quebrou a transicao review->result da adocao por um motivo nao rastreado a tempo - revertida de la, mantida so aqui). legacy.css#.page-pane tambem ganhou o mesmo backstop.
+2. What happens next abrevia ~ para exibicao, caminho completo so no title - main/project-ipc.ts chama renderAdoptionLaunchExplanationLines duas vezes (abreviado para tela, bruto para o tooltip), a funcao e a saida da CLI nao mudaram. Dialogo do passo 1 ganhou largura propria (AdoptionDialog.module.css, min(560px, 100vw-32px), mesma formula do LeftoverChangesConfirmDialog da V2-T71).
+3. Existing project mostra so o nome, id entre parenteses so quando difere.
+4. Resultado de falha mostra a mensagem completa, sempre visivel, abaixo do resumo curto (nunca so title) - ResultPane.module.css#.fullReason, com quebra e rolagem propria para uma mensagem muito longa.
+5. Revisao ganhou a linha de contexto (N files changed in project X, no corpo) e Discard/Commit explicados no rodape fixo, acima dos botoes - mesmo padrao que LeftoverChangesConfirmDialog/ProjectLockConfirmDialog (V2-T71) ja estabeleceram.
+6. Q-107 renomeada para Q-108 (V2-T78 ja tinha Q-107) - docs/QUESTOES.md, mais as duas referencias no backlog.
+
+Item 7 (rebase sobre a V2-T71, ja em main): feito. WorkspaceRepository.listChangedFilesWithStats (adapters/workspace/changed-file-stats.ts) agora reusa core/changed-file-status.ts#parseChangedFileStatusLine/ChangedFileStatus da V2-T71 para o tipo de cada linha - uma unica chamada de git status --porcelain por listagem, nunca duas. renamed/other colapsam em modified/lines: null (Q-108). Meu proprio tipo (core/ports.ts) foi renomeado de ChangedFileEntry para ChangedFileStatsEntry para nao colidir com o ChangedFileEntry mais simples ({ path, status }) que a V2-T71 ja tinha com esse nome em core/changed-file-status.ts - os dois nomes e a distincao estao documentados nos dois arquivos e no glossario do AGENTS.md.
+
+Achado durante a correcao do item 1, registrado mas nao perseguido: overflow-x: hidden no Dialog.module.css compartilhado (a correcao obvia para o scroll horizontal) travava a transicao review->result do fluxo de falha da adocao de um jeito que nao investiguei ate a causa exata (confirmado isolando a mudanca num build real, revertendo e testando de novo - o sintoma ia e voltava exatamente com essa linha). Preferi resolver no escopo mais estreito (PickPane.module.css, que e meu e nunca participa dessa transicao) a arriscar o mesmo efeito colateral nos dialogos da V2-T71 que ja usam o componente compartilhado.
+
+npm run verificar verde a partir de build limpo, depois do rebase: Statements 95.46%, Branches 91.34%, Functions 95.12%, Lines 95.71%. dependency-cruiser sem violacao (806 modulos, 2427 dependencias). Registro/protocol-handler.json (e3d8a283...) conferidos sem alteracao antes e depois de todas as capturas desta rodada.
+---
+<!-- COMMENTS:END -->
