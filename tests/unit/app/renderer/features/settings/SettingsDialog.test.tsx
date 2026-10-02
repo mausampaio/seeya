@@ -44,7 +44,13 @@ describe('SettingsDialog (V2-T65, D-052, docs/INTERFACE.md § 8)', () => {
         rows: ROWS.map((row) =>
           row.key === 'endOfDayTime' ? { ...row, value: '09:15', origin: 'chosen' as const } : row,
         ),
-        schedule: { primary: '', secondary: '', canSnooze: false, canSkip: false },
+        schedule: {
+          primary: '',
+          secondary: '',
+          canSnooze: false,
+          canSkip: false,
+          undoSnooze: { kind: 'hidden' },
+        },
       }),
     );
     window.seeya = createFakeSeeyaApi({
@@ -123,7 +129,13 @@ describe('SettingsDialog (V2-T65, D-052, docs/INTERFACE.md § 8)', () => {
       Promise.resolve({
         ok: true,
         rows: ROWS,
-        schedule: { primary: '', secondary: '', canSnooze: false, canSkip: false },
+        schedule: {
+          primary: '',
+          secondary: '',
+          canSnooze: false,
+          canSkip: false,
+          undoSnooze: { kind: 'hidden' },
+        },
       }),
     );
     window.seeya = createFakeSeeyaApi({ getSettingsPanel: vi.fn(panelResponse), saveSetting });

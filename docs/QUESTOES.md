@@ -9515,3 +9515,21 @@ caminho comum. A linha ainda aparece na revisão (tipo `M`, caminho com a seta, 
 linhas) — nunca desaparece nem quebra a lista.
 
 **Resposta:** (preenchida pelo PO)
+
+## Q-109 — V2-T50: onde fica "Undo snooze" na janela
+
+**Bloqueia:** não — registro, solução mínima já aplicada.
+
+**Contexto.** A tarefa foi escrita antes da interface atual e pede "um botão na faixa de horário, ao
+lado dos de Snooze". Hoje o rodapé tem um botão **Snooze** (que abre um menu com +15m/+30m/+1h) e
+um **Skip today**, lado a lado em duas colunas iguais (`docs/INTERFACE.md` § 1 item 7). Um terceiro
+botão quebraria essa grade; a § 1 não prevê a ação.
+
+**Decisão mínima que segui.** `Undo snooze` é um item do próprio menu do Snooze, abaixo de um
+divisor (é uma ação sobre as escolhas de cima, não uma delas). Sem adiamento hoje (ou dia pulado/já
+encerrado): o item não existe. Com adiamento mas já depois do horário configurado: o item aparece
+desabilitado, com o motivo numa segunda linha ("09:30 has already passed"). O layout do rodapé não
+muda. `Menu` ganhou `disabledReason`/`separatorBefore` por item (nada muda para quem não os usa; o
+`Select` compartilha só o `useRovingFocus`, não o `Menu`).
+
+**Resposta:** (preenchida pelo PO)

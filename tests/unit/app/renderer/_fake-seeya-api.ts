@@ -56,6 +56,7 @@ export function createFakeSeeyaApi(overrides: Partial<SeeyaApi> = {}): SeeyaApi 
     ),
     snoozeToday: neverCalled('snoozeToday'),
     skipToday: neverCalled('skipToday'),
+    undoSnoozeToday: neverCalled('undoSnoozeToday'),
     onDaemonAvailabilityUpdate: vi.fn(noopUnsubscribe),
     // V2-T75 PO review (round 3): same reasoning as `getScheduleStrip` above.
     getDaemonAvailability: vi.fn(() => Promise.resolve({ kind: 'unknown' as const })),

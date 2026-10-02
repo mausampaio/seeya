@@ -22,9 +22,18 @@ import { Popover } from '../Popover/index.js';
 import { Text } from '../Text/index.js';
 import { useRovingFocus } from '../../hooks/useRovingFocus.js';
 
+/**
+ * `disabledReason` (V2-T50): when set the item is disabled AND says why on a second line — D-024,
+ * a reason with no disabled flag (or the reverse) is unrepresentable. It uses `aria-disabled`, not
+ * the native `disabled`, so it stays focusable and a keyboard user can still read the reason.
+ * `separatorBefore` draws a divider above the item (e.g. an action that is not one of the choices
+ * above it).
+ */
 export interface MenuItem {
   readonly value: string;
   readonly label: string;
+  readonly disabledReason?: string;
+  readonly separatorBefore?: boolean;
 }
 
 export interface MenuProps {
@@ -77,22 +86,40 @@ export function Menu(props: MenuProps): JSX.Element {
         onKeyDown={onKeyDown}
       >
         {props.items.map((item) => (
-          <li key={item.value} role="none">
+          <li
+            key={item.value}
+            role="none"
+            class={item.separatorBefore === true ? cx(styles, 'separated') : undefined}
+          >
             <button
               type="button"
               role="menuitem"
+              aria-disabled={item.disabledReason !== undefined ? 'true' : undefined}
               // Roving `tabIndex` (D-052's own "nada de estado achatado" applied to focus order
               // too, in spirit) — only ever one `0`, so Tab never stops at every item in turn; the
               // dialog's own focus trap plus the explicit `.focus()` calls above/below are what
               // actually move focus, this just keeps the DOM tab order sane for anyone who tabs
               // out instead of using arrows.
               tabIndex={-1}
-              class={cx(styles, 'item')}
-              onClick={() => select(item.value)}
+              class={cx(
+                styles,
+                'item',
+                item.disabledReason !== undefined ? 'itemDisabled' : undefined,
+              )}
+              onClick={() => {
+                if (item.disabledReason === undefined) {
+                  select(item.value);
+                }
+              }}
             >
               <Text as="span" variant="body-sm">
                 {item.label}
               </Text>
+              {item.disabledReason !== undefined && (
+                <Text as="span" variant="caption" tone="tertiary" className={cx(styles, 'reason')}>
+                  {item.disabledReason}
+                </Text>
+              )}
             </button>
           </li>
         ))}

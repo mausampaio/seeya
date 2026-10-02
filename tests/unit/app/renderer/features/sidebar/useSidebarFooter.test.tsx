@@ -17,13 +17,20 @@ describe('useSidebarFooter (D-052, V2-T75)', () => {
       secondary: '',
       canSnooze: false,
       canSkip: false,
+      undoSnooze: { kind: 'hidden' },
     });
     expect(result.current.daemon).toEqual({ kind: 'idle', availability: { kind: 'unknown' } });
   });
 
   it('onSnooze calls snoozeToday with the chosen increment', () => {
     const snoozeToday = vi.fn(() =>
-      Promise.resolve({ primary: '', secondary: '', canSnooze: true, canSkip: true }),
+      Promise.resolve({
+        primary: '',
+        secondary: '',
+        canSnooze: true,
+        canSkip: true,
+        undoSnooze: { kind: 'hidden' },
+      }),
     );
     window.seeya = createFakeSeeyaApi({ snoozeToday });
     const { result } = renderHook(() => useSidebarFooter());
@@ -33,7 +40,13 @@ describe('useSidebarFooter (D-052, V2-T75)', () => {
 
   it('onSkip calls skipToday', () => {
     const skipToday = vi.fn(() =>
-      Promise.resolve({ primary: '', secondary: '', canSnooze: false, canSkip: false }),
+      Promise.resolve({
+        primary: '',
+        secondary: '',
+        canSnooze: false,
+        canSkip: false,
+        undoSnooze: { kind: 'hidden' },
+      }),
     );
     window.seeya = createFakeSeeyaApi({ skipToday });
     const { result } = renderHook(() => useSidebarFooter());
@@ -56,6 +69,7 @@ describe('useSidebarFooter (D-052, V2-T75)', () => {
         secondary: 'today',
         canSnooze: false,
         canSkip: false,
+        undoSnooze: { kind: 'hidden' },
       }),
     );
     window.seeya = createFakeSeeyaApi({ skipToday });
@@ -71,6 +85,7 @@ describe('useSidebarFooter (D-052, V2-T75)', () => {
       secondary: 'today',
       canSnooze: false,
       canSkip: false,
+      undoSnooze: { kind: 'hidden' },
     });
   });
 
@@ -81,6 +96,7 @@ describe('useSidebarFooter (D-052, V2-T75)', () => {
         secondary: 'until later',
         canSnooze: true,
         canSkip: true,
+        undoSnooze: { kind: 'hidden' },
       }),
     );
     window.seeya = createFakeSeeyaApi({ snoozeToday });
@@ -113,7 +129,13 @@ describe('useSidebarFooter (D-052, V2-T75)', () => {
     expect(result.current.scheduleActionPending).toBe('skip');
 
     await act(async () => {
-      resolveSkip?.({ primary: '', secondary: '', canSnooze: false, canSkip: false });
+      resolveSkip?.({
+        primary: '',
+        secondary: '',
+        canSnooze: false,
+        canSkip: false,
+        undoSnooze: { kind: 'hidden' },
+      });
       await Promise.resolve();
     });
     expect(result.current.scheduleActionPending).toBeNull();
@@ -152,7 +174,13 @@ describe('useSidebarFooter (D-052, V2-T75)', () => {
     });
     const { result } = renderHook(() => useSidebarFooter());
     void act(() => {
-      push?.({ primary: 'End of day', secondary: 'in 2 h 10 min', canSnooze: true, canSkip: true });
+      push?.({
+        primary: 'End of day',
+        secondary: 'in 2 h 10 min',
+        canSnooze: true,
+        canSkip: true,
+        undoSnooze: { kind: 'hidden' },
+      });
     });
     expect(result.current.schedule.primary).toBe('End of day');
     expect(result.current.schedule.secondary).toBe('in 2 h 10 min');
