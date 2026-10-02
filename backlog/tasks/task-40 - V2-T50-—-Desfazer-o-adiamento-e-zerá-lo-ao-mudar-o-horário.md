@@ -4,6 +4,7 @@ title: V2-T50 — Desfazer o adiamento e zerá-lo ao mudar o horário
 status: Review
 assignee: []
 created_date: '2026-09-24 18:04'
+updated_date: '2026-10-02 21:50'
 labels: []
 milestone: m-1
 dependencies: []
@@ -66,3 +67,13 @@ configurado; (b) fazer outro Snooze, mudar o horário em Settings… e o horári
 
 **Prova visual.** Janela real, offscreen, home descartavel, nos temas claro e escuro: menu com Undo snooze apos um adiamento; faixa de volta ao horario configurado apos desfazer (estado.json snooze 60 -> 0); Settings mudando endOfDayTime (snooze 60 -> 0, faixa no horario novo); item desabilitado com motivo depois do horario.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-10-02 21:50
+---
+Revisão do PO (2026-10-02): aprovada numa rodada. undoSnoozeToday com disponibilidade em união (noSnooze/notAdjustable/tooLate/available); saveConfigChange compartilhado zera o adiamento só quando endOfDayTime muda (CLI e Settings); rearme dos avisos já coberto pela S4-T7, provado por teste. Janela: item Undo snooze no menu do Snooze, abaixo de um divisor — ausente sem adiamento, desabilitado com motivo depois do horário configurado. Questão renumerada para Q-110 no merge (a V2-T77 ficou com Q-109). Capturas conferidas nos dois temas. Mesclada com a V2-T77; portão do zero e npm test sem identidade git verdes (3828 testes). Agente Sonnet 5.5 (51 min).
+---
+<!-- COMMENTS:END -->
