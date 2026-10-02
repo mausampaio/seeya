@@ -158,8 +158,9 @@ describe('renderDeleteAdoptedCopyConfirmation', () => {
         sizeBytes: 4096,
       },
     });
-    expect(text).toContain('4096 bytes');
-    expect(text).toContain('keeps it');
+    expect(text).toBe(
+      'The adopted copy (session fork-1) was written to after it was adopted (2026-09-23T10:00:00.000Z) — last activity 2026-09-24T10:00:00.000Z. Delete it anyway? Declining (or pressing Enter) keeps it. [y/N] ',
+    );
   });
 
   it('describes an unknown growth without inventing a size', () => {
@@ -168,7 +169,7 @@ describe('renderDeleteAdoptedCopyConfirmation', () => {
       adoptedAt: new Date('2026-09-23T10:00:00.000Z'),
       growth: { kind: 'unknown' },
     });
-    expect(text).toContain("couldn't be found");
+    expect(text).toContain('has no transcript we could find');
     expect(text).not.toContain('bytes');
   });
 });

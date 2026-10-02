@@ -137,7 +137,15 @@ export function renderRevertAdoptionConfirmation(
 export function renderDeleteAdoptedCopyConfirmation(
   info: Parameters<ConfirmDeleteAdoptedCopy>[0],
 ): string {
-  return `${renderDeleteAdoptedCopyQuestionLine(info)} Declining (or pressing Enter) keeps it. [y/N] `;
+  const question = renderDeleteAdoptedCopyQuestionLine({
+    forkSessionIdText: info.forkSessionId,
+    adoptedAtText: info.adoptedAt.toISOString(),
+    growth:
+      info.growth.kind === 'grew'
+        ? { kind: 'grew', lastWriteText: info.growth.lastWrite.toISOString() }
+        : { kind: 'unknown' },
+  });
+  return `${question} Declining (or pressing Enter) keeps it. [y/N] `;
 }
 
 export function formatRevertAdoptionReport(result: RevertAdoptionResult): string {

@@ -120,23 +120,22 @@ describe('project-management sentences', () => {
     ).toContain('no interactive terminal');
   });
 
-  it('the delete-copy question carries the growth facts, or says growth is unknown', () => {
-    const adoptedAt = new Date('2026-09-24T10:00:00.000Z');
+  it('the delete-copy question uses the texts the caller formatted, and says growth is unknown', () => {
     expect(
       renderDeleteAdoptedCopyQuestionLine({
-        forkSessionId: 'f1',
-        adoptedAt,
-        growth: { kind: 'grew', lastWrite: new Date('2026-09-24T11:00:00.000Z'), sizeBytes: 2048 },
+        forkSessionIdText: 'f1',
+        adoptedAtText: 'A',
+        growth: { kind: 'grew', lastWriteText: 'B' },
       }),
     ).toBe(
-      'The adopted copy (session f1) it kept writing after being adopted on 2026-09-24T10:00:00.000Z — last activity 2026-09-24T11:00:00.000Z, now 2048 bytes. Delete it anyway?',
+      'The adopted copy (session f1) was written to after it was adopted (A) — last activity B. Delete it anyway?',
     );
     expect(
       renderDeleteAdoptedCopyQuestionLine({
-        forkSessionId: 'f1',
-        adoptedAt,
+        forkSessionIdText: 'f1',
+        adoptedAtText: 'A',
         growth: { kind: 'unknown' },
       }),
-    ).toContain("its transcript couldn't be found");
+    ).toContain('has no transcript we could find');
   });
 });

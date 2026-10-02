@@ -129,6 +129,10 @@ describe('DeleteAdoptedCopyConfirmDialog (V2-T83)', () => {
       'The adopted copy (session f1) kept writing. Delete it anyway?',
     );
     expect(view.getByText(/This is the default/)).not.toBeNull();
+    // The full id is one hover away, the sentence itself carries the short one.
+    expect(
+      view.container.querySelector('#delete-adopted-copy-confirm-context')?.getAttribute('title'),
+    ).toBe('f1');
     // Keep is the last button of the footer: the primary, on the right.
     const buttons = Array.from(
       dialogById('delete-adopted-copy-confirm-dialog').querySelectorAll('button'),

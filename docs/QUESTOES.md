@@ -9516,6 +9516,7 @@ linhas) — nunca desaparece nem quebra a lista.
 
 **Resposta:** (preenchida pelo PO)
 
+<<<<<<< HEAD
 ## Q-109 — V2-T77: escolhas de desenho que a § 5a não fecha, e o que a retomada não entrega
 
 **Bloqueia:** não — registro, solução mínima já aplicada.
@@ -9576,6 +9577,9 @@ desabilitado, com o motivo numa segunda linha ("09:30 has already passed"). O la
 muda. `Menu` ganhou `disabledReason`/`separatorBefore` por item (nada muda para quem não os usa; o
 `Select` compartilha só o `useRovingFocus`, não o `Menu`).
 ## Q-109 — V2-T83: o que a § 4a não diz sobre o diálogo de detalhes do projeto
+=======
+## Q-111 — V2-T83: o que a § 4a não diz sobre o diálogo de detalhes do projeto
+>>>>>>> 71739ac (fix: rewrite the delete-adopted-copy question, renumber question to Q-111)
 
 **Bloqueia:** não — registro, solução mínima já aplicada.
 
@@ -9587,13 +9591,12 @@ aberto que a implementação precisou decidir agora.
    outra sessão viva". **Decisão:** é o mesmo caso (escrita desabilitada, leitura continua), mas o
    motivo muda: "This project is open in a tab. Close that tab to change it from here." — a pessoa
    resolve fechando a aba, não esperando outra sessão.
-2. **O texto de "apagar a cópia?" é o da CLI, e a frase da CLI é torta.**
-   `core/project-management-message.ts#renderDeleteAdoptedCopyQuestionLine` (movida byte a byte de
-   `cli/format-project-undo.ts`) diz "The adopted copy (session X) it kept writing after being
-   adopted on <ISO>..." — falta um "—"/"which" depois do id, e as datas saem em ISO. A § 4a pede "o
-   mesmo texto da CLI" e a tarefa pede saída da CLI inalterada, então não corrigi a frase.
-   **A decidir:** consertar a gramática (e talvez formatar as datas) nos dois lados de uma vez, numa
-   tarefa que aceite mudar a saída da CLI.
+2. **A frase de "apagar a cópia?" era agramatical e em ISO.** Resolvida por autorização do PO
+   (2026-10-02): reescrita em `core/project-management-message.ts` ("The adopted copy (session
+   <id>) was written to after it was adopted (<quando>) — last activity <quando>. Delete it
+   anyway?", sem bytes). A CLI passa o id completo e datas ISO (o formato que ela já usa); a janela
+   o id curto (completo no `title`) e data/hora locais. Única linha de CLI alterada: a pergunta de
+   `seeya project revert-adoption` sobre a cópia.
 3. **Push de `projectsUpdate` fora de ordem.** Uma ação de escrita segura o lock do projeto; um tick
    ambiente de 10s que começava durante ela lia "locked by an unidentified session" e, calculado em
    paralelo com o push que a própria ação faz ao soltar o lock, podia terminar por último e deixar

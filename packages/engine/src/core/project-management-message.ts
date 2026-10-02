@@ -11,7 +11,6 @@
  * CLI output is English (D-028), so the wording moved here byte for byte.
  */
 import type { ProjectLockInfo } from './project-lock.js';
-import type { AdoptedCopyGrowth } from './adopted-copy-growth.js';
 import { formatLockHolderDescription } from './project-lock-message.js';
 
 /** D-024: what happened to an adopted copy after its adoption was reverted. Moved here from
@@ -181,14 +180,18 @@ export function formatAdoptedCopyOutcomeLine(
  * button). `growth` is never `unchanged` here: an unchanged copy is deleted without asking
  * (`application/project-revert-adoption.ts#resolveAdoptedCopy`). */
 export function renderDeleteAdoptedCopyQuestionLine(info: {
-  readonly forkSessionId: string;
-  readonly adoptedAt: Date;
-  readonly growth: Extract<AdoptedCopyGrowth, { readonly kind: 'grew' | 'unknown' }>;
+  /** How the caller names the copy: the CLI passes the full id, the window the short one. */
+  readonly forkSessionIdText: string;
+  /** Already formatted by the caller, in the date format ITS interface uses everywhere else (the
+   * CLI: ISO, as in every other CLI line; the window: the locale date and time). */
+  readonly adoptedAtText: string;
+  readonly growth:
+    { readonly kind: 'grew'; readonly lastWriteText: string } | { readonly kind: 'unknown' };
 }): string {
   const description =
     info.growth.kind === 'grew'
-      ? `it kept writing after being adopted on ${info.adoptedAt.toISOString()} — last activity ` +
-        `${info.growth.lastWrite.toISOString()}, now ${info.growth.sizeBytes} bytes`
-      : "its transcript couldn't be found, so growth since adoption can't be confirmed";
-  return `The adopted copy (session ${info.forkSessionId}) ${description}. Delete it anyway?`;
+      ? `was written to after it was adopted (${info.adoptedAtText}) — last activity ` +
+        `${info.growth.lastWriteText}`
+      : "has no transcript we could find, so we can't tell whether it was written to since it was adopted";
+  return `The adopted copy (session ${info.forkSessionIdText}) ${description}. Delete it anyway?`;
 }

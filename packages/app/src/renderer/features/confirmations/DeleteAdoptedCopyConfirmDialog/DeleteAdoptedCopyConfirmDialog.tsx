@@ -66,7 +66,12 @@ export function DeleteAdoptedCopyConfirmDialog(): JSX.Element {
     >
       {request !== null && (
         <Stack gap="md">
-          <Text as="div" variant="body-md" id="delete-adopted-copy-confirm-context">
+          <Text
+            as="div"
+            variant="body-md"
+            id="delete-adopted-copy-confirm-context"
+            title={request.forkSessionId}
+          >
             {request.question}
           </Text>
           <Stack gap="xs">

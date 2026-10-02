@@ -44,6 +44,7 @@ import {
   type AppContext,
 } from '../composition/index.js';
 import { readProjectDetails } from '../composition/project-details-reader.js';
+import { computeDisplaySessionIds } from '@seeya-ai/engine/application/session-id-display.js';
 import { PendingConfirmations } from '../resume/pending-confirmations.js';
 import {
   formatAddRepositoryActionResult,
@@ -51,6 +52,10 @@ import {
   formatRemoveRepositoryActionResult,
   formatRevertAdoptionActionResult,
 } from '../state/project-details-result.js';
+
+function shortSessionId(sessionId: string): string {
+  return computeDisplaySessionIds([sessionId]).get(sessionId) ?? sessionId;
+}
 
 export function wireProjectDetailsIpc(
   window: BrowserWindow,
@@ -127,7 +132,16 @@ export function wireProjectDetailsIpc(
               requestId,
               projectId: request.projectId,
               forkSessionId: info.forkSessionId,
-              question: renderDeleteAdoptedCopyQuestionLine(info),
+              // Short id (the full one is the dialog's `title`) and the window's own locale
+              // date and time, never ISO.
+              question: renderDeleteAdoptedCopyQuestionLine({
+                forkSessionIdText: shortSessionId(info.forkSessionId),
+                adoptedAtText: info.adoptedAt.toLocaleString(),
+                growth:
+                  info.growth.kind === 'grew'
+                    ? { kind: 'grew', lastWriteText: info.growth.lastWrite.toLocaleString() }
+                    : { kind: 'unknown' },
+              }),
             };
             window.webContents.send(CHANNELS.confirmDeleteAdoptedCopyRequest, event);
             return answer;

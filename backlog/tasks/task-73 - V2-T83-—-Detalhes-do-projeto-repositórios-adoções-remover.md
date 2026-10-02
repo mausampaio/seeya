@@ -63,8 +63,8 @@ de verdade num espaço de trabalho descartável, sem lançar `claude`) e
 `SEEYA_APP_VERIFY_PICKED_DIRECTORIES` (`composition/verification-picked-directories.ts`, no lugar do
 diálogo nativo de pasta).
 
-**Questão aberta:** Q-109 (projeto aberto numa aba da própria janela; frase da CLI "it kept writing"
-tem gramática torta e foi mantida por exigência de saída inalterada; ordem de push; caminho cru no
+**Questão aberta:** Q-111 (projeto aberto numa aba da própria janela; frase de "apagar a cópia" corrigida
+nos dois lados com autorização do PO; ordem de push; caminho cru no
 erro de `pathNotFound`).
 
 `npm run verificar` do zero (`rm -rf packages/*/dist`): passou (formato, tipos dos três tsconfigs,
