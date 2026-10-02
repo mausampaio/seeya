@@ -660,13 +660,23 @@ export interface OpenProjectResponse {
   readonly outcomeText: string;
 }
 
-/** `CHANNELS.confirmProjectLockOpenRequest`'s payload — `questionText` is
- * `@seeya-ai/engine/core/project-lock-message.js#renderReadOnlyOpenQuestion`'s own sentence, the
- * same wording `seeya project open`'s `readline` question shows. */
+/** `CHANNELS.confirmProjectLockOpenRequest`'s payload (V2-T71, `docs/INTERFACE.md` § 9's own
+ * "quem segura o lock e desde quando"): the raw facts `@seeya-ai/engine/core/project-lock.js
+ * #ProjectLockInfo` carries, not a pre-rendered sentence — `renderer/features/confirmations/
+ * ProjectLockConfirmDialog.tsx` composes the title/context-line split § 9 asks for itself, the
+ * same "the window formats, the engine only supplies facts" split `state/
+ * projects-panel.ts#formatSessionLastActivityText` already draws for a `Date`. `heldBySessionId`
+ * is `null` exactly when `ProjectLockInfo.sessionId` is absent (D-025: an unidentified holder,
+ * never a guessed one) — `Date` crosses this IPC boundary natively, the same as `TodayPanelData
+ * .capturedAt`. Replaces the pre-V2-T71 `questionText` field (was `@seeya-ai/engine/core/
+ * project-lock-message.js#renderReadOnlyOpenQuestion`'s own sentence — still used verbatim by the
+ * CLI's own `readline` question, untouched by this task). */
 export interface ConfirmProjectLockOpenRequestEvent {
   readonly requestId: string;
   readonly projectId: string;
-  readonly questionText: string;
+  readonly heldBySessionId: string | null;
+  readonly heldByPid: number;
+  readonly heldByAcquiredAt: Date;
 }
 
 /** `CHANNELS.answerProjectLockOpenConfirm`'s payload. */
@@ -675,16 +685,26 @@ export interface AnswerProjectLockOpenConfirmRequest {
   readonly decision: 'proceed' | 'decline';
 }
 
-/** `CHANNELS.confirmLeftoverChangesOpenRequest`'s payload — `questionLines` is
- * `@seeya-ai/engine/core/project-lock-message.js#renderLeftoverChangesLines`'s own lines, the same
- * wording `seeya project open`'s own `readline` question shows (`cli/format-project.ts
- * #renderLeftoverChangesConfirmation` just joins them with `\n` and appends the `readline`-specific
- * prompt suffix). One paragraph per line, same shape `ConfirmAdoptionCommitRequestEvent
- * .changedFilesLines` already uses. */
+/** The exact shape `@seeya-ai/engine/core/changed-file-status.js#ChangedFileEntry` has —
+ * redeclared here rather than imported, same "ipc/channels.ts is pure, no engine-adjacent app
+ * module imports it back" reasoning `FallbackConfirmRequestEvent`'s own docstring already gives. */
+export type ChangedFileDisplayStatus = 'modified' | 'added' | 'deleted' | 'renamed' | 'other';
+
+export interface ChangedFileRow {
+  readonly path: string;
+  readonly status: ChangedFileDisplayStatus;
+}
+
+/** `CHANNELS.confirmLeftoverChangesOpenRequest`'s payload (V2-T71, `docs/INTERFACE.md` § 9's own
+ * "a lista de arquivos (M/A)"): `changedFiles` carries each file's own status now, read through
+ * `@seeya-ai/engine/core/ports.js#WorkspaceRepository.listChangedFilesWithStatus` — replaces the
+ * pre-V2-T71 `questionLines` field (was `@seeya-ai/engine/core/project-lock-message.js
+ * #renderLeftoverChangesLines`'s own plain lines, still used verbatim by the CLI's own `readline`
+ * question, untouched by this task). */
 export interface ConfirmLeftoverChangesOpenRequestEvent {
   readonly requestId: string;
   readonly projectId: string;
-  readonly questionLines: readonly string[];
+  readonly changedFiles: readonly ChangedFileRow[];
 }
 
 /** `CHANNELS.answerLeftoverChangesOpenConfirm`'s payload — the same three answers

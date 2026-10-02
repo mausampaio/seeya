@@ -33,10 +33,6 @@ import { openProject, SUPPORTED_HARNESS } from '@seeya-ai/engine/application/pro
 import { adoptSession } from '@seeya-ai/engine/application/project-adopt.js';
 import type { RejectedDiscoveryRecord } from '@seeya-ai/engine/core/ports.js';
 import {
-  renderLeftoverChangesLines,
-  renderReadOnlyOpenQuestion,
-} from '@seeya-ai/engine/core/project-lock-message.js';
-import {
   renderAdoptionCommitChangedFilesLines,
   renderAdoptionLaunchExplanationLines,
 } from '@seeya-ai/engine/core/project-adoption-message.js';
@@ -239,17 +235,33 @@ export function wireProjectIpc(
           const event: ConfirmProjectLockOpenRequestEvent = {
             requestId,
             projectId: request.projectId,
-            questionText: renderReadOnlyOpenQuestion(heldBy),
+            heldBySessionId: heldBy.sessionId ?? null,
+            heldByPid: heldBy.pid,
+            heldByAcquiredAt: heldBy.acquiredAt,
           };
           window.webContents.send(CHANNELS.confirmProjectLockOpenRequest, event);
           return answer;
         },
+        // V2-T71 (`docs/INTERFACE.md` § 9's own "a lista de arquivos (M/A)"): a second, additive
+        // read of the SAME pending changes `handleLeftoverChanges` already computed (as the
+        // `changedFiles` parameter below, still plain paths — `ConfirmLeftoverChanges`'s own
+        // signature is untouched, since the adoption flow's commit-review dialog shares that
+        // type and this task must never change it), just to keep each file's own status for
+        // display. Cheap and rare (only when there ARE leftover changes at all) — never worth a
+        // second port method call avoided at the cost of widening a type three other call sites
+        // would then have to follow.
         confirmLeftoverChanges: async (changedFiles) => {
+          void changedFiles;
           const { requestId, answer } = pendingLeftoverChangesConfirmations.create();
+          const root = await resolveWorkspaceRoot(context.storage, context.home.seeyaHome);
+          const entries = await context.workspace.listChangedFilesWithStatus(
+            root,
+            request.projectId,
+          );
           const event: ConfirmLeftoverChangesOpenRequestEvent = {
             requestId,
             projectId: request.projectId,
-            questionLines: renderLeftoverChangesLines(changedFiles),
+            changedFiles: entries,
           };
           window.webContents.send(CHANNELS.confirmLeftoverChangesOpenRequest, event);
           return answer;

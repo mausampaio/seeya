@@ -152,6 +152,16 @@ export const MESSAGES = {
   fallbackDialogResumeWithoutPlan: 'Resume without the plan',
   fallbackDialogOpen: 'Open a fresh session',
   fallbackDialogSkip: 'Skip',
+  // V2-T71 (`docs/INTERFACE.md` § 9's own "as saídas como cartões explicados"): one short
+  // sentence per card, in the fixed `docs/INTERFACE.md` § 9 order — "Skip this one, Open a fresh
+  // session, Resume without the plan" — never reordered to put the recommended one first; the
+  // `recommended` chip is what marks it instead.
+  fallbackCardSkipTitle: 'Skip this one',
+  fallbackCardSkipExplanation:
+    'Leave this session as it is and move on to the next one — nothing resumes right now.',
+  fallbackCardOpenTitle: 'Open a fresh session',
+  fallbackCardResumeWithoutPlanTitle: 'Resume without the plan',
+  fallbackCardRecommended: 'Recommended',
 
   // V2-T4 item 4 — the resume summary, rendered in the "Today" panel once resumeSessions
   // finishes. Same content as `cli/format-start-day.ts#formatStartDaySummary`'s four sections
@@ -278,6 +288,13 @@ export const MESSAGES = {
   daemonOwnershipTransitionAccept: 'Let seeya take over',
   daemonOwnershipTransitionDecline: 'Leave it as it is',
   daemonOwnershipTransitionApplying: 'Working…',
+  // V2-T71 — one line beside each button (`docs/INTERFACE.md` § 9's own "o que cada escolha
+  // faz"), on top of the fuller paragraph above.
+  daemonOwnershipTransitionAcceptExplanation:
+    'Stops the daemon that is running (if any), points autostart at this app, and starts its ' +
+    'own daemon.',
+  daemonOwnershipTransitionDeclineExplanation:
+    'Changes nothing — whatever runs the daemon and autostart today keeps doing it.',
 
   // V2-T14 — the "Settings" dialog (state/settings-panel.ts). One row per
   // `EDITABLE_CONFIG_KEYS` (@seeya-ai/engine/adapters/storage/config-schema.js), the same keys
@@ -468,12 +485,34 @@ export const MESSAGES = {
   // V2-T67, same "never fails in silence" reasoning the Projects tab's own row actions follow.
   newProjectUnexpectedError: (message: string): string =>
     `seeya: create failed unexpectedly (${message}).`,
-  projectLockConfirmTitle: 'Project is locked',
+  // V2-T71 (`docs/INTERFACE.md` § 9's own "New project: campo Project id com o formato explicado
+  // no erro"): shown next to the field the instant the typed id doesn't match `core/
+  // project-id.ts#isValidProjectId` — the EXACT wording the task fixed, with the example id it
+  // names. The engine's own `invalidId`/`alreadyExists` rejections (a submit the client-side
+  // check let through, or a duplicate id — never silent, D-034) still surface through
+  // `formatCreateProjectErrorText` below, unchanged.
+  newProjectIdFormatError:
+    'Use lowercase letters, digits and hyphens — for example payments-webhooks.',
+  projectLockConfirmTitle: (projectId: string): string => `Project "${projectId}" is locked`,
   projectLockConfirmProceed: 'Open read-only',
   projectLockConfirmDecline: 'Cancel',
-  leftoverChangesConfirmTitle: 'Uncommitted changes from a previous session',
+  // V2-T71 — one line beside each button (`docs/INTERFACE.md` § 9's own "o que cada opção faz
+  // escrito ao lado dela").
+  projectLockConfirmProceedExplanation:
+    'You can look around, but nothing you change here will be saved until the other session ' +
+    'finishes.',
+  projectLockConfirmDeclineExplanation: 'Go back without opening the project.',
+  leftoverChangesConfirmTitle: (projectId: string): string =>
+    `Project "${projectId}" has uncommitted changes from a previous session`,
+  leftoverChangesConfirmContext: (count: number): string =>
+    `${count} file${count === 1 ? '' : 's'} changed, left uncommitted by a previous session:`,
   leftoverChangesConfirmCommit: 'Commit now',
   leftoverChangesConfirmProceed: 'Continue without committing',
+  // V2-T71 — one line beside each button.
+  leftoverChangesConfirmProceedExplanation:
+    "Proceed, and the new session will be told what's still pending.",
+  leftoverChangesConfirmCommitExplanation:
+    'Commit these changes now (attributed to an unidentified session) before continuing.',
   adoptPickTitle: 'Adopt into project',
   adoptPickExistingLabel: 'Existing project',
   adoptPickNewLabel: 'New project',
