@@ -188,6 +188,25 @@ function eslintInstance(): ESLint {
   return sharedEslint;
 }
 
+/**
+ * Budget (ms) for `warmUpEslint`, used as the `beforeAll` timeout of the two eslint guard files
+ * (V2-T80). The first lint in a worker loads the type-aware TypeScript program (cold) and every
+ * later case reuses it. Measured on this machine: cold first case 10.5s unloaded versus 0.3-0.7s
+ * for each following case; with 12 busy-loop processes on 8 cores, the first case alone exceeded
+ * the 45s per-case test budget in 4 of 11 runs while the rest of the cases stayed well under it.
+ * So the one-time cost gets its own named budget instead of inflating every case's. Only this
+ * hook gets the larger number; every case still runs under `TEST_TIMEOUT_MS`.
+ */
+export const ESLINT_WARM_UP_TIMEOUT_MS = 180_000;
+
+/** Pays the one-time cold cost (engine + app type-aware projects) outside any single case. */
+export async function warmUpEslint(): Promise<void> {
+  await runEslint([
+    path.join(PROJECT_ROOT, ENGINE_SRC_ROOT, 'core', 'types.ts'),
+    path.join(PROJECT_ROOT, APP_SRC_ROOT, 'tabs', 'tab-model.ts'),
+  ]);
+}
+
 /** Runs the real eslint (the API of the installed package, real config) against the given paths. */
 export async function runEslint(absolutePaths: readonly string[]): Promise<CommandResult> {
   const eslint = eslintInstance();

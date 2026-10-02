@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { afterAll, afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import {
   APP_SRC_ROOT,
   PROJECT_ROOT,
@@ -9,9 +9,14 @@ import {
   writeTempFile,
   cleanUpGuardResidue,
   runEslint,
+  warmUpEslint,
+  ESLINT_WARM_UP_TIMEOUT_MS,
 } from './_support.js';
 
 const GUARD_NAME = 'app-eslint';
+
+// One-time cold type-aware program load, outside any single case (V2-T80, see _support.ts).
+beforeAll(warmUpEslint, ESLINT_WARM_UP_TIMEOUT_MS);
 
 /**
  * Shortcut for a fixture path in this file, isolated in packages/app/src/<subdir>/_guard-app-eslint/.
