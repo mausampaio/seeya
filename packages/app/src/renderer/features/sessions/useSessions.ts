@@ -42,7 +42,7 @@ import {
   type SessionsTableFilters,
 } from '../../../state/sessions-table.js';
 import { selectTab } from '../tabs/tab-select-bridge.js';
-import { openAdoptPicker } from '../../legacy/adopt-flow-view.js';
+import { openAdoptionDialog } from '../adoption/adoption-dialog-bridge.js';
 
 const AWAITING_FIRST_PROJECTS_PANEL: ProjectsPanelData = {
   projects: [],
@@ -228,7 +228,14 @@ export function useSessions(): SessionsControls {
   );
 
   const onAdopt = useCallback((row: SessionsPanelRow) => {
-    openAdoptPicker(row.sessionId, row.name);
+    openAdoptionDialog({
+      sessionId: row.sessionId,
+      name: row.name,
+      displaySessionId: row.displaySessionId,
+      cwd: row.cwd,
+      state: row.state,
+      stateLabel: row.stateLabel,
+    });
   }, []);
 
   return {

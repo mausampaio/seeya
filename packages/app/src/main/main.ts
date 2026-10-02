@@ -78,6 +78,9 @@ import {
   type BuildAppContextOverrides,
 } from '../composition/index.js';
 import { VerificationFakeHandoffGenerator } from '../composition/verification-fake-generator.js';
+import { VerificationFakeAdoptionLauncher } from '../composition/verification-fake-adoption-launcher.js';
+import { wrapWorkspaceWithFailingCommit } from '../composition/verification-fake-failing-commit.js';
+import { FsWorkspaceRepository } from '@seeya-ai/engine/adapters/workspace/index.js';
 import { shouldMarkLinuxProtocolRegistered } from '../composition/linux-protocol-marker.js';
 import { resolveProtocolScheme, type ProtocolScheme } from '../composition/protocol-scheme.js';
 import { shouldRegisterProtocolScheme } from '../composition/protocol-registration-eligibility.js';
@@ -170,6 +173,11 @@ const REFRESH_INTERVAL_MS = 10_000;
  * own comment, where `contextOverrides` is built, and the click-automation block below for the
  * full timing this buys a mid-flight "progress" screenshot. */
 const END_DAY_FAKE_DELAY_MS = 2000;
+
+/** `SEEYA_APP_VERIFY_ADOPTION_FAKE`'s own artificial delay (V2-T70) — long enough for a
+ * screenshot taken right after clicking "Open the copy" to still show the dialog closed/the tab
+ * in flight, short enough that the automation block driving this doesn't need its own long wait. */
+const ADOPTION_FAKE_DELAY_MS = 300;
 
 /**
  * `SEEYA_APP_VERIFY_END_DAY_FAKE`'s own screenshot delay per scenario (V2-T69) — `null` when the
@@ -991,6 +999,7 @@ async function captureConfirmationsVerification(
   await quitAfterConfiguredDelay(clock);
 }
 
+
 /**
  * SEEYA_APP_VERIFY_DAEMON_OWNERSHIP_DIR (V2-T71, `docs/INTERFACE.md` § 9): a DIRECTORY, not a
  * single file — two screenshots, "em repouso" and "em `loading`", of the REAL daemon-ownership
@@ -1026,6 +1035,131 @@ async function captureDaemonOwnershipTransitionVerification(
   );
   await clock.sleep(400); // inside SEEYA_APP_VERIFY_HOLD_DAEMON_OWNERSHIP_ANSWER_MS's own hold
   await shoot('02-loading.png');
+  await quitAfterConfiguredDelay(clock);
+}
+
+/**
+ * V2-T70 (`docs/INTERFACE.md` § 7): drives the real single adoption dialog end to end — step 1
+ * in `Existing project` mode (a fresh workspace's own empty list, or a pre-seeded project already
+ * selected — see the `commitWillFail` branch below), step 1 in `New project` mode with an invalid
+ * id typed, step 2 (review, with real type/line-count data from the fake fork's own writes), and
+ * the result (success or failure, depending on whether `SEEYA_APP_VERIFY_ADOPTION_FAKE_COMMIT_FAILURE`
+ * is ALSO set for this run — in which case the `New project` sub-flow and its own screenshot are
+ * skipped, since that mode would fail at project CREATION rather than at the review commit this
+ * flag means to prove; the `run.mjs` driver instead points `SEEYA_APP_HOME_OVERRIDE` at a home a
+ * prior SUCCESS run already adopted into, so `Existing project` has it pre-selected). Only ever
+ * meaningful combined with `SEEYA_APP_VERIFY_ADOPTION_FAKE` (never a real `claude` launch) and a
+ * `SEEYA_APP_HOME_OVERRIDE` whose Sessions tab already has exactly one adopt-eligible fixture
+ * session — `[data-adopt-session-id]` (`SessionsTable.tsx`) is clicked whichever row it's on, the
+ * first (and, in that fixture, only) one found.
+ */
+async function captureAdoptionFlowVerification(
+  window: BrowserWindow,
+  clock: Clock,
+  outDir: string,
+): Promise<void> {
+  const { writeFile } = await import('node:fs/promises');
+  async function shoot(name: string): Promise<void> {
+    const image = await window.webContents.capturePage();
+    await writeFile(path.join(outDir, name), image.toPNG());
+  }
+  // `?` before every DOM read below — a selector this own verification instrumentation expects
+  // to exist (the fixture home's own fork launcher/discovery timing) is never guaranteed to be
+  // there the instant this script runs; calling a native setter with `this === null` throws
+  // "Illegal invocation" (confirmed against a real run of this instrumentation before this
+  // guard), crashing the renderer instead of just skipping a step that found nothing.
+  function click(id: string): Promise<unknown> {
+    return window.webContents.executeJavaScript(`!!document.getElementById('${id}')?.click();`);
+  }
+  function clickFirst(selector: string): Promise<unknown> {
+    return window.webContents.executeJavaScript(
+      `!!document.querySelector('${selector}')?.click();`,
+    );
+  }
+  function setFieldValue(id: string, value: string): Promise<unknown> {
+    return window.webContents.executeJavaScript(`
+      (() => {
+        const el = document.getElementById('${id}');
+        if (!el) { return false; }
+        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+        setter.call(el, ${JSON.stringify(value)});
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        return true;
+      })();
+    `);
+  }
+  // Polls instead of a fixed sleep for the two steps whose timing depends on a REAL round trip
+  // (project creation via `git init`+commit, the project lock, the fake launcher's own delay, and
+  // the `confirmCommit` IPC event back to the renderer) rather than a fixed animation — a fixed
+  // sleep here either wastes time on a fast machine or, under load, shoots before the dialog
+  // reaches the state being proven. Deadline math uses the injected `Clock` (D-019), never
+  // `Date.now()` directly.
+  async function waitForElement(id: string, timeoutMs: number): Promise<boolean> {
+    const deadline = clock.now().getTime() + timeoutMs;
+    for (;;) {
+      const found: unknown = await window.webContents.executeJavaScript(
+        `!!document.getElementById('${id}');`,
+      );
+      if (found === true) {
+        return true;
+      }
+      if (clock.now().getTime() >= deadline) {
+        return false;
+      }
+      await clock.sleep(200);
+    }
+  }
+
+  // `SEEYA_APP_VERIFY_ADOPTION_FAKE_COMMIT_FAILURE` run: proving the REVIEW step's own commit
+  // failing needs `ensureProjectExists` to take its `alreadyExists` branch (never calling
+  // `commitAll` itself) — the wrapped workspace fails EVERY `commitAll`, project creation
+  // included, so a `New project` pick would fail before ever reaching the review step. The
+  // `run.mjs` driver that sets this flag always points `SEEYA_APP_HOME_OVERRIDE` at a home a
+  // prior SUCCESS run already adopted into, so `Existing project` (this dialog's own default
+  // mode) already has that project pre-selected — no typing needed, just submit.
+  const commitWillFail = process.env.SEEYA_APP_VERIFY_ADOPTION_FAKE_COMMIT_FAILURE !== undefined;
+
+  await clock.sleep(1500);
+  await click('sessions-link');
+  await clock.sleep(800);
+  await clickFirst('[data-adopt-session-id] button');
+  await clock.sleep(500);
+  await shoot('01-pick-existing-project.png');
+
+  if (commitWillFail) {
+    await click('adoption-pick-submit-button');
+  } else {
+    await click('adoption-pick-new-option');
+    await clock.sleep(200);
+    await setFieldValue('adoption-pick-new-project-id-input', 'Invalid ID!');
+    await clock.sleep(300);
+    await click('adoption-pick-submit-button'); // triggers the inline validation error
+    await clock.sleep(300);
+    await shoot('02-pick-new-project-invalid-id.png');
+
+    await setFieldValue('adoption-pick-new-project-id-input', 'adoption-fixture-project');
+    await clock.sleep(800); // the live-preview round trip (CHANNELS.previewAdoptionLaunch)
+    await click('adoption-pick-submit-button');
+  }
+  // the fake fork "runs" (ADOPTION_FAKE_DELAY_MS) and writes its files, then `confirmCommit`
+  // round-trips to the renderer — real `git init`+commit for project creation included.
+  await waitForElement('adoption-review-commit-button', 20000);
+  await clock.sleep(300); // let the review list finish painting
+  await shoot('03-review-changes.png');
+
+  await click('adoption-review-commit-button');
+  // A loaded machine (many concurrent `claude`/build processes — this instrumentation's own real
+  // usual environment) occasionally loses this first click before Preact's own listener is fully
+  // attached; one retry at the halfway point costs nothing on a fast machine (the element is
+  // already gone by then, so the click is a harmless no-op) and recovers the slow one.
+  const reachedResultFast = await waitForElement('adoption-result-close-button', 5000);
+  if (!reachedResultFast) {
+    await click('adoption-review-commit-button');
+  }
+  await waitForElement('adoption-result-close-button', 15000);
+  await clock.sleep(300);
+  await shoot(commitWillFail ? '04-result-failure.png' : '04-result.png');
+
   await quitAfterConfiguredDelay(clock);
 }
 
@@ -1416,6 +1550,16 @@ function createWindow(clock: Clock): BrowserWindow {
   if (daemonOwnershipDir !== undefined) {
     window.webContents.once('did-finish-load', () => {
       void captureDaemonOwnershipTransitionVerification(window, clock, daemonOwnershipDir);
+    });
+  }
+  // SEEYA_APP_VERIFY_ADOPTION_FLOW_DIR (V2-T70): same "a DIRECTORY, not a single file" shape as
+  // the flags above — see `captureAdoptionFlowVerification`'s own docstring for the sequence.
+  // Combine with `SEEYA_APP_VERIFY_ADOPTION_FAKE`/`SEEYA_APP_VERIFY_ADOPTION_FAKE_COMMIT_FAILURE`.
+  // Never set by `npm run app` or the README.
+  const adoptionFlowDir = process.env.SEEYA_APP_VERIFY_ADOPTION_FLOW_DIR;
+  if (adoptionFlowDir !== undefined) {
+    window.webContents.once('did-finish-load', () => {
+      void captureAdoptionFlowVerification(window, clock, adoptionFlowDir);
     });
   }
   // SEEYA_APP_AUTO_OPEN_SHELL_TAB: same "instrumentação só do spike" class as SEEYA_APP_OFFSCREEN
@@ -3046,6 +3190,19 @@ if (!gotSingleInstanceLock) {
             find: () =>
               Promise.resolve({ kind: 'installed', executablePath: fakeInstalledLaunchPath }),
           };
+    // SEEYA_APP_VERIFY_ADOPTION_FAKE (V2-T70): whenever set at all (any value), the real
+    // `ProjectAdoptTabLauncher` is replaced by `VerificationFakeAdoptionLauncher` — a real
+    // `claude` adoption fork must never launch just because someone wanted a screenshot of the
+    // review-before-commit step (`renderer/features/adoption/`). Never set by `npm run app` or
+    // the README.
+    const adoptionFakeRequested = process.env.SEEYA_APP_VERIFY_ADOPTION_FAKE !== undefined;
+    // SEEYA_APP_VERIFY_ADOPTION_FAKE_COMMIT_FAILURE (V2-T70): proves the adoption review dialog's
+    // own failure result (`docs/INTERFACE.md` § 7 item 3) — `wrapWorkspaceWithFailingCommit`'s own
+    // docstring explains why a thrown `commitAll` stands in for a real git-hook refusal. Only ever
+    // meaningful alongside `SEEYA_APP_VERIFY_ADOPTION_FAKE` (there is no commit to fail without a
+    // fork that wrote something first). Never set by `npm run app` or the README.
+    const adoptionCommitFailureRequested =
+      process.env.SEEYA_APP_VERIFY_ADOPTION_FAKE_COMMIT_FAILURE !== undefined;
     const contextOverrides: BuildAppContextOverrides = {
       ...(endDayFakeScenario !== undefined
         ? {
@@ -3054,6 +3211,23 @@ if (!gotSingleInstanceLock) {
           }
         : {}),
       ...(fakeAppInstallation !== undefined ? { appInstallation: fakeAppInstallation } : {}),
+      ...(adoptionFakeRequested
+        ? {
+            adoptionLauncher: new VerificationFakeAdoptionLauncher(
+              systemClock,
+              ADOPTION_FAKE_DELAY_MS,
+            ),
+          }
+        : {}),
+      ...(adoptionCommitFailureRequested
+        ? {
+            workspace: wrapWorkspaceWithFailingCommit(
+              new FsWorkspaceRepository(),
+              'seeya: verification fixture — commitAll always fails under ' +
+                'SEEYA_APP_VERIFY_ADOPTION_FAKE_COMMIT_FAILURE.',
+            ),
+          }
+        : {}),
     };
     const context = await buildAppContext(homeOverride, contextOverrides);
 

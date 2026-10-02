@@ -5,6 +5,7 @@
  * channel string is a classic Electron footgun (main and renderer silently never talking to each
  * other); this module is the one place the string exists.
  */
+import type { ChangedFileStatsEntry } from '@seeya-ai/engine/core/ports.js';
 import type { SidebarRow } from '../sidebar/sidebar-data.js';
 import type { TerminalFontOptions } from '../state/terminal-font.js';
 import type { TodayPanelData } from '../state/today-panel.js';
@@ -198,15 +199,20 @@ export const CHANNELS = {
   /** Renderer → main: "Adopt…" on an "Other sessions" row (V2-T30 item 5) — the same `adoptSession`
    * `seeya project adopt` calls. Same non-blocking shape as `openProject` above. */
   adoptSession: 'seeya:adopt-session',
-  /** Main → renderer: the adoption's own launch explanation, asked BEFORE anything is created
-   * (V2-T29 item 8) — the dialog shows `core/project-adoption-message.ts
-   * #renderAdoptionLaunchExplanationLines`'s own lines, the same text `seeya project adopt` prints. */
-  confirmAdoptionLaunchRequest: 'seeya:confirm-adoption-launch-request',
-  /** Renderer → main: the person's answer to one `confirmAdoptionLaunchRequest`. */
-  answerAdoptionLaunchConfirm: 'seeya:answer-adoption-launch-confirm',
+  /** Renderer → main: V2-T70's own single adoption dialog (`renderer/features/adoption/`) — the
+   * live preview of `core/project-adoption-message.ts#renderAdoptionLaunchExplanationLines`'s own
+   * three lines, recomputed as the person picks or types a project id, BEFORE `adoptSession` is
+   * ever called. Replaces the separate `confirmAdoptionLaunchRequest`/`answerAdoptionLaunchConfirm`
+   * round trip this task deleted: the person has already seen this exact explanation and clicked
+   * "Open the copy" by the time `adoptSession` runs, so `main/project-ipc.ts`'s own `confirmLaunch`
+   * callback now answers `'proceed'` immediately, with no second question
+   * ("não pergunte duas vezes", `docs/INTERFACE.md` § 7 item 1). */
+  previewAdoptionLaunch: 'seeya:preview-adoption-launch',
   /** Main → renderer: the adoption's own commit question, asked once the fork's tab has closed and
-   * something changed inside the project (V2-T29 item 4) — the dialog shows
-   * `core/project-adoption-message.ts#renderAdoptionCommitChangedFilesLines`'s own lines. */
+   * something changed inside the project (V2-T29 item 4) — V2-T70's own review dialog shows
+   * `ConfirmAdoptionCommitRequestEvent.changedFileEntries`, a type+line-count breakdown
+   * (`WorkspaceRepository.listChangedFilesWithStats`), not the plain path lines this channel used
+   * to carry. */
   confirmAdoptionCommitRequest: 'seeya:confirm-adoption-commit-request',
   /** Renderer → main: the person's answer to one `confirmAdoptionCommitRequest`. */
   answerAdoptionCommitConfirm: 'seeya:answer-adoption-commit-confirm',
@@ -736,26 +742,30 @@ export interface AdoptSessionResponse {
   readonly projectId: string;
 }
 
-/** `CHANNELS.confirmAdoptionLaunchRequest`'s payload — `explanationLines` is
+/** `CHANNELS.previewAdoptionLaunch`'s request — the same two facts
+ * `renderAdoptionLaunchExplanationLines` needs beyond the workspace root it resolves itself
+ * (`main/project-ipc.ts`): the session's own original `cwd` (known client-side, from the row the
+ * "Adopt…" button was clicked from) and the project id the person has picked or typed so far. */
+export interface PreviewAdoptionLaunchRequest {
+  readonly originalCwd: string;
+  readonly projectId: string;
+}
+
+/** `CHANNELS.previewAdoptionLaunch`'s response — `explanationLines` is
  * `@seeya-ai/engine/core/project-adoption-message.js#renderAdoptionLaunchExplanationLines`'s own
- * lines, the same text `seeya project adopt` prints before asking to continue. */
-export interface ConfirmAdoptionLaunchRequestEvent {
-  readonly requestId: string;
+ * lines, computed against a `projectId` that may not exist as a project yet (this is only a
+ * preview — nothing is created by this call). */
+export interface PreviewAdoptionLaunchResponse {
   readonly explanationLines: readonly string[];
 }
 
-/** `CHANNELS.answerAdoptionLaunchConfirm`'s payload. */
-export interface AnswerAdoptionLaunchConfirmRequest {
-  readonly requestId: string;
-  readonly decision: 'proceed' | 'decline';
-}
-
-/** `CHANNELS.confirmAdoptionCommitRequest`'s payload — `changedFilesLines` is
- * `@seeya-ai/engine/core/project-adoption-message.js#renderAdoptionCommitChangedFilesLines`'s own
- * lines. */
+/** `CHANNELS.confirmAdoptionCommitRequest`'s payload — `changedFileEntries` is
+ * `@seeya-ai/engine/core/ports.js#ChangedFileStatsEntry[]`, from `WorkspaceRepository
+ * .listChangedFilesWithStats` (V2-T70) — a type (`added`/`modified`/`deleted`) and a line-count per
+ * file, not the plain path lines this event used to carry. */
 export interface ConfirmAdoptionCommitRequestEvent {
   readonly requestId: string;
-  readonly changedFilesLines: readonly string[];
+  readonly changedFileEntries: readonly ChangedFileStatsEntry[];
 }
 
 /** `CHANNELS.answerAdoptionCommitConfirm`'s payload. */

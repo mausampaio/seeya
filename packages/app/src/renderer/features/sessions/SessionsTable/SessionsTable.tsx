@@ -163,6 +163,11 @@ function ActionCell(props: {
         // refuses a present-but-`undefined` value for it (same reasoning `Button.tsx`'s own
         // `buttonRef` conditional spread already documents).
         {...(action.adopt.kind === 'unavailable' ? { title: action.adopt.reason } : {})}
+        // V2-T70's own `main/main.ts` verification instrumentation clicks the first
+        // `[data-adopt-session-id]` it finds — same reasoning `SessionIdCopyButton`'s own
+        // `data-session-id` already documents (a stable id survives the batch-scoped
+        // `displaySessionId`).
+        data-adopt-session-id={row.sessionId}
         onClick={() => props.onAdopt(row)}
       >
         {MESSAGES.adoptButton}

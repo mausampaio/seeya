@@ -60,8 +60,8 @@ import type {
   AnswerLeftoverChangesOpenConfirmRequest,
   AdoptSessionRequest,
   AdoptSessionResponse,
-  ConfirmAdoptionLaunchRequestEvent,
-  AnswerAdoptionLaunchConfirmRequest,
+  PreviewAdoptionLaunchRequest,
+  PreviewAdoptionLaunchResponse,
   ConfirmAdoptionCommitRequestEvent,
   AnswerAdoptionCommitConfirmRequest,
   FindSessionByIdRequest,
@@ -180,10 +180,12 @@ export interface SeeyaApi {
   /** V2-T30 item 5: "Adopt…" on an "Other sessions" row — resolves only once the fork's tab closes
    * and the commit question (if any) has been answered. */
   adoptSession(request: AdoptSessionRequest): Promise<AdoptSessionResponse>;
-  onConfirmAdoptionLaunchRequest(
-    listener: (event: ConfirmAdoptionLaunchRequestEvent) => void,
-  ): void;
-  answerAdoptionLaunchConfirm(request: AnswerAdoptionLaunchConfirmRequest): void;
+  /** V2-T70: the single adoption dialog's own live preview — see `ipc/channels.ts
+   * #CHANNELS.previewAdoptionLaunch`'s own docstring for why this replaced a confirmation round
+   * trip. */
+  previewAdoptionLaunch(
+    request: PreviewAdoptionLaunchRequest,
+  ): Promise<PreviewAdoptionLaunchResponse>;
   onConfirmAdoptionCommitRequest(
     listener: (event: ConfirmAdoptionCommitRequestEvent) => void,
   ): void;
@@ -317,14 +319,7 @@ const api: SeeyaApi = {
   answerLeftoverChangesOpenConfirm: (request) =>
     ipcRenderer.send(CHANNELS.answerLeftoverChangesOpenConfirm, request),
   adoptSession: (request) => ipcRenderer.invoke(CHANNELS.adoptSession, request),
-  onConfirmAdoptionLaunchRequest: (listener) => {
-    ipcRenderer.on(
-      CHANNELS.confirmAdoptionLaunchRequest,
-      (_event, data: ConfirmAdoptionLaunchRequestEvent) => listener(data),
-    );
-  },
-  answerAdoptionLaunchConfirm: (request) =>
-    ipcRenderer.send(CHANNELS.answerAdoptionLaunchConfirm, request),
+  previewAdoptionLaunch: (request) => ipcRenderer.invoke(CHANNELS.previewAdoptionLaunch, request),
   onConfirmAdoptionCommitRequest: (listener) => {
     ipcRenderer.on(
       CHANNELS.confirmAdoptionCommitRequest,

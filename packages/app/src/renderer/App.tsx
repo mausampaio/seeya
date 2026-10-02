@@ -26,6 +26,7 @@ import {
   ResumeFallbackDialog,
   DaemonOwnershipTransitionDialog,
 } from './features/confirmations/index.js';
+import { AdoptionDialog } from './features/adoption/index.js';
 
 export function AppShell() {
   const { collapsed, toggle } = useSidebarCollapse();
@@ -86,6 +87,10 @@ export function AppShell() {
       <LeftoverChangesConfirmDialog />
       <ResumeFallbackDialog />
       <DaemonOwnershipTransitionDialog />
+      {/* V2-T70: same "mounted outside any possibly-hidden page pane" reasoning as
+       * `<NewProjectDialog/>` above — opened from the Sessions tab's own `Adopt…` button through
+       * `features/adoption/adoption-dialog-bridge.ts`. */}
+      <AdoptionDialog />
     </>
   );
 }

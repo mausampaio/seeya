@@ -1,0 +1,15 @@
+/* V2-T70 — the picker's own session card and inline validation error; everything else is
+ * `Stack`/`SegmentedControl`/`Select`/`TextField`/`InfoBox`'s own spacing. */
+.pane {
+  min-width: 0;
+}
+
+.sessionCard {
+  padding: var(--seeya-space-3);
+  border-radius: var(--seeya-radius-md);
+  background: var(--seeya-surface-subtle);
+}
+
+.error {
+  color: var(--seeya-error-text);
+}

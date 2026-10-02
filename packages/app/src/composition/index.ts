@@ -259,6 +259,16 @@ export interface AppContext {
   readonly projectLock: ProjectLock;
   readonly forkRegistration: ForkRegistration;
   /**
+   * V2-T70: verification-only, same spirit as `leanGenerator`/`deepGenerator` above — lets a
+   * screenshot script exercise the real "Adopt…" flow (`renderer/features/adoption/`) through the
+   * real `adoptSession()` pipeline without ever spawning a real `claude` session.
+   * `main/main.ts`'s own `SEEYA_APP_VERIFY_ADOPTION_FAKE` is the ONE real caller — see
+   * `composition/verification-fake-adoption-launcher.ts`'s own docstring for the fake
+   * implementation. Every real window leaves this `undefined` and `main/project-ipc.ts` builds
+   * the real `ProjectAdoptTabLauncher`, exactly as before this task.
+   */
+  readonly adoptionLauncherOverride: SessionAdoptionLauncher | undefined;
+  /**
    * `process.env.CLAUDE_CODE_SESSION_ID`, read once here (D-020) — same source
    * `cli/composition.ts#readCurrentSessionId` reads, for the identical reason: a project's commit
    * trailer (`core/project-commit.ts`) names whichever session ran `create`/`add-repo`/`adopt`.
@@ -491,6 +501,19 @@ export interface BuildAppContextOverrides {
    */
   readonly leanGenerator?: HandoffGenerator;
   readonly deepGenerator?: HandoffGenerator;
+  /**
+   * V2-T70: same verification-only spirit as the two fields above, for the "Adopt…" flow instead
+   * of End day — see `AppContext.adoptionLauncherOverride`'s own docstring.
+   */
+  readonly adoptionLauncher?: SessionAdoptionLauncher;
+  /**
+   * V2-T70: verification-only — lets a screenshot script prove the adoption review dialog's own
+   * failure result without staging a real git-hook conflict. `main/main.ts`'s own
+   * `SEEYA_APP_VERIFY_ADOPTION_FAKE_COMMIT_FAILURE` wires
+   * `composition/verification-fake-failing-commit.ts#wrapWorkspaceWithFailingCommit` here. Every
+   * real window omits it and gets the real `FsWorkspaceRepository` untouched.
+   */
+  readonly workspace?: WorkspaceRepository;
 }
 
 /**
@@ -712,9 +735,10 @@ export async function buildAppContext(
     startDaemon,
     stopDaemon,
     loginShellPathSource,
-    workspace: new FsWorkspaceRepository(),
+    workspace: overrides.workspace ?? new FsWorkspaceRepository(),
     projectLock: new FsProjectLock(),
     forkRegistration: new GenerationForkRegistration(home.seeyaHome),
+    adoptionLauncherOverride: overrides.adoptionLauncher,
     sessionId: process.env.CLAUDE_CODE_SESSION_ID,
     resolveProcessIdentity,
   };
