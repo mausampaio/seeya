@@ -37,7 +37,12 @@ import type { ChangedFileEntry } from '../../core/changed-file-status.js';
 import { parseChangedFileStatusLine } from '../../core/changed-file-status.js';
 import { runGit } from '../git/run-git.js';
 import { isEnoent } from './fs-errors.js';
-import { SEEYA_IDENTITY_EMAIL, SEEYA_IDENTITY_NAME, commitAll as commitAllImpl } from './commit.js';
+import {
+  SEEYA_IDENTITY_EMAIL,
+  SEEYA_IDENTITY_NAME,
+  commitAll as commitAllImpl,
+  ensureWorkspaceGitignoreIgnoresProjectLock,
+} from './commit.js';
 import {
   installCommitMsgHook as installCommitMsgHookImpl,
   installGeneratedClaudeMd as installGeneratedClaudeMdImpl,
@@ -153,6 +158,9 @@ export class FsWorkspaceRepository implements WorkspaceRepository {
     // session's first write into an empty `context/`) into one line naming the DIRECTORY, not the
     // file inside it — useless for a confirmation prompt that exists to show what would be
     // committed. `all` lists every individual file instead, at any depth.
+    // V2-T82 item 4: the ignore patterns must be in place BEFORE this listing, not only inside
+    // `commitAll` — see `ensureWorkspaceGitignoreIgnoresProjectLock`'s own docstring.
+    await ensureWorkspaceGitignoreIgnoresProjectLock(root);
     const status = await runGit(root, [
       'status',
       '--porcelain',
@@ -182,6 +190,7 @@ export class FsWorkspaceRepository implements WorkspaceRepository {
     root: string,
     projectId: string,
   ): Promise<readonly ChangedFileEntry[]> {
+    await ensureWorkspaceGitignoreIgnoresProjectLock(root);
     const status = await runGit(root, [
       'status',
       '--porcelain',

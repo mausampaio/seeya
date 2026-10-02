@@ -29,6 +29,7 @@ import {
   type ChangedFileStatus,
 } from '../../core/changed-file-status.js';
 import { runGit } from '../git/run-git.js';
+import { ensureWorkspaceGitignoreIgnoresProjectLock } from './commit.js';
 
 /** V2-T71's own `ChangedFileStatus` → this module's own narrower `kind` (D-024's three members,
  * `added`/`modified`/`deleted`) — `renamed` and `other` both collapse into `modified`, with
@@ -168,6 +169,9 @@ export async function listChangedFilesWithStats(
   // The ONE `git status --porcelain` call this listing makes (PO coordination, V2-T73 rebase) —
   // `WorkspaceRepository.listChangedFilesWithStatus` (V2-T71) is a separate call site with its own
   // caller, never invoked from here, so there is still only ever one status read PER listing.
+  // V2-T82 item 4: same `.gitignore` guarantee `commitAll` gives, BEFORE the listing — so the
+  // list is exactly what `commitAll` will commit, never the operational files it ignores.
+  await ensureWorkspaceGitignoreIgnoresProjectLock(root);
   const status = await runGit(root, [
     'status',
     '--porcelain',
