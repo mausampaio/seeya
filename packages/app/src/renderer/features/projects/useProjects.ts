@@ -2,8 +2,8 @@
  * The Projects tab's own data and actions (V2-T67, `docs/INTERFACE.md` § 4) — replaces
  * `renderer/legacy/projects-list-view.tsx`'s own imperative rendering of `#projects-list`
  * entirely (apagado by this task; `renderer/legacy/projects-panel-cache.ts` keeps only the data
- * cache that `adopt-flow-view.ts`/`other-sessions-dir-dialog-view.ts` still need — two OTHER,
- * untouched legacy modules).
+ * cache `adopt-flow-view.ts` still needs — an OTHER, untouched legacy module; the directory modal
+ * that used to be its other reader was deleted by V2-T68).
  *
  * **Why `pending` only ever applies to the `open`/`readOnly` actions, never `goToTab`.**
  * `api.openProject` resolves only once the launched harness tab CLOSES

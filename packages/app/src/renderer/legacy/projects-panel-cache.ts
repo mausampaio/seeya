@@ -1,11 +1,12 @@
 /**
- * A cached copy of the latest `ProjectsPanelData` push (V2-T30 item 1), read by TWO legacy,
- * Sessions/Adopt-flow modules untouched by V2-T67 — `adopt-flow-view.ts`'s own "Existing project"
- * dropdown and `other-sessions-dir-dialog-view.ts`'s own directory lookup. Split out of the
- * now-deleted `renderer/legacy/projects-list-view.tsx` (V2-T67: the Projects tab's OWN rendering
- * moved to `renderer/features/projects/`, with its own independent `onProjectsUpdate`
- * subscription in `useProjects.ts`) so these two callers keep a cache to read without pulling in
- * any rendering code that no longer exists.
+ * A cached copy of the latest `ProjectsPanelData` push (V2-T30 item 1), read by `adopt-flow-view.ts`'s
+ * own "Existing project" dropdown — the directory modal that used to be this cache's OTHER reader
+ * (`other-sessions-dir-dialog-view.ts`) was deleted by V2-T68, replaced by the Sessions tab's own
+ * independent `onProjectsUpdate` subscription (`renderer/features/sessions/useSessions.ts`). Split
+ * out of the now-deleted `renderer/legacy/projects-list-view.tsx` (V2-T67: the Projects tab's OWN
+ * rendering moved to `renderer/features/projects/`, with its own independent subscription in
+ * `useProjects.ts`) so `adopt-flow-view.ts` keeps a cache to read without pulling in any rendering
+ * code that no longer exists.
  */
 import type { ProjectsPanelData } from '../../state/projects-panel.js';
 import type { ProjectsUpdateEvent } from '../../ipc/channels.js';
@@ -16,9 +17,8 @@ let latestProjectsPanelData: ProjectsPanelData = {
   ignoredProjects: [],
 };
 
-/** `adopt-flow-view.ts`'s/`other-sessions-dir-dialog-view.ts`'s own read of the latest push — kept
- * as a function, not an export of the mutable binding itself, so nothing outside this file can
- * reassign it. */
+/** `adopt-flow-view.ts`'s own read of the latest push — kept as a function, not an export of the
+ * mutable binding itself, so nothing outside this file can reassign it. */
 export function getLatestProjectsPanelData(): ProjectsPanelData {
   return latestProjectsPanelData;
 }

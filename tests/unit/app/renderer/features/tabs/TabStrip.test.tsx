@@ -20,9 +20,10 @@ describe('TabStrip (V2-T64)', () => {
 
   it('renders the ids the rest of the window still relies on, plus the given leading content', () => {
     const { container, getByText } = render(<TabStrip leading={<span>toggle</span>} />);
-    // `today-panel`/`projects-list` dropped from this list (V2-T66/V2-T67): `#page-today`/
-    // `#page-projects` now hold `<Today/>`/`<Projects/>`, real components with their own CSS, not
-    // the bare anchors their own legacy views used to fill by hand.
+    // `today-panel`/`projects-list`/`other-sessions-list` dropped from this list (V2-T66/V2-T67/
+    // V2-T68): `#page-today`/`#page-projects`/`#page-sessions` now hold `<Today/>`/`<Projects/>`/
+    // `<Sessions/>`, real components with their own CSS, not the bare anchors their own legacy
+    // views used to fill by hand.
     for (const id of [
       'new-tab-button',
       'new-tab-popover',
@@ -31,7 +32,6 @@ describe('TabStrip (V2-T64)', () => {
       'page-today',
       'page-projects',
       'page-sessions',
-      'other-sessions-list',
     ]) {
       expect(container.querySelector(`#${id}`), `expected #${id} to be rendered`).not.toBeNull();
     }

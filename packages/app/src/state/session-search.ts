@@ -1,10 +1,11 @@
 /**
  * V2-T55 item 4 — the window's own id-search field's row shaping: turns whatever
  * `@seeya-ai/engine/application/session-id-search.js#findSessionByIdOrPrefix` found into the SAME
- * row shape the "Other sessions" directory modal already renders
- * (`state/projects-panel.ts#ProjectPanelOtherSessionRow`), so `electron/session-row-view.ts
- * #renderSessionActionRow` can render either one without a second markup (AGENTS.md: "nada de
- * duplicação"). `electron/session-search-ipc.ts` is the only caller.
+ * row shape every other session listing in this window already uses
+ * (`state/projects-panel.ts#ProjectPanelOtherSessionRow`) — V2-T68's own Sessions tab
+ * (`renderer/features/sessions/useSessions.ts`) folds a hit straight into
+ * `state/sessions-panel.ts#SessionsPanelRow`, never a second markup for the same fields
+ * (AGENTS.md: "nada de duplicação"). `main/session-search-ipc.ts` is the only caller.
  *
  * Classifies fresh rather than trusting a caller-supplied `SessionState`, on purpose: a match found
  * among the window's own already-known sessions and a match found by the direct, unwindowed
