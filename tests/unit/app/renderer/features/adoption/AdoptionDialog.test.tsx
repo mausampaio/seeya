@@ -269,7 +269,10 @@ describe('AdoptionDialog (V2-T70)', () => {
     expect(document.getElementById('adoption-result-open-project-button')).toBeNull();
   });
   describe('the adopted result (V2-T82 item 1)', () => {
-    async function showAdoptedResult(openProject: ReturnType<typeof vi.fn>): Promise<void> {
+    async function showAdoptedResult(): Promise<{ openProject: ReturnType<typeof vi.fn> }> {
+      const openProject = vi.fn((_request: { projectId: string }) =>
+        Promise.resolve({ outcomeText: '' }),
+      );
       window.seeya = createFakeSeeyaApi({ openProject });
       render(<AdoptionDialog />);
       dispatchAdoptPanel({
@@ -279,27 +282,25 @@ describe('AdoptionDialog (V2-T70)', () => {
         projectId: 'auth-hardening',
       });
       await waitFor(() => expect(getDialog().open).toBe(true));
+      return { openProject };
     }
 
     it('Close only dismisses the result — it never opens the project', async () => {
-      const openProject = vi.fn(() => Promise.resolve({}));
-      await showAdoptedResult(openProject);
+      const { openProject } = await showAdoptedResult();
       fireEvent.click(document.getElementById('adoption-result-close-button') as HTMLButtonElement);
       await waitFor(() => expect(getDialog().open).toBe(false));
       expect(openProject).not.toHaveBeenCalled();
     });
 
     it('closing the dialog any other way (Esc) is the same as Close', async () => {
-      const openProject = vi.fn(() => Promise.resolve({}));
-      await showAdoptedResult(openProject);
+      const { openProject } = await showAdoptedResult();
       getDialog().dispatchEvent(new Event('close'));
       await waitFor(() => expect(getDialog().open).toBe(false));
       expect(openProject).not.toHaveBeenCalled();
     });
 
     it('Open project opens the adopted project, then dismisses', async () => {
-      const openProject = vi.fn(() => Promise.resolve({}));
-      await showAdoptedResult(openProject);
+      const { openProject } = await showAdoptedResult();
       fireEvent.click(
         document.getElementById('adoption-result-open-project-button') as HTMLButtonElement,
       );
