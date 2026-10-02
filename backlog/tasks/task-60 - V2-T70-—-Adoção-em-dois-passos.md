@@ -4,7 +4,7 @@ title: V2-T70 — Adoção em dois passos
 status: Review
 assignee: []
 created_date: '2026-09-30 10:34'
-updated_date: '2026-10-02 16:28'
+updated_date: '2026-10-02 16:38'
 labels: []
 milestone: m-2
 dependencies:
@@ -138,5 +138,11 @@ Item 7 (rebase sobre a V2-T71, ja em main): feito. WorkspaceRepository.listChang
 Achado durante a correcao do item 1, registrado mas nao perseguido: overflow-x: hidden no Dialog.module.css compartilhado (a correcao obvia para o scroll horizontal) travava a transicao review->result do fluxo de falha da adocao de um jeito que nao investiguei ate a causa exata (confirmado isolando a mudanca num build real, revertendo e testando de novo - o sintoma ia e voltava exatamente com essa linha). Preferi resolver no escopo mais estreito (PickPane.module.css, que e meu e nunca participa dessa transicao) a arriscar o mesmo efeito colateral nos dialogos da V2-T71 que ja usam o componente compartilhado.
 
 npm run verificar verde a partir de build limpo, depois do rebase: Statements 95.46%, Branches 91.34%, Functions 95.12%, Lines 95.71%. dependency-cruiser sem violacao (806 modulos, 2427 dependencias). Registro/protocol-handler.json (e3d8a283...) conferidos sem alteracao antes e depois de todas as capturas desta rodada.
+---
+
+author: PO
+created: 2026-10-02 16:38
+---
+Revisão do PO (2026-10-02): duas rodadas. Rodada 1 devolveu rolagem horizontal (diálogo e aba Sessions), caminhos absolutos crus em 'What happens next', regressão que sumiu com a coluna Name da aba Sessions (larguras somavam 1054px com table-layout fixed), id duplicado no seletor, falha truncada sem leitura completa, revisão sem contexto nem opções explicadas, Q-107 duplicada (virou Q-108) e duas leituras de status no motor. Rodada 2 corrigiu tudo; listChangedFilesWithStats reusa core/changed-file-status.ts da V2-T71. Pendência menor para a próxima tarefa de interface: o cartão da sessão no diálogo ainda mostra o id entre colchetes ('[66666666]'), enquanto a aba Sessions já os removeu. Achado não explicado registrado pelo agente: overflow-x no .body compartilhado do Dialog quebrava a transição revisão→resultado na falha — resolvido em escopo menor. Capturas reais conferidas nos dois temas contra docs/INTERFACE.md § 7; nada real adotado (lançador fictício). Mesclada no po-gate; portão do zero e npm test sem identidade git verdes (3700 testes). Publicada; aguarda aceite do mantenedor pelo instalador.
 ---
 <!-- COMMENTS:END -->
