@@ -95,6 +95,7 @@ export function createFakeSeeyaApi(overrides: Partial<SeeyaApi> = {}): SeeyaApi 
     onThemeUpdate: vi.fn(noopUnsubscribe),
     toggleFavoriteProject: vi.fn(() => Promise.resolve()),
     pickDirectory: neverCalled('pickDirectory'),
+    resumeSession: neverCalled('resumeSession'),
   };
   return { ...base, ...overrides };
 }
