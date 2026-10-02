@@ -40,6 +40,7 @@ const EMPTY_MANIFEST: ProjectManifest = {
   defaultHarness: null,
   repositories: [],
   trackers: [],
+  lifecycle: { kind: 'active' },
 };
 
 describe('formatCreateProjectReport', () => {

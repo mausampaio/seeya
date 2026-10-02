@@ -7,6 +7,7 @@
  * both already exist by the time this runs.
  */
 import { formatLockHolderDescription } from '@seeya-ai/engine/core/project-lock-message.js';
+import { formatArchivedProjectRefusalLine } from '@seeya-ai/engine/core/project-management-message.js';
 import type { OpenProjectResult } from '@seeya-ai/engine/application/project-open.js';
 import { formatSessionStateLabel } from '@seeya-ai/engine/core/session-state-label.js';
 import { formatLockText } from './projects-panel.js';
@@ -24,6 +25,8 @@ export function formatProjectOpenOutcomeText(result: OpenProjectResult): string 
       return `Project "${result.projectId}" not found.`;
     case 'noHarnessChosen':
       return `Project "${result.projectId}" has no default harness set.`;
+    case 'projectArchived':
+      return formatArchivedProjectRefusalLine(result.projectId);
     case 'unsupportedHarness':
       return `seeya: harness "${result.harness}" is not supported yet.`;
     case 'failedToStart':

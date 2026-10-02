@@ -16,6 +16,7 @@ import { writeFileAtomic } from '../storage/atomic-write.js';
 import { resolveSchemaVersion } from '../storage/schema-version.js';
 import { isEnoent } from './fs-errors.js';
 import {
+  PROJECT_MANIFEST_SCHEMA_MIGRATIONS,
   PROJECT_MANIFEST_SCHEMA_VERSION,
   parseProjectManifestDocument,
   serializeProjectManifestDocument,
@@ -70,7 +71,7 @@ async function readManifestDocument(filePath: string): Promise<Record<string, un
   return resolveSchemaVersion(
     filePath,
     parsed as Record<string, unknown>,
-    {},
+    PROJECT_MANIFEST_SCHEMA_MIGRATIONS,
     PROJECT_MANIFEST_SCHEMA_VERSION,
   );
 }

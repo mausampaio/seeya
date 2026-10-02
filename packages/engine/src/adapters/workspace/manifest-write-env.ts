@@ -8,9 +8,10 @@
  * (`packages/cli/src/composition.ts#buildVerifyCommitDeps`) imports the same name by its public
  * subpath, never redeclaring the string.
  *
- * `commitAll`'s own four legitimate callers — `application/workspace.ts#createProject`,
- * `application/repository-association.ts#addRepository`, `application/project-remove-repo.ts`,
- * `application/project-remove.ts` — pass `manifestWriteAuthorized: true`; every other caller (the
+ * `commitAll`'s own legitimate callers (four at V2-T73, six since V2-T84) —
+ * `application/workspace.ts#createProject`, `application/repository-association.ts#addRepository`,
+ * `application/project-remove-repo.ts`, `application/project-remove.ts` and
+ * `application/project-archive.ts` (`archiveProject`/`unarchiveProject`) — pass `manifestWriteAuthorized: true`; every other caller (the
  * leftover-changes commit inside `application/project-open.ts`, the adoption's own commit inside
  * `application/project-adopt-outcome.ts`) omits it, since NEITHER of those is a place seeya itself
  * would ever legitimately change `seeya.json` — a session's own edit riding along in either commit

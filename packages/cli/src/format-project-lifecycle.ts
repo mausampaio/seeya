@@ -14,6 +14,7 @@ import type {
   ListProjectsResult,
   ShowProjectResult,
 } from '@seeya-ai/engine/application/workspace.js';
+import { formatArchiveStateText } from '@seeya-ai/engine/core/project-management-message.js';
 import {
   formatInvalidIdLine,
   formatLockStatusLine,
@@ -43,6 +44,14 @@ function formatTrackersSummary(manifest: ProjectManifest): string {
     : manifest.trackers.map((tracker) => `${tracker.type}:${tracker.project}`).join(', ');
 }
 
+/** `project show`'s own state line: `active`, or the archive date and note. */
+function formatLifecycleState(manifest: ProjectManifest): string {
+  const lifecycle = manifest.lifecycle;
+  return lifecycle.kind === 'active'
+    ? 'active'
+    : formatArchiveStateText(lifecycle.archivedAt, lifecycle.note).replace('Archived', 'archived');
+}
+
 function formatProjectLine(manifest: ProjectManifest): string {
   return (
     `- ${manifest.id} — ${manifest.name}\n` +
@@ -56,23 +65,48 @@ function formatRejectedLine(rejection: RejectedDiscoveryRecord): string {
 }
 
 /** D-022's "both sides", sayable to a human — same shape
- * `cli/format-sessions.ts#formatSummaryLine` already established for `seeya sessions`. */
-function formatSummaryLine(projectCount: number, rejectedCount: number): string {
-  const projects = `${projectCount} project${projectCount === 1 ? '' : 's'} found`;
-  if (rejectedCount === 0) {
-    return `${projects}.`;
+ * `cli/format-sessions.ts#formatSummaryLine` already established for `seeya sessions`. V2-T84:
+ * `projectCount` is the ACTIVE projects only; archived ones are named after it, only when there
+ * are any — a workspace with none archived keeps the exact pre-archiving text. */
+function formatSummaryLine(
+  projectCount: number,
+  archivedCount: number,
+  rejectedCount: number,
+): string {
+  const parts = [`${projectCount} project${projectCount === 1 ? '' : 's'} found`];
+  if (archivedCount > 0) {
+    parts.push(`${archivedCount} archived`);
   }
-  const entries = `${rejectedCount} entr${rejectedCount === 1 ? 'y' : 'ies'} ignored`;
-  return `${projects}, ${entries}.`;
+  if (rejectedCount > 0) {
+    parts.push(`${rejectedCount} entr${rejectedCount === 1 ? 'y' : 'ies'} ignored`);
+  }
+  return `${parts.join(', ')}.`;
+}
+
+function formatArchivedProjectLine(manifest: ProjectManifest): string {
+  const lifecycle = manifest.lifecycle;
+  const state =
+    lifecycle.kind === 'archived'
+      ? formatArchiveStateText(lifecycle.archivedAt, lifecycle.note)
+      : 'Not archived';
+  return (
+    `- ${manifest.id} — ${manifest.name}\n` +
+    `    ${state} | repositories: ${formatRepositoriesSummary(manifest)}`
+  );
 }
 
 export function formatProjectsReport(result: ListProjectsResult): string {
+  const active = result.manifests.filter((manifest) => manifest.lifecycle.kind === 'active');
+  const archived = result.manifests.filter((manifest) => manifest.lifecycle.kind === 'archived');
   const lines = [
     `Workspace: ${result.root}`,
-    formatSummaryLine(result.manifests.length, result.rejected.length),
+    formatSummaryLine(active.length, archived.length, result.rejected.length),
   ];
-  if (result.manifests.length > 0) {
-    lines.push('', ...result.manifests.map(formatProjectLine));
+  if (active.length > 0) {
+    lines.push('', ...active.map(formatProjectLine));
+  }
+  if (archived.length > 0) {
+    lines.push('', 'Archived:', ...archived.map(formatArchivedProjectLine));
   }
   if (result.rejected.length > 0) {
     lines.push('', 'Ignored entries:', ...result.rejected.map(formatRejectedLine));
@@ -94,6 +128,7 @@ export function formatShowProjectReport(result: ShowProjectResult): string {
         `  repositories: ${formatRepositoriesSummary(result.manifest)}`,
         `  trackers: ${formatTrackersSummary(result.manifest)}`,
         `  ${formatLockStatusLine(result.lockStatus)}`,
+        `  state: ${formatLifecycleState(result.manifest)}`,
       ].join('\n');
   }
 }

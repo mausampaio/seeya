@@ -75,6 +75,7 @@ import type { ProjectAuditDeps } from '@seeya-ai/engine/application/project-audi
 import type { AdoptSessionDeps } from '@seeya-ai/engine/application/project-adopt.js';
 import type { RemoveProjectDeps } from '@seeya-ai/engine/application/project-remove.js';
 import type { RemoveRepositoryDeps } from '@seeya-ai/engine/application/project-remove-repo.js';
+import type { ArchiveProjectDeps } from '@seeya-ai/engine/application/project-archive.js';
 import type { RevertAdoptionDeps } from '@seeya-ai/engine/application/project-revert-adoption.js';
 import type { DaemonDeps } from '@seeya-ai/engine/scheduler/index.js';
 
@@ -690,6 +691,15 @@ export async function buildProjectRemoveDeps(context: ProjectContext): Promise<R
 export async function buildProjectRemoveRepoDeps(
   context: ProjectContext,
 ): Promise<RemoveRepositoryDeps> {
+  return { ...context, ...(await capturePidAndProcStart()) };
+}
+
+/** `seeya project archive|unarchive <id>`'s own composition (V2-T84) — same shape as
+ * `buildProjectRemoveRepoDeps`: this invocation's own `pid`/`procStart` hold the project lock for
+ * the whole of the synchronous write. */
+export async function buildProjectArchiveDeps(
+  context: ProjectContext,
+): Promise<ArchiveProjectDeps> {
   return { ...context, ...(await capturePidAndProcStart()) };
 }
 

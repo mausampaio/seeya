@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   parseProjectManifestDocument,
+  PROJECT_MANIFEST_SCHEMA_MIGRATIONS,
   PROJECT_MANIFEST_SCHEMA_VERSION,
   serializeProjectManifestDocument,
 } from '@seeya-ai/engine/adapters/workspace/project-manifest-schema.js';
@@ -24,6 +25,73 @@ describe('parseProjectManifestDocument', () => {
       defaultHarness: null,
       repositories: [],
       trackers: [],
+      lifecycle: { kind: 'active' },
+    });
+  });
+
+  describe('archive state (V2-T84)', () => {
+    it('a v1 document (no archive keys) is migrated and reads as active (D-025)', () => {
+      const migrated = PROJECT_MANIFEST_SCHEMA_MIGRATIONS[1]?.(MINIMAL_DOCUMENT);
+      expect(migrated?.schemaVersion).toBe(2);
+      expect(parseProjectManifestDocument(migrated)).toMatchObject({
+        lifecycle: { kind: 'active' },
+      });
+    });
+
+    it('a v2 document without the keys reads as active', () => {
+      const manifest = parseProjectManifestDocument({ ...MINIMAL_DOCUMENT, schemaVersion: 2 });
+      expect(manifest.lifecycle).toEqual({ kind: 'active' });
+    });
+
+    it('parses archivedAt and archiveNote into the archived variant', () => {
+      const manifest = parseProjectManifestDocument({
+        ...MINIMAL_DOCUMENT,
+        archivedAt: '2026-10-02T10:00:00.000Z',
+        archiveNote: 'Finished — shipped',
+      });
+      expect(manifest.lifecycle).toEqual({
+        kind: 'archived',
+        archivedAt: new Date('2026-10-02T10:00:00.000Z'),
+        note: 'Finished — shipped',
+      });
+    });
+
+    it('archivedAt without a note reads as note null', () => {
+      const manifest = parseProjectManifestDocument({
+        ...MINIMAL_DOCUMENT,
+        archivedAt: '2026-10-02T10:00:00.000Z',
+      });
+      expect(manifest.lifecycle).toMatchObject({ kind: 'archived', note: null });
+    });
+
+    it('rejects an archiveNote without archivedAt, and an unparseable archivedAt', () => {
+      expect(() => parseProjectManifestDocument({ ...MINIMAL_DOCUMENT, archiveNote: 'x' })).toThrow(
+        /archiveNote/,
+      );
+      expect(() =>
+        parseProjectManifestDocument({ ...MINIMAL_DOCUMENT, archivedAt: 'not a date' }),
+      ).toThrow(/archivedAt/);
+    });
+
+    it('round-trips an archived manifest, with and without a note', () => {
+      for (const note of ['Finished', undefined]) {
+        const manifest = parseProjectManifestDocument({
+          ...MINIMAL_DOCUMENT,
+          archivedAt: '2026-10-02T10:00:00.000Z',
+          ...(note === undefined ? {} : { archiveNote: note }),
+        });
+        const serialized = serializeProjectManifestDocument(manifest);
+        expect(parseProjectManifestDocument(serialized)).toEqual(manifest);
+        expect('archiveNote' in serialized).toBe(note !== undefined);
+      }
+    });
+
+    it('serializing an active manifest writes no archive keys at all', () => {
+      const serialized = serializeProjectManifestDocument(
+        parseProjectManifestDocument(MINIMAL_DOCUMENT),
+      );
+      expect(serialized).not.toHaveProperty('archivedAt');
+      expect(serialized).not.toHaveProperty('archiveNote');
     });
   });
 

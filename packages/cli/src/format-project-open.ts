@@ -15,6 +15,7 @@ import {
   renderReadOnlyOpenQuestion,
 } from '@seeya-ai/engine/core/project-lock-message.js';
 import {
+  formatArchivedProjectRefusalLine,
   formatPathNotFoundLine,
   formatProjectNotFoundLine,
   formatRepositoryAlreadyAssociatedLine,
@@ -188,6 +189,8 @@ export function formatOpenProjectReport(result: OpenProjectResult): string {
         `Project "${result.projectId}" has no default harness set — pass --with <harness> ` +
         '(e.g. --with claude) to choose one for this session.'
       );
+    case 'projectArchived':
+      return formatArchivedProjectRefusalLine(result.projectId);
     case 'unsupportedHarness':
       return `seeya: harness "${result.harness}" is not supported yet — only "claude" is, for now.`;
     case 'failedToStart':

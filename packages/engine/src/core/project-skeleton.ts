@@ -106,6 +106,7 @@ export function buildProjectSkeleton(projectId: string): ProjectSkeleton {
     defaultHarness: null,
     repositories: [],
     trackers: [],
+    lifecycle: { kind: 'active' },
   };
   const files: WorkspaceProjectFile[] = [
     { relativePath: 'AGENTS.md', content: buildAgentsMd(projectId) },

@@ -24,6 +24,7 @@ import {
   buildEndDayContext,
   buildProjectAdoptContext,
   buildProjectAdoptDeps,
+  buildProjectArchiveDeps,
   buildProjectAuditDeps,
   buildProjectContext,
   buildProjectOpenDeps,
@@ -68,6 +69,10 @@ import {
   runProjectVerifyCommitCommand,
   runProjectVerifyBashCommandCommand,
 } from './project-command.js';
+import {
+  runProjectArchiveCommand,
+  runProjectUnarchiveCommand,
+} from './project-archive-command.js';
 import {
   runProjectRemoveCommand,
   runProjectRemoveRepoCommand,
@@ -557,6 +562,31 @@ projectCommand
     if (exitCode !== 0) {
       process.exitCode = exitCode;
     }
+  });
+
+projectCommand
+  .command('archive')
+  .description(
+    'Archive a project (V2-T84): it leaves the day-to-day views, nothing is deleted, and ' +
+      '"seeya project unarchive" brings it back. Refuses while another live session holds the ' +
+      "project's lock.",
+  )
+  .argument('<id>', 'The project id, e.g. "auth-hardening".')
+  .option('--note <text>', 'A one-line note kept with the archive, e.g. "Finished — shipped".')
+  .action(async (id: string, options: { note?: string }) => {
+    const context = buildProjectContext();
+    const deps = await buildProjectArchiveDeps(context);
+    console.log(await runProjectArchiveCommand(deps, id, options.note));
+  });
+
+projectCommand
+  .command('unarchive')
+  .description('Bring an archived project back into the day-to-day views (V2-T84).')
+  .argument('<id>', 'The project id, e.g. "auth-hardening".')
+  .action(async (id: string) => {
+    const context = buildProjectContext();
+    const deps = await buildProjectArchiveDeps(context);
+    console.log(await runProjectUnarchiveCommand(deps, id));
   });
 
 projectCommand
