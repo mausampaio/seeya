@@ -8,7 +8,7 @@
 import { MESSAGES } from '../../text/messages.js';
 import { reduceAdoptPanel, type AdoptPanelState } from '../../state/adopt-panel.js';
 import { resolveChosenAdoptProjectId } from '../../state/adopt-picker.js';
-import { getLatestProjectsPanelData, triggerProjectOpen } from './projects-list-view.js';
+import { getLatestProjectsPanelData, triggerProjectOpen } from './projects-panel-cache.js';
 import { closeOtherSessionsDirDialog } from './other-sessions-dir-dialog-view.js';
 import { renderDialogLines } from './dialog-lines.js';
 import type {
@@ -79,7 +79,7 @@ function renderAdoptDialogs(state: AdoptPanelState): void {
 }
 
 /** The picker's own "existing project" options, rebuilt from the lateral's latest known projects
- * (`electron/projects-list-view.ts#getLatestProjectsPanelData` — never a second IPC round trip). */
+ * (`projects-panel-cache.ts#getLatestProjectsPanelData` — never a second IPC round trip). */
 function renderAdoptPickDialog(): void {
   const select = document.getElementById('adopt-existing-select') as HTMLSelectElement;
   select.textContent = '';
@@ -138,7 +138,7 @@ export function wireAdoptFlow(): void {
   /**
    * "Adopt…" on a session row (event delegation — rows are rebuilt on every push/render). V2-T55
    * moved every "Adopt…" button out of the flat `#other-sessions-list` (now directory rows only,
-   * `electron/projects-list-view.ts`) into two other containers that share the identical row
+   * `other-sessions-and-ignored-view.ts`) into two other containers that share the identical row
    * markup (`electron/session-row-view.ts#renderSessionActionRow`): the directory modal
    * (`#other-sessions-dir-dialog-sessions`) and the id-search result
    * (`#session-search-result`) — one delegated listener per container, same trigger logic.

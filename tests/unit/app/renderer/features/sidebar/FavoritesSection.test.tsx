@@ -72,11 +72,14 @@ describe('FavoritesSection (D-052, V2-T75)', () => {
     expect(onToggleFavorite).toHaveBeenCalledWith('payments-webhooks', false);
   });
 
-  it('renders the New project anchor with the exact legacy id, unbound', () => {
-    const { container } = render(
+  it('renders the New project button with the exact legacy id, and opens the dialog on click (V2-T67)', () => {
+    const { container, getByLabelText } = render(
       <FavoritesSection rows={[]} onOpenProject={() => {}} onToggleFavorite={() => {}} />,
     );
     const button = container.querySelector('#new-project-button');
     expect(button).not.toBeNull();
+    // `new-project-dialog-bridge.ts`'s own opener defaults to a no-op until `NewProjectDialog`
+    // registers one (never mounted by this test) — this only proves the click doesn't throw.
+    expect(() => fireEvent.click(getByLabelText('New project'))).not.toThrow();
   });
 });

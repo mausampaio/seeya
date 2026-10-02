@@ -11,7 +11,9 @@
  * V2-T65: Settings is no longer one of these — `renderer/features/settings/SettingsDialog` is a
  * real, reactive component now, mounted directly in `App.tsx` with its own `open`/`onClose` state
  * instead of an imperative anchor here. V2-T69: End day left the same way —
- * `renderer/features/end-day/EndDayDialog` replaces the `#end-day-dialog` anchor below.
+ * `renderer/features/end-day/EndDayDialog` replaces the `#end-day-dialog` anchor below. V2-T67:
+ * "New project…" left the same way — `renderer/features/projects/NewProjectDialog` replaces the
+ * `#new-project-dialog` anchor that used to live here.
  */
 import { Dialog } from '../components/Dialog/Dialog.js';
 
@@ -36,20 +38,6 @@ export function DialogsShell() {
           <button id="daemon-ownership-transition-accept" type="button"></button>
           <button id="daemon-ownership-transition-decline" type="button"></button>
         </div>
-      </Dialog>
-      <Dialog id="new-project-dialog" className="project-dialog">
-        <h3 id="new-project-dialog-title"></h3>
-        <form id="new-project-form">
-          <label>
-            Project id
-            <input id="new-project-id-input" type="text" placeholder="auth-hardening" />
-          </label>
-          <p id="new-project-error" class="project-dialog-error"></p>
-          <div class="project-dialog-actions">
-            <button type="submit" id="new-project-submit"></button>
-            <button type="button" id="new-project-cancel"></button>
-          </div>
-        </form>
       </Dialog>
       <Dialog id="project-lock-confirm-dialog" className="project-dialog">
         <h3 id="project-lock-confirm-title"></h3>

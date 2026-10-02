@@ -9348,3 +9348,55 @@ citada vs. classe definida), mais barato de avaliar que B e sem efeito colateral
 existentes.
 
 **Resposta:** (preenchida pelo PO)
+
+## Q-104 — V2-T67: a aba Projects trata `staleLock` como `Unlocked`, nunca um quarto texto
+
+**Bloqueia:** não — registro, solução mínima já aplicada.
+
+**Contexto.** `docs/INTERFACE.md` § 4 nomeia exatamente três textos de lock para a tabela: `Open in
+this window`, `Unlocked`, `Locked by session <id>`. `ProjectLockStatus` (`@seeya-ai/engine/
+application/project-lock.js`) tem TRÊS estados — `unlocked`, `heldByLiveSession`, `staleLock` — e a
+spec é silenciosa sobre qual dos três textos um `staleLock` (o holder não está mais vivo) deveria
+usar.
+
+**Decisão mínima que segui.** `staleLock` lê como `Unlocked` (`state/projects-panel.ts
+#resolveProjectRowLock`) — nunca um quarto texto mais alarmante. Abrir um projeto com lock stale já
+sucede sem pedir confirmação nenhuma (`checkProjectLock`'s own `decision: 'acquire'` para um holder
+morto), então a AÇÃO por trás do botão é idêntica à de um projeto de fato destravado; um texto que
+sugerisse travamento real descreveria um fato que não muda o que o clique faz.
+
+**Onde isto diverge de outra tela já existente.** `seeya project show`/`cli/format-project.ts`
+mostram um texto PRÓPRIO para `staleLock` ("stale — last held by ... (reclaimable)") — ali faz
+sentido, porque aquele comando é sobre DIAGNOSTICAR o estado do lock, não sobre decidir uma ação.
+A aba Projects é sobre AÇÃO; os dois textos convivem, cada um no seu lugar
+(`ProjectPanelRow.lockText` continua com o texto rico, só para a lateral's own `resolveProjectLockBadge`
+— ver "lock/action/repositoryCount/lastActivity" no glossário de `AGENTS.md`).
+
+**Resposta:** (preenchida pelo PO)
+
+## Q-105 — V2-T67: a aba Projects não mostra o resultado de "Open"/"Read only…" depois que a aba fecha
+
+**Bloqueia:** não — registro, solução mínima já aplicada.
+
+**Contexto.** `docs/INTERFACE.md` § 4 não lista nenhum texto de resultado para a ação da linha —
+diferente do fluxo legado (`renderer/legacy/projects-list-view.tsx`, apagado por esta tarefa), que
+escrevia a frase final ("Project ... closed (exit code ...)") num parágrafo (`#project-open-result-text`)
+só visível a quem estivesse na própria aba Projects no momento em que a sessão fechasse — um
+mecanismo frágil mesmo antes desta tarefa, já que `openProject` só resolve quando a aba do harness
+FECHA (horas depois, em geral).
+
+**Decisão mínima que segui.** `useProjects.ts#onRowAction` chama `openProject` e usa a promise só
+para saber quando parar de mostrar `loading` no botão (`.then(onSettled, onSettled)`, nunca
+`.finally()` sozinho — evitaria um "unhandled rejection" no console para uma recusa/erro que não
+tem mais onde aparecer nesta tela). O botão simplesmente some/troca de forma assim que a linha
+passa a `openHere` (`Go to tab`) no próximo `projectsUpdate` — o mesmo sinal que já reflete o que
+aconteceu, sem inventar um segundo texto de resultado que a spec não pediu. O `#project-open-result-text`
+legado continua existindo (como leftover do fluxo de adoção, `renderer/legacy/adopt-flow-view.ts`,
+fora do escopo desta tarefa) mas a aba Projects não escreve mais nele.
+
+**Opções que enxergo:** A) aceitar como está — o próximo `docs/INTERFACE.md` que tratar desta tela
+(V2-T71 redesenha a confirmação de lock; nenhuma tarefa ainda redesenha um resultado de "Open" na
+própria tabela) decide se vale a pena um retorno visível. B) acrescentar uma linha de resultado por
+linha da tabela agora, não pedida pela spec.
+
+**Resposta:** (preenchida pelo PO)

@@ -28,8 +28,11 @@ function project(overrides: Partial<ProjectPanelRow> = {}): ProjectPanelRow {
     projectId: 'auth-hardening',
     name: 'Auth hardening',
     lockText: 'unlocked',
+    lock: { kind: 'unlocked' },
     sessions: [],
     favorite: false,
+    repositoryCount: 0,
+    lastActivity: null,
     ...overrides,
   };
 }

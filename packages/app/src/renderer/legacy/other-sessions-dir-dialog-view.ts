@@ -1,13 +1,13 @@
 /**
  * The "Other sessions" directory modal (V2-T55 item 3): clicking a directory row
- * (`electron/projects-list-view.ts#renderOtherSessionsDirectoryRow`) opens this dialog with every
- * session in that directory — name, short id (copyable), state label, last activity, and
+ * (`other-sessions-and-ignored-view.ts#renderOtherSessionsDirectoryRow`) opens this dialog with
+ * every session in that directory — name, short id (copyable), state label, last activity, and
  * Adopt… — one row per session, built by `session-row-view.ts#renderSessionActionRow` (the same
  * row `session-search-view.ts` renders for a search hit, never a second markup for the same
  * fields).
  */
 import { MESSAGES } from '../../text/messages.js';
-import { getLatestProjectsPanelData } from './projects-list-view.js';
+import { getLatestProjectsPanelData } from './projects-panel-cache.js';
 import { renderSessionActionRow } from './session-row-view.js';
 import type { OtherSessionDirectoryPanelRow } from '../../state/projects-panel.js';
 
@@ -83,7 +83,7 @@ export function refreshOtherSessionsDirDialog(): void {
 }
 
 /** Wired once, at startup, from `electron/project-panel-view.ts#wireProjectPanel` — AFTER
- * `wireProjectsListView`, so `getLatestProjectsPanelData()` is already current by the time this
+ * `wireProjectsPanelCache`, so `getLatestProjectsPanelData()` is already current by the time this
  * file's own `onProjectsUpdate` listener runs (IPC listeners fire in registration order). */
 export function wireOtherSessionsDirDialog(): void {
   (document.getElementById('other-sessions-dir-dialog-close') as HTMLButtonElement).textContent =

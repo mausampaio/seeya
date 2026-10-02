@@ -7,8 +7,9 @@
   gap: var(--seeya-space-1);
 }
 
-/* V2-T72 item 2 — hidden until `renderer/legacy/projects-list-view.tsx` has something to show;
- * that legacy module still owns 100% of this heading/list's content (unchanged by this task) —
+/* V2-T72 item 2 — hidden until `renderer/legacy/other-sessions-and-ignored-view.ts` (split out of
+ * `renderer/legacy/projects-list-view.tsx` by V2-T67) has something to show; that legacy module
+ * still owns 100% of this heading/list's content (unchanged by this task) —
  * this component only ever renders the stable anchor it appends into. Font sizing is the one
  * documented exception to "use Text" in this file (D-052 item 7, PO review 2026-10-01): legacy
  * code sets `.textContent`/appends `<li>`s directly on these two ids, never through a Preact
@@ -29,4 +30,17 @@
   padding: 0;
   font-size: 12px;
   line-height: 16px;
+}
+
+/* PO review round 1 (V2-T67): each ignored project's own reason used to be the RAW, often
+ * path-laden error message — even abbreviated by `~` (`state/error-reason-summary.ts`), a long
+ * one still wrapped into a multi-line block in this ~280px-wide sidebar ("um bloco de oito
+ * linhas"). `other-sessions-and-ignored-view.ts#renderIgnoredProjectRow` already carries the
+ * complete message in `title` (a real tooltip on hover), so truncating the visible line here loses
+ * nothing. A minimal CSS addition, not a redesign of this legacy-owned region: same anchors, same
+ * imperative fill, just a line that no longer wraps. */
+.ignoredList li {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

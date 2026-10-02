@@ -1,0 +1,22 @@
+/* V2-T67 — the Projects tab's own "Ignored projects" section, below the table. */
+.section {
+  margin-top: var(--seeya-space-6);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--seeya-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* PO review round 1: `.list` is a flex column, so each `<li>` is itself a flex item — a flex
+ * item's default `min-width: auto` keeps it from ever shrinking enough to need `Text`'s own
+ * `truncate` ellipsis at all (that prop's own docstring names this exact caveat). `min-width: 0`
+ * lets the item actually shrink to the list's own width instead of forcing the row (and the whole
+ * sidebar/tab) wider to fit an untruncated absolute path. */
+.item {
+  min-width: 0;
+}

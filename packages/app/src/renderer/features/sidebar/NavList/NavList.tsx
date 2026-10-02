@@ -5,8 +5,9 @@
  * projects/Sessions colados um no outro".
  *
  * The "Ignored projects" heading/list (`docs/INTERFACE.md` § 1 item 5) stay a LEGACY-owned anchor
- * here — `renderer/legacy/projects-list-view.tsx#renderProjectsPanel` still fills them on every
- * push, unchanged by this task (that region's own redesign is a future task, not this one). No
+ * here — `renderer/legacy/other-sessions-and-ignored-view.ts` still fills them on every push
+ * (split out of `renderer/legacy/projects-list-view.tsx` by V2-T67, unchanged behaviour — that
+ * region's own redesign is a future task, not this one). No
  * `hidden` prop is bound from here on purpose: legacy code toggles `.hidden` on these two elements
  * directly, on every push, not just once — binding a REACTIVE `hidden` from this component would
  * fight that on the next time `<NavList/>` itself re-renders for an unrelated reason (a running-

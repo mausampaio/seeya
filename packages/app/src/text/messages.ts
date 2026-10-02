@@ -430,19 +430,8 @@ export const MESSAGES = {
   // keeps only the tooltip text, text being its whole job (this file's own top comment).
   sidebarToggleTooltipShow: 'Show sidebar (Ctrl+B)',
   sidebarToggleTooltipHide: 'Hide sidebar (Ctrl+B)',
-  projectsHeading: 'Projects',
   otherSessionsHeading: 'Other sessions',
-  projectsEmpty: 'No projects yet.',
   otherSessionsEmpty: 'No other sessions.',
-  projectOpenButton: 'Open',
-  projectLockLabel: (lockText: string): string => `Lock: ${lockText}`,
-  // Pulled out of electron/projects-list-view.ts's own row-building code (PO review, 2026-09-25):
-  // "montagem de texto" belongs here, concentrated, like every other user-facing string in this
-  // project — not inline template literals inside a DOM-building function.
-  // V2-T55 item 5: the short id rides alongside the name in every session row this project's
-  // window renders, aberta ou fechada — the same discipline `seeya sessions` already has.
-  projectSessionRowLabel: (name: string, displaySessionId: string, state: string): string =>
-    `${name} [${displaySessionId}] (${state})`,
   adoptButton: 'Adopt…',
   // V2-T72 item 2 — a project whose `seeya.json` failed to parse/validate no longer just
   // disappears from the window (the maintainer's own "o projeto some"): it shows here, with the
@@ -476,6 +465,9 @@ export const MESSAGES = {
   newProjectIdLabel: 'Project id',
   newProjectSubmit: 'Create',
   newProjectCancel: 'Cancel',
+  // V2-T67, same "never fails in silence" reasoning the Projects tab's own row actions follow.
+  newProjectUnexpectedError: (message: string): string =>
+    `seeya: create failed unexpectedly (${message}).`,
   projectLockConfirmTitle: 'Project is locked',
   projectLockConfirmProceed: 'Open read-only',
   projectLockConfirmDecline: 'Cancel',
@@ -517,4 +509,39 @@ export const MESSAGES = {
   pageTabLabelToday: 'Today',
   pageTabLabelProjects: 'Projects',
   pageTabLabelSessions: 'Sessions',
+
+  // V2-T67 — the Projects tab (`docs/INTERFACE.md` § 4), replacing the imperative
+  // `renderer/legacy/projects-list-view.tsx` this task deletes.
+  projectsTabTitle: 'Projects',
+  projectsTabCount: (count: number): string => `${count} ${count === 1 ? 'project' : 'projects'}`,
+  projectsSearchLabel: 'Search projects',
+  projectsSearchPlaceholder: 'Search by name',
+  projectsFilterGroupLabel: 'Filter projects',
+  projectsFilterAll: 'All',
+  projectsFilterRunning: 'With a running session',
+  projectsFilterLocked: 'Locked',
+  projectsTableHeaderName: 'Name',
+  projectsTableHeaderLock: 'Lock',
+  projectsTableHeaderSessions: 'Sessions',
+  projectsTableHeaderRepositories: 'Repositories',
+  projectsTableHeaderLastActivity: 'Last activity',
+  // `docs/INTERFACE.md` § 4's own three lock texts, verbatim — `ProjectRowLock`
+  // (`state/projects-panel.ts`) is the one place that decides WHICH of these a row shows.
+  projectsLockOpenHere: 'Open in this window',
+  projectsLockUnlocked: 'Unlocked',
+  projectsLockLockedBy: (displaySessionId: string): string =>
+    `Locked by session ${displaySessionId}`,
+  projectsLockLockedByUnknown: 'Locked by an unidentified session',
+  projectsActionGoToTab: 'Go to tab',
+  projectsActionOpen: 'Open',
+  projectsActionReadOnly: 'Read only…',
+  projectsEmptyTitle: 'No projects yet',
+  projectsEmptyDescription: 'Create a project to get started.',
+  projectsNoMatchTitle: 'No projects match',
+  projectsNoMatchDescription: 'Try a different search or filter.',
+  // PO review round 1: the raw enum-ish "unknown" read as an error, not an absence of data —
+  // a dash in secondary tone reads as "nothing recorded" instead, with the `title` saying so
+  // explicitly (D-025: never a guessed date, just a clearer way to say there isn't one).
+  projectsLastActivityUnknown: '—',
+  projectsLastActivityUnknownTitle: 'No activity recorded for this project yet.',
 } as const;
