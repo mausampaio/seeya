@@ -4,6 +4,7 @@ title: 'V2-T83 — Detalhes do projeto: repositórios, adoções, remover'
 status: Review
 assignee: []
 created_date: '2026-10-02 20:22'
+updated_date: '2026-10-02 22:02'
 labels:
   - ui
 dependencies: []
@@ -70,3 +71,13 @@ erro de `pathNotFound`).
 `npm run verificar` do zero (`rm -rf packages/*/dist`): passou (formato, tipos dos três tsconfigs,
 lint, build, dependências, cobertura 95.7% linhas).
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: agent
+created: 2026-10-02 22:02
+---
+Rebase sobre origin/main 75e7c96 feito: conflitos em ProjectsTable/Projects/useProjects/messages/IconButton/AGENTS/QUESTOES resolvidos mantendo o botão de expandir da V2-T77 e o Manage project da V2-T83 na mesma linha. Frase de apagar a cópia reescrita nos dois lados (única linha de CLI alterada: a pergunta de revert-adoption sobre a cópia). Questão renumerada para Q-111. Colunas da tabela rebalanceadas (Name truncava com chevron + Manage). Capturas 00, 00b (linha expandida) e 05 regeradas nos dois temas; verificar do zero passou.
+---
+<!-- COMMENTS:END -->
