@@ -236,13 +236,62 @@ describe('packages/app/build/installer.nsh', () => {
   // across however many updates a machine goes through.
   it('caps installer.log at a fixed size and checks it on every write', () => {
     expect(installerNsh).toContain('SEEYA_INSTALLER_LOG_MAX_BYTES');
+    const ensureMatch = installerNsh.match(/!macro SeeyaLogEnsureUtf8Body([\s\S]*?)!macroend/);
+    expect(ensureMatch).not.toBeNull();
+    const ensureBody = ensureMatch?.[1] ?? '';
+    expect(ensureBody).toContain('SEEYA_INSTALLER_LOG_MAX_BYTES');
+    // Restarting the file (over the cap) is the only place it is opened for overwrite.
+    expect(ensureBody).toContain('FileOpen $SeeyaLogFileHandle "$SeeyaLogPath" w');
     const logWriteMatch = installerNsh.match(/!macro seeyaLogWrite([\s\S]*?)!macroend/);
-    expect(logWriteMatch).not.toBeNull();
     const body = logWriteMatch?.[1] ?? '';
-    expect(body).toContain('SEEYA_INSTALLER_LOG_MAX_BYTES');
-    // Never overwrites the whole file on a normal write — only when over the cap.
+    // Never overwrites the whole file on a normal write.
     expect(body).toContain('FileOpen $SeeyaLogFileHandle "$SeeyaLogPath" a');
-    expect(body).toContain('FileOpen $SeeyaLogFileHandle "$SeeyaLogPath" w');
+    expect(body).not.toContain('"$SeeyaLogPath" w');
+  });
+
+  // V2-T47: the log is UTF-8 with a BOM, every write goes through the ensure step first, and a
+  // pre-BOM log is converted rather than left mixed. Measured with a throwaway makensis harness
+  // (see the task notes): without the BOM Windows readers guess ANSI and show `â€”` for `—`.
+  it('writes installer.log as UTF-8 with a BOM, converting a pre-BOM log', () => {
+    const ensureBody =
+      installerNsh.match(/!macro SeeyaLogEnsureUtf8Body([\s\S]*?)!macroend/)?.[1] ?? '';
+    expect(
+      ensureBody.match(
+        /FileWriteByte \$\w+ 239\s+FileWriteByte \$\w+ 187\s+FileWriteByte \$\w+ 191/g,
+      ),
+    ).toHaveLength(2);
+    expect(ensureBody).toContain('${if} $SeeyaLogByte1 == 239');
+    expect(ensureBody).toContain('Rename "$SeeyaLogPath.utf8" "$SeeyaLogPath"');
+    const logWriteBody = installerNsh.match(/!macro seeyaLogWrite([\s\S]*?)!macroend/)?.[1] ?? '';
+    expect(logWriteBody.indexOf('Call SeeyaLogEnsureUtf8')).toBeGreaterThan(-1);
+    expect(logWriteBody.indexOf('Call un.SeeyaLogEnsureUtf8')).toBeGreaterThan(-1);
+    expect(logWriteBody.indexOf('Call SeeyaLogEnsureUtf8')).toBeLessThan(
+      logWriteBody.indexOf('FileOpen $SeeyaLogFileHandle "$SeeyaLogPath" a'),
+    );
+  });
+
+  it('has one ensure Function per pass (install and uninstall), each guarded to its own pass', () => {
+    expect(installerNsh).toMatch(/!ifndef BUILD_UNINSTALLER\s+Function SeeyaLogEnsureUtf8\b/);
+    expect(installerNsh).toMatch(/!ifdef BUILD_UNINSTALLER\s+Function un\.SeeyaLogEnsureUtf8\b/);
+  });
+
+  // V2-T47 item 2: the CLI's own trailing newline is dropped before `seeyaLogWrite` adds its own.
+  it('trims trailing CR/LF from the captured CLI output before logging it', () => {
+    const runBody = installerNsh.match(/!macro seeyaRunLoggedCli([\s\S]*?)!macroend/)?.[1] ?? '';
+    const trimIndex = runBody.indexOf('seeyaTrimTrailingNewlines $SeeyaLogOutput');
+    expect(trimIndex).toBeGreaterThan(-1);
+    expect(trimIndex).toBeLessThan(runBody.indexOf('!insertmacro seeyaLogWrite'));
+    const trimBody =
+      installerNsh.match(/!macro seeyaTrimTrailingNewlines var([\s\S]*?)!macroend/)?.[1] ?? '';
+    expect(trimBody).toContain('"$\\r"');
+    expect(trimBody).toContain('"$\\n"');
+  });
+
+  // The two path defines exist only so a scratch harness can redirect the log; the shipped
+  // installer must still default to ~/.seeya/installer.log.
+  it('defaults the log location to $PROFILE\\.seeya\\installer.log', () => {
+    expect(installerNsh).toContain('!define SEEYA_INSTALLER_LOG_DIR "$PROFILE\\.seeya"');
+    expect(installerNsh).toContain('"${SEEYA_INSTALLER_LOG_DIR}\\installer.log"');
   });
 
   // V2-T45 review round, item 1 (bug fix): `${APP_EXECUTABLE_FILENAME}` is a compile-time define —

@@ -151,6 +151,16 @@ Var SeeyaAppExePath
 
 !define SEEYA_INSTALLER_LOG_MAX_BYTES 262144
 
+; Overridable ONLY so a throwaway `makensis` harness (never the real installer) can point the very
+; same macros at a scratch directory instead of the real `~/.seeya/` -- the shipped installer never
+; defines either name before this point, so it always gets the `$PROFILE` defaults.
+!ifndef SEEYA_INSTALLER_LOG_DIR
+  !define SEEYA_INSTALLER_LOG_DIR "$PROFILE\.seeya"
+!endif
+!ifndef SEEYA_INSTALLER_LOG_FILE
+  !define SEEYA_INSTALLER_LOG_FILE "${SEEYA_INSTALLER_LOG_DIR}\installer.log"
+!endif
+
 Var SeeyaLogPath
 Var SeeyaLogSize
 Var SeeyaLogFileHandle
@@ -163,6 +173,122 @@ Var SeeyaLogTimeDow
 Var SeeyaLogTimeHour
 Var SeeyaLogTimeMinute
 Var SeeyaLogTimeSecond
+Var SeeyaLogByte1
+Var SeeyaLogByte2
+Var SeeyaLogByte3
+Var SeeyaLogMigrateHandle
+Var SeeyaLogLastChar
+Var SeeyaLogOutputLength
+
+; V2-T47: `installer.log` is UTF-8, marked as such with a BOM (EF BB BF). Measured (a throwaway
+; `makensis` harness, Unicode NSIS 3.0.4.1, the toolchain electron-builder downloads): the CLI's
+; UTF-8 text already reaches the file byte-for-byte (`—` is E2 80 94, `é` is C3 A9) -- `nsExec::
+; ExecToStack` hands the bytes back unchanged and `FileWrite` narrows them unchanged -- but with
+; NO marker, so any Windows reader that guesses (Windows PowerShell 5's `Get-Content`, old
+; Notepad) falls back to the ANSI code page and shows `â€”`. The BOM is what makes the guess
+; unnecessary. The ensure function below also upgrades a log written before this task (same
+; bytes, no BOM) by copying it, byte by byte, behind a BOM, so one file never mixes encodings.
+;
+; Same `un.` twin and per-pass guard as `SeeyaPathFind` below, for the same two measured compiler
+; rules (a `Call` from the uninstaller pass needs the `un.` prefix; a Function referenced by only
+; one pass is "not referenced" -- fatal under -WX -- in the other).
+!macro SeeyaLogEnsureUtf8Body
+  ClearErrors
+  StrCpy $SeeyaLogSize 0
+  FileOpen $SeeyaLogFileHandle "$SeeyaLogPath" r
+  ${if} ${Errors}
+    ClearErrors
+    Goto seeyaLogEnsureFresh
+  ${endIf}
+  FileSeek $SeeyaLogFileHandle 0 END $SeeyaLogSize
+  ${if} $SeeyaLogSize > ${SEEYA_INSTALLER_LOG_MAX_BYTES}
+    FileClose $SeeyaLogFileHandle
+    Goto seeyaLogEnsureFresh
+  ${endIf}
+  ${if} $SeeyaLogSize == 0
+    FileClose $SeeyaLogFileHandle
+    Goto seeyaLogEnsureFresh
+  ${endIf}
+  FileSeek $SeeyaLogFileHandle 0 SET
+  StrCpy $SeeyaLogByte1 ""
+  StrCpy $SeeyaLogByte2 ""
+  StrCpy $SeeyaLogByte3 ""
+  FileReadByte $SeeyaLogFileHandle $SeeyaLogByte1
+  FileReadByte $SeeyaLogFileHandle $SeeyaLogByte2
+  FileReadByte $SeeyaLogFileHandle $SeeyaLogByte3
+  ClearErrors
+  ${if} $SeeyaLogByte1 == 239
+  ${andIf} $SeeyaLogByte2 == 187
+  ${andIf} $SeeyaLogByte3 == 191
+    FileClose $SeeyaLogFileHandle
+    Goto seeyaLogEnsureDone
+  ${endIf}
+  ; Legacy (no BOM) log: copy it behind a BOM into a sibling file, then swap it in.
+  FileSeek $SeeyaLogFileHandle 0 SET
+  FileOpen $SeeyaLogMigrateHandle "$SeeyaLogPath.utf8" w
+  ${if} ${Errors}
+    ClearErrors
+    FileClose $SeeyaLogFileHandle
+    Goto seeyaLogEnsureDone
+  ${endIf}
+  FileWriteByte $SeeyaLogMigrateHandle 239
+  FileWriteByte $SeeyaLogMigrateHandle 187
+  FileWriteByte $SeeyaLogMigrateHandle 191
+  ${Do}
+    FileReadByte $SeeyaLogFileHandle $SeeyaLogByte1
+    ${if} ${Errors}
+      ${Break}
+    ${endIf}
+    FileWriteByte $SeeyaLogMigrateHandle $SeeyaLogByte1
+  ${Loop}
+  ClearErrors
+  FileClose $SeeyaLogMigrateHandle
+  FileClose $SeeyaLogFileHandle
+  Delete "$SeeyaLogPath"
+  Rename "$SeeyaLogPath.utf8" "$SeeyaLogPath"
+  Goto seeyaLogEnsureDone
+  seeyaLogEnsureFresh:
+  ; Missing, empty or over the cap: (re)start the file as just the BOM.
+  FileOpen $SeeyaLogFileHandle "$SeeyaLogPath" w
+  ${ifNot} ${Errors}
+    FileWriteByte $SeeyaLogFileHandle 239
+    FileWriteByte $SeeyaLogFileHandle 187
+    FileWriteByte $SeeyaLogFileHandle 191
+    FileClose $SeeyaLogFileHandle
+  ${endIf}
+  seeyaLogEnsureDone:
+  ClearErrors
+!macroend
+
+!ifndef BUILD_UNINSTALLER
+Function SeeyaLogEnsureUtf8
+  !insertmacro SeeyaLogEnsureUtf8Body
+FunctionEnd
+!endif
+
+!ifdef BUILD_UNINSTALLER
+Function un.SeeyaLogEnsureUtf8
+  !insertmacro SeeyaLogEnsureUtf8Body
+FunctionEnd
+!endif
+
+; Drops every trailing CR/LF from `var` (what a CLI prints at the end of its last line), so the
+; log line that embeds it does not gain a blank line after it.
+!macro seeyaTrimTrailingNewlines var
+  ${Do}
+    StrLen $SeeyaLogOutputLength ${var}
+    ${if} $SeeyaLogOutputLength == 0
+      ${Break}
+    ${endIf}
+    StrCpy $SeeyaLogLastChar ${var} 1 -1
+    ${if} $SeeyaLogLastChar != "$\r"
+    ${andIf} $SeeyaLogLastChar != "$\n"
+      ${Break}
+    ${endIf}
+    IntOp $SeeyaLogOutputLength $SeeyaLogOutputLength - 1
+    StrCpy ${var} ${var} $SeeyaLogOutputLength
+  ${Loop}
+!macroend
 
 ; Appends one timestamped, instance-labelled line to `~/.seeya/installer.log`, truncating first if
 ; the file has already grown past the cap above. No `un.` twin needed: unlike `SeeyaPathFind`, this
@@ -170,21 +296,17 @@ Var SeeyaLogTimeSecond
 ; `Call` -- the "must start with un." compiler rule this file's other comments warn about is about
 ; `Call`/`GetFunctionAddress`, not about macros.
 !macro seeyaLogWrite instanceLabel message
-  StrCpy $SeeyaLogPath "$PROFILE\.seeya\installer.log"
-  CreateDirectory "$PROFILE\.seeya"
-  StrCpy $SeeyaLogSize 0
+  StrCpy $SeeyaLogPath "${SEEYA_INSTALLER_LOG_FILE}"
+  CreateDirectory "${SEEYA_INSTALLER_LOG_DIR}"
+  ; V2-T47: afterwards the file exists, starts with the UTF-8 BOM and is within the cap (a missing,
+  ; empty or over-the-cap file is restarted as just the BOM; a pre-BOM log is converted in place).
+  !ifdef BUILD_UNINSTALLER
+    Call un.SeeyaLogEnsureUtf8
+  !else
+    Call SeeyaLogEnsureUtf8
+  !endif
   ClearErrors
-  FileOpen $SeeyaLogFileHandle "$SeeyaLogPath" r
-  ${ifNot} ${Errors}
-    FileSeek $SeeyaLogFileHandle 0 END $SeeyaLogSize
-    FileClose $SeeyaLogFileHandle
-  ${endIf}
-  ClearErrors
-  ${if} $SeeyaLogSize > ${SEEYA_INSTALLER_LOG_MAX_BYTES}
-    FileOpen $SeeyaLogFileHandle "$SeeyaLogPath" w
-  ${else}
-    FileOpen $SeeyaLogFileHandle "$SeeyaLogPath" a
-  ${endIf}
+  FileOpen $SeeyaLogFileHandle "$SeeyaLogPath" a
   ${ifNot} ${Errors}
     ${GetTime} "" "L" $SeeyaLogTimeDay $SeeyaLogTimeMonth $SeeyaLogTimeYear $SeeyaLogTimeDow $SeeyaLogTimeHour $SeeyaLogTimeMinute $SeeyaLogTimeSecond
     FileSeek $SeeyaLogFileHandle 0 END
@@ -205,6 +327,8 @@ Var SeeyaLogTimeSecond
   Pop $SeeyaLogExitCode
   Pop $SeeyaLogOutput
   !insertmacro seeyaClearRunAsNode
+  ; V2-T47: the CLI's last line ends in a newline; `seeyaLogWrite` adds its own.
+  !insertmacro seeyaTrimTrailingNewlines $SeeyaLogOutput
   !insertmacro seeyaLogWrite "${instanceLabel}" "${stepLabel} -- exit $SeeyaLogExitCode -- $SeeyaLogOutput"
 !macroend
 
