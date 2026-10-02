@@ -18,6 +18,22 @@ describe('IconButton (D-052, V2-T75)', () => {
     expect(getByRole('button', { name: 'Collapse sidebar' })).not.toBeNull();
   });
 
+  it('forwards an optional native tooltip (V2-T83), absent otherwise', () => {
+    const withTitle = render(
+      <IconButton aria-label="Manage project X" title="Manage project X">
+        <span>i</span>
+      </IconButton>,
+    );
+    expect(withTitle.getByRole('button').getAttribute('title')).toBe('Manage project X');
+    cleanup();
+    const without = render(
+      <IconButton aria-label="Manage project X">
+        <span>i</span>
+      </IconButton>,
+    );
+    expect(without.getByRole('button').hasAttribute('title')).toBe(false);
+  });
+
   it('defaults to ghost variant, size md', () => {
     const { getByRole } = render(<IconButton aria-label="x">i</IconButton>);
     expect(classesOf(getByRole('button'))).toEqual(

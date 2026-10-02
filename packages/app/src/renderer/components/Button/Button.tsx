@@ -14,7 +14,7 @@ import styles from './Button.module.css';
 import { cx, mergeClassName } from '../css-class.js';
 import { Text, type TextVariant } from '../Text/index.js';
 import { Spinner } from '../Spinner/index.js';
-import type { Size } from '../props.js';
+import type { Size, Tone } from '../props.js';
 
 /** `size`'s own spinner diameter — close to the text's own cap height at each step, never a fixed
  * number that would look oversized next to `sm` or cramped next to `lg`. */
@@ -25,6 +25,11 @@ const SPINNER_SIZE_BY_SIZE: Record<Size, number> = {
 };
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost';
+
+/** V2-T83 (D-052's shared `tone` vocabulary): only `neutral` (the default — each variant's own
+ * look) and `error` (a destructive action: "Remove project", `docs/INTERFACE.md` § 4a) are real
+ * here, so the type admits exactly those two — never a `success`/`info` button nobody designed. */
+export type ButtonTone = Extract<Tone, 'neutral' | 'error'>;
 
 /** D-052 item 7 (PO review, 2026-10-01): `size`'s own padding scale (`Button.module.css`) stays a
  * `Size`, but the TEXT itself now always comes from `Text` — this is the one place that decides
@@ -39,6 +44,7 @@ const TEXT_VARIANT_BY_SIZE: Record<Size, TextVariant> = {
 export interface ButtonProps {
   readonly id?: string;
   readonly variant?: ButtonVariant;
+  readonly tone?: ButtonTone;
   readonly size?: Size;
   /** `docs/INTERFACE.md` § 1's own "End day…, largura total" — never a fixed width, always the
    * width of whatever the button sits inside. */
@@ -71,7 +77,7 @@ export interface ButtonProps {
   /** V2-T64: a native tooltip for when the visible label is already a shortened form of a longer
    * fact (e.g. the New tab popover's own recent-directory shortcuts, `shortenDirectoryPath`) —
    * optional, most buttons have no need for a second, longer text. */
-  readonly title?: string;
+  readonly title?: string | undefined;
   readonly onClick?: (event: TargetedMouseEvent<HTMLButtonElement>) => void;
   readonly children: ComponentChildren;
   /** PO review (2026-10-01): a plain DOM ref to the underlying `<button>` — same reasoning as
@@ -87,6 +93,7 @@ export function Button(props: ButtonProps): JSX.Element {
       'button',
       props.variant ?? 'primary',
       props.size ?? 'md',
+      props.tone === 'error' && 'toneError',
       props.fullWidth === true && 'fullWidth',
     ),
     props.className,

@@ -146,6 +146,8 @@ import {
   type TabResumeOpener,
 } from '../resume/tab-session-resumer.js';
 import { wireProjectIpc } from './project-ipc.js';
+import { wireProjectDetailsIpc } from './project-details-ipc.js';
+import { captureProjectDetailsVerification } from './verification-project-details.js';
 import { wireSessionSearchIpc } from './session-search-ipc.js';
 import { wireSessionResumeIpc } from './session-resume-ipc.js';
 import { wireDirectoryPickerIpc } from './directory-picker-ipc.js';
@@ -1752,6 +1754,19 @@ function createWindow(clock: Clock): BrowserWindow {
       void captureAdoptionFlowVerification(window, clock, adoptionFlowDir);
     });
   }
+  // SEEYA_APP_VERIFY_PROJECT_DETAILS_DIR (V2-T83): same "a DIRECTORY, not a single file" shape as the
+  // flags above — see `verification-project-details.ts`'s own docstring for the sequence and for
+  // what the driver script must have prepared (a disposable workspace, a live lock holder, and
+  // `SEEYA_APP_VERIFY_PICKED_DIRECTORIES` in place of the native folder dialog). Never set by
+  // `npm run app` or the README.
+  const projectDetailsDir = process.env.SEEYA_APP_VERIFY_PROJECT_DETAILS_DIR;
+  if (projectDetailsDir !== undefined) {
+    window.webContents.once('did-finish-load', () => {
+      void captureProjectDetailsVerification(window, clock, projectDetailsDir).then(() =>
+        quitAfterConfiguredDelay(clock),
+      );
+    });
+  }
   // SEEYA_APP_VERIFY_SELECT_STATES_DIR (V2-T81): same "a DIRECTORY, not a single file" shape as the
   // flags above — see `captureSelectStatesVerification`'s own docstring for the sequence. Combine
   // with `SEEYA_APP_VERIFY_ADOPTION_FAKE`. Never set by `npm run app` or the README.
@@ -2711,6 +2726,9 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // V2-T55 item 4: the id-search field's own IPC — same "own module, main.ts doesn't grow" split
   // `wireProjectIpc` already established.
   wireSessionSearchIpc(context);
+  // V2-T83: the "Project details" dialog's own IPC — same "own module" split, reusing the push
+  // `wireProjectIpc` already exposes so every action refreshes the Projects tab at once.
+  wireProjectDetailsIpc(window, context, projectIpc.pushProjectsUpdate);
   // V2-T68: the Sessions tab's own "Resume" button — same "own module" split, reusing the SAME
   // tabResumeOpener as every other tab-backed launcher above.
   wireSessionResumeIpc(context, tabResumeOpener);

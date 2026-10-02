@@ -22,6 +22,7 @@ import { isValidProjectId } from '../core/project-id.js';
 import { selectProjectAdoption } from '../core/adoption-registry.js';
 import { planAdoptionRevert, type RevertPlan } from '../core/project-revert.js';
 import { decideAdoptedCopyGrowth, type AdoptedCopyGrowth } from '../core/adopted-copy-growth.js';
+import type { AdoptedCopyOutcome } from '../core/project-management-message.js';
 import { buildProjectCommitMessage } from '../core/project-commit.js';
 import { resolveWorkspaceRoot } from './workspace.js';
 import { acquireProjectLock, releaseProjectLock } from './project-lock.js';
@@ -73,14 +74,7 @@ export interface RevertAdoptionCallbacks {
   readonly confirmDeleteCopy?: ConfirmDeleteAdoptedCopy;
 }
 
-/** D-024: `deleted` carries nothing else to say; `kept` always says why, so the report can read
- * differently for "it grew, and the answer was no" than for "there was no way to ask". */
-export type AdoptedCopyOutcome =
-  | { readonly kind: 'deleted' }
-  | {
-      readonly kind: 'kept';
-      readonly reason: 'grew' | 'unknownGrowth' | 'confirmationUnavailable';
-    };
+export type { AdoptedCopyOutcome };
 
 export type RevertAdoptionResult =
   | { readonly kind: 'invalidId'; readonly projectId: string }

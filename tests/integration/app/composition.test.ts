@@ -11,9 +11,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { writeFile } from 'node:fs/promises';
 import {
   buildAppContext,
+  buildAddRepositoryDeps,
   buildProjectAdoptDeps,
   buildProjectOpenDeps,
   buildProjectWorkspaceDeps,
+  buildRemoveProjectDeps,
+  buildRemoveRepositoryDeps,
+  buildRevertAdoptionDeps,
   resolveAppHome,
   toEndDayDeps,
 } from '../../../packages/app/src/composition/index.js';
@@ -393,5 +397,50 @@ describe('buildProjectAdoptDeps (V2-T30 item 5)', () => {
     expect(deps.procStart).toBe('123');
     expect(deps.forkSessionId).toBe('22222222-2222-4222-8222-222222222222');
     expect(deps.idleMinutes).toBe(45);
+  });
+});
+
+// V2-T83: the "Project details" dialog's four write actions — the same engine functions the CLI
+// calls, each with the `Deps` shape its own signature declares.
+describe('project-details action deps (V2-T83)', () => {
+  it('buildAddRepositoryDeps takes no lock identity — addRepository never takes the lock', async () => {
+    fixture = await createDiscoveryFixture();
+    const context = await buildAppContext(fixture.root, {
+      appInstallation: new FakeAppInstallation(),
+    });
+
+    const deps = buildAddRepositoryDeps(context);
+
+    expect(deps.storage).toBe(context.storage);
+    expect(deps.workspace).toBe(context.workspace);
+    expect(deps.gitReader).toBe(context.gitReader);
+    expect(deps.directoryExistence).toBe(context.directoryExistence);
+    expect(deps.seeyaHome).toBe(context.home.seeyaHome);
+    expect(deps.sessionId).toBe(context.sessionId);
+    expect(Object.keys(deps)).not.toContain('pid');
+  });
+
+  it('the three lock-taking actions carry the window own pid/procStart as the lock holder', async () => {
+    fixture = await createDiscoveryFixture();
+    const context = await buildAppContext(fixture.root, {
+      appInstallation: new FakeAppInstallation(),
+    });
+    const identity = { pid: 4242, procStart: '123' };
+
+    const removeRepository = buildRemoveRepositoryDeps(context, identity);
+    const removeProject = buildRemoveProjectDeps(context, identity);
+    const revert = buildRevertAdoptionDeps(context, identity);
+
+    for (const deps of [removeRepository, removeProject, revert]) {
+      expect(deps.storage).toBe(context.storage);
+      expect(deps.workspace).toBe(context.workspace);
+      expect(deps.projectLock).toBe(context.projectLock);
+      expect(deps.processControl).toBe(context.processControl);
+      expect(deps.clock).toBe(context.clock);
+      expect(deps.pid).toBe(4242);
+      expect(deps.procStart).toBe('123');
+    }
+    // Only the revert flow needs to check/delete the adopted copy's transcript.
+    expect(revert.forkCleanup).toBe(context.forkCleanup);
   });
 });

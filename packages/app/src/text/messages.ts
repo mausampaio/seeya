@@ -1,3 +1,5 @@
+import { PROJECT_DETAILS_MESSAGES } from './project-details-messages.js';
+
 /**
  * Every string the interface shows a person, concentrated here (D-028: English; AGENTS.md §
  * "Texto voltado ao usuário" — the same discipline `packages/cli/src` already follows for CLI
@@ -647,4 +649,5 @@ export const MESSAGES = {
   projectSessionsResumeTitle:
     'Resumes this session through the same flow as Open: lock, hooks, CLAUDE.md.',
   projectSessionsDismissResult: 'Dismiss',
+  ...PROJECT_DETAILS_MESSAGES,
 } as const;

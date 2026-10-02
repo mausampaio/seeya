@@ -1,0 +1,4 @@
+/* V2-T83 — width only; the shared `.seeya-dialog` chrome and `Dialog`'s own footer shape do the rest. */
+.dialog {
+  width: min(480px, calc(100vw - var(--seeya-space-8)));
+}

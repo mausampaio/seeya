@@ -39,6 +39,7 @@ import {
   type ProjectSessionResumeResult,
 } from '../../hooks/useProjectSessionResume.js';
 import type { ProjectSessionsPanelProps } from './ProjectsTable/ProjectSessionsPanel.js';
+import { openProjectDetails } from '../project-details/project-details-bridge.js';
 
 const AWAITING_FIRST_PROJECTS_PANEL: ProjectsPanelData = {
   projects: [],
@@ -70,6 +71,8 @@ export interface ProjectsControls {
   /** The last project-session `Resume` started from this tab — never silent. */
   readonly resumeResult: ProjectSessionResumeResult | null;
   readonly dismissResumeResult: () => void;
+  /** V2-T83: opens the "Project details" dialog (`features/project-details/`) for `row`. */
+  readonly onManage: (row: ProjectPanelRow) => void;
 }
 
 export function useProjects(): ProjectsControls {
@@ -182,5 +185,6 @@ export function useProjects(): ProjectsControls {
     sessionsPanel,
     resumeResult: projectResume.result,
     dismissResumeResult: projectResume.dismissResult,
+    onManage: (row) => openProjectDetails(row.projectId),
   };
 }

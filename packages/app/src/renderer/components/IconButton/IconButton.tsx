@@ -44,6 +44,8 @@ export interface IconButtonProps {
    * exclusive children of the one centered box), so there was nothing here to fix. */
   readonly loading?: boolean;
   readonly hidden?: boolean;
+  /** V2-T83: a native tooltip — optional; `aria-label` stays the accessible name. */
+  readonly title?: string | undefined;
   readonly className?: string;
   readonly onClick?: (event: TargetedMouseEvent<HTMLButtonElement>) => void;
   readonly 'aria-label': string;
@@ -78,6 +80,7 @@ export function IconButton(props: IconButtonProps): JSX.Element {
       hidden={props.hidden}
       aria-label={props['aria-label']}
       aria-expanded={props['aria-expanded']}
+      title={props.title}
       onClick={props.onClick}
     >
       {props.loading === true ? (

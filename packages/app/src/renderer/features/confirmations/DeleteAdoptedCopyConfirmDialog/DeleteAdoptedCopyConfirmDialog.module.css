@@ -1,0 +1,4 @@
+/* V2-T83 — width only. The question sentence carries two ISO timestamps, so it may need to wrap. */
+.dialog {
+  width: min(520px, calc(100vw - var(--seeya-space-8)));
+}

@@ -50,6 +50,19 @@ import type {
   AnswerDaemonOwnershipTransitionRequest,
   ProjectsUpdateEvent,
   ProjectsPanelResponse,
+  AddProjectRepositoryRequest,
+  AnswerDeleteAdoptedCopyConfirmRequest,
+  AnswerRemoveProjectConfirmRequest,
+  AnswerRevertAdoptionConfirmRequest,
+  ConfirmDeleteAdoptedCopyRequestEvent,
+  ConfirmRemoveProjectRequestEvent,
+  ConfirmRevertAdoptionRequestEvent,
+  GetProjectDetailsRequest,
+  GetProjectDetailsResponse,
+  ProjectDetailsActionResponse,
+  RemoveProjectRepositoryRequest,
+  RemoveProjectRequest,
+  RevertProjectAdoptionRequest,
   CreateProjectRequest,
   CreateProjectResponse,
   OpenProjectRequest,
@@ -165,6 +178,26 @@ export interface SeeyaApi {
   onProjectsUpdate(listener: (event: ProjectsUpdateEvent) => void): () => void;
   /** V2-T30 item 1: fetched once, at startup — see `CHANNELS.getProjectsPanel`'s own docstring. */
   getProjectsPanel(): Promise<ProjectsPanelResponse>;
+  /** V2-T83: the "Project details" dialog — see each channel's own docstring in `ipc/channels.ts`. */
+  getProjectDetails(request: GetProjectDetailsRequest): Promise<GetProjectDetailsResponse>;
+  addProjectRepository(request: AddProjectRepositoryRequest): Promise<ProjectDetailsActionResponse>;
+  removeProjectRepository(
+    request: RemoveProjectRepositoryRequest,
+  ): Promise<ProjectDetailsActionResponse>;
+  revertProjectAdoption(
+    request: RevertProjectAdoptionRequest,
+  ): Promise<ProjectDetailsActionResponse>;
+  removeProject(request: RemoveProjectRequest): Promise<ProjectDetailsActionResponse>;
+  onConfirmRevertAdoptionRequest(
+    listener: (event: ConfirmRevertAdoptionRequestEvent) => void,
+  ): void;
+  answerRevertAdoptionConfirm(request: AnswerRevertAdoptionConfirmRequest): void;
+  onConfirmDeleteAdoptedCopyRequest(
+    listener: (event: ConfirmDeleteAdoptedCopyRequestEvent) => void,
+  ): void;
+  answerDeleteAdoptedCopyConfirm(request: AnswerDeleteAdoptedCopyConfirmRequest): void;
+  onConfirmRemoveProjectRequest(listener: (event: ConfirmRemoveProjectRequestEvent) => void): void;
+  answerRemoveProjectConfirm(request: AnswerRemoveProjectConfirmRequest): void;
   /** V2-T30 item 4: "New project…". */
   createProject(request: CreateProjectRequest): Promise<CreateProjectResponse>;
   /** V2-T30 item 3: a project's "Open" button — resolves only once the tab closes. */
@@ -307,6 +340,36 @@ const api: SeeyaApi = {
     ipcRenderer.invoke(CHANNELS.answerDaemonOwnershipTransition, request),
   onProjectsUpdate: (listener) => subscribe(CHANNELS.projectsUpdate, listener),
   getProjectsPanel: () => ipcRenderer.invoke(CHANNELS.getProjectsPanel),
+  getProjectDetails: (request) => ipcRenderer.invoke(CHANNELS.getProjectDetails, request),
+  addProjectRepository: (request) => ipcRenderer.invoke(CHANNELS.addProjectRepository, request),
+  removeProjectRepository: (request) =>
+    ipcRenderer.invoke(CHANNELS.removeProjectRepository, request),
+  revertProjectAdoption: (request) => ipcRenderer.invoke(CHANNELS.revertProjectAdoption, request),
+  removeProject: (request) => ipcRenderer.invoke(CHANNELS.removeProject, request),
+  onConfirmRevertAdoptionRequest: (listener) => {
+    ipcRenderer.on(
+      CHANNELS.confirmRevertAdoptionRequest,
+      (_event, data: ConfirmRevertAdoptionRequestEvent) => listener(data),
+    );
+  },
+  answerRevertAdoptionConfirm: (request) =>
+    ipcRenderer.send(CHANNELS.answerRevertAdoptionConfirm, request),
+  onConfirmDeleteAdoptedCopyRequest: (listener) => {
+    ipcRenderer.on(
+      CHANNELS.confirmDeleteAdoptedCopyRequest,
+      (_event, data: ConfirmDeleteAdoptedCopyRequestEvent) => listener(data),
+    );
+  },
+  answerDeleteAdoptedCopyConfirm: (request) =>
+    ipcRenderer.send(CHANNELS.answerDeleteAdoptedCopyConfirm, request),
+  onConfirmRemoveProjectRequest: (listener) => {
+    ipcRenderer.on(
+      CHANNELS.confirmRemoveProjectRequest,
+      (_event, data: ConfirmRemoveProjectRequestEvent) => listener(data),
+    );
+  },
+  answerRemoveProjectConfirm: (request) =>
+    ipcRenderer.send(CHANNELS.answerRemoveProjectConfirm, request),
   createProject: (request) => ipcRenderer.invoke(CHANNELS.createProject, request),
   openProject: (request) => ipcRenderer.invoke(CHANNELS.openProject, request),
   resumeProjectSession: (request) => ipcRenderer.invoke(CHANNELS.resumeProjectSession, request),

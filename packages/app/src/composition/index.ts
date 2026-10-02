@@ -89,6 +89,10 @@ import type {
 import type { ProjectOpenDeps } from '@seeya-ai/engine/application/project-open.js';
 import type { AdoptSessionDeps } from '@seeya-ai/engine/application/project-adopt.js';
 import type { WorkspaceCommandDeps } from '@seeya-ai/engine/application/workspace.js';
+import type { AddRepositoryDeps } from '@seeya-ai/engine/application/repository-association.js';
+import type { RemoveRepositoryDeps } from '@seeya-ai/engine/application/project-remove-repo.js';
+import type { RemoveProjectDeps } from '@seeya-ai/engine/application/project-remove.js';
+import type { RevertAdoptionDeps } from '@seeya-ai/engine/application/project-revert-adoption.js';
 import type { DaemonOwner, DaemonOwnershipTransitionAnswer } from '@seeya-ai/engine/core/types.js';
 import type { PathPlatformHint } from '@seeya-ai/engine/core/cwd-normalization.js';
 import type { EndDayDeps } from '@seeya-ai/engine/application/types.js';
@@ -434,6 +438,66 @@ export function buildProjectAdoptDeps(
     procStart: processIdentity.procStart,
     forkSessionId,
     ...projectHookIdentity(),
+  };
+}
+
+/**
+ * V2-T83: `seeya project add-repo`'s own `AddRepositoryDeps`, assembled from an `AppContext` — the
+ * "Project details" dialog's `Add repository…`. No lock is taken (the engine's `addRepository`
+ * never takes one), so no process identity either.
+ */
+export function buildAddRepositoryDeps(context: AppContext): AddRepositoryDeps {
+  return {
+    storage: context.storage,
+    workspace: context.workspace,
+    gitReader: context.gitReader,
+    directoryExistence: context.directoryExistence,
+    seeyaHome: context.home.seeyaHome,
+    sessionId: context.sessionId,
+  };
+}
+
+/** V2-T83: the lock-taking `Deps` the three writing project actions share — this window's own
+ * `pid`/`procStart` is the lock holder for the whole synchronous operation, same as the CLI's own
+ * `capturePidAndProcStart` for `remove`/`remove-repo`/`revert-adoption`. */
+function buildProjectLockHolderDeps(
+  context: AppContext,
+  processIdentity: AppProcessIdentity,
+): RemoveRepositoryDeps & RemoveProjectDeps {
+  return {
+    storage: context.storage,
+    workspace: context.workspace,
+    projectLock: context.projectLock,
+    processControl: context.processControl,
+    clock: context.clock,
+    seeyaHome: context.home.seeyaHome,
+    sessionId: context.sessionId,
+    pid: processIdentity.pid,
+    procStart: processIdentity.procStart,
+  };
+}
+
+export function buildRemoveRepositoryDeps(
+  context: AppContext,
+  processIdentity: AppProcessIdentity,
+): RemoveRepositoryDeps {
+  return buildProjectLockHolderDeps(context, processIdentity);
+}
+
+export function buildRemoveProjectDeps(
+  context: AppContext,
+  processIdentity: AppProcessIdentity,
+): RemoveProjectDeps {
+  return buildProjectLockHolderDeps(context, processIdentity);
+}
+
+export function buildRevertAdoptionDeps(
+  context: AppContext,
+  processIdentity: AppProcessIdentity,
+): RevertAdoptionDeps {
+  return {
+    ...buildProjectLockHolderDeps(context, processIdentity),
+    forkCleanup: context.forkCleanup,
   };
 }
 

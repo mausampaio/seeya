@@ -1,0 +1,16 @@
+/* V2-T83 — the base `.seeya-dialog` chrome already gives border/background/shadow/padding, and
+ * `Dialog`'s own `footer` shape pins the title and the Close button while the body scrolls. Width
+ * only; `display` is deliberately NOT set here (`tests/integration/guards/dialog-display-css.test.ts`
+ * — an author `display` on the bare class would keep a closed dialog painted). */
+.dialog {
+  width: min(640px, calc(100vw - var(--seeya-space-8)));
+}
+
+.notice {
+  margin-bottom: var(--seeya-space-4);
+}
+
+/* A line of an action's result — the recovery line holds a long git hash and path-ish text. */
+.resultLine {
+  overflow-wrap: anywhere;
+}

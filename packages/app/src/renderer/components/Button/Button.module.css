@@ -122,3 +122,34 @@
   background: var(--seeya-surface-hover);
   color: var(--seeya-text);
 }
+
+/* V2-T83: `tone="error"` — a destructive action (`docs/INTERFACE.md` § 4a's "Remove project").
+ * Declared AFTER the variants so, at equal specificity, these win: `.toneError.primary` is a solid
+ * error button (the confirmation's own primary), `.toneError.secondary` an outlined one (the
+ * entry point in the dialog, calmer than a solid red block). */
+.toneError.primary {
+  background: var(--seeya-error-base);
+  color: var(--seeya-on-brand);
+}
+
+.toneError.primary:not(:disabled):hover {
+  background: var(--seeya-error-text);
+}
+
+.toneError.secondary {
+  color: var(--seeya-error-text);
+  border-color: var(--seeya-error-base);
+}
+
+.toneError.secondary:not(:disabled):hover {
+  background: var(--seeya-error-bg);
+}
+
+.toneError.ghost {
+  color: var(--seeya-error-text);
+}
+
+.toneError.ghost:not(:disabled):hover {
+  background: var(--seeya-error-bg);
+  color: var(--seeya-error-text);
+}

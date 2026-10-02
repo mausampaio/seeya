@@ -25,7 +25,11 @@ import {
   LeftoverChangesConfirmDialog,
   ResumeFallbackDialog,
   DaemonOwnershipTransitionDialog,
+  RevertAdoptionConfirmDialog,
+  DeleteAdoptedCopyConfirmDialog,
+  RemoveProjectConfirmDialog,
 } from './features/confirmations/index.js';
+import { ProjectDetailsDialog } from './features/project-details/index.js';
 import { AdoptionDialog } from './features/adoption/index.js';
 
 export function AppShell() {
@@ -91,6 +95,15 @@ export function AppShell() {
        * `<NewProjectDialog/>` above — opened from the Sessions tab's own `Adopt…` button through
        * `features/adoption/adoption-dialog-bridge.ts`. */}
       <AdoptionDialog />
+      {/* V2-T83: "Project details" (`docs/INTERFACE.md` § 4a) and the three confirmations its
+       * actions trigger — mounted here for the same reason as the dialogs above: a `<dialog>`
+       * inside the Projects tab's own (possibly hidden) page pane would never show. Opened from
+       * the row's `Manage project` button through `features/project-details/
+       * project-details-bridge.ts`. */}
+      <ProjectDetailsDialog />
+      <RevertAdoptionConfirmDialog />
+      <DeleteAdoptedCopyConfirmDialog />
+      <RemoveProjectConfirmDialog />
     </>
   );
 }

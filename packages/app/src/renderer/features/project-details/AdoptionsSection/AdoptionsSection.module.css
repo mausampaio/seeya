@@ -1,0 +1,36 @@
+/* V2-T83 — same card-per-row shape as `RepositoriesSection`. */
+.section {
+  margin-bottom: var(--seeya-space-6);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--seeya-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--seeya-space-3);
+  min-width: 0;
+  padding: var(--seeya-space-2) var(--seeya-space-3);
+  border: 1px solid var(--seeya-border);
+  border-radius: var(--seeya-radius-md);
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.mono {
+  font-family: var(--seeya-font-mono);
+}

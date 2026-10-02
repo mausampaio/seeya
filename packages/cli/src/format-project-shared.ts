@@ -9,12 +9,7 @@ import type { ProjectManifest } from '@seeya-ai/engine/core/types.js';
 import type { ProjectLockStatus } from '@seeya-ai/engine/application/workspace.js';
 import { formatLockHolderDescription } from '@seeya-ai/engine/core/project-lock-message.js';
 
-export function formatInvalidIdLine(projectId: string): string {
-  return (
-    `seeya: "${projectId}" is not a valid project id — use lowercase letters, digits and ` +
-    'hyphens only, e.g. "auth-hardening".'
-  );
-}
+export { formatInvalidProjectIdLine as formatInvalidIdLine } from '@seeya-ai/engine/core/project-management-message.js';
 
 /** Shared by `format-project-lifecycle.ts`'s own `formatProjectLine` (list) and
  * `formatShowProjectReport` (show). */

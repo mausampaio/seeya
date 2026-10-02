@@ -91,6 +91,20 @@ export function createFakeSeeyaApi(overrides: Partial<SeeyaApi> = {}): SeeyaApi 
     getProjectsPanel: vi.fn(() =>
       Promise.resolve({ projects: [], otherSessionsByDirectory: [], ignoredProjects: [] }),
     ),
+    // V2-T83: the "Project details" dialog is mounted for the life of the window (`App.tsx`), so
+    // its three confirmations register their listeners on mount — harmless no-ops, like the other
+    // `onConfirm*Request` defaults above; the data/action calls are only reached once a test opens it.
+    getProjectDetails: neverCalled('getProjectDetails'),
+    addProjectRepository: neverCalled('addProjectRepository'),
+    removeProjectRepository: neverCalled('removeProjectRepository'),
+    revertProjectAdoption: neverCalled('revertProjectAdoption'),
+    removeProject: neverCalled('removeProject'),
+    onConfirmRevertAdoptionRequest: vi.fn(),
+    answerRevertAdoptionConfirm: vi.fn(),
+    onConfirmDeleteAdoptedCopyRequest: vi.fn(),
+    answerDeleteAdoptedCopyConfirm: vi.fn(),
+    onConfirmRemoveProjectRequest: vi.fn(),
+    answerRemoveProjectConfirm: vi.fn(),
     createProject: neverCalled('createProject'),
     openProject: vi.fn(() => Promise.resolve({ outcomeText: '' })),
     onConfirmProjectLockOpenRequest: vi.fn(),

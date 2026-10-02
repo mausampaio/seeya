@@ -1,0 +1,5 @@
+/* V2-T83 — the header's own rows truncate rather than wrap: a long path never stretches the dialog. */
+.header {
+  min-width: 0;
+  margin-bottom: var(--seeya-space-4);
+}

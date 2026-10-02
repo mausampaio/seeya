@@ -1,0 +1,33 @@
+/* V2-T83 — a card per repository row; `min-width: 0` on the text column is what lets a long remote
+ * or path ellipsize (`Text`'s own `truncate`) instead of widening the dialog. */
+.section {
+  margin-bottom: var(--seeya-space-6);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--seeya-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--seeya-space-3);
+  min-width: 0;
+  padding: var(--seeya-space-2) var(--seeya-space-3);
+  border: 1px solid var(--seeya-border);
+  border-radius: var(--seeya-radius-md);
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}

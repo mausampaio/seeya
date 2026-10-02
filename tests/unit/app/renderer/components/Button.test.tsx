@@ -25,6 +25,24 @@ describe('Button (D-052, V2-T75)', () => {
     expect(classesOf(getByRole('button'))).toContain(styles[size]);
   });
 
+  // V2-T83: the shared `tone` vocabulary (D-052) — only `error` changes anything; `neutral` is each
+  // variant's own look, so it adds no class at all.
+  it('applies the error tone class only when asked, on any variant', () => {
+    for (const variant of ['primary', 'secondary', 'ghost'] as const) {
+      const { getByRole, unmount } = render(
+        <Button variant={variant} tone="error">
+          Remove
+        </Button>,
+      );
+      expect(classesOf(getByRole('button'))).toEqual(
+        expect.arrayContaining([styles.toneError, styles[variant]]),
+      );
+      unmount();
+    }
+    const plain = render(<Button tone="neutral">x</Button>);
+    expect(classesOf(plain.getByRole('button'))).not.toContain(styles.toneError);
+  });
+
   it('applies the fullWidth class only when asked', () => {
     const withFullWidth = render(<Button fullWidth>x</Button>);
     expect(classesOf(withFullWidth.getByRole('button'))).toContain(styles.fullWidth);
