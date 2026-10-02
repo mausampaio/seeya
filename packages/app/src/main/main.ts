@@ -146,6 +146,7 @@ import {
   type TabResumeOpener,
 } from '../resume/tab-session-resumer.js';
 import { wireProjectIpc } from './project-ipc.js';
+import { wireProjectDetailsIpc } from './project-details-ipc.js';
 import { wireSessionSearchIpc } from './session-search-ipc.js';
 import { wireSessionResumeIpc } from './session-resume-ipc.js';
 import { wireDirectoryPickerIpc } from './directory-picker-ipc.js';
@@ -2711,6 +2712,9 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // V2-T55 item 4: the id-search field's own IPC — same "own module, main.ts doesn't grow" split
   // `wireProjectIpc` already established.
   wireSessionSearchIpc(context);
+  // V2-T83: the "Project details" dialog's own IPC — same "own module" split, reusing the push
+  // `wireProjectIpc` already exposes so every action refreshes the Projects tab at once.
+  wireProjectDetailsIpc(window, context, projectIpc.pushProjectsUpdate);
   // V2-T68: the Sessions tab's own "Resume" button — same "own module" split, reusing the SAME
   // tabResumeOpener as every other tab-backed launcher above.
   wireSessionResumeIpc(context, tabResumeOpener);

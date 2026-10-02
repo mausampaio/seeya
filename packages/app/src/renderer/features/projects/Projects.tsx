@@ -78,6 +78,7 @@ export function Projects(): JSX.Element {
           expandedProjectIds={controls.expandedProjectIds}
           onToggleExpanded={controls.onToggleExpanded}
           sessionsPanel={controls.sessionsPanel}
+          onManage={controls.onManage}
         />
       )}
       <IgnoredProjectsSection rows={panel.ignoredProjects} />

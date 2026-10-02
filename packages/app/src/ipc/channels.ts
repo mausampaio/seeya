@@ -14,6 +14,8 @@ import type { DaemonControlAvailability } from '../state/daemon-control-panel.js
 import type { AutostartControlAvailability } from '../state/autostart-control-panel.js';
 import type { SettingsRow, ProjectPolicyLine } from '../state/settings-panel.js';
 import type { ProjectPanelOtherSessionRow, ProjectsPanelData } from '../state/projects-panel.js';
+import type { ProjectDetailsData } from '../state/project-details.js';
+import type { ProjectActionResponse } from '../state/project-details-result.js';
 import type { EffectiveTheme } from '../theme/resolve-theme.js';
 import type {
   EndDayNotCapturedRow,
@@ -177,6 +179,33 @@ export const CHANNELS = {
    * renderer's own `onProjectsUpdate` registration (see `electron/project-ipc.ts`'s own
    * docstring). */
   getProjectsPanel: 'seeya:get-projects-panel',
+  /** Renderer → main: the "Project details" dialog's own data (V2-T83, `docs/INTERFACE.md` §
+   * 4a) — fetched when the dialog opens and again after every action, never pushed on the ambient
+   * cycle (a dialog nobody has open costs nothing). */
+  getProjectDetails: 'seeya:get-project-details',
+  /** Renderer → main: "Add repository…" (V2-T83) — the same `addRepository` `seeya project
+   * add-repo` calls, with the path the OS folder picker (`pickDirectory`) returned. */
+  addProjectRepository: 'seeya:add-project-repository',
+  /** Renderer → main: a repository row's "Remove" (V2-T83) — the same `removeRepository`
+   * `seeya project remove-repo` calls. */
+  removeProjectRepository: 'seeya:remove-project-repository',
+  /** Renderer → main: "Revert…" on an adopted session (V2-T83) — the same `revertAdoption` `seeya
+   * project revert-adoption` calls; its two questions travel as the two request/answer pairs
+   * below. Resolves once the revert (or the refusal) is decided. */
+  revertProjectAdoption: 'seeya:revert-project-adoption',
+  /** Renderer → main: "Remove project" (V2-T83) — the same `removeProject` `seeya project remove`
+   * calls; its one question is `confirmRemoveProjectRequest` below. */
+  removeProject: 'seeya:remove-project',
+  /** Main → renderer: `revertAdoption`'s own `confirmRevert` (V2-T83, `docs/INTERFACE.md` § 9). */
+  confirmRevertAdoptionRequest: 'seeya:confirm-revert-adoption-request',
+  answerRevertAdoptionConfirm: 'seeya:answer-revert-adoption-confirm',
+  /** Main → renderer: `revertAdoption`'s own `confirmDeleteCopy` — asked only when the adopted
+   * copy kept writing after the adoption (or could not be checked). */
+  confirmDeleteAdoptedCopyRequest: 'seeya:confirm-delete-adopted-copy-request',
+  answerDeleteAdoptedCopyConfirm: 'seeya:answer-delete-adopted-copy-confirm',
+  /** Main → renderer: `removeProject`'s own `confirmRemove`. */
+  confirmRemoveProjectRequest: 'seeya:confirm-remove-project-request',
+  answerRemoveProjectConfirm: 'seeya:answer-remove-project-confirm',
   /** Renderer → main: "New project…" (V2-T30 item 4) — the same `createProject` `seeya project
    * create` calls. */
   createProject: 'seeya:create-project',
@@ -848,4 +877,79 @@ export interface ResumeSessionRequest {
  * fire-and-forget row action, Q-105), so this only ever clears the row's own `loading` state. */
 export interface ResumeSessionResponse {
   readonly resumed: boolean;
+}
+
+/** `CHANNELS.getProjectDetails`'s payload (V2-T83). */
+export interface GetProjectDetailsRequest {
+  readonly projectId: string;
+}
+
+export type GetProjectDetailsResponse = ProjectDetailsData;
+
+/** `CHANNELS.addProjectRepository`'s payload — `path` is whatever `CHANNELS.pickDirectory`
+ * returned, never typed by hand. */
+export interface AddProjectRepositoryRequest {
+  readonly projectId: string;
+  readonly path: string;
+}
+
+export interface RemoveProjectRepositoryRequest {
+  readonly projectId: string;
+  readonly name: string;
+}
+
+/** `forkSessionId` identifies the adoption to revert — `selectProjectAdoption` matches it exactly
+ * (a full id is a prefix of itself), so a project with several adoptions never needs a second
+ * argument. */
+export interface RevertProjectAdoptionRequest {
+  readonly projectId: string;
+  readonly forkSessionId: string;
+}
+
+export interface RemoveProjectRequest {
+  readonly projectId: string;
+}
+
+/** Every write action's response (V2-T83): the engine's own outcome, already rendered into the
+ * CLI's own sentences (`state/project-details-result.ts`), with a `tone` the dialog colors it by. */
+export type ProjectDetailsActionResponse = ProjectActionResponse;
+
+export interface ConfirmRevertAdoptionRequestEvent {
+  readonly requestId: string;
+  readonly projectId: string;
+  readonly originalSessionId: string;
+  readonly forkSessionId: string;
+  readonly commitCount: number;
+}
+
+export interface AnswerRevertAdoptionConfirmRequest {
+  readonly requestId: string;
+  readonly decision: 'proceed' | 'decline';
+}
+
+/** `question` is `core/project-management-message.ts#renderDeleteAdoptedCopyQuestionLine` — the
+ * same first half of the sentence the CLI asks, rendered by the main process because it needs the
+ * transcript's own last-write time and size, which only `ForkCleanup` knows. */
+export interface ConfirmDeleteAdoptedCopyRequestEvent {
+  readonly requestId: string;
+  readonly projectId: string;
+  readonly forkSessionId: string;
+  readonly question: string;
+}
+
+export interface AnswerDeleteAdoptedCopyConfirmRequest {
+  readonly requestId: string;
+  readonly decision: 'delete' | 'keep';
+}
+
+export interface ConfirmRemoveProjectRequestEvent {
+  readonly requestId: string;
+  readonly projectId: string;
+  readonly name: string;
+  readonly fileCount: number;
+}
+
+export interface AnswerRemoveProjectConfirmRequest {
+  readonly requestId: string;
+  readonly decision: 'proceed' | 'decline';
 }

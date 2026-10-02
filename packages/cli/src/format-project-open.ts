@@ -14,6 +14,12 @@ import {
   renderLeftoverChangesLines,
   renderReadOnlyOpenQuestion,
 } from '@seeya-ai/engine/core/project-lock-message.js';
+import {
+  formatPathNotFoundLine,
+  formatProjectNotFoundLine,
+  formatRepositoryAlreadyAssociatedLine,
+  formatRepositoryLinkedLine,
+} from '@seeya-ai/engine/core/project-management-message.js';
 import type { AddRepositoryResult } from '@seeya-ai/engine/application/repository-association.js';
 import type {
   MissingRepositoryRecord,
@@ -33,17 +39,13 @@ export function formatAddRepoReport(result: AddRepositoryResult): string {
     case 'invalidId':
       return formatInvalidIdLine(result.projectId);
     case 'projectNotFound':
-      return `Project "${result.projectId}" not found.`;
+      return formatProjectNotFoundLine(result.projectId);
     case 'pathNotFound':
-      return `seeya: "${result.path}" does not exist.`;
+      return formatPathNotFoundLine(result.path);
     case 'alreadyAssociated':
-      return `Repository "${result.name}" is already associated with project "${result.projectId}".`;
-    case 'added': {
-      const remoteNote = result.hasRemote
-        ? ''
-        : ' (no remote — only resolvable on this device, docs/V2-RUMO.md § "Repositório sem remoto")';
-      return `Linked repository "${result.name}" to project "${result.projectId}"${remoteNote}.`;
-    }
+      return formatRepositoryAlreadyAssociatedLine(result.name, result.projectId);
+    case 'added':
+      return formatRepositoryLinkedLine(result.name, result.projectId, result.hasRemote);
   }
 }
 

@@ -27,7 +27,12 @@ import { Text } from '../../../components/Text/index.js';
 import { TableRow } from '../../../components/TableRow/index.js';
 import { IconButton } from '../../../components/IconButton/index.js';
 import { Button } from '../../../components/Button/index.js';
-import { ChevronDownIcon, ChevronRightIcon, StarIcon } from '../../../components/Icon/index.js';
+import {
+  ChevronDownIcon,
+  ChevronRightIcon,
+  SettingsIcon,
+  StarIcon,
+} from '../../../components/Icon/index.js';
 import { ProjectSessionsPanel, type ProjectSessionsPanelProps } from './ProjectSessionsPanel.js';
 import { MESSAGES } from '../../../../text/messages.js';
 import {
@@ -48,6 +53,9 @@ export interface ProjectsTableProps {
   /** What each expanded row's sessions list needs — everything `ProjectSessionsPanel` takes except
    * the project itself, which the table already knows per row. */
   readonly sessionsPanel: Omit<ProjectSessionsPanelProps, 'project'>;
+  /** V2-T83: opens the "Project details" dialog for the row — a separate, icon-only affordance
+   * (`docs/INTERFACE.md` § 4a), never a replacement for the row's own main action. */
+  readonly onManage: (row: ProjectPanelRow) => void;
 }
 
 /** Narrowed to exactly the five header labels this table actually shows — all plain strings in
@@ -117,6 +125,9 @@ const COLUMNS: readonly {
   // `width` (a ceiling AND a floor) makes every label render at the identical size this column
   // needs to actually read as a column.
   { key: 'action', width: '151px', align: 'right' },
+  // V2-T83: the `Manage project` icon button — headerless, like Favorite/Action; 32px holds a 24px
+  // `IconButton` with a few px of air.
+  { key: 'manage', width: '32px' },
 ];
 
 function ActionButton(props: {
@@ -228,6 +239,23 @@ function NameCell(props: {
   );
 }
 
+function ManageProjectButton(props: {
+  readonly row: ProjectPanelRow;
+  readonly onManage: ProjectsTableProps['onManage'];
+}): JSX.Element {
+  const label = MESSAGES.manageProjectButtonLabel(props.row.name);
+  return (
+    <IconButton
+      size="sm"
+      aria-label={label}
+      title={label}
+      onClick={() => props.onManage(props.row)}
+    >
+      <SettingsIcon />
+    </IconButton>
+  );
+}
+
 function buildRowCells(
   row: ProjectPanelRow,
   pending: boolean,
@@ -246,6 +274,7 @@ function buildRowCells(
     <NumericCell value={row.repositoryCount} />,
     <LastActivityCell lastActivity={row.lastActivity} />,
     <ActionButton row={row} pending={pending} onRowAction={onRowAction} />,
+    <ManageProjectButton row={row} onManage={props.onManage} />,
   ];
 }
 
