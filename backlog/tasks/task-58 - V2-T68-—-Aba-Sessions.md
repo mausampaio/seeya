@@ -4,7 +4,7 @@ title: V2-T68 — Aba Sessions
 status: Review
 assignee: []
 created_date: '2026-09-30 10:34'
-updated_date: '2026-10-02 11:00'
+updated_date: '2026-10-02 11:23'
 labels: []
 milestone: m-2
 dependencies:
@@ -112,3 +112,43 @@ pulados, pré-existentes), cobertura 95.84%/91.66%/95.32%/96.07% (stmts/branch/f
 
 **Questões abertas (`docs/QUESTOES.md`):** Q-106 (acima).
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: Claude (agente)
+created: 2026-10-02 11:23
+---
+Revisão do PO, rodada 1: estrutura aprovada (filtros, busca por nome/id inclusive fora da janela,
+caso ambíguo sem escolher, célula vazia de sessão de projeto, lista vazia, "Copied!"). Q-106
+(sessão viva rodando em outro lugar, sem aba nesta janela, fica com a célula de ação vazia) aceita
+como registrada — fechada.
+
+Correções pedidas antes do merge, todas aplicadas:
+
+1. Rebase sobre `origin/main` (`edf7f1d`) — trouxe a correção da V2-T79 (`Button` com `loading`
+   centralizado); confirmado nas novas capturas que "Resume" não sai mais deslocado.
+2. "Live debugging session" mostrava `Go to tab` com estado `ended` e "0 running" no cabeçalho —
+   defeito da FIXTURE de verificação, não do produto: o script de prova usava um `procStart`
+   fictício para o pid real da aba, e `ProcessControl.isAlive` (corretamente) não encontrava
+   correspondência. Corrigido lendo o `procStart` real do pid via o mesmo adaptador do motor
+   (`adapters/process/proc-start.ts#captureObservedProcStart`) — a linha agora lê "alive" e o
+   cabeçalho "1 running".
+3. O motivo do `Adopt…` desabilitado virava texto na própria linha (`disabledReason`), dobrando a
+   altura e espremendo as outras células — trocado por `title` apenas (tooltip), nunca uma linha
+   visível, como a § 5 pede.
+4. Coluna de ação com largura própria (240px) e `min-width` por botão (84px), alinhada à direita e
+   consistente entre linhas com um ou dois botões — a data de última atividade não é mais cortada.
+5. Id e estado não quebram mais linha: id sem colchetes, fonte mono (`variant="code"`) + truncate;
+   estado com truncate + `title`; sem sublinhado no estado "Copied!" (era só `:hover`, mas o clique
+   sintético deixava o ponteiro em cima do botão na captura).
+
+Capturas regeneradas nos dois temas (light/dark) — sequência inteira (01 a 10), já que o fixture
+mudou, mais uma tentativa de `11-adopt-tooltip` (tooltip nativo não aparece em `capturePage()` de
+uma janela offscreen, como esperado — a prova do atributo `title` é o teste unitário
+`SessionsTable.test.tsx`'s own "Adopt… is disabled with the reason as a dica when ineligible", que
+também confere que o motivo NUNCA aparece como texto visível na linha).
+
+`npm run verificar` do zero: verde — detalhes no relatório desta rodada.
+---
+<!-- COMMENTS:END -->
