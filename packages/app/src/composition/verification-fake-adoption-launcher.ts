@@ -72,6 +72,12 @@ export class VerificationFakeAdoptionLauncher implements SessionAdoptionLauncher
     // project only ever exists inside a disposable `SEEYA_APP_HOME_OVERRIDE` workspace, never a
     // real one, and the fork is discarded/committed from this call's own fixture regardless.
     await rm(path.join(projectDir, 'AGENTS.md'), { force: true });
+    // V2-T82 item 4: the two operational files a real session leaves in a project's directory
+    // (`.claude/settings.json` from `openProject`, `.seeya-audit`) — both ignored by the
+    // workspace's `.gitignore`, so the review list must NOT show them.
+    await mkdir(path.join(projectDir, '.claude'), { recursive: true });
+    await writeFile(path.join(projectDir, '.claude', 'settings.json'), '{}\n', 'utf8');
+    await writeFile(path.join(projectDir, '.seeya-audit'), '', 'utf8'); // empty = "no marker" to the real reader
     const notesDir = path.join(projectDir, 'context', 'notes');
     await mkdir(notesDir, { recursive: true });
     for (let index = 1; index <= EXTRA_FIXTURE_FILE_COUNT; index += 1) {

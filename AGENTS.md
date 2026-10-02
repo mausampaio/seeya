@@ -744,7 +744,14 @@ o resultado de falha da adoção sem armar um gancho de git real em conflito) e
 diálogo único de adoção: o passo 1 em `Existing project` (lista vazia num espaço de trabalho
 novo), o passo 1 em `New project` com um id inválido digitado, o passo 2 (revisão com tipo e
 linhas, lista longa o bastante para rolar) e o resultado — sucesso ou falha, conforme
-`SEEYA_APP_VERIFY_ADOPTION_FAKE_COMMIT_FAILURE` estar ligada nesta mesma execução) —
+`SEEYA_APP_VERIFY_ADOPTION_FAKE_COMMIT_FAILURE` estar ligada nesta mesma execução),
+`SEEYA_APP_VERIFY_FAKE_HARNESS_LOG` (V2-T82: troca o `HarnessLauncher` de `openProject` por
+`composition/verification-fake-harness-launcher.ts` — nunca lança `claude`, só acrescenta uma
+linha JSON por chamada de `open()` no arquivo indicado; `AppContext.harnessLauncherOverride`) e
+`SEEYA_APP_VERIFY_ADOPTION_RESULT_BUTTON` (V2-T82: `close` ou `open`, combinada com
+`SEEYA_APP_VERIFY_ADOPTION_FLOW_DIR` — clica o botão real do resultado da adoção e espera; a
+prova é o arquivo da flag anterior, escrito pelo pipeline real de `openProject`: sem linha, o
+**Close** não abriu nada) —
 mesma categoria de `SEEYA_DAEMON_CHILD`
 acima (nunca vão para disco, ninguém digita), mas nenhuma delas é lida por `npm run app` nem
 documentada no `README.md`: existem só para um agente sem tela/teclado próprios provar a janela

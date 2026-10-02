@@ -15,7 +15,15 @@
 .scrollableBody[open] {
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - var(--seeya-space-8));
+  /* V2-T82 item 3: the old cap (the whole window height minus one small margin) put a 9-file review
+   * edge to edge in the window. `min(80vh, 720px)`: a tall window never gets a dialog taller than
+   * 720px (a list that long should scroll, not stretch), and a short one keeps 10vh of air above
+   * and below. Shared on purpose — End day's result and the confirmations pick it up too, so every
+   * footer dialog in the window caps at the same height. */
+  max-height: min(80vh, 720px);
+  /* `border-box`: the dialog's own padding and border count INSIDE the cap — measured with the
+   * default `content-box`, a 1000px-tall window drew an 845px dialog (84%, not 80%). */
+  box-sizing: border-box;
 }
 
 .body {
@@ -42,6 +50,10 @@
 
 .footer {
   flex: 0 0 auto;
+  /* V2-T82 item 2: the footer had no space from the body, so a card/list that ends flush with the
+   * body butted against the buttons. One shared token here, for every dialog that passes `footer`;
+   * a caller whose body already ends with its own margin should drop that margin, not add more. */
+  margin-top: var(--seeya-space-4);
   display: flex;
   justify-content: flex-end;
   gap: var(--seeya-space-2);
