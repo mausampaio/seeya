@@ -4,7 +4,7 @@ title: 'V2-T69 — End day: prévia, andamento e resultado estruturados'
 status: Review
 assignee: []
 created_date: '2026-09-30 10:34'
-updated_date: '2026-10-01 23:07'
+updated_date: '2026-10-02 00:06'
 labels: []
 milestone: m-2
 dependencies:
@@ -176,3 +176,35 @@ próprio comentário de `resolveEndDayFakeScreenshotDelayMs`, nunca escondido.
 **Questões abertas:** nenhuma. Nada exigiu desviar de `docs/DECISOES.md`/`docs/ESPECIFICACAO.md`
 nem inventar comportamento não especificado.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: Claude Sonnet 5
+created: 2026-10-02 00:06
+---
+Revisão do PO, rodada 1 — itens 1 a 7 corrigidos nesta rodada (commit 3df353e), item 8 adiado conforme combinado (aguarda V2-T66 em `main`).
+
+1. **A prévia "omitia" zeta-poisoned** — investigado e não era defeito de produto: `buildEndDayPreviewRows` já dobra `result.failedCaptures` em `notCaptured` (`kind: 'failed'`) corretamente, e `evaluateFullEligibility` roda igual em dry-run e execução real (`capture-session.ts`). O defeito era só no script de verificação (fora do repo): `buildFixtureHome('preview')` excluía a sessão zeta-poisoned só nesse cenário, produzindo uma história inconsistente entre as 8 capturas originais. Corrigido no script; acrescentei um teste de regressão em `tests/unit/app/state/end-day-sessions.test.ts` travando o invariante (caminho home abreviado + texto completo preservado).
+
+2. **A lista do andamento incluía sessão cheap-ineligible** (`delta-ignored`) — o motor de fato manda `captureStarted`/`captureFinished` para ela (vai por `sessionsInScope`), mas este painel nunca deveria rastreá-la. `state/end-day-panel.ts#seedTrackedSessions` agora rastreia só `willBeCaptured` + `notCaptured` com `kind: 'failed'` (nunca mais `'ineligible'`); `index`/`total` são computados localmente a partir dessa lista filtrada, nunca mais do evento cru do motor (que conta `sessionsInScope` inteiro). Evento para sessão não rastreada agora é ignorado (antes era anexado). `M` agora bate com "capturadas + falhas", como descrito. Testes de regressão em `tests/unit/app/state/end-day-panel.test.ts`.
+
+3. **Largura do conteúdo** — `.pane` tinha `max-width: 560px`, competindo com o padding/borda do próprio diálogo em vez de preenchê-lo. Trocado por `width: 100%` nas três panes.
+
+4. **Rodapé cortado** — `Dialog` (design system) ganhou um prop `footer` novo: quando usado, título e rodapé ficam fixos e só o corpo rola, com o diálogo nunca passando da altura da janela (`Dialog.module.css#.scrollableBody`, gated em `[open]`, respeitando o guard de `display` já existente). Os botões de cada fase saíram das três panes e foram para `EndDayDialog.tsx#footerFor`. A 9ª captura (`result-long-light.png`) prova com ~14 linhas (3 capturadas + 1 falha + 10 puladas) — rolagem visível, Close/Open Today sempre visíveis.
+
+5. **Motivo cru** — `state/end-day-failure-reason.ts#summarizeFailureReason` abrevia toda ocorrência de `homeDir` com `~` e trunca em 100 caracteres com reticências para a linha visível. Escolhi o `title` (tooltip nativo) para o texto completo, não um detalhe recolhível — nunca escondido. `EndDayReasonRow`/`EndDayNotCapturedRow` ganharam `fullReason` ao lado de `reason`.
+
+6. **"(D-031)" removido** de `CLOSED_SESSION_REASON`. Auditei todo texto voltado ao usuário que eu havia escrito nesta tarefa (`MESSAGES`, os módulos `end-day-*`) — nenhuma outra citação de decisão sobrou fora de comentário de código.
+
+7. **Etiquetas inconsistentes** — `formatSessionStateLabel` já estava em uso (preview e result); o problema era só visual, minúsculo ao lado de "Lean"/"Deep" capitalizados. Extraí `renderer/features/end-day/session-badges.ts#buildSessionSummaryBadges` (elimina também a duplicação que já existia entre `PreviewPane`/`ResultPane`), que capitaliza só a cópia de exibição deste badge — o valor canônico de `formatSessionStateLabel` continua minúsculo em todo outro lugar (CLI, lateral).
+
+8. **Adiado** — não toquei em `sidebar/directory-label.ts` nesta rodada.
+
+Capturas regeneradas (`<scratchpad-da-sessão>\v2t69-verify\screenshots\`): as 8 originais (4 cenários × 2 temas) mais a 9ª (`result-long-light.png`), todas conferidas visualmente contra os 7 itens.
+
+`npm run verificar` com dist limpo: verde (358 arquivos de teste, 3426 testes + 4 skipped, cobertura 95.56%/91.32%/94.74%/95.76%). Uma reexecução anterior teve 1 falha isolada em `tests/integration/application/workspace-boundary.test.ts` (timeout + EBUSY no `rmdir`, Windows, contenção de I/O sob carga paralela) — sem relação com esta tarefa; confirmado como instável ao rodar o arquivo sozinho (passou). A segunda execução completa, do zero, foi 100% verde.
+
+Commit: `3df353e`.
+---
+<!-- COMMENTS:END -->
