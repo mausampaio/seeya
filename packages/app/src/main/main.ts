@@ -1028,7 +1028,7 @@ async function captureDaemonOwnershipTransitionVerification(
     const image = await window.webContents.capturePage();
     await writeFile(path.join(outDir, name), image.toPNG());
   }
-  await clock.sleep(4000); // the dialog's own async getDaemonOwnershipTransitionOffer() round trip
+  await clock.sleep(7000); // the dialog's own async getDaemonOwnershipTransitionOffer() round trip (measured: 4s was too early on a loaded machine, the idle capture showed no dialog)
   await shoot('01-idle.png');
   await window.webContents.executeJavaScript(
     "document.getElementById('daemon-ownership-transition-decline')?.click();",
