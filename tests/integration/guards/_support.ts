@@ -2,6 +2,7 @@ import { mkdirSync, readdirSync, rmSync, writeFileSync, type Dirent } from 'node
 import { spawnSync, type SpawnSyncReturns } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ESLint } from 'eslint';
 
 /**
  * Common support for tests/integration/guards/*.test.ts. Not a test file itself (doesn't end in
@@ -163,10 +164,37 @@ export function runCommandWithBudget(args: readonly string[], timeoutMs: number)
   return run(args, { timeoutMs });
 }
 
-/** Runs the real eslint (the binary installed in node_modules) against the given paths. */
-export function runEslint(absolutePaths: readonly string[]): CommandResult {
-  const binary = path.join(PROJECT_ROOT, 'node_modules', 'eslint', 'bin', 'eslint.js');
-  return run([binary, '--no-color', ...absolutePaths]);
+/**
+ * One `ESLint` instance per test worker, built lazily and reused by every case (V2-T80).
+ *
+ * Why in-process and not a child per case any more: each case used to spawn `node eslint.js`,
+ * paying Node startup + config load + a cold type-aware TypeScript program EVERY time. Under a
+ * loaded machine (other agents compiling/testing) that cost alone crossed
+ * `CHILD_PROCESS_BUDGET_MS` — measured 2026-10-02: three consecutive `npm run verificar` runs
+ * failed 1, 12 and 14 guard cases with "[guard child process exceeded its own 30000ms budget...]"
+ * and no product defect. A shared instance pays the startup and the TypeScript project load once.
+ *
+ * Fidelity: `new ESLint({ cwd: PROJECT_ROOT })` resolves the same real `eslint.config.js` the CLI
+ * does (flat config lookup from `cwd`), `lintFiles` takes the same absolute paths the CLI got,
+ * and the `stylish` formatter is the CLI's own default — so the output text the tests match on
+ * (rule id, message) and the exit-code rule (any error -> 1) are the same. Where this stops: it
+ * proves the CONFIG rejects/approves a file; it no longer proves the `eslint` binary starts,
+ * which `npm run verificar`'s own lint step already does on every run.
+ */
+let sharedEslint: ESLint | undefined;
+
+function eslintInstance(): ESLint {
+  sharedEslint ??= new ESLint({ cwd: PROJECT_ROOT });
+  return sharedEslint;
+}
+
+/** Runs the real eslint (the API of the installed package, real config) against the given paths. */
+export async function runEslint(absolutePaths: readonly string[]): Promise<CommandResult> {
+  const eslint = eslintInstance();
+  const results = await eslint.lintFiles([...absolutePaths]);
+  const formatter = await eslint.loadFormatter('stylish');
+  const errorCount = results.reduce((sum, result) => sum + result.errorCount, 0);
+  return { exitCode: errorCount > 0 ? 1 : 0, output: await formatter.format(results) };
 }
 
 export interface DependencyCruiserViolation {

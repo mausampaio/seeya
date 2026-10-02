@@ -1,7 +1,7 @@
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Clock } from '@seeya-ai/engine/core/ports.js';
 import { RESUME_PROMPT_ARG_LIMIT_CHARS } from '@seeya-ai/engine/adapters/resumption/args.js';
 import {
@@ -297,10 +297,12 @@ describe('TabSessionResumer#runFallback', () => {
 
     await resumer.runFallback('session-1', '/project', 'the plan', reason);
     opener.triggerExit('tab-1', 0);
-    // removeFallbackContextFile is async — let its promise settle before checking the directory.
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    const tmpEntriesAfterExit = await readdir(path.join(seeyaHome, 'tmp'));
-    expect(tmpEntriesAfterExit).toHaveLength(0);
+    // removeFallbackContextFile is async (real fs unlink, no promise exposed to the test): wait for
+    // the observable fact — the directory emptying — instead of a fixed turn of the event loop,
+    // which a loaded machine can outrun (V2-T80).
+    await vi.waitFor(async () => {
+      const tmpEntriesAfterExit = await readdir(path.join(seeyaHome, 'tmp'));
+      expect(tmpEntriesAfterExit).toHaveLength(0);
+    });
   });
 });

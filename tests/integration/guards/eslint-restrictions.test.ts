@@ -65,11 +65,11 @@ describe('guard: eslint rejects node:* in core/ and non-deterministic time sourc
 
   it(
     'approves a clean file in src/core/ (control)',
-    () => {
+    async () => {
       const filePath = writeTempFile(fixture('core', 'control.ts'), 'export {};\n');
       created.push(filePath);
 
-      const result = runEslint([filePath]);
+      const result = await runEslint([filePath]);
 
       expect(result.exitCode, result.output).toBe(0);
     },
@@ -78,14 +78,14 @@ describe('guard: eslint rejects node:* in core/ and non-deterministic time sourc
 
   it(
     'rejects node:* imported in src/core/, with a message saying what to do',
-    () => {
+    async () => {
       const filePath = writeTempFile(
         fixture('core', 'violation-test-node.ts'),
         "import { readFileSync } from 'node:fs';\nexport const content = readFileSync('x');\n",
       );
       created.push(filePath);
 
-      const result = runEslint([filePath]);
+      const result = await runEslint([filePath]);
 
       expect(result.exitCode, result.output).not.toBe(0);
       expect(result.output).toContain('no-restricted-imports');
@@ -96,14 +96,14 @@ describe('guard: eslint rejects node:* in core/ and non-deterministic time sourc
 
   it(
     'rejects argument-less new Date() outside src/adapters/clock/, with a message saying what to do (D-019)',
-    () => {
+    async () => {
       const filePath = writeTempFile(
         fixture('application', 'violation-test-date-no-argument.ts'),
         'export const now = new Date();\n',
       );
       created.push(filePath);
 
-      const result = runEslint([filePath]);
+      const result = await runEslint([filePath]);
 
       expect(result.exitCode, result.output).not.toBe(0);
       expect(result.output).toContain('no-restricted-syntax');
@@ -114,14 +114,14 @@ describe('guard: eslint rejects node:* in core/ and non-deterministic time sourc
 
   it(
     'rejects Date.now() outside src/adapters/clock/, with a message saying what to do (D-019)',
-    () => {
+    async () => {
       const filePath = writeTempFile(
         fixture('application', 'violation-test-date-now.ts'),
         'export const now = Date.now();\n',
       );
       created.push(filePath);
 
-      const result = runEslint([filePath]);
+      const result = await runEslint([filePath]);
 
       expect(result.exitCode, result.output).not.toBe(0);
       expect(result.output).toContain('no-restricted-syntax');
@@ -132,14 +132,14 @@ describe('guard: eslint rejects node:* in core/ and non-deterministic time sourc
 
   it(
     'approves new Date(value) WITH an argument outside src/adapters/clock/ (D-019, the allowed case)',
-    () => {
+    async () => {
       const filePath = writeTempFile(
         fixture('application', 'control-test-date-with-argument.ts'),
         "export const commitDate = new Date('2026-01-01');\n",
       );
       created.push(filePath);
 
-      const result = runEslint([filePath]);
+      const result = await runEslint([filePath]);
 
       expect(result.exitCode, result.output).toBe(0);
     },
@@ -148,14 +148,14 @@ describe('guard: eslint rejects node:* in core/ and non-deterministic time sourc
 
   it(
     'approves Date.parse(value) outside src/adapters/clock/ (D-019, the allowed case)',
-    () => {
+    async () => {
       const filePath = writeTempFile(
         fixture('application', 'control-test-date-parse.ts'),
         "export const instant = Date.parse('2026-01-01');\n",
       );
       created.push(filePath);
 
-      const result = runEslint([filePath]);
+      const result = await runEslint([filePath]);
 
       expect(result.exitCode, result.output).toBe(0);
     },
@@ -164,14 +164,14 @@ describe('guard: eslint rejects node:* in core/ and non-deterministic time sourc
 
   it(
     'rejects setTimeout outside src/adapters/clock/',
-    () => {
+    async () => {
       const filePath = writeTempFile(
         fixture('application', 'violation-test-settimeout.ts'),
         'export const id = setTimeout(() => {}, 1000);\n',
       );
       created.push(filePath);
 
-      const result = runEslint([filePath]);
+      const result = await runEslint([filePath]);
 
       expect(result.exitCode, result.output).not.toBe(0);
       expect(result.output).toContain('no-restricted-globals');
@@ -182,14 +182,14 @@ describe('guard: eslint rejects node:* in core/ and non-deterministic time sourc
 
   it(
     'rejects setInterval outside src/adapters/clock/',
-    () => {
+    async () => {
       const filePath = writeTempFile(
         fixture('application', 'violation-test-setinterval.ts'),
         'export const id = setInterval(() => {}, 1000);\n',
       );
       created.push(filePath);
 
-      const result = runEslint([filePath]);
+      const result = await runEslint([filePath]);
 
       expect(result.exitCode, result.output).not.toBe(0);
       expect(result.output).toContain('no-restricted-globals');
@@ -199,14 +199,14 @@ describe('guard: eslint rejects node:* in core/ and non-deterministic time sourc
 
   it(
     'approves new Date() and Date.now() inside src/adapters/clock/ (control for the exception)',
-    () => {
+    async () => {
       const filePath = writeTempFile(
         fixture('adapters/clock', 'control-test-date.ts'),
         'export const now = () => new Date();\nexport const nowMs = () => Date.now();\n',
       );
       created.push(filePath);
 
-      const result = runEslint([filePath]);
+      const result = await runEslint([filePath]);
 
       expect(result.exitCode, result.output).toBe(0);
     },
@@ -245,14 +245,14 @@ describe('guard: eslint rejects spawn imported straight from node:child_process 
 
   it(
     'rejects spawn imported from node:child_process in an ordinary adapter, with a message pointing at spawnHidden',
-    () => {
+    async () => {
       const filePath = writeTempFile(
         guardFixturePath(GUARD_NAME, 'adapters/generation', 'violation-test-spawn.ts'),
         "import { spawn } from 'node:child_process';\nexport const child = spawn('echo', ['hi']);\n",
       );
       created.push(filePath);
 
-      const result = runEslint([filePath]);
+      const result = await runEslint([filePath]);
 
       expect(result.exitCode, result.output).not.toBe(0);
       expect(result.output).toContain('no-restricted-imports');
@@ -264,14 +264,14 @@ describe('guard: eslint rejects spawn imported straight from node:child_process 
 
   it(
     'rejects an aliased spawn import (import { spawn as run }) the same way — importNames matches the original export name, not the local alias',
-    () => {
+    async () => {
       const filePath = writeTempFile(
         guardFixturePath(GUARD_NAME, 'application', 'violation-test-spawn-alias.ts'),
         "import { spawn as run } from 'node:child_process';\nexport const child = run('echo', ['hi']);\n",
       );
       created.push(filePath);
 
-      const result = runEslint([filePath]);
+      const result = await runEslint([filePath]);
 
       expect(result.exitCode, result.output).not.toBe(0);
       expect(result.output).toContain('no-restricted-imports');
@@ -281,7 +281,7 @@ describe('guard: eslint rejects spawn imported straight from node:child_process 
 
   it(
     'approves importing spawnHidden from adapters/process/spawn.ts elsewhere in src/ (control: the guard targets node:child_process, not the word "spawn")',
-    () => {
+    async () => {
       const filePath = writeTempFile(
         guardFixturePath(GUARD_NAME, 'adapters/generation', 'control-test-spawn-hidden.ts'),
         // Two levels up: this fixture lives in adapters/generation/_guard-eslint/, one directory
@@ -291,7 +291,7 @@ describe('guard: eslint rejects spawn imported straight from node:child_process 
       );
       created.push(filePath);
 
-      const result = runEslint([filePath]);
+      const result = await runEslint([filePath]);
 
       expect(result.exitCode, result.output).toBe(0);
     },
@@ -300,8 +300,8 @@ describe('guard: eslint rejects spawn imported straight from node:child_process 
 
   it(
     'approves the real adapters/process/spawn.ts wrapper importing spawn directly (control for the exemption)',
-    () => {
-      const result = runEslint([
+    async () => {
+      const result = await runEslint([
         path.join(PROJECT_ROOT, 'packages/engine/src/adapters/process/spawn.ts'),
       ]);
 
@@ -312,8 +312,8 @@ describe('guard: eslint rejects spawn imported straight from node:child_process 
 
   it(
     'approves the real daemon-launch.ts, termination-posix.ts and spawn-interactive.ts (the three declared D-038 exceptions)',
-    () => {
-      const result = runEslint(
+    async () => {
+      const result = await runEslint(
         [
           'packages/engine/src/adapters/process/daemon-launch.ts',
           'packages/engine/src/adapters/process/termination-posix.ts',
