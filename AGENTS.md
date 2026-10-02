@@ -664,7 +664,7 @@ e rola a aba Today o suficiente para três cartões caberem numa única captura)
 resultado já aplicado, as duas sem reiniciar a janela), `SEEYA_APP_DEBUG_CONSOLE` (V2-T66:
 encaminha `console.*`/uma exceção não tratada/uma falha de navegação do renderer para o stdout
 deste processo — achou dois defeitos de produção reais durante a verificação desta própria tarefa,
-nenhum visível de outro jeito sem abrir o DevTools que um agente sem tela não tem como abrir) e
+nenhum visível de outro jeito sem abrir o DevTools que um agente sem tela não tem como abrir),
 `SEEYA_APP_VERIFY_PROJECTS_TAB_STATES_DIR` (V2-T67: uma PASTA, não um arquivo — a única
 instrumentação deste arquivo que grava mais de dois PNGs. Combinada com
 `SEEYA_APP_AUTO_OPEN_SHELL_TAB=1`/`SEEYA_APP_VERIFICATION_TAB_PID_PATH` (mecanismo pré-existente,
@@ -676,7 +676,18 @@ linha daquele projeto lê `openHere` na primeira captura. Seis capturas nomeadas
 tabela inteira (três estados de lock, um favorito, "Ignored projects"), busca ativa, busca sem
 resultado, cada filtro, e o diálogo "New project" aberto por cima — `ProjectsFilters.tsx`'s own
 `id`s estáveis por opção (`projects-filter-all/running/locked`, acrescentados por esta tarefa) são
-o que esta instrumentação clica) —
+o que esta instrumentação clica), `SEEYA_APP_VERIFY_BUTTON_CENTERING_DIR` (V2-T79: mesma forma de
+"uma PASTA" da acima, bem mais simples — um único projeto livre basta (sem o truque de pid/decoy),
+já que a lateral/o rodapé renderizam ao lado de qualquer aba principal. Três capturas:
+`01-open-and-skip.png` (o botão "Open" da linha do projeto livre e "Skip today" do rodapé, os dois
+em repouso, no mesmo quadro — a lateral nunca sai de tela), `02-create.png` (diálogo "New project"
+aberto, botão "Create"), `03-loading.png` (o mesmo botão "Skip today" depois de um clique real,
+ainda em `loading` — ver `SEEYA_APP_VERIFY_HOLD_SKIP_MS` a seguir) e
+`SEEYA_APP_VERIFY_HOLD_SKIP_MS` (V2-T79: segura a resposta do `CHANNELS.skipToday` real pelos
+milissegundos informados ANTES de devolvê-la ao renderer — `skipTodayNow`'s own escrita local já
+aconteceu de verdade, só a resposta fica retida — para que uma captura logo depois do clique prove
+o rótulo de um botão `loading` ainda centralizado, sem correr contra a latência real de uma
+escrita local quase instantânea; ausente, não muda nada do caminho normal) —
 mesma categoria de `SEEYA_DAEMON_CHILD`
 acima (nunca vão para disco, ninguém digita), mas nenhuma delas é lida por `npm run app` nem
 documentada no `README.md`: existem só para um agente sem tela/teclado próprios provar a janela
