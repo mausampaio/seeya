@@ -1211,6 +1211,28 @@ async function captureSelectStatesVerification(
   await click('#sessions-link');
   await clock.sleep(1200);
   await shoot('01-sessions-filters-closed.png');
+  // Real layout numbers (V2-T81 PO review): the rendered width of every header cell, the table
+  // against its container, and the horizontal overflow of the page region — read with
+  // `getBoundingClientRect()` in the real bundle, never estimated from CSS.
+  const tableMetrics = await run(`(() => {
+    const table = document.querySelector('#page-sessions table');
+    if (!table) { return null; }
+    const box = table.getBoundingClientRect();
+    const parent = table.parentElement.getBoundingClientRect();
+    const scroller = table.closest('[class*="scroll"]') || table.parentElement;
+    return {
+      windowInnerWidth: window.innerWidth,
+      tableWidth: box.width,
+      containerWidth: parent.width,
+      scrollerScrollWidth: scroller.scrollWidth,
+      scrollerClientWidth: scroller.clientWidth,
+      headerWidths: [...table.querySelectorAll('th')].map((th) => [th.textContent, Math.round(th.getBoundingClientRect().width * 10) / 10]),
+    };
+  })()`);
+  await writeFile(
+    path.join(outDir, 'sessions-table-metrics.json'),
+    JSON.stringify(tableMetrics, null, 2),
+  );
 
   await click('#sessions-filter-project');
   await clock.sleep(300);
@@ -1240,6 +1262,19 @@ async function captureSelectStatesVerification(
   await clock.sleep(600);
   await click('[id^="today-resume-in-"]');
   await clock.sleep(300);
+  const resumeInMetrics = await run(`(() => {
+    const trigger = document.querySelector('[id^="today-resume-in-"]');
+    const card = trigger.closest('li, section, article, div[class*="card"]');
+    return {
+      triggerWidth: trigger.getBoundingClientRect().width,
+      notice: trigger.parentElement.parentElement.getBoundingClientRect().width,
+      triggerText: trigger.textContent,
+    };
+  })()`);
+  await writeFile(
+    path.join(outDir, 'resume-in-metrics.json'),
+    JSON.stringify(resumeInMetrics, null, 2),
+  );
   await shoot('05-today-resume-in-open.png');
   await pressKey('Escape');
   await clock.sleep(200);

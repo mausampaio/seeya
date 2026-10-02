@@ -47,6 +47,9 @@ export interface SelectProps {
    * read better in the mono family `SessionCard`'s own directory line already uses. Off by
    * default (most selects in this app show plain words, not paths). */
   readonly monospace?: boolean;
+  /** D-052's shared `fullWidth`: the select takes the whole width of its container (no 280px
+   * ceiling). Omitted, the trigger is as wide as its content, up to that ceiling. */
+  readonly fullWidth?: boolean;
   readonly className?: string;
   readonly onChange?: (value: string) => void;
 }
@@ -109,7 +112,12 @@ export function Select(props: SelectProps): JSX.Element {
   }
 
   return (
-    <div class={mergeClassName(cx(styles, 'field'), props.className)}>
+    <div
+      class={mergeClassName(
+        cx(styles, 'field', props.fullWidth === true && 'fullWidth'),
+        props.className,
+      )}
+    >
       <label class={cx(styles, 'labelRow')} for={props.id}>
         <Text as="span" variant="body-sm" weight={500} tone="secondary">
           {props.label}
@@ -123,7 +131,12 @@ export function Select(props: SelectProps): JSX.Element {
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={listId}
-        class={cx(styles, 'trigger', props.monospace === true && 'monospace')}
+        class={cx(
+          styles,
+          'trigger',
+          props.monospace === true && 'monospace',
+          props.fullWidth === true && 'fullWidth',
+        )}
         disabled={props.disabled}
         onClick={() => setOpen((wasOpen) => !wasOpen)}
         onKeyDown={handleTriggerKeyDown}

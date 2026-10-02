@@ -33,22 +33,18 @@ type SessionsTableHeaderKey = Extract<
 >;
 
 /** One entry per column, in order — same `width`/`align` discipline as `ProjectsTable.tsx`'s own
- * `COLUMNS`. **PO review round 2 (V2-T70's own visual proof found it):** the original set of
- * widths here was never pixel-measured and summed to 1054px — with `table-layout: fixed`, when a
- * table's explicit column widths sum to MORE than its container's own width, the browser grows
- * the TABLE itself past the container instead of shrinking those columns, and starves the one
- * column left without an explicit width (Name) down to a measured `0`, not just "narrow" —
- * confirmed with a real `getBoundingClientRect()` read against the built bundle at this window's
- * own default size (1200px, 260px sidebar, ~938px content width): `th0`'s own rendered width was
- * exactly `0`. These numbers are the same real-bundle-measurement discipline as
- * `ProjectsTable.tsx`'s own COLUMNS (not a screenshot ruler) — `id`/`directory`/`project` all keep
- * their own `truncate` + `title` backstop for a value longer than these mid-range widths, `state`
- * stays at its own PO-reviewed 160px (the one column whose longest realistic value, "no running
- * process", must never truncate), and `action` is the minimum that fits `Resume`+`Adopt…` side by
- * side (`.actionButton`'s own `min-width: 84px` × 2 + `gap: 8px` + this cell's own `12px` × 2
- * padding, `TableRow.module.css#.cell`). Sum: 800px, leaving Name ~140px at this window's default
- * size — truncating a long name is correct and expected (the same tradeoff `ProjectsTable.tsx`'s
- * own Name column already makes), never losing the column outright. */
+ * `COLUMNS`. **V2-T81 PO review — the rule, replacing the old fixed 800px budget** (which starved
+ * every column at 1500px: "auth-harde…", "555555…", "02/10/2026, 1…" with a wide gap before the
+ * buttons): the four columns whose content has a KNOWN size get a fixed width that fits it
+ * entirely — `id` (8 mono characters, never truncates), `state` (its longest realistic value,
+ * "no running process"), `lastActivity` (the full "02/10/2026, 00:16:44", same 174px
+ * `ProjectsTable.tsx` measured) and `action` (`Resume`+`Adopt…` side by side: `.actionButton`'s
+ * own 84px × 2 + 8px gap + 24px cell padding). `name`, `directory` and `project` carry NO width:
+ * with `table-layout: fixed` and `width: 100%` the browser splits whatever is left among the
+ * columns without one, so they grow with the window and truncate (`truncate` + `title`) only when
+ * the window really is narrow. The fixed widths sum to 634px; at the narrowest supported content
+ * width that still leaves the flexible columns a positive share, and the table never exceeds its
+ * container (no horizontal scroll) because fixed columns can only overflow when THEIR sum does. */
 // Exported for `tests/unit/app/renderer/features/sessions/SessionsTable.test.tsx`'s own column-
 // width-budget guard — happy-dom (this test's own environment) never runs a real layout engine,
 // so it cannot reproduce the `table-layout: fixed` overflow this file's own docstring just
@@ -62,11 +58,11 @@ export const COLUMNS: readonly {
   readonly align?: 'right';
 }[] = [
   { key: 'name', headerKey: 'sessionsTableHeaderName' },
-  { key: 'id', headerKey: 'sessionsTableHeaderId', width: '80px' },
+  { key: 'id', headerKey: 'sessionsTableHeaderId', width: '100px' },
   { key: 'state', headerKey: 'sessionsTableHeaderState', width: '160px' },
-  { key: 'directory', headerKey: 'sessionsTableHeaderDirectory', width: '130px' },
-  { key: 'project', headerKey: 'sessionsTableHeaderProject', width: '100px' },
-  { key: 'lastActivity', headerKey: 'sessionsTableHeaderLastActivity', width: '130px' },
+  { key: 'directory', headerKey: 'sessionsTableHeaderDirectory' },
+  { key: 'project', headerKey: 'sessionsTableHeaderProject' },
+  { key: 'lastActivity', headerKey: 'sessionsTableHeaderLastActivity', width: '174px' },
   { key: 'action', width: '200px', align: 'right' },
 ];
 

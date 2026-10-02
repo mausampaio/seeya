@@ -68,6 +68,7 @@ export function CwdChangeNotice(props: CwdChangeNoticeProps): JSX.Element {
           label={MESSAGES.todayResumeInLabel}
           value={selected}
           monospace
+          fullWidth
           disabled={props.disabled}
           options={existing.map((entry) => ({
             value: entry.cwd,

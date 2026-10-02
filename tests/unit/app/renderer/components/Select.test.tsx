@@ -233,6 +233,14 @@ describe('Select (V2-T81 — trigger + Popover listbox, not a native <select>)',
     expect(classesOf(trigger)).toContain(styles.monospace);
   });
 
+  it('fullWidth is opt-in on both the field and the trigger', () => {
+    const plain = renderSelect();
+    expect(classesOf(plain.trigger)).not.toContain(styles.fullWidth);
+    cleanup();
+    const full = render(<Select id="wide" label="Wide" value="a" options={OPTIONS} fullWidth />);
+    expect(classesOf(full.getByLabelText('Wide'))).toContain(styles.fullWidth);
+  });
+
   it('the list is labelled by the same label text', () => {
     const { list } = renderSelect();
     expect(list.getAttribute('aria-label')).toBe('Resume in options');

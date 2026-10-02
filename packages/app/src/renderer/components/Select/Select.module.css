@@ -23,7 +23,8 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--seeya-space-3);
-  width: 100%;
+  /* Content-sized (never wider than the reasonable ceiling) unless `fullWidth` says otherwise. */
+  width: fit-content;
   max-width: 280px;
   box-sizing: border-box;
   padding: var(--seeya-space-1) var(--seeya-space-3);
@@ -36,6 +37,17 @@
   transition:
     background-color var(--seeya-motion-micro) var(--seeya-motion-easing),
     border-color var(--seeya-motion-micro) var(--seeya-motion-easing);
+}
+
+/* `fullWidth` (D-052's shared vocabulary): the field and its trigger take the whole width of what
+ * they sit in, no ceiling — the label then uses all the room (a long path truncates only at the
+ * container's own edge). */
+.fullWidth {
+  width: 100%;
+}
+
+.trigger.fullWidth {
+  max-width: none;
 }
 
 .trigger:not(:disabled):hover {
