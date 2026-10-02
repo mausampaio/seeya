@@ -31,7 +31,13 @@ function SessionCard(props: {
   const directory = formatDirectoryPathForDisplay(session.cwd, props.homeDir, props.platformHint);
   return (
     <Stack gap="xs" className={cx(styles, 'sessionCard')}>
-      <Stack direction="horizontal" gap="sm" align="center">
+      {/* PO review round 2: this row's own three pieces (name, id, state chip) never shrink —
+       * on the dialog's own NEW, narrower width (matching every other dialog, item 1/2 of that
+       * same review) a longer name no longer fit on one line, and `Dialog.tsx`'s own
+       * `overflow-y: auto` computes `overflow-x: auto` too (the CSS spec's mixed-overflow rule),
+       * turning that overflow into a stray horizontal scrollbar instead of visibly wrapping.
+       * `wrap` is the same backstop `Stack`'s own docstring already offers for exactly this. */}
+      <Stack direction="horizontal" gap="sm" align="center" wrap>
         <Text as="span" variant="body-md" weight={500}>
           {session.name}
         </Text>
@@ -108,8 +114,14 @@ export function PickPane(props: PickPaneProps): JSX.Element {
               {MESSAGES.adoptPickExplanationHeading}
             </Text>
             {controls.explanationLines.map((line, index) => (
-              <Text as="p" variant="body-sm" key={index}>
-                {index + 1}. {line}
+              <Text
+                as="p"
+                variant="body-sm"
+                key={index}
+                className={cx(styles, 'explanationLine')}
+                {...(line.fullText !== line.text ? { title: line.fullText } : {})}
+              >
+                {index + 1}. {line.text}
               </Text>
             ))}
           </Stack>

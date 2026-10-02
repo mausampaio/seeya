@@ -73,7 +73,14 @@ describe('AdoptionDialog (V2-T70)', () => {
 
   it('shows the live explanation preview as a valid new project id is typed', async () => {
     const previewAdoptionLaunch = vi.fn(() =>
-      Promise.resolve({ explanationLines: ['The copy will open in /code/payments.'] }),
+      Promise.resolve({
+        explanationLines: [
+          {
+            text: 'The copy will open in /code/payments.',
+            fullText: 'The copy will open in /code/payments.',
+          },
+        ],
+      }),
     );
     window.seeya = createFakeSeeyaApi({ previewAdoptionLaunch });
     const { getByText } = render(<AdoptionDialog />);
@@ -151,6 +158,7 @@ describe('AdoptionDialog (V2-T70)', () => {
     ).mock.calls[0]?.[0] as (event: unknown) => void;
     onConfirmAdoptionCommitRequest({
       requestId: 'req-1',
+      projectId: 'auth-hardening',
       changedFileEntries: [
         { kind: 'added', path: 'context/know-how.md', lines: { added: 4, removed: 0 } },
         { kind: 'modified', path: 'INDEX.md', lines: { added: 2, removed: 1 } },
@@ -216,7 +224,7 @@ describe('AdoptionDialog (V2-T70)', () => {
       ),
       previewAdoptionLaunch: vi.fn(() => Promise.resolve({ explanationLines: [] })),
     });
-    const { getByText } = render(<AdoptionDialog />);
+    const { getByText, getAllByText } = render(<AdoptionDialog />);
     openAdoptionDialog(SESSION);
     await waitFor(() => expect(getDialog().open).toBe(true));
 
@@ -235,6 +243,7 @@ describe('AdoptionDialog (V2-T70)', () => {
     ).mock.calls[0]?.[0] as (event: unknown) => void;
     onConfirmAdoptionCommitRequest({
       requestId: 'req-1',
+      projectId: 'auth-hardening',
       changedFileEntries: [{ kind: 'added', path: 'INDEX.md', lines: { added: 1, removed: 0 } }],
     });
     await waitFor(() => expect(getDialog().open).toBe(true));
@@ -249,7 +258,13 @@ describe('AdoptionDialog (V2-T70)', () => {
     });
 
     await waitFor(() => expect(getDialog().open).toBe(true));
-    expect(getByText(/committing them failed/)).not.toBeNull();
+    // PO review round 2: the full reason is now ALSO shown in full below the (truncated)
+    // headline — "committing them failed" reads in both (this message is over the headline's own
+    // 100-char cap), so `getAllByText` proves BOTH are on screen; the unique tail text past the
+    // headline's own truncation point proves the COMPLETE message is really there, not just a
+    // repeat of the same truncated hint.
+    expect(getAllByText(/committing them failed/)).toHaveLength(2);
+    expect(getByText(/git hook refused\)\./)).not.toBeNull();
     expect(document.getElementById('adoption-result-open-project-button')).toBeNull();
   });
 });

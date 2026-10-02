@@ -7,6 +7,7 @@
  */
 import type { JSX } from 'preact';
 import { Stack } from '../../../components/Stack/index.js';
+import { Text } from '../../../components/Text/index.js';
 import { StatusList, type StatusListItem } from '../../../components/StatusList/index.js';
 import { MESSAGES } from '../../../../text/messages.js';
 import type { AdoptionReviewRow } from '../../../../state/adoption-review.js';
@@ -14,6 +15,10 @@ import type { ChangedFileStatsEntry } from '@seeya-ai/engine/core/ports.js';
 
 export interface ReviewPaneProps {
   readonly rows: readonly AdoptionReviewRow[];
+  /** `docs/INTERFACE.md` § 9's own "uma linha de contexto" — same `leftoverChangesConfirmContext`
+   * shape V2-T71 already established, in the scrollable body, above the list. */
+  readonly fileCount: number;
+  readonly projectId: string;
 }
 
 const KIND_LABEL: Record<ChangedFileStatsEntry['kind'], string> = {
@@ -42,6 +47,9 @@ function toReviewItem(row: AdoptionReviewRow): StatusListItem {
 export function ReviewPane(props: ReviewPaneProps): JSX.Element {
   return (
     <Stack gap="md">
+      <Text as="p" variant="body-md">
+        {MESSAGES.adoptReviewContext(props.fileCount, props.projectId)}
+      </Text>
       <StatusList items={props.rows.map(toReviewItem)} emptyMessage={MESSAGES.adoptReviewEmpty} />
     </Stack>
   );

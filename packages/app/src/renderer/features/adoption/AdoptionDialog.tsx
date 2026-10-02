@@ -14,8 +14,12 @@
  * would block the very tab the fork session needs the person to work in.
  */
 import type { ComponentChildren, JSX } from 'preact';
+import styles from './AdoptionDialog.module.css';
+import { cx } from '../../components/css-class.js';
 import { Dialog } from '../../components/Dialog/index.js';
 import { Button } from '../../components/Button/index.js';
+import { Stack } from '../../components/Stack/index.js';
+import { Text } from '../../components/Text/index.js';
 import { MESSAGES } from '../../../text/messages.js';
 import { PickPane } from './PickPane/index.js';
 import { ReviewPane } from './ReviewPane/index.js';
@@ -55,19 +59,38 @@ function footerFor(controls: AdoptionControls): ComponentChildren {
     );
   }
   if (state.kind === 'commitConfirm') {
+    // Same shape `LeftoverChangesConfirmDialog`/`ProjectLockConfirmDialog`/
+    // `DaemonOwnershipTransitionDialog` (V2-T71, `docs/INTERFACE.md` § 9) already established:
+    // each option's explanation lives IN the footer, full-width, stacked ABOVE a single
+    // right-aligned button row — never two narrow columns each under its own button (that shape
+    // pushed a shorter explanation's button out of line with the longer one's, the defect V2-T71's
+    // own PO review round 1 found).
     return (
-      <>
-        <Button
-          id="adoption-review-discard-button"
-          variant="secondary"
-          onClick={() => controls.answerCommit('decline')}
-        >
-          {MESSAGES.adoptReviewDiscard}
-        </Button>
-        <Button id="adoption-review-commit-button" onClick={() => controls.answerCommit('commit')}>
-          {MESSAGES.adoptReviewCommit}
-        </Button>
-      </>
+      <Stack gap="sm" className={cx(styles, 'footerStack')}>
+        <Stack gap="xs">
+          <Text as="p" variant="caption" tone="secondary">
+            <strong>{MESSAGES.adoptReviewDiscard}:</strong> {MESSAGES.adoptReviewDiscardExplanation}
+          </Text>
+          <Text as="p" variant="caption" tone="secondary">
+            <strong>{MESSAGES.adoptReviewCommit}:</strong> {MESSAGES.adoptReviewCommitExplanation}
+          </Text>
+        </Stack>
+        <Stack direction="horizontal" gap="sm" justify="end">
+          <Button
+            id="adoption-review-discard-button"
+            variant="secondary"
+            onClick={() => controls.answerCommit('decline')}
+          >
+            {MESSAGES.adoptReviewDiscard}
+          </Button>
+          <Button
+            id="adoption-review-commit-button"
+            onClick={() => controls.answerCommit('commit')}
+          >
+            {MESSAGES.adoptReviewCommit}
+          </Button>
+        </Stack>
+      </Stack>
     );
   }
   if (state.kind === 'result') {
@@ -115,10 +138,17 @@ export function AdoptionDialog(): JSX.Element {
       title={titleFor(state)}
       open={isDialogOpen(state)}
       onClose={handleClose}
+      className={cx(styles, 'dialog')}
       footer={footerFor(controls)}
     >
       {state.kind === 'pickProject' && <PickPane session={state.session} controls={controls} />}
-      {state.kind === 'commitConfirm' && <ReviewPane rows={controls.reviewRows} />}
+      {state.kind === 'commitConfirm' && (
+        <ReviewPane
+          rows={controls.reviewRows}
+          fileCount={state.entries.length}
+          projectId={state.projectId}
+        />
+      )}
       {state.kind === 'result' && (
         <ResultPane
           outcomeText={state.outcomeText}

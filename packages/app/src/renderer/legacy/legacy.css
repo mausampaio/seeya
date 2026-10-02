@@ -160,9 +160,17 @@ body {
 }
 
 /* V2-T63: a page tab's own content (Today/Projects/Sessions) — unlike a terminal pane (xterm
- * paints its own scrollback), this is ordinary DOM content, so it needs its own scroll/padding. */
+ * paints its own scrollback), this is ordinary DOM content, so it needs its own scroll/padding.
+ * PO review round 2 (V2-T70): `overflow-x: hidden` added — the CSS spec's own mixed-overflow rule
+ * computes `overflow-x` to `auto` too whenever `overflow-y` isn't `visible`, and a real capture of
+ * the Sessions tab found a page-wide horizontal scrollbar here (root cause fixed at its source,
+ * `SessionsTable.tsx`'s own column-width budget — see that file's own docstring) — this is the
+ * same flat backstop `#sidebar-content { overflow-x: hidden }` already set for an identical class
+ * of bug (V2-T55 aceite correction 1), now covering every page tab, not just the one that broke:
+ * no page tab's content in this design system is meant to scroll sideways. */
 .page-pane {
   overflow-y: auto;
+  overflow-x: hidden;
   padding: var(--seeya-space-4);
   box-sizing: border-box;
 }

@@ -751,12 +751,25 @@ export interface PreviewAdoptionLaunchRequest {
   readonly projectId: string;
 }
 
-/** `CHANNELS.previewAdoptionLaunch`'s response — `explanationLines` is
- * `@seeya-ai/engine/core/project-adoption-message.js#renderAdoptionLaunchExplanationLines`'s own
- * lines, computed against a `projectId` that may not exist as a project yet (this is only a
- * preview — nothing is created by this call). */
+/** One line of `CHANNELS.previewAdoptionLaunch`'s own explanation — `text` is what's shown ON
+ * SCREEN (`main/project-ipc.ts` computes it against `~`-abbreviated paths, PO review round 2:
+ * the raw absolute path, with the real machine's own username in it, was both a privacy leak and
+ * what forced the dialog wider than every other one); `fullText` is the SAME line against the raw,
+ * unabbreviated path — `@seeya-ai/engine/core/project-adoption-message.js
+ * #renderAdoptionLaunchExplanationLines`'s own output unmodified, so the CLI's identical call
+ * (`cli/format-project-adopt.ts#renderAdoptionLaunchConfirmation`) never changes. Equal to `text`
+ * when abbreviation had nothing to shorten (same "only when it would actually differ" convention
+ * `IgnoredProjectsSection.tsx`/`ResultPane.tsx#summarizeErrorReason` already use) — a caller never
+ * needs a third comparison to decide whether a `title` tooltip would say anything new. */
+export interface AdoptionExplanationLine {
+  readonly text: string;
+  readonly fullText: string;
+}
+
+/** `CHANNELS.previewAdoptionLaunch`'s response — computed against a `projectId` that may not
+ * exist as a project yet (this is only a preview — nothing is created by this call). */
 export interface PreviewAdoptionLaunchResponse {
-  readonly explanationLines: readonly string[];
+  readonly explanationLines: readonly AdoptionExplanationLine[];
 }
 
 /** `CHANNELS.confirmAdoptionCommitRequest`'s payload — `changedFileEntries` is
@@ -765,6 +778,7 @@ export interface PreviewAdoptionLaunchResponse {
  * file, not the plain path lines this event used to carry. */
 export interface ConfirmAdoptionCommitRequestEvent {
   readonly requestId: string;
+  readonly projectId: string;
   readonly changedFileEntries: readonly ChangedFileStatsEntry[];
 }
 

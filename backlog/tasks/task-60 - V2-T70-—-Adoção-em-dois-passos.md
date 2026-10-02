@@ -34,7 +34,7 @@ projectId)` devolve `readonly ChangedFileEntry[]` — união discriminada por `k
 linhas dos arquivos rastreados, leitura direta + contagem de quebras de linha para os não
 rastreados (detecção de binário por byte NUL). Renomeio vira `modified` com o caminho inteiro
 `"old -> new"` e `lines: null` — nunca recasado contra a grafia diferente (`old => new`) do
-`--numstat` (decisão registrada em `docs/QUESTOES.md` Q-107). 10 testes de integração contra um
+`--numstat` (decisão registrada em `docs/QUESTOES.md` Q-108). 10 testes de integração contra um
 repositório git real (`tests/integration/workspace/changed-file-stats.test.ts`).
 
 **Diálogo único de adoção (`docs/INTERFACE.md` § 7).**
@@ -113,5 +113,5 @@ tarefa passa a reusar o parser/tipo de status dela, estendendo-os em vez de dupl
 coordenação **não foi executada** nesta sessão (o aviso de "já está em main" nunca chegou) — fica
 registrada aqui para quem revisar ou continuar.
 
-**Sem questões novas em `docs/QUESTOES.md`** além da Q-107 (já registrada no commit `0c3f622`).
+**Sem questões novas em `docs/QUESTOES.md`** além da Q-108 (já registrada no commit `0c3f622`).
 <!-- SECTION:NOTES:END -->

@@ -33,6 +33,7 @@ import { openProject, SUPPORTED_HARNESS } from '@seeya-ai/engine/application/pro
 import { adoptSession } from '@seeya-ai/engine/application/project-adopt.js';
 import type { RejectedDiscoveryRecord } from '@seeya-ai/engine/core/ports.js';
 import { renderAdoptionLaunchExplanationLines } from '@seeya-ai/engine/core/project-adoption-message.js';
+import { collapseHomeDirectory } from '../sidebar/directory-label.js';
 import { CHANNELS } from '../ipc/channels.js';
 import type {
   AdoptSessionRequest,
@@ -285,6 +286,16 @@ export function wireProjectIpc(
   // `adoptSession` is ever invoked. Resolves the workspace root the same way `openProject`'s own
   // handler does; never creates anything (`path.join` alone, no `ensureProjectExists`) — a project
   // id that doesn't exist yet previews exactly where it WOULD be created.
+  //
+  // PO review round 2: the raw lines (the CLI's own `renderAdoptionLaunchConfirmation` calls the
+  // SAME engine function with the SAME raw paths, unchanged by this) carry the real machine's own
+  // absolute path, username included — a privacy leak on screen and what forced this dialog wider
+  // than every other one. The function itself stays pure and un-parametrized (`core/` never learns
+  // `~`-abbreviation, a window-only concern); this handler instead calls it TWICE — once against
+  // `collapseHomeDirectory`'d paths (what the dialog shows), once against the raw ones (`fullText`,
+  // for a `title` tooltip when it differs) — rather than string-replacing a path substring inside
+  // an already-assembled prose sentence, which would break the moment that sentence's own wording
+  // changes around it.
   ipcMain.handle(
     CHANNELS.previewAdoptionLaunch,
     async (
@@ -293,12 +304,32 @@ export function wireProjectIpc(
     ): Promise<PreviewAdoptionLaunchResponse> => {
       const root = await resolveWorkspaceRoot(context.storage, context.home.seeyaHome);
       const projectDir = path.join(root, request.projectId);
+      const platformHint = process.platform === 'win32' ? 'win32' : 'posix';
+      const abbreviatedCwd = collapseHomeDirectory(
+        request.originalCwd,
+        context.homeDir,
+        platformHint,
+      );
+      const abbreviatedProjectDir = collapseHomeDirectory(
+        projectDir,
+        context.homeDir,
+        platformHint,
+      );
+      const displayLines = renderAdoptionLaunchExplanationLines(
+        abbreviatedCwd,
+        abbreviatedProjectDir,
+        request.projectId,
+      );
+      const fullLines = renderAdoptionLaunchExplanationLines(
+        request.originalCwd,
+        projectDir,
+        request.projectId,
+      );
       return {
-        explanationLines: renderAdoptionLaunchExplanationLines(
-          request.originalCwd,
-          projectDir,
-          request.projectId,
-        ),
+        explanationLines: displayLines.map((text, index) => ({
+          text,
+          fullText: fullLines[index] ?? text,
+        })),
       };
     },
   );
@@ -366,7 +397,11 @@ export function wireProjectIpc(
             request.projectId,
           );
           const { requestId, answer } = pendingCommitConfirmations.create();
-          const event: ConfirmAdoptionCommitRequestEvent = { requestId, changedFileEntries };
+          const event: ConfirmAdoptionCommitRequestEvent = {
+            requestId,
+            projectId: request.projectId,
+            changedFileEntries,
+          };
           window.webContents.send(CHANNELS.confirmAdoptionCommitRequest, event);
           return answer;
         },

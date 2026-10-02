@@ -30,7 +30,10 @@ import {
   getAdoptPanelState,
   subscribeAdoptPanel,
 } from './adoption-dialog-bridge.js';
-import type { ConfirmAdoptionCommitRequestEvent } from '../../../ipc/channels.js';
+import type {
+  AdoptionExplanationLine,
+  ConfirmAdoptionCommitRequestEvent,
+} from '../../../ipc/channels.js';
 
 export type AdoptPickMode = 'existing' | 'new';
 
@@ -57,7 +60,7 @@ export interface AdoptionControls {
   readonly newProjectId: string;
   readonly setNewProjectId: (projectId: string) => void;
   readonly pickError: string | undefined;
-  readonly explanationLines: readonly string[];
+  readonly explanationLines: readonly AdoptionExplanationLine[];
   readonly submitting: boolean;
   readonly submit: () => void;
   readonly cancel: () => void;
@@ -94,6 +97,7 @@ export function useAdoption(): AdoptionControls {
       dispatchAdoptPanel({
         kind: 'commitRequestReceived',
         requestId: event.requestId,
+        projectId: event.projectId,
         entries: event.changedFileEntries,
       });
     });
@@ -103,14 +107,20 @@ export function useAdoption(): AdoptionControls {
   const [existingProjectId, setExistingProjectId] = useState('');
   const [newProjectId, setNewProjectId] = useState('');
   const [pickError, setPickError] = useState<string | undefined>(undefined);
-  const [explanationLines, setExplanationLines] = useState<readonly string[]>([]);
+  const [explanationLines, setExplanationLines] = useState<readonly AdoptionExplanationLine[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   const existingProjectOptions = useMemo<readonly AdoptionExistingProjectOption[]>(
     () =>
       getLatestProjectsPanelData().projects.map((project) => ({
         value: project.projectId,
-        label: `${project.name} (${project.projectId})`,
+        // PO review round 2: the id repeated the name for every ordinary project (a fresh
+        // project's `name` defaults to its `projectId`) — "payments-webhooks (payments-webhooks)"
+        // said nothing twice. The id is only useful when it's a DIFFERENT fact from the name.
+        label:
+          project.name === project.projectId
+            ? project.name
+            : `${project.name} (${project.projectId})`,
       })),
     // Recomputed fresh every time the picker opens — a project created in an earlier adoption
     // (or from the Projects tab, in the same session) should show up without this hook having its

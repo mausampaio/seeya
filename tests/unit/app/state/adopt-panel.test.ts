@@ -27,6 +27,7 @@ describe('reduceAdoptPanel (V2-T70)', () => {
     state = reduceAdoptPanel(state, {
       kind: 'commitRequestReceived',
       requestId: 'adopt-commit-1',
+      projectId: 'x',
       entries: [{ kind: 'added', path: 'AGENTS.md', lines: null }],
     });
     expect(state.kind).toBe('commitConfirm');
@@ -106,8 +107,14 @@ describe('reduceAdoptPanel (V2-T70)', () => {
     const result = reduceAdoptPanel(idle, {
       kind: 'commitRequestReceived',
       requestId: 'r1',
+      projectId: 'x',
       entries: [],
     });
-    expect(result).toEqual({ kind: 'commitConfirm', requestId: 'r1', entries: [] });
+    expect(result).toEqual({
+      kind: 'commitConfirm',
+      requestId: 'r1',
+      projectId: 'x',
+      entries: [],
+    });
   });
 });

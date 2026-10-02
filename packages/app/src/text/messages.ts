@@ -528,8 +528,17 @@ export const MESSAGES = {
   adoptPickExplanationHeading: 'What happens next',
   adoptReviewTitle: 'Review before committing',
   adoptReviewEmpty: 'Nothing changed inside the project.',
+  // PO review round 2 (`docs/INTERFACE.md` § 9's own "uma linha de contexto, o que cada opção
+  // faz escrito ao lado dela" — the pattern `leftoverChangesConfirmContext`/
+  // `leftoverChangesConfirm{Commit,Proceed}Explanation` above already established): the context
+  // line sits in the scrollable body, above the file list; the two explanations sit in the
+  // dialog's own fixed footer, above the buttons they describe.
+  adoptReviewContext: (count: number, projectId: string): string =>
+    `${count} file${count === 1 ? '' : 's'} changed in project "${projectId}":`,
   adoptReviewCommit: 'Commit',
   adoptReviewDiscard: 'Discard',
+  adoptReviewDiscardExplanation: "Discard the copy's changes — nothing is recorded in the project.",
+  adoptReviewCommitExplanation: 'Commit these changes to the project, attributed to this adoption.',
   adoptResultTitle: 'Adoption result',
   adoptResultOpenProject: 'Open project',
   adoptResultClose: 'Close',

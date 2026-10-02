@@ -24,7 +24,18 @@
    * the item's `overflow` is anything other than `visible` in that axis, which is the flexbox
    * spec's own carve-out this relies on (confirmed by `SettingsDialog.module.css#.body`, the first
    * caller of this exact mechanism). `min-height: 0` says the same thing explicitly, for a reader
-   * who hasn't memorized that carve-out. */
+   * who hasn't memorized that carve-out.
+   *
+   * PO review round 2 (V2-T70): a real capture found a stray horizontal scrollbar here, caused by
+   * a 2px sub-pixel flex-layout rounding (measured with a real `getBoundingClientRect()` read —
+   * no single child was individually wider than this body). `overflow-x: hidden` here would be
+   * the obvious blanket fix (the CSS spec's own mixed-overflow rule already computes `overflow-x`
+   * to `auto` once `overflow-y` isn't `visible`) — **measured and reverted**: it broke the
+   * adoption dialog's own commit-failure path (the dialog got stuck, never reopening with the
+   * result, confirmed by toggling only this one line on a real build and nothing else) for a
+   * reason this task did not track down in the time it had. Fixed at each caller's own narrower
+   * scope instead — see `PickPane.module.css#.pane` for the one case this task's own dialog
+   * actually needed it. */
   overflow-y: auto;
   min-height: 0;
 }

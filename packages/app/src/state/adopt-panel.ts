@@ -40,6 +40,7 @@ export type AdoptPanelState =
   | {
       readonly kind: 'commitConfirm';
       readonly requestId: string;
+      readonly projectId: string;
       readonly entries: readonly ChangedFileStatsEntry[];
     }
   | {
@@ -56,6 +57,7 @@ export type AdoptPanelEvent =
   | {
       readonly kind: 'commitRequestReceived';
       readonly requestId: string;
+      readonly projectId: string;
       readonly entries: readonly ChangedFileStatsEntry[];
     }
   | { readonly kind: 'commitAnswered' }
@@ -86,7 +88,12 @@ export function reduceAdoptPanel(state: AdoptPanelState, event: AdoptPanelEvent)
     // push must never be silently dropped just because this machine's own idea of "what came
     // before" doesn't match exactly).
     case 'commitRequestReceived':
-      return { kind: 'commitConfirm', requestId: event.requestId, entries: event.entries };
+      return {
+        kind: 'commitConfirm',
+        requestId: event.requestId,
+        projectId: event.projectId,
+        entries: event.entries,
+      };
     case 'commitAnswered':
       return state.kind === 'commitConfirm' ? { kind: 'launching' } : state;
     case 'resultReceived':
