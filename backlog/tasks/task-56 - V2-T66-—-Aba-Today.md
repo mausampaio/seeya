@@ -4,7 +4,7 @@ title: V2-T66 — Aba Today
 status: Review
 assignee: []
 created_date: '2026-09-30 10:34'
-updated_date: '2026-10-01 20:08'
+updated_date: '2026-10-02 00:05'
 labels: []
 milestone: m-2
 dependencies:
@@ -100,6 +100,7 @@ Defeito encontrado e corrigido no PRÓPRIO script de captura (fora do código do
 
 Nada de `git stash` usado. Nenhuma recusa do sandbox contornada — o guard de termos locais recusou o primeiro commit por um caminho de home com o nome de usuário real desta máquina (maiúsculo e minúsculo) numa fixture de teste, sem eu perceber; corrigido trocando por `<usuario>`/`<USUARIO>`, a convenção já usada em `tests/unit/adapters/autostart/*.test.ts` e outros, não um afrouxamento do guard.
 ---
+
 author: Claude (agent)
 created: 2026-10-01 20:50
 ---
@@ -116,5 +117,11 @@ Revisão do PO, terceira rodada, mesma branch. Quatro itens, todos no item 2 ori
 Capturas novas (dois temas) com os quatro itens visíveis na MESMA captura por tema: `today-paths-{light,dark}.png` (itens 1/3/4) e `today-resume-result-sync-{light,dark}.png` (itens 1/2, mais a sincronia da lateral já confirmada certa na rodada anterior). `dist` apagado, `npm run verificar` verde — 353 arquivos de teste, cobertura 95,71% statements / 95,9% lines, inalterada.
 
 Nada de `git stash`. Nenhuma recusa contornada.
+---
+
+author: PO
+created: 2026-10-02 00:05
+---
+Revisão do PO (2026-10-01): três rodadas. Rodada 2 corrigiu o contador do cartão Today desatualizado depois de retomar (push de todayUpdate após resumeSelected) e abreviou o home com ~. Rodada 3: ~ visível em captura, bloco Resumed formatado, teto de 80 caracteres na aba larga (TODAY_TAB_DIRECTORY_MAX_LENGTH), título '(today)'/'(1 day ago)'. Capturas reais conferidas nos dois temas contra docs/INTERFACE.md § 3. Mesclada no po-gate; npm run verificar do zero e npm test sem identidade git verdes (3431 testes). Publicada; aguarda aceite do mantenedor pelo instalador.
 ---
 <!-- COMMENTS:END -->
