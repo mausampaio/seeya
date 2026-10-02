@@ -1,0 +1,4 @@
+/* V2-T71 — wide enough for the body paragraph to read comfortably without wrapping too tightly. */
+.dialog {
+  width: min(480px, calc(100vw - var(--seeya-space-8)));
+}

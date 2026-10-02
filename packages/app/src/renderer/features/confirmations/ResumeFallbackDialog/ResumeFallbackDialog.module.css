@@ -1,0 +1,8 @@
+/* V2-T71 — wide enough for three stacked cards to read comfortably. */
+.dialog {
+  width: min(480px, calc(100vw - var(--seeya-space-8)));
+}
+
+.card {
+  width: 100%;
+}

@@ -13,48 +13,17 @@
  * instead of an imperative anchor here. V2-T69: End day left the same way —
  * `renderer/features/end-day/EndDayDialog` replaces the `#end-day-dialog` anchor below. V2-T67:
  * "New project…" left the same way — `renderer/features/projects/NewProjectDialog` replaces the
- * `#new-project-dialog` anchor that used to live here.
+ * `#new-project-dialog` anchor that used to live here. V2-T71: four more left the same way —
+ * `renderer/features/confirmations/` (`ProjectLockConfirmDialog`/`LeftoverChangesConfirmDialog`/
+ * `ResumeFallbackDialog`/`DaemonOwnershipTransitionDialog`) replace the `#project-lock-confirm-
+ * dialog`/`#leftover-changes-confirm-dialog`/`#fallback-dialog`/`#daemon-ownership-transition-
+ * dialog` anchors that used to live here.
  */
 import { Dialog } from '../components/Dialog/Dialog.js';
 
 export function DialogsShell() {
   return (
     <>
-      <Dialog id="fallback-dialog">
-        <h3 id="fallback-dialog-title"></h3>
-        <p id="fallback-dialog-reason"></p>
-        <p id="fallback-dialog-body"></p>
-        <div id="fallback-dialog-actions">
-          <button id="fallback-dialog-resume-without-plan" type="button" hidden></button>
-          <button id="fallback-dialog-open" type="button"></button>
-          <button id="fallback-dialog-skip" type="button"></button>
-        </div>
-      </Dialog>
-      <Dialog id="daemon-ownership-transition-dialog">
-        <h3 id="daemon-ownership-transition-title"></h3>
-        <p id="daemon-ownership-transition-body"></p>
-        <p id="daemon-ownership-transition-status"></p>
-        <div id="daemon-ownership-transition-actions">
-          <button id="daemon-ownership-transition-accept" type="button"></button>
-          <button id="daemon-ownership-transition-decline" type="button"></button>
-        </div>
-      </Dialog>
-      <Dialog id="project-lock-confirm-dialog" className="project-dialog">
-        <h3 id="project-lock-confirm-title"></h3>
-        <p id="project-lock-confirm-question"></p>
-        <div class="project-dialog-actions">
-          <button id="project-lock-confirm-proceed" type="button"></button>
-          <button id="project-lock-confirm-decline" type="button"></button>
-        </div>
-      </Dialog>
-      <Dialog id="leftover-changes-confirm-dialog" className="project-dialog">
-        <h3 id="leftover-changes-confirm-title"></h3>
-        <div id="leftover-changes-confirm-lines"></div>
-        <div class="project-dialog-actions">
-          <button id="leftover-changes-confirm-commit" type="button"></button>
-          <button id="leftover-changes-confirm-proceed" type="button"></button>
-        </div>
-      </Dialog>
       <Dialog id="adopt-pick-dialog" className="project-dialog">
         <h3 id="adopt-pick-title"></h3>
         <form id="adopt-pick-form">

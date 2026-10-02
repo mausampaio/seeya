@@ -73,7 +73,12 @@ export function createFakeSeeyaApi(overrides: Partial<SeeyaApi> = {}): SeeyaApi 
     // "fetchInitial seeds state" reasoning as `getScheduleStrip`/`getAppVersion` above) — a real
     // resolving value, not `neverCalled`.
     getHomeDir: vi.fn(() => Promise.resolve('/home/<usuario>')),
-    getDaemonOwnershipTransitionOffer: neverCalled('getDaemonOwnershipTransitionOffer'),
+    // V2-T71: `DaemonOwnershipTransitionDialog` calls this unconditionally on mount (same
+    // "fetchInitial seeds state" reasoning `getScheduleStrip`/`getAppVersion` above already need)
+    // — a real resolving value, never offering, not `neverCalled`.
+    getDaemonOwnershipTransitionOffer: vi.fn(() =>
+      Promise.resolve({ shouldOffer: false, launchPath: '' }),
+    ),
     answerDaemonOwnershipTransition: neverCalled('answerDaemonOwnershipTransition'),
     onProjectsUpdate: vi.fn(noopUnsubscribe),
     getProjectsPanel: vi.fn(() =>

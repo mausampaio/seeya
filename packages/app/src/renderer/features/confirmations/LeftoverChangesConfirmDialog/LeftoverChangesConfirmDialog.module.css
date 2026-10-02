@@ -1,0 +1,5 @@
+/* V2-T71 — wide enough for a real path to read without wrapping into the badge column, capped so
+ * a long file list still scrolls inside the window instead of growing past it. */
+.dialog {
+  width: min(560px, calc(100vw - var(--seeya-space-8)));
+}
