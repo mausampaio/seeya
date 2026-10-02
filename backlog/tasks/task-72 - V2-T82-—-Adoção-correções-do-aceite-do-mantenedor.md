@@ -4,7 +4,7 @@ title: 'V2-T82 — Adoção: correções do aceite do mantenedor'
 status: Review
 assignee: []
 created_date: '2026-10-02 17:29'
-updated_date: '2026-10-02 18:29'
+updated_date: '2026-10-02 18:48'
 labels:
   - ui
 dependencies: []
@@ -38,5 +38,11 @@ author: Claude
 created: 2026-10-02 18:29
 ---
 PO pediu conferir os diálogos do V2-T71 contra o Dialog compartilhado alterado. Capturas reais nos dois temas (projeto travado com processo-isca real e procStart lido pelo adaptador, mudanças pendentes com 18 arquivos, retomada que falhou nas duas formas, transição do daemon em repouso e em loading) e a 04-result clara da adoção, todas abertas e olhadas: nenhum diálogo ficou cortado pelo teto 80vh/720px nem com espaço dobrado; os três cartões da retomada cabem sem rolagem; a lista longa rola por dentro com título e rodapé fixos. Observação: o espaço entre o último parágrafo e os botões soma a margem padrão de p com os 16px do rodapé, legível e coerente nos cinco diálogos; a folga entre parágrafos dentro dos corpos é anterior a esta tarefa. Ajuste de instrumentação: a espera da captura em repouso da transição do daemon subiu de 4s para 7s (aos 4s o diálogo ainda não tinha aparecido).
+---
+
+author: PO
+created: 2026-10-02 18:48
+---
+Revisão do PO (2026-10-02): os quatro defeitos do aceite corrigidos. (1) Close/Esc só fecham; Open project abre — provado na janela real por contagem de chamadas ao HarnessLauncher fictício (0 e 1) e por três testes renderizados que falhavam antes. (2) Dialog compartilhado: margem de 16px acima do rodapé. (3) Teto min(80vh, 720px) com box-sizing border-box, lista rolando por dentro. (4) Causa medida com git real: os padrões .seeya-audit e **/.claude/ só eram garantidos no .gitignore dentro de commitAll, e as listagens rodavam antes (3 listados vs 1 commitado na reprodução); as três listagens agora garantem os padrões antes de ler — efeito colateral registrado: uma listagem pode reescrever o .gitignore do espaço de trabalho (idempotente, a mesma escrita do commit). Diálogos da V2-T71 e do End day reconferidos em captura com o Dialog alterado, sem espaço dobrado nem corte. Mesclada no po-gate; portão do zero e npm test sem identidade git verdes (3734 testes). Agente Sonnet 5.5.
 ---
 <!-- COMMENTS:END -->
