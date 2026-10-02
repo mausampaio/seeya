@@ -95,33 +95,48 @@ describe('Button (D-052, V2-T75)', () => {
     });
   });
 
-  describe('loading (D-052, maintainer complement, V2-T65-estado-na-tela item 2)', () => {
-    it('omitted: no spinner slot at all, exactly as before this prop existed', () => {
+  describe('loading (D-052, maintainer complement, V2-T65-estado-na-tela item 2; overlay fix V2-T79)', () => {
+    it('omitted: no spinner in the DOM at all, exactly as before this prop existed', () => {
       const { getByRole, container } = render(<Button>Skip today</Button>);
       expect(container.querySelector('svg')).toBeNull();
       expect(getByRole('button').getAttribute('aria-busy')).toBeNull();
     });
 
-    it('false: reserves the spinner slot (mounted, hidden) but never disables the button', () => {
-      const { getByRole, container } = render(<Button loading={false}>Skip today</Button>);
-      const button = getByRole('button') as HTMLButtonElement;
-      expect(button.disabled).toBe(false);
-      expect(button.getAttribute('aria-busy')).toBeNull();
-      // The spinner SVG is in the DOM even at loading=false — this is what keeps the button's own
-      // width identical once loading flips to true (Button.module.css's own `.spinnerSlotHidden`
-      // is what actually hides it, a CSS concern this rendered test can't observe directly — see
-      // guard reasoning in `Button.tsx`'s own docstring).
-      expect(container.querySelector('svg')).not.toBeNull();
-    });
+    it(
+      'false: structurally IDENTICAL to a button without the prop at all — no spinner, no ' +
+        'extra wrapper around the label (V2-T79: this is the case that used to shift Open/Skip ' +
+        'today/Create off-center)',
+      () => {
+        const withLoadingFalse = render(<Button loading={false}>Skip today</Button>);
+        const withoutLoading = render(<Button>Skip today</Button>);
+        const button = withLoadingFalse.container.querySelector('button');
+        if (button === null) {
+          throw new Error('expected a <button> in the rendered container, found none');
+        }
+        expect(button.disabled).toBe(false);
+        expect(button.getAttribute('aria-busy')).toBeNull();
+        expect(withLoadingFalse.container.querySelector('svg')).toBeNull();
+        // Byte-for-byte the same markup either way — the whole point of the fix.
+        expect(withLoadingFalse.container.innerHTML).toBe(withoutLoading.container.innerHTML);
+        withLoadingFalse.unmount();
+        withoutLoading.unmount();
+      },
+    );
 
-    it('true: disables the button, sets aria-busy, and keeps the ORIGINAL label text (never a swap)', () => {
-      const { getByRole, container } = render(<Button loading>Skip today</Button>);
-      const button = getByRole('button') as HTMLButtonElement;
-      expect(button.disabled).toBe(true);
-      expect(button.getAttribute('aria-busy')).toBe('true');
-      expect(button.textContent).toContain('Skip today');
-      expect(container.querySelector('svg')).not.toBeNull();
-    });
+    it(
+      'true: disables the button, sets aria-busy, keeps the ORIGINAL label text in the DOM ' +
+        '(hidden, never swapped out), and overlays a spinner',
+      () => {
+        const { getByRole, container } = render(<Button loading>Skip today</Button>);
+        const button = getByRole('button') as HTMLButtonElement;
+        expect(button.disabled).toBe(true);
+        expect(button.getAttribute('aria-busy')).toBe('true');
+        // The label is still in the DOM (never removed, never replaced by the spinner) — this is
+        // what keeps the button's own width stable across the transition.
+        expect(button.textContent).toContain('Skip today');
+        expect(container.querySelector('svg')).not.toBeNull();
+      },
+    );
 
     it('a click handler never fires while loading (same guarantee as plain disabled)', () => {
       const onClick = vi.fn();
@@ -134,18 +149,13 @@ describe('Button (D-052, V2-T75)', () => {
       expect(onClick).not.toHaveBeenCalled();
     });
 
-    it(
-      'the spinner element itself is the SAME node across the loading transition — only its ' +
-        'hidden class toggles, it is never removed and re-added',
-      () => {
-        const { getByRole, container, rerender } = render(<Button loading={false}>x</Button>);
-        const spinnerBefore = container.querySelector('svg');
-        expect(spinnerBefore).not.toBeNull();
-        rerender(<Button loading>x</Button>);
-        const spinnerAfter = container.querySelector('svg');
-        expect(spinnerAfter).toBe(spinnerBefore);
-        expect((getByRole('button') as HTMLButtonElement).disabled).toBe(true);
-      },
-    );
+    it('the spinner is mounted ONLY while loading=true — removed again once it flips back', () => {
+      const { container, rerender } = render(<Button loading={false}>x</Button>);
+      expect(container.querySelector('svg')).toBeNull();
+      rerender(<Button loading>x</Button>);
+      expect(container.querySelector('svg')).not.toBeNull();
+      rerender(<Button loading={false}>x</Button>);
+      expect(container.querySelector('svg')).toBeNull();
+    });
   });
 });
