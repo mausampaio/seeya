@@ -1,0 +1,21 @@
+/* V2-T67 — replaces the `.seeya-table-row*` global classes (`renderer/legacy/components.css`). */
+.row {
+  border-bottom: 1px solid var(--seeya-border);
+}
+
+.row.selected {
+  background: var(--seeya-brand-soft);
+}
+
+.row.clickable {
+  cursor: pointer;
+}
+
+.row.clickable:hover {
+  background: var(--seeya-surface-subtle);
+}
+
+.cell {
+  padding: var(--seeya-space-2) var(--seeya-space-3);
+  color: var(--seeya-text);
+}

@@ -103,16 +103,8 @@
   color: var(--seeya-text-secondary);
 }
 
-.seeya-table-row {
-  border-bottom: 1px solid var(--seeya-border);
-}
-
-.seeya-table-row--selected {
-  background: var(--seeya-brand-soft);
-}
-
-.seeya-table-row-cell {
-  padding: var(--seeya-space-2) var(--seeya-space-3);
-  font-size: 14px;
-  color: var(--seeya-text);
-}
+/* V2-T67: `.seeya-table-row*` removed — `TableRow` (`renderer/components/TableRow/`) has its own
+ * CSS module now (`TableRow.module.css`), its first production caller being the Projects tab's
+ * own table. Confirmed by grep that nothing under `renderer/legacy/` ever referenced these three
+ * classes directly (D-052's own "sem chamador de produção ainda" for every component V2-T62 left
+ * unstyled). */
