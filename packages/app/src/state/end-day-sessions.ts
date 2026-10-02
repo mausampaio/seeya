@@ -20,7 +20,7 @@ import type {
 } from '@seeya-ai/engine/core/types.js';
 import { formatDirectoryPathForDisplay } from '../sidebar/directory-label.js';
 import { CLOSED_SESSION_REASON, formatIneligibilityReasons } from './end-day-reasons.js';
-import { summarizeFailureReason } from './end-day-failure-reason.js';
+import { summarizeErrorReason } from './error-reason-summary.js';
 
 /** PO review round 2 (V2-T69, item 2): rebased onto V2-T66's `sidebar/directory-label.ts` —
  * `EndDayDirectoryPlatform` used to be its own local alias of the identical `'win32' | 'posix'`
@@ -106,7 +106,7 @@ function toReasonRow(
   platform: EndDayDirectoryPlatform,
   reason: string,
 ): EndDayReasonRow {
-  const summary = summarizeFailureReason(reason, homeDir, platform);
+  const summary = summarizeErrorReason(reason, homeDir, platform);
   return {
     sessionId,
     name,
