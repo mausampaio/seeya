@@ -66,7 +66,10 @@ export interface AdoptionControls {
   readonly cancel: () => void;
   readonly reviewRows: readonly AdoptionReviewRow[];
   readonly answerCommit: (decision: 'commit' | 'decline') => void;
+  /** Only dismisses the result — never opens anything (V2-T82 item 1). */
   readonly closeResult: () => void;
+  /** The result's own **Open project** button: opens the adopted project, then dismisses. */
+  readonly openProjectFromResult: () => void;
 }
 
 /** The project id this attempt will actually submit — `mode === 'new'` reuses
@@ -229,6 +232,12 @@ export function useAdoption(): AdoptionControls {
   }
 
   function closeResult(): void {
+    dispatchAdoptPanel({ kind: 'resultClosed' });
+  }
+
+  /** V2-T82 item 1: opening the project is its OWN action, never a side effect of dismissing —
+   * `Close`, Esc and any other way to dismiss the result only call `closeResult`. */
+  function openProjectFromResult(): void {
     if (state.kind === 'result' && state.adopted) {
       // Fire-and-forget, same "the tab IS the feedback" shape `openProject`/`adoptSession`
       // themselves already are (Q-087 item 3) — never awaited by a click.
@@ -256,6 +265,7 @@ export function useAdoption(): AdoptionControls {
     reviewRows,
     answerCommit,
     closeResult,
+    openProjectFromResult,
   };
 }
 

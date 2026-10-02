@@ -211,11 +211,14 @@ export function wireProjectIpc(
     CHANNELS.openProject,
     async (_event, request: OpenProjectRequest): Promise<OpenProjectResponse> => {
       const processIdentity = await context.resolveProcessIdentity();
-      const launcher = new ProjectOpenTabLauncher({
-        claudeCommand: CLAUDE_COMMAND,
-        opener: tabOpener,
-        label: request.projectId,
-      });
+      // V2-T82: only the verification-only `harnessLauncherOverride` ever replaces the real one.
+      const launcher =
+        context.harnessLauncherOverride ??
+        new ProjectOpenTabLauncher({
+          claudeCommand: CLAUDE_COMMAND,
+          opener: tabOpener,
+          label: request.projectId,
+        });
       const deps = buildProjectOpenDeps(context, processIdentity, launcher, randomUUID());
       // V2-T73 item 2: `openProject` only ever reports `manifestRestore` through this callback
       // (the same pre-launch channel the CLI already prints through) — captured here so the

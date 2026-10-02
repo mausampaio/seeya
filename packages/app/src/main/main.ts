@@ -79,6 +79,7 @@ import {
 } from '../composition/index.js';
 import { VerificationFakeHandoffGenerator } from '../composition/verification-fake-generator.js';
 import { VerificationFakeAdoptionLauncher } from '../composition/verification-fake-adoption-launcher.js';
+import { VerificationFakeHarnessLauncher } from '../composition/verification-fake-harness-launcher.js';
 import { wrapWorkspaceWithFailingCommit } from '../composition/verification-fake-failing-commit.js';
 import { FsWorkspaceRepository } from '@seeya-ai/engine/adapters/workspace/index.js';
 import { shouldMarkLinuxProtocolRegistered } from '../composition/linux-protocol-marker.js';
@@ -1030,7 +1031,7 @@ async function captureDaemonOwnershipTransitionVerification(
     const image = await window.webContents.capturePage();
     await writeFile(path.join(outDir, name), image.toPNG());
   }
-  await clock.sleep(4000); // the dialog's own async getDaemonOwnershipTransitionOffer() round trip
+  await clock.sleep(7000); // the dialog's own async getDaemonOwnershipTransitionOffer() round trip (measured: 4s was too early on a loaded machine, the idle capture showed no dialog)
   await shoot('01-idle.png');
   await window.webContents.executeJavaScript(
     "document.getElementById('daemon-ownership-transition-decline')?.click();",
@@ -1161,6 +1162,19 @@ async function captureAdoptionFlowVerification(
   await waitForElement('adoption-result-close-button', 15000);
   await clock.sleep(300);
   await shoot(commitWillFail ? '04-result-failure.png' : '04-result.png');
+
+  // SEEYA_APP_VERIFY_ADOPTION_RESULT_BUTTON (V2-T82 item 1): `close` or `open` — clicks that real
+  // button of the result step. The proof is NOT in this function: `SEEYA_APP_VERIFY_FAKE_HARNESS_LOG`'s
+  // own file gets a line only when the real `openProject` pipeline ran, so the script that launched
+  // this process reads that file afterwards (no line = Close never opened anything).
+  const resultButton = process.env.SEEYA_APP_VERIFY_ADOPTION_RESULT_BUTTON;
+  if (resultButton === 'close') {
+    await click('adoption-result-close-button');
+    await clock.sleep(8000);
+  } else if (resultButton === 'open') {
+    await click('adoption-result-open-project-button');
+    await clock.sleep(8000);
+  }
 
   await quitAfterConfiguredDelay(clock);
 }
@@ -3358,6 +3372,16 @@ if (!gotSingleInstanceLock) {
             adoptionLauncher: new VerificationFakeAdoptionLauncher(
               systemClock,
               ADOPTION_FAKE_DELAY_MS,
+            ),
+          }
+        : {}),
+      // SEEYA_APP_VERIFY_FAKE_HARNESS_LOG (V2-T82): the path of a file that
+      // `VerificationFakeHarnessLauncher` appends one line to per `openProject` call, instead of
+      // spawning `claude`. Never set by `npm run app` or the README.
+      ...(process.env.SEEYA_APP_VERIFY_FAKE_HARNESS_LOG !== undefined
+        ? {
+            harnessLauncher: new VerificationFakeHarnessLauncher(
+              process.env.SEEYA_APP_VERIFY_FAKE_HARNESS_LOG,
             ),
           }
         : {}),

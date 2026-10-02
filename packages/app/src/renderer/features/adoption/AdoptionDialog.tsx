@@ -104,7 +104,7 @@ function footerFor(controls: AdoptionControls): ComponentChildren {
           {MESSAGES.adoptResultClose}
         </Button>
         {state.adopted && (
-          <Button id="adoption-result-open-project-button" onClick={controls.closeResult}>
+          <Button id="adoption-result-open-project-button" onClick={controls.openProjectFromResult}>
             {MESSAGES.adoptResultOpenProject}
           </Button>
         )}

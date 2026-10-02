@@ -77,8 +77,16 @@ const IGNORED_WORKSPACE_PATTERNS: readonly string[] = [
  * (git's own pattern rule), so one line covers every project's own `.seeya-lock`, present or
  * future. Idempotent: a `.gitignore` that already has the line is left untouched (no rewrite, no
  * extra commit).
+ *
+ * V2-T82 item 4: ALSO called by the three pending-change listings (`listChangedFiles`,
+ * `listChangedFilesWithStatus`, `listChangedFilesWithStats`) before they read `git status`. Measured
+ * defect: a workspace whose `.gitignore` predated the `.seeya-audit` and `.claude/` directory patterns showed
+ * those files as untracked in an adoption review (9 listed) while `commitAll`, which adds the
+ * patterns first, committed 7. A listing and the commit must share one truth, so the listing
+ * asserts the same ignore state first (the write is workspace-internal, and `commitAll` later
+ * commits the `.gitignore` change along with the project).
  */
-async function ensureWorkspaceGitignoreIgnoresProjectLock(root: string): Promise<void> {
+export async function ensureWorkspaceGitignoreIgnoresProjectLock(root: string): Promise<void> {
   const gitignorePath = path.join(root, GITIGNORE_FILE_NAME);
   let current: string;
   try {

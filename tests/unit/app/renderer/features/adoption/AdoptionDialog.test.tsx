@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, waitFor } from '@testing-library/preact';
 import { createFakeSeeyaApi } from '../../_fake-seeya-api.js';
 import { AdoptionDialog } from '../../../../../../packages/app/src/renderer/features/adoption/index.js';
 import {
+  dispatchAdoptPanel,
   openAdoptionDialog,
   resetAdoptPanelStateForTests,
 } from '../../../../../../packages/app/src/renderer/features/adoption/adoption-dialog-bridge.js';
@@ -266,5 +267,46 @@ describe('AdoptionDialog (V2-T70)', () => {
     expect(getAllByText(/committing them failed/)).toHaveLength(2);
     expect(getByText(/git hook refused\)\./)).not.toBeNull();
     expect(document.getElementById('adoption-result-open-project-button')).toBeNull();
+  });
+  describe('the adopted result (V2-T82 item 1)', () => {
+    async function showAdoptedResult(): Promise<{ openProject: ReturnType<typeof vi.fn> }> {
+      const openProject = vi.fn<
+        (request: { projectId: string }) => Promise<{ outcomeText: string }>
+      >(() => Promise.resolve({ outcomeText: '' }));
+      window.seeya = createFakeSeeyaApi({ openProject });
+      render(<AdoptionDialog />);
+      dispatchAdoptPanel({
+        kind: 'resultReceived',
+        outcomeText: 'seeya: adopted into "auth-hardening".',
+        adopted: true,
+        projectId: 'auth-hardening',
+      });
+      await waitFor(() => expect(getDialog().open).toBe(true));
+      return { openProject };
+    }
+
+    it('Close only dismisses the result — it never opens the project', async () => {
+      const { openProject } = await showAdoptedResult();
+      fireEvent.click(document.getElementById('adoption-result-close-button') as HTMLButtonElement);
+      await waitFor(() => expect(getDialog().open).toBe(false));
+      expect(openProject).not.toHaveBeenCalled();
+    });
+
+    it('closing the dialog any other way (Esc) is the same as Close', async () => {
+      const { openProject } = await showAdoptedResult();
+      getDialog().dispatchEvent(new Event('close'));
+      await waitFor(() => expect(getDialog().open).toBe(false));
+      expect(openProject).not.toHaveBeenCalled();
+    });
+
+    it('Open project opens the adopted project, then dismisses', async () => {
+      const { openProject } = await showAdoptedResult();
+      fireEvent.click(
+        document.getElementById('adoption-result-open-project-button') as HTMLButtonElement,
+      );
+      await waitFor(() => expect(getDialog().open).toBe(false));
+      expect(openProject).toHaveBeenCalledTimes(1);
+      expect(openProject).toHaveBeenCalledWith({ projectId: 'auth-hardening' });
+    });
   });
 });

@@ -269,6 +269,12 @@ export interface AppContext {
    */
   readonly adoptionLauncherOverride: SessionAdoptionLauncher | undefined;
   /**
+   * V2-T82: verification-only, same spirit as `adoptionLauncherOverride` — lets a screenshot script
+   * click the adoption result's real **Open project** button without ever spawning `claude`.
+   * `main/main.ts`'s own `SEEYA_APP_VERIFY_FAKE_HARNESS_LOG` is the ONE real caller.
+   */
+  readonly harnessLauncherOverride: HarnessLauncher | undefined;
+  /**
    * `process.env.CLAUDE_CODE_SESSION_ID`, read once here (D-020) — same source
    * `cli/composition.ts#readCurrentSessionId` reads, for the identical reason: a project's commit
    * trailer (`core/project-commit.ts`) names whichever session ran `create`/`add-repo`/`adopt`.
@@ -506,6 +512,8 @@ export interface BuildAppContextOverrides {
    * of End day — see `AppContext.adoptionLauncherOverride`'s own docstring.
    */
   readonly adoptionLauncher?: SessionAdoptionLauncher;
+  /** V2-T82: see `AppContext.harnessLauncherOverride`. */
+  readonly harnessLauncher?: HarnessLauncher;
   /**
    * V2-T70: verification-only — lets a screenshot script prove the adoption review dialog's own
    * failure result without staging a real git-hook conflict. `main/main.ts`'s own
@@ -739,6 +747,7 @@ export async function buildAppContext(
     projectLock: new FsProjectLock(),
     forkRegistration: new GenerationForkRegistration(home.seeyaHome),
     adoptionLauncherOverride: overrides.adoptionLauncher,
+    harnessLauncherOverride: overrides.harnessLauncher,
     sessionId: process.env.CLAUDE_CODE_SESSION_ID,
     resolveProcessIdentity,
   };
