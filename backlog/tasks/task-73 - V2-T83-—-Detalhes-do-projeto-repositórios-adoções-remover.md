@@ -4,7 +4,7 @@ title: 'V2-T83 — Detalhes do projeto: repositórios, adoções, remover'
 status: Review
 assignee: []
 created_date: '2026-10-02 20:22'
-updated_date: '2026-10-02 22:02'
+updated_date: '2026-10-02 22:10'
 labels:
   - ui
 dependencies: []
@@ -79,5 +79,11 @@ author: agent
 created: 2026-10-02 22:02
 ---
 Rebase sobre origin/main 75e7c96 feito: conflitos em ProjectsTable/Projects/useProjects/messages/IconButton/AGENTS/QUESTOES resolvidos mantendo o botão de expandir da V2-T77 e o Manage project da V2-T83 na mesma linha. Frase de apagar a cópia reescrita nos dois lados (única linha de CLI alterada: a pergunta de revert-adoption sobre a cópia). Questão renumerada para Q-111. Colunas da tabela rebalanceadas (Name truncava com chevron + Manage). Capturas 00, 00b (linha expandida) e 05 regeradas nos dois temas; verificar do zero passou.
+---
+
+author: PO
+created: 2026-10-02 22:10
+---
+Revisão do PO (2026-10-02): três rodadas. Diálogo Project details conforme a § 4a (cabeçalho, Repositories com Add/Remove, Adopted sessions com Revert…, Remove project), reusando addRepository/removeRepository/revertAdoption/removeProject e as frases da CLI movidas para core/project-management-message.ts. Defeito achado e corrigido com teste: um push ambiente antigo podia chegar depois do push de uma ação e deixar o estado velho na tela (deliverLatestOnly). Rodada 2: frase da pergunta 'apagar a cópia' reescrita nos dois lados (autorizado pelo PO — única linha da CLI que mudou: o prompt de revert-adoption sobre a cópia), questão renumerada para Q-111. Rodada 3: rebase sobre a V2-T77, linha do projeto com expandir + Manage. Pendência menor para a V2-T84: a 1200 px o texto 'Locked by session <id>' perde os últimos caracteres do id. Capturas reais conferidas nos dois temas. Mesclada no po-gate; portão do zero e npm test sem identidade git verdes (3912 testes). Agente Sonnet 5.5.
 ---
 <!-- COMMENTS:END -->
