@@ -32,12 +32,19 @@ export interface SwitchProps {
   readonly label: ComponentChildren;
   readonly checked: boolean;
   readonly disabled?: boolean;
-  /** D-052, maintainer's own complement (V2-T65-estado-na-tela item 2) — same contract as
-   * `Button.tsx`'s own `loading` (its docstring has the full reasoning, including why the slot is
-   * reserved on both `true` AND `false` rather than only while actually loading). Forces the
-   * switch disabled regardless of `disabled`/`disabledReason` — a switch mid-command and a switch
-   * that's simply unavailable are different facts (D-024), so `loading` never reads
-   * `disabledReason` underneath it. */
+  /** D-052, maintainer's own complement (V2-T65-estado-na-tela item 2) — same `loading` contract
+   * as `Button.tsx`'s own prop (disables, sets `aria-busy`, shows a `Spinner`). Forces the switch
+   * disabled regardless of `disabled`/`disabledReason` — a switch mid-command and a switch that's
+   * simply unavailable are different facts (D-024), so `loading` never reads `disabledReason`
+   * underneath it. **Checked against V2-T79's own off-center defect (the maintainer's installer
+   * screenshot) and left AS IS on purpose:** this row reserves the `Spinner`'s slot on both `true`
+   * and `false` too (`.spinnerSlot`/`.spinnerSlotHidden`, `Switch.module.css`), but unlike
+   * `Button`'s old shape, `.row` is never `justify-content: center` — it packs the track, the
+   * label and the spinner from the left (the default `flex-start`), with nothing visible ever
+   * sitting to the slot's right that a reserved gutter could push. The only production caller
+   * (`GeneralSection.tsx`'s own autostart switch) confirms this: the switch is the first, left-most
+   * element of its own vertical `Stack`, so the gutter only ever adds invisible trailing space,
+   * never a shift. */
   readonly loading?: boolean;
   /** docs/INTERFACE.md § 8's own "indisponível com o motivo" — shown under the label, only while
    * `disabled` (D-024: pairing them in props would let a caller pass a reason for an enabled

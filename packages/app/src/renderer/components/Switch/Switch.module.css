@@ -70,8 +70,10 @@
   margin-left: calc(36px + var(--seeya-space-2));
 }
 
-/* `Switch.tsx`'s own `loading` prop docstring has the full reasoning — same reserved-slot shape
- * as `Button.module.css`'s own `.spinnerSlot`/`.spinnerSlotHidden`. */
+/* `Switch.tsx`'s own `loading` prop docstring has the full reasoning, including why this reserved,
+ * always-mounted slot was checked against V2-T79's off-center defect and left as is: `.row` packs
+ * its children from the left (never `justify-content: center`, unlike `Button`'s old shape), so a
+ * trailing invisible slot here never pushes anything visible out of place. */
 .spinnerSlot {
   display: inline-flex;
   align-items: center;

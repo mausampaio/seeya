@@ -38,7 +38,10 @@ export interface IconButtonProps {
    * `Button.tsx`'s own `loading` (its docstring has the full reasoning). An `IconButton`'s own box
    * is ALREADY a fixed `width`/`height` per `size` (`IconButton.module.css`), so unlike `Button`
    * there is no separate reserved slot to add here: the spinner simply replaces the icon in the
-   * SAME box, which is already as width-stable as a prop can get. */
+   * SAME box, which is already as width-stable as a prop can get. **Checked against V2-T79's own
+   * off-center defect and confirmed unaffected:** this component never reserved a second, gutter
+   * element in the first place (see the ternary below — the icon and the `Spinner` are mutually
+   * exclusive children of the one centered box), so there was nothing here to fix. */
   readonly loading?: boolean;
   readonly hidden?: boolean;
   readonly className?: string;
