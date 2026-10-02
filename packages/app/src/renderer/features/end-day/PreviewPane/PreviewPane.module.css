@@ -1,15 +1,14 @@
-/* D-052 (V2-T69). */
+/* D-052 (V2-T69). PO review round 1, item 3: this used to be `max-width: 560px` — the exact width
+ * `EndDayDialog.module.css#.dialog` sets, which reads as "match the dialog" but actually competes
+ * with it once the dialog's own padding/border are taken into account, leaving a visible gap
+ * between the content and the dialog's right edge. `width: 100%` always fills whatever space the
+ * dialog's own content box actually has, which is the real goal — `min-width` stays, as a
+ * readability floor on a dialog that could in principle be squeezed narrower than is legible. */
 .pane {
+  width: 100%;
   min-width: 420px;
-  max-width: 560px;
 }
 
 .heading {
   margin-bottom: var(--seeya-space-2);
-}
-
-.actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--seeya-space-2);
 }

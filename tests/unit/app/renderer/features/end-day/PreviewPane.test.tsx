@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render } from '@testing-library/preact';
+import { afterEach, describe, expect, it } from 'vitest';
+import { cleanup, render } from '@testing-library/preact';
 import { PreviewPane } from '../../../../../../packages/app/src/renderer/features/end-day/PreviewPane/index.js';
 
 afterEach(cleanup);
@@ -18,14 +18,16 @@ describe('PreviewPane (D-052, V2-T69)', () => {
       <PreviewPane
         data={{ willBeCaptured: [], notCaptured: [], costCeiling: CEILING }}
         starting={false}
-        onCancel={vi.fn()}
-        onRun={vi.fn()}
       />,
     );
     expect(getAllByText('Nothing to show.')).toHaveLength(2);
   });
 
-  it('shows the mode badge ("Lean"/"Deep") alongside the state badge', () => {
+  // PO review round 1 (V2-T69, item 7): the state badge now reads capitalized ("Alive"), matching
+  // the mode badge's own convention ("Deep") — `formatSessionStateLabel`'s own canonical, lowercase
+  // return value is unchanged (every OTHER caller still needs it lowercase); only this row's own
+  // display copy capitalizes it (`session-badges.ts#buildSessionSummaryBadges`).
+  it('shows the mode badge ("Lean"/"Deep") alongside the state badge, both capitalized', () => {
     const { getByText } = render(
       <PreviewPane
         data={{
@@ -36,11 +38,9 @@ describe('PreviewPane (D-052, V2-T69)', () => {
           costCeiling: CEILING,
         }}
         starting={false}
-        onCancel={vi.fn()}
-        onRun={vi.fn()}
       />,
     );
-    expect(getByText('alive')).not.toBeNull();
+    expect(getByText('Alive')).not.toBeNull();
     expect(getByText('Deep')).not.toBeNull();
   });
 
@@ -49,39 +49,9 @@ describe('PreviewPane (D-052, V2-T69)', () => {
       <PreviewPane
         data={{ willBeCaptured: [], notCaptured: [], costCeiling: CEILING }}
         starting={false}
-        onCancel={vi.fn()}
-        onRun={vi.fn()}
       />,
     );
     expect(getByText(/up to 2 × \$0.50 per session/)).not.toBeNull();
-  });
-
-  it('starting=true hides Cancel and shows Run end-day now loading/disabled', () => {
-    const { queryByRole, getByRole } = render(
-      <PreviewPane
-        data={{ willBeCaptured: [], notCaptured: [], costCeiling: CEILING }}
-        starting={true}
-        onCancel={vi.fn()}
-        onRun={vi.fn()}
-      />,
-    );
-    expect(queryByRole('button', { name: 'Cancel' })).toBeNull();
-    const runButton = getByRole('button', { name: 'Run end-day now' }) as HTMLButtonElement;
-    expect(runButton.disabled).toBe(true);
-  });
-
-  it('clicking Run end-day now when not starting calls onRun', () => {
-    const onRun = vi.fn();
-    const { getByRole } = render(
-      <PreviewPane
-        data={{ willBeCaptured: [], notCaptured: [], costCeiling: CEILING }}
-        starting={false}
-        onCancel={vi.fn()}
-        onRun={onRun}
-      />,
-    );
-    fireEvent.click(getByRole('button', { name: 'Run end-day now' }));
-    expect(onRun).toHaveBeenCalledTimes(1);
   });
 
   it('a "closed" not-captured row shows the Closed badge, never Skipped/Failed', () => {
@@ -90,15 +60,73 @@ describe('PreviewPane (D-052, V2-T69)', () => {
         data={{
           willBeCaptured: [],
           notCaptured: [
-            { sessionId: 's1', name: 'gamma', cwd: '~/gamma', kind: 'closed', reason: 'x' },
+            {
+              sessionId: 's1',
+              name: 'gamma',
+              cwd: '~/gamma',
+              kind: 'closed',
+              reason: 'x',
+              fullReason: 'x',
+            },
           ],
           costCeiling: CEILING,
         }}
         starting={false}
-        onCancel={vi.fn()}
-        onRun={vi.fn()}
       />,
     );
     expect(getByText('Closed')).not.toBeNull();
+  });
+
+  // PO review round 1 (V2-T69, item 5): the row's visible text is the short `reason`; the complete
+  // message only shows up as a hover tooltip (`title`), never hidden outright.
+  it('a failed row shows the short reason, with the full one only in the tooltip', () => {
+    const { getByText } = render(
+      <PreviewPane
+        data={{
+          willBeCaptured: [],
+          notCaptured: [
+            {
+              sessionId: 's1',
+              name: 'zeta',
+              cwd: '~/zeta',
+              kind: 'failed',
+              reason: '~/.seeya/days/x.json is not valid JSON…',
+              fullReason:
+                '/home/x/.seeya/days/x.json is not valid JSON: SyntaxError: Unexpected token',
+            },
+          ],
+          costCeiling: CEILING,
+        }}
+        starting={false}
+      />,
+    );
+    const detail = getByText('~/.seeya/days/x.json is not valid JSON…');
+    expect(detail.title).toBe(
+      '/home/x/.seeya/days/x.json is not valid JSON: SyntaxError: Unexpected token',
+    );
+  });
+
+  it('a reason that was not shortened carries no tooltip at all', () => {
+    const { getByText } = render(
+      <PreviewPane
+        data={{
+          willBeCaptured: [],
+          notCaptured: [
+            {
+              sessionId: 's1',
+              name: 'beta',
+              cwd: '~/beta',
+              kind: 'ineligible',
+              reason: 'This directory is in the ignore list.',
+              fullReason: 'This directory is in the ignore list.',
+            },
+          ],
+          costCeiling: CEILING,
+        }}
+        starting={false}
+      />,
+    );
+    const detail = getByText('This directory is in the ignore list.');
+    expect(detail.title).toBe('');
   });
 });

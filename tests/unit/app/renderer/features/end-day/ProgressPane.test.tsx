@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render } from '@testing-library/preact';
+import { afterEach, describe, expect, it } from 'vitest';
+import { cleanup, render } from '@testing-library/preact';
 import { ProgressPane } from '../../../../../../packages/app/src/renderer/features/end-day/ProgressPane/index.js';
 
 afterEach(cleanup);
@@ -8,11 +8,7 @@ afterEach(cleanup);
 describe('ProgressPane (D-052, V2-T69)', () => {
   it('shows the "Capturing i of N: name" headline', () => {
     const { getByText } = render(
-      <ProgressPane
-        current={{ index: 2, total: 5, name: 'alpha' }}
-        sessions={[]}
-        onHide={vi.fn()}
-      />,
+      <ProgressPane current={{ index: 2, total: 5, name: 'alpha' }} sessions={[]} />,
     );
     expect(getByText('Capturing 2 of 5: alpha...')).not.toBeNull();
   });
@@ -27,7 +23,6 @@ describe('ProgressPane (D-052, V2-T69)', () => {
           { sessionId: 's3', name: 'gamma', status: 'waiting' },
           { sessionId: 's4', name: 'delta', status: 'waiting' },
         ]}
-        onHide={vi.fn()}
       />,
     );
     const bar = getByRole('progressbar');
@@ -44,7 +39,6 @@ describe('ProgressPane (D-052, V2-T69)', () => {
           { sessionId: 's2', name: 'beta', status: 'ineligible' },
           { sessionId: 's3', name: 'gamma', status: 'failed' },
         ]}
-        onHide={vi.fn()}
       />,
     );
     expect(getByRole('progressbar').getAttribute('aria-valuenow')).toBe('3');
@@ -58,19 +52,13 @@ describe('ProgressPane (D-052, V2-T69)', () => {
           { sessionId: 's1', name: 'alpha', status: 'capturing' },
           { sessionId: 's2', name: 'beta', status: 'waiting' },
         ]}
-        onHide={vi.fn()}
       />,
     );
     expect(getByText('Capturing')).not.toBeNull();
     expect(getByText('Waiting')).not.toBeNull();
   });
 
-  it('clicking Hide calls onHide', () => {
-    const onHide = vi.fn();
-    const { getByRole } = render(
-      <ProgressPane current={{ index: 1, total: 1, name: 'x' }} sessions={[]} onHide={onHide} />,
-    );
-    fireEvent.click(getByRole('button', { name: 'Hide' }));
-    expect(onHide).toHaveBeenCalledTimes(1);
-  });
+  // Hide moved to `EndDayDialog`'s own footer (PO review round 1, V2-T69 item 4) — the click
+  // behaviour is covered by `EndDayDialog.test.tsx`'s own "Hide calls the control" test, which
+  // renders through the real dialog instead of this pane in isolation.
 });

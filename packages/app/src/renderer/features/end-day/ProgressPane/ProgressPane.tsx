@@ -11,7 +11,6 @@ import styles from './ProgressPane.module.css';
 import { cx } from '../../../components/css-class.js';
 import { Stack } from '../../../components/Stack/index.js';
 import { Text } from '../../../components/Text/index.js';
-import { Button } from '../../../components/Button/index.js';
 import { ProgressBar } from '../../../components/ProgressBar/index.js';
 import { StatusList, type StatusListItem } from '../../../components/StatusList/index.js';
 import type { Tone } from '../../../components/props.js';
@@ -25,7 +24,6 @@ import type {
 export interface ProgressPaneProps {
   readonly sessions: readonly EndDaySessionProgress[];
   readonly current: EndDayCurrentCapture;
-  readonly onHide: () => void;
 }
 
 const STATUS_BADGE: Record<
@@ -62,11 +60,6 @@ export function ProgressPane(props: ProgressPaneProps): JSX.Element {
       </Text>
       <ProgressBar value={finishedCount(props.sessions)} max={props.current.total} label={text} />
       <StatusList items={props.sessions.map(toItem)} emptyMessage={MESSAGES.endDayNothingToShow} />
-      <div class={cx(styles, 'actions')}>
-        <Button id="end-day-dialog-hide" variant="secondary" onClick={props.onHide}>
-          {MESSAGES.endDayHide}
-        </Button>
-      </div>
     </Stack>
   );
 }

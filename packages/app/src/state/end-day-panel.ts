@@ -93,8 +93,11 @@ export type EndDayPanelEvent =
       readonly kind: 'sessionStarted';
       readonly sessionId: string;
       readonly name: string;
-      readonly index: number;
-      readonly total: number;
+      // No `index`/`total` here (PO review round 1, V2-T69 item 2, dropped from a V2-T5a-era
+      // shape): the engine's own event counts `sessionsInScope`, a bigger population than this
+      // panel tracks (`seedTrackedSessions`'s own docstring) — carrying the raw numbers here would
+      // invite a reader to wire them back into `current` by mistake. `handleSessionStarted` always
+      // computes `index`/`total` itself, from the tracked list it already has.
     }
   | {
       readonly kind: 'sessionFinished';
@@ -107,33 +110,47 @@ export type EndDayPanelEvent =
   | { readonly kind: 'closed' };
 
 /** Seeds the running view's own tracked rows from the preview's two lists — `willBeCaptured` plus
- * every `notCaptured` row EXCEPT `kind: 'closed'` ones: a closed session (D-031) never went through
- * `runSession` at all, so it never gets a `captureStarted`/`captureFinished` event to update it,
- * and showing it stuck on "waiting" forever would be a lie (D-025). */
+ * `notCaptured` rows whose `kind` is `'failed'` only.
+ *
+ * PO review round 1 (V2-T69, item 2): this list — and the `M` in "i of M" it sizes — reads as "the
+ * sessions this run will actually attempt to capture, or that fail trying", never the engine's own
+ * `sessionsInScope` (`application/end-day.ts`), which is bigger: it also includes cheap-ineligible
+ * sessions (an ignored directory, a duplicate already captured today) that genuinely DO get a
+ * `captureStarted`/`captureFinished` pair from the engine — correctly, from the engine's own
+ * accounting — but showing them here read as "stuck on Waiting forever" (the person watches a
+ * session that will never move) and inflated `M` past what "captures remaining" means to a reader.
+ * `kind: 'closed'` sessions (D-031) never go through `runSession` at all, so they never get an
+ * event either way; `kind: 'ineligible'` now gets excluded for a different reason — it DOES get
+ * events, this view just isn't where that fact belongs (the frozen preview already said so, and
+ * the result view's own "Skipped" list says so again once the run is over). */
 function seedTrackedSessions(preview: EndDayPreviewData): EndDaySessionProgress[] {
   const fromCaptured = preview.willBeCaptured.map((row) => ({
     sessionId: row.sessionId,
     name: row.name,
     status: 'waiting' as const,
   }));
-  const fromNotCaptured = preview.notCaptured
-    .filter((row) => row.kind !== 'closed')
+  const fromFailed = preview.notCaptured
+    .filter((row) => row.kind === 'failed')
     .map((row) => ({ sessionId: row.sessionId, name: row.name, status: 'waiting' as const }));
-  return [...fromCaptured, ...fromNotCaptured];
+  return [...fromCaptured, ...fromFailed];
 }
 
-/** A `captureStarted` for a `sessionId` this panel never seeded (shouldn't happen — every tracked
- * session comes straight from the same `EndDayResult` the real run re-derives — but D-025: showing
- * fewer rows than `total` would be a worse lie than one unexpected row) is appended instead of
- * dropped. */
+function isTracked(sessions: readonly EndDaySessionProgress[], sessionId: string): boolean {
+  return sessions.some((session) => session.sessionId === sessionId);
+}
+
+/** How many tracked sessions have already started (any status other than `waiting`) — the `index`
+ * half of "i of M", always computed from the SAME tracked list `total` comes from (never the
+ * engine event's own `index`/`total`, which count `sessionsInScope` — `seedTrackedSessions`'s own
+ * docstring has why those differ here, PO review round 1). */
+function countStarted(sessions: readonly EndDaySessionProgress[]): number {
+  return sessions.filter((session) => session.status !== 'waiting').length;
+}
+
 function markSessionStarted(
   sessions: readonly EndDaySessionProgress[],
   sessionId: string,
-  name: string,
 ): EndDaySessionProgress[] {
-  if (!sessions.some((session) => session.sessionId === sessionId)) {
-    return [...sessions, { sessionId, name, status: 'capturing' }];
-  }
   return sessions.map((session) =>
     session.sessionId === sessionId ? { ...session, status: 'capturing' } : session,
   );
@@ -149,24 +166,40 @@ function markSessionFinished(
   );
 }
 
+/** PO review round 1 (V2-T69, item 2): a `captureStarted` for a `sessionId` this panel doesn't
+ * track (a cheap-ineligible session — see `seedTrackedSessions`) is ignored outright, never
+ * appended and never bumping `current` — the person reading "i of M" should never see M inflated
+ * by a session that was never going to move past one state. The engine's own eligibility check
+ * already ran once for the preview; a session it predicted ineligible changing its mind between
+ * the preview and the real run (a rare race, not a normal path) just never gets a live row here —
+ * the final result view stays authoritative regardless, since it reads `EndDayResult` directly,
+ * never this tracked list. */
 function handleSessionStarted(
   state: EndDayPanelState,
   event: Extract<EndDayPanelEvent, { kind: 'sessionStarted' }>,
 ): EndDayPanelState {
-  const current = { index: event.index, total: event.total, name: event.name };
   if (state.kind === 'starting') {
+    const tracked = seedTrackedSessions(state);
+    if (!isTracked(tracked, event.sessionId)) {
+      return state;
+    }
+    const sessions = markSessionStarted(tracked, event.sessionId);
     return {
       kind: 'running',
       visible: true,
-      sessions: markSessionStarted(seedTrackedSessions(state), event.sessionId, event.name),
-      current,
+      sessions,
+      current: { index: countStarted(sessions), total: tracked.length, name: event.name },
     };
   }
   if (state.kind === 'running') {
+    if (!isTracked(state.sessions, event.sessionId)) {
+      return state;
+    }
+    const sessions = markSessionStarted(state.sessions, event.sessionId);
     return {
       ...state,
-      sessions: markSessionStarted(state.sessions, event.sessionId, event.name),
-      current,
+      sessions,
+      current: { index: countStarted(sessions), total: state.sessions.length, name: event.name },
     };
   }
   return state;

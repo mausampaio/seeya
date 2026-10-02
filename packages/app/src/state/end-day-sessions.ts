@@ -19,6 +19,7 @@ import type {
 } from '@seeya-ai/engine/core/types.js';
 import { formatSessionDirectory } from '../sidebar/directory-label.js';
 import { CLOSED_SESSION_REASON, formatIneligibilityReasons } from './end-day-reasons.js';
+import { summarizeFailureReason } from './end-day-failure-reason.js';
 
 export type EndDayDirectoryPlatform = 'win32' | 'posix';
 
@@ -44,7 +45,12 @@ export interface EndDayNotCapturedRow {
   readonly name: string;
   readonly cwd: string;
   readonly kind: EndDayNotCapturedKind;
+  /** Short, `~`-abbreviated — PO review round 1 (V2-T69, item 5). */
   readonly reason: string;
+  /** The complete, unabbreviated message — identical to `reason` when nothing was shortened. A
+   * view that wants a tooltip for the full text compares the two (`reason !== fullReason`), never a
+   * separate boolean this module would also have to keep in sync. */
+  readonly fullReason: string;
 }
 
 /** A session's final fate once a REAL run has actually finished — `failed`/`skipped` share this
@@ -54,7 +60,10 @@ export interface EndDayReasonRow {
   readonly sessionId: string;
   readonly name: string;
   readonly cwd: string;
+  /** Short, `~`-abbreviated — PO review round 1 (V2-T69, item 5). */
   readonly reason: string;
+  /** See `EndDayNotCapturedRow.fullReason`'s own docstring. */
+  readonly fullReason: string;
 }
 
 export interface EndDayPreviewRows {
@@ -91,7 +100,14 @@ function toReasonRow(
   platform: EndDayDirectoryPlatform,
   reason: string,
 ): EndDayReasonRow {
-  return { sessionId, name, cwd: formatSessionDirectory(cwd, homeDir, platform), reason };
+  const summary = summarizeFailureReason(reason, homeDir, platform);
+  return {
+    sessionId,
+    name,
+    cwd: formatSessionDirectory(cwd, homeDir, platform),
+    reason: summary.text,
+    fullReason: summary.fullText,
+  };
 }
 
 function toListedReasonRow(
@@ -128,25 +144,23 @@ export function buildEndDayPreviewRows(
   );
   const notCaptured: EndDayNotCapturedRow[] = [
     ...result.ineligible.map((item) => ({
-      sessionId: item.sessionId,
-      name: item.name,
-      cwd: formatSessionDirectory(item.cwd, homeDir, platform),
       kind: 'ineligible' as const,
-      reason: formatIneligibilityReasons(item.reasons),
+      ...toReasonRow(
+        item.sessionId,
+        item.name,
+        item.cwd,
+        homeDir,
+        platform,
+        formatIneligibilityReasons(item.reasons),
+      ),
     })),
     ...result.listedSessions.map((item) => ({
-      sessionId: item.sessionId,
-      name: item.name,
-      cwd: formatSessionDirectory(item.cwd, homeDir, platform),
       kind: 'closed' as const,
-      reason: CLOSED_SESSION_REASON,
+      ...toReasonRow(item.sessionId, item.name, item.cwd, homeDir, platform, CLOSED_SESSION_REASON),
     })),
     ...result.failedCaptures.map((item) => ({
-      sessionId: item.sessionId,
-      name: item.name,
-      cwd: formatSessionDirectory(item.cwd, homeDir, platform),
       kind: 'failed' as const,
-      reason: item.reason,
+      ...toReasonRow(item.sessionId, item.name, item.cwd, homeDir, platform, item.reason),
     })),
   ];
   return { willBeCaptured, notCaptured };

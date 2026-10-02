@@ -32,5 +32,9 @@ export function formatIneligibilityReasons(reasons: readonly IneligibilityReason
  * registry entry was found for it at all, read as closed gracefully (never "work in progress",
  * `core/types.ts#EndDayResult.listedSessions`'s own docstring). Named plainly here so the same
  * fact the CLI's own "Not captured (closed sessions, D-031)" heading states reads as a sentence in
- * the window instead of a section title. */
-export const CLOSED_SESSION_REASON = 'Session closed — no running process was found (D-031).';
+ * the window instead of a section title.
+ *
+ * PO review round 1 (V2-T69): no decision id in user-facing text — `D-031` named the mechanism to
+ * a reader of THIS comment, never to the person reading the dialog, who has no `docs/DECISOES.md`
+ * to look it up in. */
+export const CLOSED_SESSION_REASON = 'Session closed — no running process was found.';

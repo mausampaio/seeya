@@ -9,17 +9,15 @@
  * at all instead of jumping straight to `running`).
  */
 import type { JSX } from 'preact';
-import { formatSessionStateLabel } from '@seeya-ai/engine/core/session-state-label.js';
 import styles from './PreviewPane.module.css';
 import { cx } from '../../../components/css-class.js';
 import { Stack } from '../../../components/Stack/index.js';
 import { Text } from '../../../components/Text/index.js';
-import { Button } from '../../../components/Button/index.js';
 import { InfoBox } from '../../../components/InfoBox/index.js';
 import { StatusList, type StatusListItem } from '../../../components/StatusList/index.js';
 import type { Tone } from '../../../components/props.js';
 import { MESSAGES } from '../../../../text/messages.js';
-import { resolveSessionStateTone } from '../../../../state/session-state-tone.js';
+import { buildSessionSummaryBadges } from '../session-badges.js';
 import type {
   EndDayNotCapturedKind,
   EndDayNotCapturedRow,
@@ -32,12 +30,6 @@ export interface PreviewPaneProps {
   /** `true` while the `starting` phase shows this same data read-only (see this file's own
    * docstring). */
   readonly starting: boolean;
-  readonly onCancel: () => void;
-  readonly onRun: () => void;
-}
-
-function captureModeLabel(mode: EndDaySessionSummaryRow['mode']): string {
-  return mode === 'lean' ? 'Lean' : 'Deep';
 }
 
 function toWillBeCapturedItem(row: EndDaySessionSummaryRow): StatusListItem {
@@ -45,10 +37,7 @@ function toWillBeCapturedItem(row: EndDaySessionSummaryRow): StatusListItem {
     id: row.sessionId,
     title: row.name,
     meta: row.cwd,
-    badges: [
-      { label: formatSessionStateLabel(row.state), tone: resolveSessionStateTone(row.state) },
-      { label: captureModeLabel(row.mode), tone: 'neutral' },
-    ],
+    badges: buildSessionSummaryBadges(row),
   };
 }
 
@@ -61,12 +50,16 @@ const NOT_CAPTURED_BADGE: Record<
   failed: { label: MESSAGES.endDayStatusFailed, tone: 'error' },
 };
 
+/** `row.reason` already comes pre-abbreviated/truncated from `state/end-day-sessions.ts` (which has
+ * `homeDir`/`platform` to abbreviate with); `row.fullReason` is only shown as a tooltip when it
+ * actually differs — PO review round 1 (V2-T69, item 5). */
 function toNotCapturedItem(row: EndDayNotCapturedRow): StatusListItem {
   return {
     id: row.sessionId,
     title: row.name,
     meta: row.cwd,
     detail: row.reason,
+    detailTitle: row.reason !== row.fullReason ? row.fullReason : undefined,
     badges: [NOT_CAPTURED_BADGE[row.kind]],
   };
 }
@@ -94,19 +87,6 @@ export function PreviewPane(props: PreviewPaneProps): JSX.Element {
         />
       </section>
       <InfoBox>{MESSAGES.endDayCostCeiling(data.costCeiling)}</InfoBox>
-      <div class={cx(styles, 'actions')}>
-        <Button
-          id="end-day-dialog-cancel"
-          variant="secondary"
-          hidden={props.starting}
-          onClick={props.onCancel}
-        >
-          {MESSAGES.endDayCancel}
-        </Button>
-        <Button id="end-day-dialog-run" loading={props.starting} onClick={props.onRun}>
-          {MESSAGES.endDayRunNow}
-        </Button>
-      </div>
     </Stack>
   );
 }

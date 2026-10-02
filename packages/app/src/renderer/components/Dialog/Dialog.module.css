@@ -1,0 +1,37 @@
+/* V2-T69 (`docs/INTERFACE.md` § 6 item 4, PO review round 1): the opt-in scrollable-body shape —
+ * a caller that passes `footer` gets a dialog whose title and footer stay fixed in place while
+ * ONLY the space between them scrolls, and the dialog itself never exceeds the window's height.
+ * Added to the shared `Dialog` component (not a per-feature CSS module) because two features now
+ * need the identical shape: `SettingsDialog.module.css#.body`/`.footer` already hand-rolled this
+ * exact layout before this prop existed (left as-is, out of this task's scope) — End day's own
+ * result view (a list long enough to overflow a short window) is the second, and a second caller
+ * asking for the same shape is the design system's job, not another copy in another region.
+ *
+ * Gated on `[open]`, never unconditional: an AUTHOR `display` rule on the BARE class always wins
+ * over the UA stylesheet's own `dialog:not([open]) { display: none }` regardless of specificity —
+ * the exact bug `tests/integration/guards/dialog-display-css.test.ts` exists to catch
+ * (V2-T65-estado-na-tela's own finding: an always-`display:flex` dialog stays painted, and
+ * clickable through, after `.close()` until something unrelated forces a re-render). */
+.scrollableBody[open] {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - var(--seeya-space-8));
+}
+
+.body {
+  /* A flex item's default automatic minimum height is its OWN content size, which would stop this
+   * element from ever shrinking small enough to scroll inside the dialog's `max-height` — UNLESS
+   * the item's `overflow` is anything other than `visible` in that axis, which is the flexbox
+   * spec's own carve-out this relies on (confirmed by `SettingsDialog.module.css#.body`, the first
+   * caller of this exact mechanism). `min-height: 0` says the same thing explicitly, for a reader
+   * who hasn't memorized that carve-out. */
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.footer {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--seeya-space-2);
+}

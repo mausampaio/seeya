@@ -34,6 +34,11 @@ export interface StatusListItem {
   /** A freeform secondary sentence — a reason, an excerpt. Never a short enum value (use `badges`
    * for that instead). */
   readonly detail?: string;
+  /** V2-T69 (PO review round 1, item 5): the native `title` attribute (a hover tooltip) for
+   * `detail` — the full, unabbreviated text when `detail` itself was shortened for legibility.
+   * Omit when `detail` already says the whole thing; never duplicate it here "just in case".
+   * `string | undefined` explicitly — see `Text.tsx#TextProps.title`'s own docstring for why. */
+  readonly detailTitle?: string | undefined;
   readonly badges?: readonly StatusListBadge[];
 }
 
@@ -57,7 +62,13 @@ function StatusListRow(props: { readonly item: StatusListItem }): JSX.Element {
           </Text>
         )}
         {item.detail !== undefined && (
-          <Text as="span" variant="caption" tone="secondary" className={cx(styles, 'detail')}>
+          <Text
+            as="span"
+            variant="caption"
+            tone="secondary"
+            title={item.detailTitle}
+            className={cx(styles, 'detail')}
+          >
             {item.detail}
           </Text>
         )}

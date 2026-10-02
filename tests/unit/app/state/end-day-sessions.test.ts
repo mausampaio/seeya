@@ -82,6 +82,7 @@ describe('buildEndDayPreviewRows (V2-T69)', () => {
         cwd: '~/ignored',
         kind: 'ineligible',
         reason: 'This directory is in the ignore list.',
+        fullReason: 'This directory is in the ignore list.',
       },
     ]);
   });
@@ -93,7 +94,10 @@ describe('buildEndDayPreviewRows (V2-T69)', () => {
 
     expect(notCaptured).toHaveLength(1);
     expect(notCaptured[0]?.kind).toBe('closed');
-    expect(notCaptured[0]?.reason).toMatch(/D-031/);
+    // PO review round 1 (V2-T69, item 6): user-facing text never cites a decision id — the person
+    // reading this dialog has no `docs/DECISOES.md` to look `D-031` up in.
+    expect(notCaptured[0]?.reason).toBe('Session closed — no running process was found.');
+    expect(notCaptured[0]?.reason).not.toMatch(/D-0\d+/);
   });
 
   it('maps result.failedCaptures to notCaptured rows kind "failed" with the raw error', () => {
@@ -112,8 +116,31 @@ describe('buildEndDayPreviewRows (V2-T69)', () => {
         cwd: '~/broken',
         kind: 'failed',
         reason: 'ENOENT',
+        fullReason: 'ENOENT',
       },
     ]);
+  });
+
+  // PO review round 1 (V2-T69, item 5): a long message with a home-rooted path gets a short,
+  // `~`-abbreviated `reason` for display, while `fullReason` keeps the complete original text for
+  // a tooltip — this is the exact shape End day's own failure rows need it for.
+  it('abbreviates a home-rooted path inside a long failedCaptures reason, keeping the full text', () => {
+    const longPath = `${HOME_DIR}/.seeya/days/2026-09-30/sessions/session-9.json`;
+    const rawReason = `${longPath} is not valid JSON: Unexpected token o in JSON at position 1 while parsing near the start of the document body`;
+    const result = buildResult({
+      failedCaptures: [
+        { sessionId: 'session-9', name: 'poisoned', cwd: longPath, reason: rawReason },
+      ],
+    });
+
+    const { notCaptured } = buildEndDayPreviewRows(result, HOME_DIR, 'posix');
+
+    expect(notCaptured).toHaveLength(1);
+    const row = notCaptured[0];
+    expect(row?.reason).not.toBe(rawReason);
+    expect(row?.reason).toMatch(/^~\/\.seeya\/days\//);
+    expect(row?.reason.length).toBeLessThan(rawReason.length);
+    expect(row?.fullReason).toBe(rawReason);
   });
 
   it('a day with nothing in any bucket produces two empty lists, never undefined', () => {
@@ -148,7 +175,13 @@ describe('buildEndDayResultRows (V2-T69)', () => {
     });
     const { failed } = buildEndDayResultRows(result, HOME_DIR, 'posix');
     expect(failed).toEqual([
-      { sessionId: 'session-4', name: 'broken', cwd: '~/broken', reason: 'ENOENT' },
+      {
+        sessionId: 'session-4',
+        name: 'broken',
+        cwd: '~/broken',
+        reason: 'ENOENT',
+        fullReason: 'ENOENT',
+      },
     ]);
   });
 

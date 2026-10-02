@@ -18,11 +18,12 @@
  * background with no cancellation path (`application/end-day.ts` has none) — Esc there can only
  * ever mean Hide, never a lie about having stopped anything.
  */
-import type { JSX } from 'preact';
+import type { ComponentChildren, JSX } from 'preact';
 import styles from './EndDayDialog.module.css';
 import { cx } from '../../components/css-class.js';
 import { Dialog } from '../../components/Dialog/index.js';
 import { Text } from '../../components/Text/index.js';
+import { Button } from '../../components/Button/index.js';
 import { MESSAGES } from '../../../text/messages.js';
 import { PreviewPane } from './PreviewPane/index.js';
 import { ProgressPane } from './ProgressPane/index.js';
@@ -41,6 +42,53 @@ function isDialogOpen(state: EndDayControls['state']): boolean {
     return state.visible;
   }
   return true;
+}
+
+/**
+ * PO review round 1 (V2-T69, item 4): the action buttons for each phase, lifted OUT of the three
+ * panes and into `Dialog`'s own `footer` prop — this is what gives every phase the pinned-header/
+ * pinned-footer/scrolling-body shape (`Dialog.module.css#.scrollableBody`) instead of letting a
+ * long list push the buttons below the window's own bottom edge. `previewPending`'s brief loading
+ * text has no buttons and never overflows, so it's the one phase left without a `footer` — the
+ * plain, unconstrained `Dialog` shape it already had. */
+function footerFor(state: EndDayControls['state'], controls: EndDayControls): ComponentChildren {
+  if (state.kind === 'preview' || state.kind === 'starting') {
+    return (
+      <>
+        <Button
+          id="end-day-dialog-cancel"
+          variant="secondary"
+          hidden={state.kind === 'starting'}
+          onClick={controls.cancel}
+        >
+          {MESSAGES.endDayCancel}
+        </Button>
+        <Button id="end-day-dialog-run" loading={state.kind === 'starting'} onClick={controls.run}>
+          {MESSAGES.endDayRunNow}
+        </Button>
+      </>
+    );
+  }
+  if (state.kind === 'running') {
+    return (
+      <Button id="end-day-dialog-hide" variant="secondary" onClick={controls.hide}>
+        {MESSAGES.endDayHide}
+      </Button>
+    );
+  }
+  if (state.kind === 'result') {
+    return (
+      <>
+        <Button id="end-day-dialog-close" variant="secondary" onClick={controls.closeResult}>
+          {MESSAGES.endDayClose}
+        </Button>
+        <Button id="end-day-dialog-open-today" onClick={controls.openToday}>
+          {MESSAGES.endDayOpenToday}
+        </Button>
+      </>
+    );
+  }
+  return undefined;
 }
 
 export function EndDayDialog(props: EndDayDialogProps): JSX.Element {
@@ -68,6 +116,7 @@ export function EndDayDialog(props: EndDayDialogProps): JSX.Element {
       open={isDialogOpen(state)}
       onClose={handleClose}
       className={cx(styles, 'dialog')}
+      footer={footerFor(state, controls)}
     >
       {state.kind === 'previewPending' && (
         <Text as="p" variant="body-md">
@@ -75,24 +124,13 @@ export function EndDayDialog(props: EndDayDialogProps): JSX.Element {
         </Text>
       )}
       {(state.kind === 'preview' || state.kind === 'starting') && (
-        <PreviewPane
-          data={state}
-          starting={state.kind === 'starting'}
-          onCancel={controls.cancel}
-          onRun={controls.run}
-        />
+        <PreviewPane data={state} starting={state.kind === 'starting'} />
       )}
       {state.kind === 'running' && (
-        <ProgressPane sessions={state.sessions} current={state.current} onHide={controls.hide} />
+        <ProgressPane sessions={state.sessions} current={state.current} />
       )}
       {state.kind === 'result' && (
-        <ResultPane
-          captured={state.captured}
-          failed={state.failed}
-          skipped={state.skipped}
-          onOpenToday={controls.openToday}
-          onClose={controls.closeResult}
-        />
+        <ResultPane captured={state.captured} failed={state.failed} skipped={state.skipped} />
       )}
     </Dialog>
   );

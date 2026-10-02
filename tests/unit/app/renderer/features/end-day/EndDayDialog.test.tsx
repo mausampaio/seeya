@@ -54,6 +54,7 @@ describe('EndDayDialog (D-052, V2-T69)', () => {
               cwd: '~/beta',
               kind: 'ineligible',
               reason: 'This directory is in the ignore list.',
+              fullReason: 'This directory is in the ignore list.',
             },
           ],
           costCeiling: {
@@ -189,7 +190,15 @@ describe('EndDayDialog (D-052, V2-T69)', () => {
             captured: [
               { sessionId: 's1', name: 'alpha', cwd: '~/alpha', state: 'ended', mode: 'lean' },
             ],
-            failed: [{ sessionId: 's2', name: 'beta', cwd: '~/beta', reason: 'ENOENT' }],
+            failed: [
+              {
+                sessionId: 's2',
+                name: 'beta',
+                cwd: '~/beta',
+                reason: 'ENOENT',
+                fullReason: 'ENOENT',
+              },
+            ],
             skipped: [],
           },
           { openToday },

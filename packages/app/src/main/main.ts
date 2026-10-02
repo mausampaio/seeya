@@ -180,7 +180,9 @@ const END_DAY_FAKE_DELAY_MS = 2000;
  * `captured`, one `capturing`, one `waiting`, `docs/INTERFACE.md` § 6 item 2); `'result'` waits
  * for all three plus the near-instant poisoned session (a pre-corrupted `~/.seeya` handoff, never
  * the generator — `evaluateFullEligibility`'s own documented "corruption is a visible failure"
- * path) to finish.
+ * path) to finish. `'result-long'` (PO review round 1, item 4's own 9th screenshot) is the same
+ * wait as `'result'` — its extra rows are all cheap-ineligible/closed sessions the fixture adds,
+ * none of which ever touch the fake generator's own delay, so the real run finishes no slower.
  */
 function resolveEndDayFakeScreenshotDelayMs(scenario: string | undefined): number | null {
   switch (scenario) {
@@ -191,6 +193,7 @@ function resolveEndDayFakeScreenshotDelayMs(scenario: string | undefined): numbe
     case 'hidden':
       return 12000;
     case 'result':
+    case 'result-long':
       return 21000;
     default:
       return null;

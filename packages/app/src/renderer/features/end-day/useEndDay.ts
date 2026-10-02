@@ -49,13 +49,11 @@ export function useEndDay(): EndDayControls {
     // `SettingsDialog.tsx` already gives for its own always-mounted lifetime.
     api.onEndDayProgress((event) => {
       if (event.kind === 'started') {
-        dispatch({
-          kind: 'sessionStarted',
-          sessionId: event.sessionId,
-          name: event.name,
-          index: event.index,
-          total: event.total,
-        });
+        // `event.index`/`event.total` (the engine's own `sessionsInScope` count) are deliberately
+        // not forwarded — `state/end-day-panel.ts#handleSessionStarted` computes its own `index`/
+        // `total` from the narrower tracked list it seeds from the preview (PO review round 1,
+        // V2-T69 item 2).
+        dispatch({ kind: 'sessionStarted', sessionId: event.sessionId, name: event.name });
       } else {
         dispatch({ kind: 'sessionFinished', sessionId: event.sessionId, outcome: event.outcome });
       }

@@ -4,15 +4,13 @@
  * plan, same reason the dialog refreshes the Today panel on finish, `useEndDay.ts`).
  */
 import type { JSX } from 'preact';
-import { formatSessionStateLabel } from '@seeya-ai/engine/core/session-state-label.js';
 import styles from './ResultPane.module.css';
 import { cx } from '../../../components/css-class.js';
 import { Stack } from '../../../components/Stack/index.js';
 import { Text } from '../../../components/Text/index.js';
-import { Button } from '../../../components/Button/index.js';
 import { StatusList, type StatusListItem } from '../../../components/StatusList/index.js';
 import { MESSAGES } from '../../../../text/messages.js';
-import { resolveSessionStateTone } from '../../../../state/session-state-tone.js';
+import { buildSessionSummaryBadges } from '../session-badges.js';
 import type {
   EndDayReasonRow,
   EndDaySessionSummaryRow,
@@ -22,8 +20,6 @@ export interface ResultPaneProps {
   readonly captured: readonly EndDaySessionSummaryRow[];
   readonly failed: readonly EndDayReasonRow[];
   readonly skipped: readonly EndDayReasonRow[];
-  readonly onOpenToday: () => void;
-  readonly onClose: () => void;
 }
 
 function toCapturedItem(row: EndDaySessionSummaryRow): StatusListItem {
@@ -31,15 +27,21 @@ function toCapturedItem(row: EndDaySessionSummaryRow): StatusListItem {
     id: row.sessionId,
     title: row.name,
     meta: row.cwd,
-    badges: [
-      { label: formatSessionStateLabel(row.state), tone: resolveSessionStateTone(row.state) },
-      { label: row.mode === 'lean' ? 'Lean' : 'Deep', tone: 'neutral' },
-    ],
+    badges: buildSessionSummaryBadges(row),
   };
 }
 
+/** `row.reason` already comes pre-abbreviated/truncated from `state/end-day-sessions.ts`;
+ * `row.fullReason` is only shown as a tooltip when it actually differs — PO review round 1
+ * (V2-T69, item 5). */
 function toReasonItem(row: EndDayReasonRow): StatusListItem {
-  return { id: row.sessionId, title: row.name, meta: row.cwd, detail: row.reason };
+  return {
+    id: row.sessionId,
+    title: row.name,
+    meta: row.cwd,
+    detail: row.reason,
+    detailTitle: row.reason !== row.fullReason ? row.fullReason : undefined,
+  };
 }
 
 export function ResultPane(props: ResultPaneProps): JSX.Element {
@@ -72,14 +74,6 @@ export function ResultPane(props: ResultPaneProps): JSX.Element {
           emptyMessage={MESSAGES.endDayNothingToShow}
         />
       </section>
-      <div class={cx(styles, 'actions')}>
-        <Button id="end-day-dialog-close" variant="secondary" onClick={props.onClose}>
-          {MESSAGES.endDayClose}
-        </Button>
-        <Button id="end-day-dialog-open-today" onClick={props.onOpenToday}>
-          {MESSAGES.endDayOpenToday}
-        </Button>
-      </div>
     </Stack>
   );
 }

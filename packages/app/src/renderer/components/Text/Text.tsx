@@ -64,7 +64,10 @@ export interface TextProps {
   readonly truncate?: boolean;
   readonly as?: TextElement;
   readonly id?: string;
-  readonly title?: string;
+  /** `string | undefined` explicitly (not just `title?: string`) — `exactOptionalPropertyTypes`
+   * (`tsconfig.base.json`) otherwise refuses a caller that computes the value conditionally, e.g.
+   * `title={condition ? text : undefined}` (`StatusList.tsx`'s own `detailTitle`, V2-T69). */
+  readonly title?: string | undefined;
   readonly className?: string;
   readonly children?: ComponentChildren;
 }

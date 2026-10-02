@@ -1,10 +1,6 @@
-/* D-052 (V2-T69). */
+/* D-052 (V2-T69). PO review round 1, item 3: see `PreviewPane.module.css#.pane`'s own docstring —
+ * same fix, same reason. */
 .pane {
+  width: 100%;
   min-width: 420px;
-  max-width: 560px;
-}
-
-.actions {
-  display: flex;
-  justify-content: flex-end;
 }

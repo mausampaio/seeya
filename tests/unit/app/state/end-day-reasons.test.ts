@@ -31,7 +31,11 @@ describe('formatIneligibilityReasons (V2-T69)', () => {
 });
 
 describe('CLOSED_SESSION_REASON (V2-T69)', () => {
-  it('names D-031 so the reason is traceable, not just "closed"', () => {
-    expect(CLOSED_SESSION_REASON).toMatch(/D-031/);
+  // PO review round 1: the original text cited "(D-031)" — a decision id meaningless to the person
+  // reading the dialog, who has no `docs/DECISOES.md` to look it up in. Regression test: this used
+  // to read `expect(CLOSED_SESSION_REASON).toMatch(/D-031/)`, which this exact string now fails.
+  it('is a plain sentence, never a decision id a reader of the dialog has no way to resolve', () => {
+    expect(CLOSED_SESSION_REASON).toBe('Session closed — no running process was found.');
+    expect(CLOSED_SESSION_REASON).not.toMatch(/D-0\d+/);
   });
 });
