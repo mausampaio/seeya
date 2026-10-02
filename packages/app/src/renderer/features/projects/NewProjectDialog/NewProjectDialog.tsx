@@ -17,6 +17,16 @@
  * `new-project-cancel`) — `main/main.ts#verifyTextFieldClipboardRoundTrip` (V2-T74) drives this
  * dialog by those exact ids with `executeJavaScript`, unrelated to this task and left untouched.
  *
+ * **V2-T71 (`docs/INTERFACE.md` § 9 — "New project: campo `Project id` com o formato explicado no
+ * erro"): the id's shape is checked locally, with the engine's own `core/
+ * project-id.ts#isValidProjectId` — the SAME regex `createProject` itself would reject against,
+ * never a second, looser one — the instant the field loses focus, so a malformed id never has to
+ * round-trip to the engine to be told it's wrong. The engine's own `invalidId`/`alreadyExists`
+ * rejections (a submit this check let through some other way, or a duplicate id) still show
+ * through `formatCreateProjectErrorText`, unchanged — this task adds a FASTER, more specific
+ * error for the one case a person can fix without ever reaching the engine, never removes the
+ * other one.
+ *
  * @example
  * <NewProjectDialog/> // mounted once, in App.tsx
  */
@@ -32,12 +42,23 @@ import { MESSAGES } from '../../../../text/messages.js';
 import { getSeeyaApi } from '../../../ipc/client.js';
 import { formatCreateProjectErrorText } from '../../../../state/create-project-result.js';
 import { registerNewProjectDialogOpener } from '../new-project-dialog-bridge.js';
+import { isValidProjectId } from '@seeya-ai/engine/core/project-id.js';
 
 export function NewProjectDialog(): JSX.Element {
   const [open, setOpen] = useState(false);
   const [projectId, setProjectId] = useState('');
   const [error, setError] = useState<string | undefined>(undefined);
   const [submitting, setSubmitting] = useState(false);
+
+  // V2-T71: checked on blur, same "the field itself tells you, before you ever submit" moment
+  // `docs/INTERFACE.md` § 8 already uses for Settings' own fields — a still-focused field that
+  // simply hasn't been typed into yet never shows this (an empty string is never "malformed",
+  // it's just not filled in yet).
+  function handleIdBlur(value: string): void {
+    setError(
+      value.length > 0 && !isValidProjectId(value) ? MESSAGES.newProjectIdFormatError : undefined,
+    );
+  }
 
   // Registered once — the SAME "mounts once, the real implementation is in place before anyone
   // can click" guarantee `page-tab-bridge.ts`'s own docstring already relies on.
@@ -51,10 +72,17 @@ export function NewProjectDialog(): JSX.Element {
 
   function handleSubmit(event: TargetedEvent<HTMLFormElement>): void {
     event.preventDefault();
+    const trimmedId = projectId.trim();
+    // V2-T71: a submit via Enter never has to blur the field first — the SAME check `handleIdBlur`
+    // above runs, so a malformed id is caught here too, never sent to the engine at all.
+    if (!isValidProjectId(trimmedId)) {
+      setError(MESSAGES.newProjectIdFormatError);
+      return;
+    }
     setError(undefined);
     setSubmitting(true);
     void getSeeyaApi()
-      .createProject({ projectId: projectId.trim() })
+      .createProject({ projectId: trimmedId })
       .then((response) => {
         setSubmitting(false);
         if (response.kind !== 'created') {
@@ -97,6 +125,7 @@ export function NewProjectDialog(): JSX.Element {
             error={error}
             disabled={submitting}
             onInput={setProjectId}
+            onBlur={handleIdBlur}
           />
           <Stack direction="horizontal" gap="sm" justify="end">
             <Button

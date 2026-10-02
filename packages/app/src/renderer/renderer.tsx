@@ -21,6 +21,13 @@
  * (`renderer/features/today/Today.tsx`), driven by its own `useToday` hook subscribing straight to
  * the IPC client, the same "needs none of this wiring any more" shape this docstring already
  * describes above for the lateral/Settings.
+ *
+ * V2-T71: `wireFallbackDialog`/`wireDaemonOwnershipTransitionDialog`/
+ * `offerDaemonOwnershipTransitionIfNeeded` (`renderer/legacy/fallback-dialog-view.ts`/
+ * `daemon-ownership-transition-view.ts`, apagados by this task) are gone from here too, for the
+ * same reason — `renderer/features/confirmations/ResumeFallbackDialog`/
+ * `DaemonOwnershipTransitionDialog` are real components now, mounted as part of `<App/>`, each
+ * fetching/subscribing on its own `useEffect`.
  */
 import { render } from 'preact';
 import { AppShell } from './App.js';
@@ -30,11 +37,6 @@ import {
 } from './legacy/dialog-focus-return.js';
 import { wireTheme } from './legacy/theme-view.js';
 import { focusActiveTabTerminal } from './features/tabs/index.js';
-import { wireFallbackDialog } from './legacy/fallback-dialog-view.js';
-import {
-  offerDaemonOwnershipTransitionIfNeeded,
-  wireDaemonOwnershipTransitionDialog,
-} from './legacy/daemon-ownership-transition-view.js';
 import { wireProjectPanel } from './legacy/project-panel-view.js';
 import './ipc/client.js';
 
@@ -80,14 +82,9 @@ async function main(): Promise<void> {
   render(<AppShell />, document.getElementById('root') as HTMLElement);
 
   await wireTheme();
-  wireFallbackDialog();
-  wireDaemonOwnershipTransitionDialog();
   registerActiveTerminalFocuser(focusActiveTabTerminal);
   wireDialogFocusReturn();
   wireProjectPanel();
-  // V2-T13 item 5: after every other piece of the window is already wired and usable — the
-  // ownership-transition question never blocks tabs/sidebar/settings from working.
-  await offerDaemonOwnershipTransitionIfNeeded();
 }
 
 void main();

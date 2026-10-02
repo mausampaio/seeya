@@ -20,6 +20,12 @@ import { Sidebar, useSidebarCollapse } from './features/sidebar/index.js';
 import { TabStrip } from './features/tabs/index.js';
 import { SettingsDialog } from './features/settings/index.js';
 import { NewProjectDialog } from './features/projects/index.js';
+import {
+  ProjectLockConfirmDialog,
+  LeftoverChangesConfirmDialog,
+  ResumeFallbackDialog,
+  DaemonOwnershipTransitionDialog,
+} from './features/confirmations/index.js';
 
 export function AppShell() {
   const { collapsed, toggle } = useSidebarCollapse();
@@ -71,6 +77,15 @@ export function AppShell() {
        * (`FavoritesSection.tsx`) and this tab's own "New project" button through
        * `new-project-dialog-bridge.ts`. */}
       <NewProjectDialog />
+      {/* V2-T71: four more confirmations mounted here, same "owns its own open/closed state,
+       * driven by its own IPC subscription" shape `NewProjectDialog` above already established —
+       * replaces four static anchors `DialogsShell` used to carry (`project-lock-confirm-dialog`,
+       * `leftover-changes-confirm-dialog`, `fallback-dialog`, `daemon-ownership-transition-dialog`,
+       * all apagados from `legacy/dialogs-shell.tsx` by this task). */}
+      <ProjectLockConfirmDialog />
+      <LeftoverChangesConfirmDialog />
+      <ResumeFallbackDialog />
+      <DaemonOwnershipTransitionDialog />
     </>
   );
 }

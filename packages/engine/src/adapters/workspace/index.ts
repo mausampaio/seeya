@@ -31,6 +31,8 @@ import type {
 import type { AuditableCommit } from '../../core/project-audit.js';
 import type { ProjectManifest, ProjectSkeleton } from '../../core/types.js';
 import type { LockHolderProcess } from '../../core/lock-holder-process.js';
+import type { ChangedFileEntry } from '../../core/changed-file-status.js';
+import { parseChangedFileStatusLine } from '../../core/changed-file-status.js';
 import { runGit } from '../git/run-git.js';
 import { isEnoent } from './fs-errors.js';
 import { SEEYA_IDENTITY_EMAIL, SEEYA_IDENTITY_NAME, commitAll as commitAllImpl } from './commit.js';
@@ -166,6 +168,35 @@ export class FsWorkspaceRepository implements WorkspaceRepository {
       .split('\n')
       .filter((line) => line.trim().length > 0)
       .map((line) => line.slice(3));
+  }
+
+  /**
+   * V2-T71: the SAME `git status` query as `listChangedFiles` above (never a second, divergent
+   * scoping), kept as structured entries instead of stripped to bare paths — `core/
+   * changed-file-status.ts#parseChangedFileStatusLine` is the one place that reads the two-letter
+   * porcelain code. Additive: `listChangedFiles`'s own callers never had to change for this.
+   */
+  async listChangedFilesWithStatus(
+    root: string,
+    projectId: string,
+  ): Promise<readonly ChangedFileEntry[]> {
+    const status = await runGit(root, [
+      'status',
+      '--porcelain',
+      '--untracked-files=all',
+      '--',
+      projectId,
+    ]);
+    if (!status.ran || status.exitCode !== 0) {
+      throw new Error(
+        `git status failed in workspace at "${root}": ` +
+          `${status.ran ? `exit ${status.exitCode}` : status.reason}`,
+      );
+    }
+    return status.stdout
+      .split('\n')
+      .filter((line) => line.trim().length > 0)
+      .map(parseChangedFileStatusLine);
   }
 
   /** V2-T32: `seeya project remove`'s own physical deletion — `root/projectId` only, `commitAll`

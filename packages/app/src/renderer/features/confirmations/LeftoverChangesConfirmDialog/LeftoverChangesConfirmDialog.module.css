@@ -1,0 +1,13 @@
+/* V2-T71 — wide enough for a real path to read without wrapping into the badge column, capped so
+ * a long file list still scrolls inside the window instead of growing past it. */
+.dialog {
+  width: min(560px, calc(100vw - var(--seeya-space-8)));
+}
+
+/* PO review, round 1: the whole footer (both explanations, THEN the button row) takes the full
+ * width `Dialog`'s own `.footer` flex row has available — `Dialog.module.css#.footer` is
+ * `justify-content: flex-end`, which would otherwise shrink a single child to its own content
+ * width instead of filling the row the way the dialog's body/file-list above it already does. */
+.footerStack {
+  width: 100%;
+}

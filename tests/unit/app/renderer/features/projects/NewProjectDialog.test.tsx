@@ -58,6 +58,59 @@ describe('NewProjectDialog (V2-T67)', () => {
     expect(input.value).toBe('auth-hardening');
   });
 
+  it('shows the format error on blur, before any submit (V2-T71)', async () => {
+    const createProject = vi.fn();
+    window.seeya = createFakeSeeyaApi({ createProject });
+    const { getByText } = render(<NewProjectDialog />);
+    openNewProjectDialog();
+    const dialog = document.getElementById('new-project-dialog') as HTMLDialogElement;
+    await waitFor(() => expect(dialog.open).toBe(true));
+
+    const input = document.getElementById('new-project-id-input') as HTMLInputElement;
+    fireEvent.input(input, { target: { value: 'Auth Hardening' } });
+    fireEvent.blur(input);
+
+    await waitFor(() =>
+      expect(
+        getByText('Use lowercase letters, digits and hyphens — for example payments-webhooks.'),
+      ).not.toBeNull(),
+    );
+    expect(createProject).not.toHaveBeenCalled();
+  });
+
+  it('blocks submit for a malformed id without ever reaching the engine (V2-T71)', async () => {
+    const createProject = vi.fn();
+    window.seeya = createFakeSeeyaApi({ createProject });
+    const { getByText } = render(<NewProjectDialog />);
+    openNewProjectDialog();
+    const dialog = document.getElementById('new-project-dialog') as HTMLDialogElement;
+    await waitFor(() => expect(dialog.open).toBe(true));
+
+    const input = document.getElementById('new-project-id-input') as HTMLInputElement;
+    fireEvent.input(input, { target: { value: '../escape' } });
+    fireEvent.submit(document.getElementById('new-project-form') as HTMLFormElement);
+
+    await waitFor(() =>
+      expect(
+        getByText('Use lowercase letters, digits and hyphens — for example payments-webhooks.'),
+      ).not.toBeNull(),
+    );
+    expect(createProject).not.toHaveBeenCalled();
+    expect(dialog.open).toBe(true);
+  });
+
+  it('an empty, never-touched field shows no format error (not malformed, just not filled in)', async () => {
+    window.seeya = createFakeSeeyaApi();
+    const { queryByText } = render(<NewProjectDialog />);
+    openNewProjectDialog();
+    const dialog = document.getElementById('new-project-dialog') as HTMLDialogElement;
+    await waitFor(() => expect(dialog.open).toBe(true));
+
+    expect(
+      queryByText('Use lowercase letters, digits and hyphens — for example payments-webhooks.'),
+    ).toBeNull();
+  });
+
   it('cancel closes without creating anything', async () => {
     const createProject = vi.fn();
     window.seeya = createFakeSeeyaApi({ createProject });

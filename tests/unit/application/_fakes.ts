@@ -32,6 +32,7 @@ import type {
 } from '@seeya-ai/engine/core/ports.js';
 import type { ProjectLockInfo } from '@seeya-ai/engine/core/project-lock.js';
 import type { LockHolderProcess } from '@seeya-ai/engine/core/lock-holder-process.js';
+import type { ChangedFileEntry } from '@seeya-ai/engine/core/changed-file-status.js';
 import type { AuditableCommit } from '@seeya-ai/engine/core/project-audit.js';
 import type {
   AdoptionRecord,
@@ -651,6 +652,22 @@ export class FakeWorkspaceRepository implements WorkspaceRepository {
   listChangedFiles(root: string, projectId: string): Promise<readonly string[]> {
     void root;
     return Promise.resolve(this.changedFilesByProject.get(projectId) ?? []);
+  }
+
+  // V2-T71: additive sibling of `listChangedFiles` above — a test that never calls
+  // `setChangedFilesWithStatus` reads the same "nothing here yet" default.
+  private readonly changedFilesWithStatusByProject = new Map<string, readonly ChangedFileEntry[]>();
+
+  setChangedFilesWithStatus(projectId: string, entries: readonly ChangedFileEntry[]): void {
+    this.changedFilesWithStatusByProject.set(projectId, entries);
+  }
+
+  listChangedFilesWithStatus(
+    root: string,
+    projectId: string,
+  ): Promise<readonly ChangedFileEntry[]> {
+    void root;
+    return Promise.resolve(this.changedFilesWithStatusByProject.get(projectId) ?? []);
   }
 
   // V2-T32: `project-remove.test.ts`/`project-remove-repo.test.ts`/`project-revert-adoption

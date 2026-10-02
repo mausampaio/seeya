@@ -705,7 +705,30 @@ de projeto, um filtro de diretório, busca por nome, busca por id de uma sessão
 janela offscreen: sem foco real, `navigator.clipboard.writeText` recusa com "Document is not
 focused" mesmo depois de um `sendInputEvent` (um clique de verdade, ao contrário de `el.click()`
 via `executeJavaScript`, que não carrega ativação de usuário nenhuma para a Clipboard API aceitar) —
-medido com esta própria instrumentação antes da correção) —
+medido com esta própria instrumentação antes da correção), `SEEYA_APP_VERIFY_CONFIRMATIONS_DIR`
+(V2-T71: mesma forma de pasta-não-arquivo das acima — sete capturas nomeadas em sequência pelos
+diálogos de confirmação da seção 9: o projeto travado (evento `confirmProjectLockOpenRequest`
+despachado direto, nunca pelo `openProject()` real — `heldByPid`/`heldByAcquiredAt` vêm de
+`SEEYA_APP_VERIFY_DECOY_PID`/`SEEYA_APP_VERIFY_DECOY_PROC_START`, lidos de um processo filho REAL
+que o script de verificação lança, nunca inventados), as mudanças pendentes (evento
+`confirmLeftoverChangesOpenRequest`, lista longa fictícia com M/A/D/R), as duas formas da
+retomada que falhou (evento `confirmFallbackRequest`, com e sem `offersResumeWithoutPlan`), e os
+três estados do "New project" — este último sem despacho fictício nenhum: `CHANNELS.createProject`
+roda de verdade contra o espaço de trabalho descartável, criando o mesmo id duas vezes para
+provar a recusa "already exists" do motor), `SEEYA_APP_VERIFY_DAEMON_OWNERSHIP_DIR` (V2-T71:
+mesma forma de pasta-não-arquivo — duas capturas, "em repouso" e em `loading`, do diálogo de
+transição de posse REAL (nunca um evento fictício) — alcançar `shouldOffer: true` de propósito
+precisa de `SEEYA_APP_VERIFY_FAKE_INSTALLED_LAUNCH_PATH` (abaixo) mais um `daemon.lock` de
+fixture, escrito pelo script de verificação na própria `SEEYA_APP_HOME_OVERRIDE`, nomeando o
+MESMO processo filho real acima com um `launchedBy` diferente do caminho fictício; o clique da
+captura em `loading` é sempre em `Leave it as it is` — nunca `Let seeya take over`, que tocaria o
+autostart/daemon de verdade), `SEEYA_APP_VERIFY_FAKE_INSTALLED_LAUNCH_PATH` (V2-T71: substitui
+`AppInstallation` por uma fictícia que sempre responde "instalado" neste caminho, sem nunca
+consultar o registro/`dpkg`/`/Applications` reais — `composition/index.ts#BuildAppContextOverrides
+.appInstallation`, usado apenas pela captura acima), `SEEYA_APP_VERIFY_HOLD_DAEMON_OWNERSHIP_ANSWER_MS`
+(V2-T71: mesma técnica de `SEEYA_APP_VERIFY_HOLD_SKIP_MS` — segura a resposta real de
+`answerDaemonOwnershipTransition` pelos milissegundos informados antes de devolvê-la, só para a
+captura em `loading` acima) —
 mesma categoria de `SEEYA_DAEMON_CHILD`
 acima (nunca vão para disco, ninguém digita), mas nenhuma delas é lida por `npm run app` nem
 documentada no `README.md`: existem só para um agente sem tela/teclado próprios provar a janela

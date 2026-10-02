@@ -396,6 +396,36 @@ describe('FsWorkspaceRepository', () => {
     expect(changed).toEqual([path.posix.join('auth-hardening', 'context', 'know-how.md')]);
   });
 
+  // V2-T71 (`docs/INTERFACE.md` § 9's own "a lista de arquivos (M/A)") — same scoping as
+  // `listChangedFiles` above, but keeping each entry's own git status for display.
+  it('listChangedFilesWithStatus reports a new file as added and a tracked edit as modified', async () => {
+    root = await makeTmpDir();
+    const workspace = new FsWorkspaceRepository();
+    await workspace.initialize(root);
+    await workspace.writeProjectSkeleton(
+      root,
+      'auth-hardening',
+      buildProjectSkeleton('auth-hardening'),
+    );
+    await workspace.commitAll(root, 'auth-hardening', 'Create project auth-hardening');
+
+    await writeFile(
+      path.join(root, 'auth-hardening', 'context', 'know-how.md'),
+      'how this project is operated\n',
+      'utf8',
+    );
+    await writeFile(path.join(root, 'auth-hardening', 'INDEX.md'), 'edited\n', 'utf8');
+
+    const entries = await workspace.listChangedFilesWithStatus(root, 'auth-hardening');
+    expect(entries).toEqual(
+      expect.arrayContaining([
+        { path: path.posix.join('auth-hardening', 'context', 'know-how.md'), status: 'added' },
+        { path: path.posix.join('auth-hardening', 'INDEX.md'), status: 'modified' },
+      ]),
+    );
+    expect(entries).toHaveLength(2);
+  });
+
   it("listChangedFiles is scoped to ONE project — a second project's own pending change never leaks in (D-047 item 3)", async () => {
     root = await makeTmpDir();
     const workspace = new FsWorkspaceRepository();
@@ -421,6 +451,14 @@ describe('FsWorkspaceRepository', () => {
     root = await makeTmpDir();
     const workspace = new FsWorkspaceRepository();
     await expect(workspace.listChangedFiles(root, 'auth-hardening')).rejects.toThrow(
+      /git status failed/,
+    );
+  });
+
+  it('listChangedFilesWithStatus throws when root is not a git repository at all', async () => {
+    root = await makeTmpDir();
+    const workspace = new FsWorkspaceRepository();
+    await expect(workspace.listChangedFilesWithStatus(root, 'auth-hardening')).rejects.toThrow(
       /git status failed/,
     );
   });
