@@ -60,15 +60,16 @@
 
 /* Sizes — padding, PLUS font-size/line-height matching `Text`'s own body-sm/body-md/body-lg
  * exactly (identity § 4.4). PO review (2026-10-01, round 2): `Text` (`Button.tsx`'s own
- * `TEXT_VARIANT_BY_SIZE`) is the PRIMARY source for this button's own text — but two of this
- * window's own real callers (`#end-day-button`, `#autostart-control-button`) are legacy-owned
- * anchors whose content a plain `.ts` module overwrites with `button.textContent = …`
- * (`renderer/legacy/end-day-dialog-view.ts`/`autostart-control-view.ts`), which REPLACES the
- * `<Text>` span this component renders with a bare text node — losing `Text`'s own classes
- * entirely. `font-size`/`line-height`/`font-weight` are inherited CSS properties, so repeating
- * the identity's own numbers here (never a one-off value — same three variants, same pixels) is
- * what keeps a legacy-overwritten button reading at the right size too, through inheritance
- * alone, without this component needing to know those two buttons exist. */
+ * `TEXT_VARIANT_BY_SIZE`) is the PRIMARY source for this button's own text — this duplication was
+ * originally a defensive measure for two anchors whose content a legacy `.ts` module overwrote
+ * with `button.textContent = …` (REPLACING the `<Text>` span this component renders with a bare
+ * text node, losing its classes entirely): `#end-day-button` (fixed by V2-T69 — it's a real
+ * reactive `<Button>` now, `renderer/features/end-day/`) and `#autostart-control-button` (removed
+ * entirely by V2-T65 — autostart moved to a `Switch` in Settings). Kept anyway as a harmless
+ * belt-and-braces: `font-size`/`line-height`/`font-weight` are inherited CSS properties, so
+ * repeating the identity's own numbers here (never a one-off value — same three variants, same
+ * pixels) costs nothing and protects against the same defect reappearing in a future
+ * legacy-anchored button, without this component needing to know any of them exist. */
 .sm {
   padding: var(--seeya-space-1) var(--seeya-space-3);
   font-size: 14px;

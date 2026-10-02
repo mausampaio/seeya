@@ -8,8 +8,8 @@ const SESSION = {
   name: 'alpha',
 };
 
-describe('projectEndDayProgressEvent', () => {
-  it('captureStarted projects to index/total/name', () => {
+describe('projectEndDayProgressEvent (V2-T69)', () => {
+  it('captureStarted projects to a started event carrying sessionId/index/total/name', () => {
     const event: CaptureProgressEvent = {
       kind: 'captureStarted',
       session: SESSION,
@@ -17,18 +17,33 @@ describe('projectEndDayProgressEvent', () => {
       total: 5,
     };
 
-    expect(projectEndDayProgressEvent(event)).toEqual({ index: 2, total: 5, name: 'alpha' });
+    expect(projectEndDayProgressEvent(event)).toEqual({
+      kind: 'started',
+      sessionId: SESSION.sessionId,
+      name: 'alpha',
+      index: 2,
+      total: 5,
+    });
   });
 
-  it('captureFinished projects to null — the panel only shows what is CURRENTLY running', () => {
-    const captured: CaptureProgressEvent = {
+  it('captureFinished with a captured outcome projects to a finished event', () => {
+    const event: CaptureProgressEvent = {
       kind: 'captureFinished',
       session: SESSION,
       index: 2,
       total: 5,
       outcome: { kind: 'captured' },
     };
-    const failed: CaptureProgressEvent = {
+
+    expect(projectEndDayProgressEvent(event)).toEqual({
+      kind: 'finished',
+      sessionId: SESSION.sessionId,
+      outcome: 'captured',
+    });
+  });
+
+  it('captureFinished with a failed outcome carries the outcome kind, not the reason text', () => {
+    const event: CaptureProgressEvent = {
       kind: 'captureFinished',
       session: SESSION,
       index: 3,
@@ -36,7 +51,26 @@ describe('projectEndDayProgressEvent', () => {
       outcome: { kind: 'failed', reason: 'claude binary not found' },
     };
 
-    expect(projectEndDayProgressEvent(captured)).toBeNull();
-    expect(projectEndDayProgressEvent(failed)).toBeNull();
+    expect(projectEndDayProgressEvent(event)).toEqual({
+      kind: 'finished',
+      sessionId: SESSION.sessionId,
+      outcome: 'failed',
+    });
+  });
+
+  it('captureFinished with an ineligible outcome projects to "ineligible"', () => {
+    const event: CaptureProgressEvent = {
+      kind: 'captureFinished',
+      session: SESSION,
+      index: 1,
+      total: 1,
+      outcome: { kind: 'ineligible', reasons: ['duplicateToday'] },
+    };
+
+    expect(projectEndDayProgressEvent(event)).toEqual({
+      kind: 'finished',
+      sessionId: SESSION.sessionId,
+      outcome: 'ineligible',
+    });
   });
 });

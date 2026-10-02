@@ -38,8 +38,8 @@ export function FavoritesSection(props: FavoritesSectionProps): JSX.Element {
       action={
         // No `onClick` here on purpose — `renderer/legacy/new-project-dialog-view.ts#wireNewProjectDialog`
         // attaches the real click handler to this exact `id` after mount (unchanged by this task,
-        // D-052's own "o que ainda não é reescrito... fica funcionando"), same passthrough-anchor
-        // pattern `SidebarFooter`'s own `end-day-button`/`autostart-control-button` use.
+        // D-052's own "o que ainda não é reescrito... fica funcionando") — the same passthrough-anchor
+        // pattern `#end-day-button` used before V2-T69 made it a real reactive `<Button>`.
         <IconButton id="new-project-button" size="sm" aria-label={MESSAGES.newProjectButton}>
           {/* PO review (defect 2, V2-T75): 24px — fills this button's own 24px (`size="sm"`) box
            * exactly, the identity's own preferred grid (§ 6.4). The real legibility bug this icon

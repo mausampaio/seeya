@@ -481,6 +481,16 @@ function resolveCliDaemonScriptPath(): string {
 export interface BuildAppContextOverrides {
   readonly appInstallation?: AppInstallation;
   readonly autostart?: Autostart;
+  /**
+   * V2-T69: verification-only, same spirit as the two fields above — lets a screenshot script
+   * exercise End day's real "em andamento"/"resultado" views (`renderer/features/end-day/`)
+   * through the real `endDay()` pipeline without ever spawning a real, billed `claude -p` process.
+   * `electron/main.ts`'s own `SEEYA_APP_VERIFY_END_DAY_FAKE` is the ONE real caller — see
+   * `composition/verification-fake-generator.ts`'s own docstring for the fake implementation.
+   * Every other caller (a real window) omits both and gets the real adapters, as always.
+   */
+  readonly leanGenerator?: HandoffGenerator;
+  readonly deepGenerator?: HandoffGenerator;
 }
 
 /**
@@ -685,12 +695,14 @@ export async function buildAppContext(
       }),
     transcriptReader: new TranscriptFileReader({ claudeHome: home.claudeHome }),
     gitReader: new GitAdapter({ clock }),
-    leanGenerator: new LeanHandoffGenerator(generatorOptions),
-    deepGenerator: new DeepHandoffGenerator({
-      ...generatorOptions,
-      seeyaHome: home.seeyaHome,
-      clock,
-    }),
+    leanGenerator: overrides.leanGenerator ?? new LeanHandoffGenerator(generatorOptions),
+    deepGenerator:
+      overrides.deepGenerator ??
+      new DeepHandoffGenerator({
+        ...generatorOptions,
+        seeyaHome: home.seeyaHome,
+        clock,
+      }),
     forkCleanup: new DiscoveryForkCleanup({
       claudeHome: home.claudeHome,
       seeyaHome: home.seeyaHome,

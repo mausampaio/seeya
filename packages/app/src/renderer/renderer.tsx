@@ -9,7 +9,9 @@
  * more — all are real components now, mounted as part of `<App/>` itself, driven by their own
  * hooks subscribing
  * straight to the IPC client (Settings' own autostart switch replaces the last "Cuidados:
- * autostart continua... até a V2-T65" exception D-052 had carved out here). Excluded from
+ * autostart continua... até a V2-T65" exception D-052 had carved out here). End day
+ * (`renderer/features/end-day/`, V2-T69) joined them the same way — it's mounted inside
+ * `SidebarFooter`, no separate `wire*` call here. Excluded from
  * `packages/app/src`'s coverage floor with everything else that cannot run without a display —
  * every module this file wires is unit-tested (the pure ones) or is itself excluded for the same
  * "cannot run headless" reason (the DOM-wiring ones).
@@ -29,7 +31,6 @@ import {
 import { wireTheme } from './legacy/theme-view.js';
 import { focusActiveTabTerminal } from './features/tabs/index.js';
 import { wireFallbackDialog } from './legacy/fallback-dialog-view.js';
-import { wireEndDayDialog } from './legacy/end-day-dialog-view.js';
 import {
   offerDaemonOwnershipTransitionIfNeeded,
   wireDaemonOwnershipTransitionDialog,
@@ -80,7 +81,6 @@ async function main(): Promise<void> {
 
   await wireTheme();
   wireFallbackDialog();
-  wireEndDayDialog();
   wireDaemonOwnershipTransitionDialog();
   registerActiveTerminalFocuser(focusActiveTabTerminal);
   wireDialogFocusReturn();

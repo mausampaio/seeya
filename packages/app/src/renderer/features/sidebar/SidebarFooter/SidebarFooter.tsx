@@ -1,11 +1,15 @@
 /**
  * D-052 (V2-T75): the lateral's own footer (`docs/INTERFACE.md` § 1 item 7) — schedule strip,
  * "End day…", and the daemon pill. Replaces `renderer/legacy/schedule-strip-view.ts`/
- * `daemon-control-view.ts` entirely (deleted by that task); `renderer/legacy/
- * end-day-dialog-view.ts` stays legacy-owned — this component renders only the stable anchor
- * elements (`#end-day-button`) that module already attaches to by id, unchanged, never a bound
- * `onClick`/reactive text for it (`NavList.tsx`'s own docstring has the same reasoning: a legacy
- * module toggles this on every push of its own, not just once).
+ * `daemon-control-view.ts` entirely (deleted by that task).
+ *
+ * V2-T69: "End day…" is a real, reactive button now (`renderer/features/end-day/`), replacing
+ * `renderer/legacy/end-day-dialog-view.ts`'s own `#end-day-button` stable anchor (apagado by this
+ * task) — `useEndDay()` is owned HERE, not inside `<EndDayDialog/>` itself, because the trigger
+ * button's own label needs to reflect the dialog's state even while it's hidden
+ * (`describeEndDayFooterLabel`, `docs/INTERFACE.md` § 6 item 2's own "o rodapé... permite
+ * reabrir") — the same "owns its own popover" shape this component already has for the Snooze
+ * `Menu`.
  *
  * V2-T65 (`docs/INTERFACE.md`'s own "o botão de autostart sai do rodapé da lateral"): the
  * autostart anchor this component used to render for `renderer/legacy/autostart-control-view.ts`
@@ -39,6 +43,8 @@ import { Menu } from '../../../components/Menu/index.js';
 import { Text } from '../../../components/Text/index.js';
 import { ChevronDownIcon, ClockIcon, PlayIcon, StopIcon } from '../../../components/Icon/index.js';
 import { MESSAGES } from '../../../../text/messages.js';
+import { describeEndDayFooterLabel } from '../../../../state/end-day-panel.js';
+import { EndDayDialog, useEndDay } from '../../end-day/index.js';
 import { useSidebarFooter } from './useSidebarFooter.js';
 
 const SNOOZE_OPTIONS: readonly [15 | 30 | 60, string][] = [
@@ -55,6 +61,7 @@ const SNOOZE_MENU_ITEMS = SNOOZE_OPTIONS.map(([minutes, label]) => ({
 export function SidebarFooter(): JSX.Element {
   const { schedule, scheduleActionPending, onSnooze, onSkip, daemon, onDaemonControlClicked } =
     useSidebarFooter();
+  const endDay = useEndDay();
   const [snoozeMenuOpen, setSnoozeMenuOpen] = useState(false);
   const snoozeTriggerRef = useRef<HTMLButtonElement>(null);
 
@@ -153,9 +160,10 @@ export function SidebarFooter(): JSX.Element {
           )}
         </div>
 
-        <Button id="end-day-button" size="sm" fullWidth>
-          {MESSAGES.endDayButton}
+        <Button id="end-day-button" size="sm" fullWidth onClick={endDay.triggerClicked}>
+          {describeEndDayFooterLabel(endDay.state)}
         </Button>
+        <EndDayDialog controls={endDay} />
 
         <div class={daemonPillClassName}>
           <span class={cx(styles, 'daemonDot')} aria-hidden="true" />

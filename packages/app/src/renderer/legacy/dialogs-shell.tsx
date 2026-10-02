@@ -10,7 +10,8 @@
  *
  * V2-T65: Settings is no longer one of these — `renderer/features/settings/SettingsDialog` is a
  * real, reactive component now, mounted directly in `App.tsx` with its own `open`/`onClose` state
- * instead of an imperative anchor here.
+ * instead of an imperative anchor here. V2-T69: End day left the same way —
+ * `renderer/features/end-day/EndDayDialog` replaces the `#end-day-dialog` anchor below.
  */
 import { Dialog } from '../components/Dialog/Dialog.js';
 
@@ -25,16 +26,6 @@ export function DialogsShell() {
           <button id="fallback-dialog-resume-without-plan" type="button" hidden></button>
           <button id="fallback-dialog-open" type="button"></button>
           <button id="fallback-dialog-skip" type="button"></button>
-        </div>
-      </Dialog>
-      <Dialog id="end-day-dialog">
-        <h3 id="end-day-dialog-title"></h3>
-        <pre id="end-day-dialog-report"></pre>
-        <p id="end-day-dialog-cost"></p>
-        <p id="end-day-dialog-progress" hidden></p>
-        <div id="end-day-dialog-actions">
-          <button id="end-day-dialog-run" type="button" hidden></button>
-          <button id="end-day-dialog-cancel" type="button" hidden></button>
         </div>
       </Dialog>
       <Dialog id="daemon-ownership-transition-dialog">

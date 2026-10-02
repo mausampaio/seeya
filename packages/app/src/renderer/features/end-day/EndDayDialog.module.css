@@ -1,0 +1,5 @@
+/* D-052 (V2-T69) — chrome stays the shared `.seeya-dialog*` legacy classes (`Dialog.tsx`'s own
+ * docstring); this module only adds the width this dialog's own content needs. */
+.dialog {
+  width: min(560px, 90vw);
+}

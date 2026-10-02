@@ -41,6 +41,9 @@ export function createFakeSeeyaApi(overrides: Partial<SeeyaApi> = {}): SeeyaApi 
     resumeSelected: neverCalled('resumeSelected'),
     onResumeProgress: vi.fn(),
     onResumeTabOpened: vi.fn(),
+    // V2-T69: `useEndDay` calls `onEndDayProgress` unconditionally on mount (it's mounted inside
+    // `SidebarFooter`, for the life of the window) — a harmless no-op default, same reasoning
+    // `onTabData`/`onSessionsUpdate` above already have for their own always-registered listeners.
     endDayPreview: neverCalled('endDayPreview'),
     endDayRun: neverCalled('endDayRun'),
     onEndDayProgress: vi.fn(),
