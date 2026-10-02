@@ -43,7 +43,7 @@ export const PROJECT_DETAILS_MESSAGES = {
 
   projectDetailsRemoveHeading: 'Remove project',
   projectDetailsRemoveDescription:
-    "Takes the project out of the workspace. Its history stays in the workspace's own git, so it can be recovered.",
+    "For a project created by mistake. Takes it out of the workspace; its history stays in the workspace's own git, so it can be recovered. To retire a project you finished, archive it instead.",
   projectDetailsRemoveProject: 'Remove project…',
 
   confirmRevertTitle: (projectId: string): string => `Revert the adoption in "${projectId}"?`,

@@ -29,6 +29,7 @@ function project(overrides: Partial<ProjectPanelRow> = {}): ProjectPanelRow {
     name: 'Auth hardening',
     lockText: 'unlocked',
     lock: { kind: 'unlocked' },
+    lifecycle: { kind: 'active' },
     sessions: [],
     favorite: false,
     repositoryCount: 0,
@@ -238,5 +239,28 @@ describe('countRunningSessions (V2-T63 item 6)', () => {
 
   it('is zero with nothing running', () => {
     expect(countRunningSessions([], [])).toBe(0);
+  });
+});
+
+describe('archived projects stay out of the day-to-day lists (V2-T84)', () => {
+  const archivedFavorite = project({
+    projectId: 'old-thing',
+    name: 'Old thing',
+    favorite: true,
+    lifecycle: { kind: 'archived', archivedAt: new Date('2026-10-02T00:00:00.000Z'), note: null },
+    sessions: [session({ lastActivity: new Date('2026-10-01T10:00:00.000Z') })],
+  });
+
+  it('an archived favorite is not in Favorites — and is back once the lifecycle is active again (the star was never touched)', () => {
+    expect(buildFavoriteProjectRows([archivedFavorite], null)).toEqual([]);
+    const unarchived = { ...archivedFavorite, lifecycle: { kind: 'active' } as const };
+    expect(buildFavoriteProjectRows([unarchived], null).map((row) => row.projectId)).toEqual([
+      'old-thing',
+    ]);
+  });
+
+  it('an archived project with recent activity is not in Recent', () => {
+    const archivedNotFavorite = { ...archivedFavorite, favorite: false };
+    expect(buildRecentProjectRows([archivedNotFavorite], null)).toEqual([]);
   });
 });

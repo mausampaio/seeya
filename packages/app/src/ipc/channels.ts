@@ -196,6 +196,14 @@ export const CHANNELS = {
   /** Renderer → main: "Remove project" (V2-T83) — the same `removeProject` `seeya project remove`
    * calls; its one question is `confirmRemoveProjectRequest` below. */
   removeProject: 'seeya:remove-project',
+  /** Renderer → main: "Archive project…" confirmed (V2-T84, `docs/INTERFACE.md` § 4b) — the same
+   * `archiveProject` `seeya project archive` calls. The confirmation (with the optional note) is
+   * the renderer's own dialog, so no engine question travels back. */
+  archiveProject: 'seeya:archive-project',
+  /** Renderer → main: "Unarchive" confirmed (V2-T84) — the same `unarchiveProject` `seeya
+   * project unarchive` calls. "Unarchive and open" is this call followed by the ordinary
+   * `openProject`. */
+  unarchiveProject: 'seeya:unarchive-project',
   /** Main → renderer: `revertAdoption`'s own `confirmRevert` (V2-T83, `docs/INTERFACE.md` § 9). */
   confirmRevertAdoptionRequest: 'seeya:confirm-revert-adoption-request',
   answerRevertAdoptionConfirm: 'seeya:answer-revert-adoption-confirm',
@@ -907,6 +915,17 @@ export interface RevertProjectAdoptionRequest {
 }
 
 export interface RemoveProjectRequest {
+  readonly projectId: string;
+}
+
+/** `note` is `null` when the person left the optional field empty (`normalizeArchiveNote` trims
+ * and drops a blank one on the main side as well). */
+export interface ArchiveProjectRequest {
+  readonly projectId: string;
+  readonly note: string | null;
+}
+
+export interface UnarchiveProjectRequest {
   readonly projectId: string;
 }
 

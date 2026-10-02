@@ -91,6 +91,7 @@ import type { AdoptSessionDeps } from '@seeya-ai/engine/application/project-adop
 import type { WorkspaceCommandDeps } from '@seeya-ai/engine/application/workspace.js';
 import type { AddRepositoryDeps } from '@seeya-ai/engine/application/repository-association.js';
 import type { RemoveRepositoryDeps } from '@seeya-ai/engine/application/project-remove-repo.js';
+import type { ArchiveProjectDeps } from '@seeya-ai/engine/application/project-archive.js';
 import type { RemoveProjectDeps } from '@seeya-ai/engine/application/project-remove.js';
 import type { RevertAdoptionDeps } from '@seeya-ai/engine/application/project-revert-adoption.js';
 import type { DaemonOwner, DaemonOwnershipTransitionAnswer } from '@seeya-ai/engine/core/types.js';
@@ -463,7 +464,7 @@ export function buildAddRepositoryDeps(context: AppContext): AddRepositoryDeps {
 function buildProjectLockHolderDeps(
   context: AppContext,
   processIdentity: AppProcessIdentity,
-): RemoveRepositoryDeps & RemoveProjectDeps {
+): RemoveRepositoryDeps & RemoveProjectDeps & ArchiveProjectDeps {
   return {
     storage: context.storage,
     workspace: context.workspace,
@@ -481,6 +482,14 @@ export function buildRemoveRepositoryDeps(
   context: AppContext,
   processIdentity: AppProcessIdentity,
 ): RemoveRepositoryDeps {
+  return buildProjectLockHolderDeps(context, processIdentity);
+}
+
+/** V2-T84: `archiveProject`/`unarchiveProject` — the same lock-taking shape as the other writes. */
+export function buildArchiveProjectDeps(
+  context: AppContext,
+  processIdentity: AppProcessIdentity,
+): ArchiveProjectDeps {
   return buildProjectLockHolderDeps(context, processIdentity);
 }
 

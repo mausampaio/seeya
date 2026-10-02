@@ -25,6 +25,7 @@ import {
   type FavoriteProjectRow,
   type RecentProjectRow,
 } from '../../../state/sidebar-summary.js';
+import { isActiveProject } from '../../../state/projects-table.js';
 import { buildTodayCardSummary, type TodayCardSummary } from '../../../state/today-panel.js';
 import { onActiveTabChanged, openOrFocusPageTab } from '../tabs/index.js';
 import { pageTabId, type PageTabKind } from '../../../tabs/page-tab.js';
@@ -95,7 +96,8 @@ export function useSidebar(): SidebarData {
     todayCard: buildTodayCardSummary(today),
     favorites: buildFavoriteProjectRows(projects.projects, activeTabId),
     recent: buildRecentProjectRows(projects.projects, activeTabId),
-    allProjectsCount: projects.projects.length,
+    // V2-T84: archived projects are not part of the day-to-day count.
+    allProjectsCount: projects.projects.filter(isActiveProject).length,
     runningSessionsCount: countRunningSessions(
       projects.projects,
       projects.otherSessionsByDirectory,

@@ -19,6 +19,10 @@ import type {
 export interface SessionsPanelRow extends ProjectPanelSessionRow {
   readonly projectId: string | null;
   readonly projectName: string | null;
+  /** V2-T84: the session's project is archived — its project-flow `Resume` is off, with the
+   * reason (`state/sessions-table.ts#resolveSessionRowAction`). `false` for a session with no
+   * project (nothing to be archived). */
+  readonly projectArchived: boolean;
   /** `null` exactly when `projectId` is not `null` — a session that belongs to a project is never
    * offered "Adopt…" at all (`docs/INTERFACE.md` § 5's own "Adopt… — sem projeto e elegível"), so
    * there is no eligibility to compute for it in the first place (D-025: never a guessed
@@ -30,11 +34,23 @@ function toProjectSessionRow(
   project: ProjectPanelRow,
   session: ProjectPanelSessionRow,
 ): SessionsPanelRow {
-  return { ...session, projectId: project.projectId, projectName: project.name, adopt: null };
+  return {
+    ...session,
+    projectId: project.projectId,
+    projectName: project.name,
+    projectArchived: project.lifecycle.kind === 'archived',
+    adopt: null,
+  };
 }
 
 function toOtherSessionRow(session: ProjectPanelOtherSessionRow): SessionsPanelRow {
-  return { ...session, projectId: null, projectName: null, adopt: session.adopt };
+  return {
+    ...session,
+    projectId: null,
+    projectName: null,
+    projectArchived: false,
+    adopt: session.adopt,
+  };
 }
 
 /**

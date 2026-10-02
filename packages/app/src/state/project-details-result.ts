@@ -11,14 +11,22 @@ import type { AddRepositoryResult } from '@seeya-ai/engine/application/repositor
 import type { RemoveRepositoryResult } from '@seeya-ai/engine/application/project-remove-repo.js';
 import type { RemoveProjectResult } from '@seeya-ai/engine/application/project-remove.js';
 import type { RevertAdoptionResult } from '@seeya-ai/engine/application/project-revert-adoption.js';
+import type {
+  ArchiveProjectResult,
+  UnarchiveProjectResult,
+} from '@seeya-ai/engine/application/project-archive.js';
 import {
   formatAdoptedCopyOutcomeLine,
   formatInvalidProjectIdLine,
   formatNothingToRevertLine,
   formatPathNotFoundLine,
+  formatProjectAlreadyActiveLine,
+  formatProjectAlreadyArchivedLine,
+  formatProjectArchivedLine,
   formatProjectLockedRefusalLine,
   formatProjectNotFoundLine,
   formatProjectRemovedLine,
+  formatProjectUnarchivedLine,
   formatRecoveryLine,
   formatRemovedAdoptionsLines,
   formatRepositoryAlreadyAssociatedLine,
@@ -172,5 +180,47 @@ export function formatRemoveProjectActionResult(
           ...formatRemovedAdoptionsLines(result.removedAdoptions),
         ],
       };
+  }
+}
+
+/** V2-T84: `alreadyArchived` is `info` — nothing changed, and that is fine (same reading
+ * `alreadyAssociated` gets above), never folded into `success`. */
+export function formatArchiveProjectActionResult(
+  result: ArchiveProjectResult,
+): ProjectActionResponse {
+  switch (result.kind) {
+    case 'invalidId':
+      return say('error', formatInvalidProjectIdLine(result.projectId));
+    case 'notFound':
+      return say('error', formatProjectNotFoundLine(result.projectId));
+    case 'locked':
+      return say(
+        'error',
+        formatProjectLockedRefusalLine(result.projectId, result.heldBy, 'archive it'),
+      );
+    case 'alreadyArchived':
+      return say('info', formatProjectAlreadyArchivedLine(result.projectId, result.archivedAt));
+    case 'archived':
+      return say('success', formatProjectArchivedLine(result.projectId, result.note));
+  }
+}
+
+export function formatUnarchiveProjectActionResult(
+  result: UnarchiveProjectResult,
+): ProjectActionResponse {
+  switch (result.kind) {
+    case 'invalidId':
+      return say('error', formatInvalidProjectIdLine(result.projectId));
+    case 'notFound':
+      return say('error', formatProjectNotFoundLine(result.projectId));
+    case 'locked':
+      return say(
+        'error',
+        formatProjectLockedRefusalLine(result.projectId, result.heldBy, 'unarchive it'),
+      );
+    case 'alreadyActive':
+      return say('info', formatProjectAlreadyActiveLine(result.projectId));
+    case 'unarchived':
+      return say('success', formatProjectUnarchivedLine(result.projectId));
   }
 }

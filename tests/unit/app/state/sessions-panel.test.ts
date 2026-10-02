@@ -31,6 +31,7 @@ describe('flattenSessionsPanelRows (V2-T68)', () => {
             name: 'Auth hardening',
             lockText: 'unlocked',
             lock: { kind: 'unlocked' },
+            lifecycle: { kind: 'active' },
             sessions: [session({ sessionId: 'a' })],
             favorite: false,
             repositoryCount: 0,
@@ -44,9 +45,40 @@ describe('flattenSessionsPanelRows (V2-T68)', () => {
         ...session({ sessionId: 'a' }),
         projectId: 'auth-hardening',
         projectName: 'Auth hardening',
+        projectArchived: false,
         adopt: null,
       },
     ]);
+  });
+
+  it('marks a session of an ARCHIVED project, and keeps listing it with the project name (V2-T84)', () => {
+    const rows = flattenSessionsPanelRows(
+      panel({
+        projects: [
+          {
+            projectId: 'old-thing',
+            name: 'Old thing',
+            lockText: 'unlocked',
+            lock: { kind: 'unlocked' },
+            lifecycle: {
+              kind: 'archived',
+              archivedAt: new Date('2026-10-02T00:00:00.000Z'),
+              note: null,
+            },
+            sessions: [session({ sessionId: 'a' })],
+            favorite: false,
+            repositoryCount: 0,
+            lastActivity: null,
+          },
+        ],
+      }),
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      projectId: 'old-thing',
+      projectName: 'Old thing',
+      projectArchived: true,
+    });
   });
 
   it('carries an "other" session with no project and its own adopt eligibility', () => {
@@ -66,6 +98,7 @@ describe('flattenSessionsPanelRows (V2-T68)', () => {
         ...session({ sessionId: 'b' }),
         projectId: null,
         projectName: null,
+        projectArchived: false,
         adopt: { kind: 'available' },
       },
     ]);
@@ -80,6 +113,7 @@ describe('flattenSessionsPanelRows (V2-T68)', () => {
             name: 'P',
             lockText: 'unlocked',
             lock: { kind: 'unlocked' },
+            lifecycle: { kind: 'active' },
             sessions: [session({ sessionId: 'a' }), session({ sessionId: 'b' })],
             favorite: false,
             repositoryCount: 0,

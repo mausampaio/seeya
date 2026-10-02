@@ -14,6 +14,7 @@ import { computeDisplaySessionIds } from '@seeya-ai/engine/application/session-i
 import type {
   AdoptionRecord,
   AssociatedRepository,
+  ProjectLifecycle,
   ProjectManifest,
   RepositoryMapEntry,
 } from '@seeya-ai/engine/core/types.js';
@@ -56,6 +57,9 @@ export type ProjectDetailsData =
       readonly name: string;
       readonly dir: string;
       readonly writeAccess: ProjectDetailsWriteAccess;
+      /** V2-T84: active or archived (with the date and note) — the dialog's Archive section is
+       * either `Archive project…` or the archived state with `Unarchive`. */
+      readonly lifecycle: ProjectLifecycle;
       readonly repositories: readonly ProjectDetailsRepositoryRow[];
       readonly adoptions: readonly ProjectDetailsAdoptionRow[];
       readonly fileCount: number;
@@ -154,6 +158,7 @@ export function buildProjectDetailsData(inputs: ProjectDetailsInputs): ProjectDe
       inputs.lockStatus.kind === 'heldByLiveSession'
         ? { kind: 'blocked', heldByText: inputs.lockHeldByText }
         : { kind: 'open' },
+    lifecycle: inputs.manifest.lifecycle,
     repositories: inputs.manifest.repositories.map((repository) =>
       toRepositoryRow(projectId, repository, inputs),
     ),

@@ -10,7 +10,12 @@
 import { formatLockHolderDescription } from '@seeya-ai/engine/core/project-lock-message.js';
 import { formatSessionStateLabel } from '@seeya-ai/engine/core/session-state-label.js';
 import type { PathPlatformHint } from '@seeya-ai/engine/core/cwd-normalization.js';
-import type { AdoptionRecord, ProjectManifest, SessionState } from '@seeya-ai/engine/core/types.js';
+import type {
+  AdoptionRecord,
+  ProjectLifecycle,
+  ProjectManifest,
+  SessionState,
+} from '@seeya-ai/engine/core/types.js';
 import type { RejectedDiscoveryRecord } from '@seeya-ai/engine/core/ports.js';
 import type { ProjectLockStatus } from '@seeya-ai/engine/application/project-lock.js';
 import { computeDisplaySessionIds } from '@seeya-ai/engine/application/session-id-display.js';
@@ -84,7 +89,10 @@ export type ProjectRowLock =
 export type ProjectRowAction =
   | { readonly kind: 'goToTab'; readonly tabId: string }
   | { readonly kind: 'open' }
-  | { readonly kind: 'readOnly' };
+  | { readonly kind: 'readOnly' }
+  /** V2-T84 (`docs/INTERFACE.md` § 4b): an archived project's row never offers `Open`/`Resume` —
+   * the one action is `Unarchive…`, whatever the lock says. */
+  | { readonly kind: 'unarchive' };
 
 export interface ProjectPanelRow {
   readonly projectId: string;
@@ -97,6 +105,10 @@ export interface ProjectPanelRow {
   readonly lockText: string;
   /** V2-T67 — see this field's own type's docstring above. */
   readonly lock: ProjectRowLock;
+  /** V2-T84: `ProjectManifest.lifecycle`, carried whole (D-024) — an archived project is hidden
+   * from the day-to-day views (`state/projects-table.ts`, `state/sidebar-summary.ts`) but its
+   * sessions stay in `sessions` (and in the Sessions tab): archiving changes visibility only. */
+  readonly lifecycle: ProjectLifecycle;
   readonly sessions: readonly ProjectPanelSessionRow[];
   /** V2-T63: whether this project is starred on THIS machine
    * (`@seeya-ai/engine/core/favorite-projects.js`'s own `favorite-projects.json`, read once per
@@ -140,9 +152,16 @@ function resolveProjectRowLock(
 
 /**
  * @example
- * resolveProjectRowAction({ kind: 'unlocked' }) // { kind: 'open' }
+ * resolveProjectRowAction({ lock: { kind: 'unlocked' }, lifecycle: { kind: 'active' } })
+ * // { kind: 'open' }
  */
-export function resolveProjectRowAction(lock: ProjectRowLock): ProjectRowAction {
+export function resolveProjectRowAction(
+  row: Pick<ProjectPanelRow, 'lock' | 'lifecycle'>,
+): ProjectRowAction {
+  if (row.lifecycle.kind === 'archived') {
+    return { kind: 'unarchive' };
+  }
+  const lock = row.lock;
   switch (lock.kind) {
     case 'openHere':
       return { kind: 'goToTab', tabId: lock.tabId };
@@ -376,6 +395,7 @@ export function buildProjectsPanelData(
       name: project.manifest.name,
       lockText: formatLockText(status),
       lock: resolveProjectRowLock(sessions, status, holderDisplaySessionIds),
+      lifecycle: project.manifest.lifecycle,
       sessions,
       favorite: favoriteProjectIds.has(project.manifest.id),
       repositoryCount: project.manifest.repositories.length,

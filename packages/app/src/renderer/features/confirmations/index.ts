@@ -4,4 +4,7 @@ export { ResumeFallbackDialog } from './ResumeFallbackDialog/index.js';
 export { RevertAdoptionConfirmDialog } from './RevertAdoptionConfirmDialog/index.js';
 export { DeleteAdoptedCopyConfirmDialog } from './DeleteAdoptedCopyConfirmDialog/index.js';
 export { RemoveProjectConfirmDialog } from './RemoveProjectConfirmDialog/index.js';
+export { ArchiveProjectConfirmDialog } from './ArchiveProjectConfirmDialog/index.js';
+export { UnarchiveProjectConfirmDialog } from './UnarchiveProjectConfirmDialog/index.js';
+export { openArchiveConfirm, openUnarchiveConfirm } from './archive-confirm-bridge.js';
 export { DaemonOwnershipTransitionDialog } from './DaemonOwnershipTransitionDialog/index.js';

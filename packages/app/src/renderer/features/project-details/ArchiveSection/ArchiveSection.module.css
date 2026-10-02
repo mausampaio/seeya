@@ -1,0 +1,10 @@
+/* V2-T84 — the same rule-separated area `RemoveProjectSection` uses, so the two read as a pair at the
+ * end of the dialog (archive first, as the recommended one). */
+.section {
+  padding-top: var(--seeya-space-4);
+  border-top: 1px solid var(--seeya-border);
+}
+
+.action {
+  margin-top: var(--seeya-space-3);
+}

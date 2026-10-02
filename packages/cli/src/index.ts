@@ -69,10 +69,7 @@ import {
   runProjectVerifyCommitCommand,
   runProjectVerifyBashCommandCommand,
 } from './project-command.js';
-import {
-  runProjectArchiveCommand,
-  runProjectUnarchiveCommand,
-} from './project-archive-command.js';
+import { runProjectArchiveCommand, runProjectUnarchiveCommand } from './project-archive-command.js';
 import {
   runProjectRemoveCommand,
   runProjectRemoveRepoCommand,

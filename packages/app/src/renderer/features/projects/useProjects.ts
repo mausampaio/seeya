@@ -40,6 +40,7 @@ import {
 } from '../../hooks/useProjectSessionResume.js';
 import type { ProjectSessionsPanelProps } from './ProjectsTable/ProjectSessionsPanel.js';
 import { openProjectDetails } from '../project-details/project-details-bridge.js';
+import { openUnarchiveConfirm } from '../confirmations/archive-confirm-bridge.js';
 
 const AWAITING_FIRST_PROJECTS_PANEL: ProjectsPanelData = {
   projects: [],
@@ -113,9 +114,15 @@ export function useProjects(): ProjectsControls {
 
   const onRowAction = useCallback(
     (row: ProjectPanelRow) => {
-      const action = resolveProjectRowAction(row.lock);
+      const action = resolveProjectRowAction(row);
       if (action.kind === 'goToTab') {
         selectTab(action.tabId);
+        return;
+      }
+      if (action.kind === 'unarchive') {
+        // V2-T84: never opens anything by itself — the confirmation asks whether to only
+        // unarchive or unarchive and open, and runs the call (with its own `loading`).
+        openUnarchiveConfirm({ projectId: row.projectId, name: row.name });
         return;
       }
       // `open` and `readOnly` both resolve to the exact same `openProject` IPC call — the
@@ -137,7 +144,7 @@ export function useProjects(): ProjectsControls {
 
   const isRowActionPending = useCallback(
     (row: ProjectPanelRow) =>
-      resolveProjectRowAction(row.lock).kind !== 'goToTab' && pendingProjectIds.has(row.projectId),
+      resolveProjectRowAction(row).kind !== 'goToTab' && pendingProjectIds.has(row.projectId),
     [pendingProjectIds],
   );
 

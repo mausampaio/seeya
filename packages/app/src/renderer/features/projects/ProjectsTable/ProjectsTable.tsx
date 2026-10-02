@@ -35,6 +35,7 @@ import {
 } from '../../../components/Icon/index.js';
 import { ProjectSessionsPanel, type ProjectSessionsPanelProps } from './ProjectSessionsPanel.js';
 import { MESSAGES } from '../../../../text/messages.js';
+import { formatArchiveDate } from '@seeya-ai/engine/core/project-management-message.js';
 import {
   formatProjectRowLockText,
   formatSessionLastActivityText,
@@ -56,6 +57,9 @@ export interface ProjectsTableProps {
   /** V2-T83: opens the "Project details" dialog for the row — a separate, icon-only affordance
    * (`docs/INTERFACE.md` § 4a), never a replacement for the row's own main action. */
   readonly onManage: (row: ProjectPanelRow) => void;
+  /** V2-T84: the `Archived` filter is on — the Lock column becomes the archive date, the note sits
+   * under the name, the row has no sessions chevron and its one action is `Unarchive…`. */
+  readonly archivedView?: boolean;
 }
 
 /** Narrowed to exactly the five header labels this table actually shows — all plain strings in
@@ -67,6 +71,7 @@ type ProjectsTableHeaderKey = Extract<
   keyof typeof MESSAGES,
   | 'projectsTableHeaderName'
   | 'projectsTableHeaderLock'
+  | 'projectsTableHeaderArchived'
   | 'projectsTableHeaderSessions'
   | 'projectsTableHeaderRepositories'
   | 'projectsTableHeaderLastActivity'
@@ -133,18 +138,40 @@ const COLUMNS: readonly {
   { key: 'manage', width: '32px' },
 ];
 
+/** The columns for the current view: while `Archived` is on, the Lock column (meaningless for a
+ * project nobody opens) is headed `Archived` and shows the archive date instead. */
+function columnsFor(archivedView: boolean): typeof COLUMNS {
+  if (!archivedView) {
+    return COLUMNS;
+  }
+  return COLUMNS.map((column) =>
+    column.key === 'lock'
+      ? { ...column, headerKey: 'projectsTableHeaderArchived' as const }
+      : column,
+  );
+}
+
+const ACTION_LABELS = {
+  goToTab: MESSAGES.projectsActionGoToTab,
+  open: MESSAGES.projectsActionOpen,
+  readOnly: MESSAGES.projectsActionReadOnly,
+  unarchive: MESSAGES.projectsActionUnarchive,
+} as const;
+
 function ActionButton(props: {
   readonly row: ProjectPanelRow;
   readonly pending: boolean;
   readonly onRowAction: (row: ProjectPanelRow) => void;
 }): JSX.Element {
-  const action = resolveProjectRowAction(props.row.lock);
-  const label =
-    action.kind === 'goToTab'
-      ? MESSAGES.projectsActionGoToTab
-      : action.kind === 'open'
-        ? MESSAGES.projectsActionOpen
-        : MESSAGES.projectsActionReadOnly;
+  const action = resolveProjectRowAction(props.row);
+  const label = ACTION_LABELS[action.kind];
+  // V2-T84: unarchiving writes to the project, so a live lock held by another session turns the
+  // button off with the reason (the engine would refuse anyway, D-047 item 8) — never a click that
+  // fails afterwards.
+  const blockedByLock = action.kind === 'unarchive' && props.row.lock.kind === 'lockedByOther';
+  const blockedTitle = blockedByLock
+    ? MESSAGES.projectsUnarchiveBlockedByLock(formatProjectRowLockText(props.row.lock))
+    : undefined;
   // `goToTab` is always synchronous (a plain tab switch, `useProjects.ts#onRowAction`) — this
   // component never shows a spinner for it, independent of whatever `pending` the caller passes,
   // the same invariant `useProjects.ts#isRowActionPending`'s own docstring already states.
@@ -153,8 +180,12 @@ function ActionButton(props: {
     <div class={cx(styles, 'actionCell')}>
       <Button
         size="sm"
-        variant={action.kind === 'readOnly' ? 'secondary' : 'primary'}
+        variant={
+          action.kind === 'readOnly' || action.kind === 'unarchive' ? 'secondary' : 'primary'
+        }
         loading={loading}
+        disabled={blockedByLock}
+        {...(blockedTitle === undefined ? {} : { title: blockedTitle })}
         className={cx(styles, 'actionButton')}
         onClick={() => props.onRowAction(props.row)}
       >
@@ -225,20 +256,46 @@ function NameCell(props: {
   readonly onToggleExpanded: (projectId: string) => void;
 }): JSX.Element {
   const { row, expanded } = props;
+  const archivedNote = row.lifecycle.kind === 'archived' ? row.lifecycle.note : null;
   return (
     <div class={cx(styles, 'nameCell')}>
-      <IconButton
-        size="sm"
-        aria-label={MESSAGES.projectSessionsExpandLabel(row.name, expanded)}
-        aria-expanded={expanded}
-        onClick={() => props.onToggleExpanded(row.projectId)}
-      >
-        {expanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
-      </IconButton>
-      <Text as="span" variant="body-sm" weight={500} truncate title={row.name}>
-        {row.name}
-      </Text>
+      {/* V2-T84: an archived row has no sessions list to expand (its sessions live in the Sessions
+       * tab, where `Resume` is off with the reason) — never a `Resume` offered here. */}
+      {row.lifecycle.kind === 'active' && (
+        <IconButton
+          size="sm"
+          aria-label={MESSAGES.projectSessionsExpandLabel(row.name, expanded)}
+          aria-expanded={expanded}
+          onClick={() => props.onToggleExpanded(row.projectId)}
+        >
+          {expanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
+        </IconButton>
+      )}
+      <div class={cx(styles, 'nameText')}>
+        <Text as="span" variant="body-sm" weight={500} truncate title={row.name}>
+          {row.name}
+        </Text>
+        {archivedNote !== null && (
+          <Text as="span" variant="caption" tone="secondary" truncate title={archivedNote}>
+            {archivedNote}
+          </Text>
+        )}
+      </div>
     </div>
+  );
+}
+
+/** The Lock column's cell: the lock text, or — while `Archived` is on — the archive date. */
+function LockOrArchivedCell(props: { readonly row: ProjectPanelRow }): JSX.Element {
+  const { row } = props;
+  const text =
+    row.lifecycle.kind === 'archived'
+      ? formatArchiveDate(row.lifecycle.archivedAt)
+      : formatProjectRowLockText(row.lock);
+  return (
+    <Text as="span" variant="body-sm" tone="secondary" truncate title={text}>
+      {text}
+    </Text>
   );
 }
 
@@ -266,13 +323,10 @@ function buildRowCells(
   props: ProjectsTableProps,
 ): readonly ComponentChildren[] {
   const { onToggleFavorite, onRowAction } = props;
-  const lockText = formatProjectRowLockText(row.lock);
   return [
     <FavoriteStarButton row={row} onToggleFavorite={onToggleFavorite} />,
     <NameCell row={row} expanded={expanded} onToggleExpanded={props.onToggleExpanded} />,
-    <Text as="span" variant="body-sm" tone="secondary" truncate title={lockText}>
-      {lockText}
-    </Text>,
+    <LockOrArchivedCell row={row} />,
     <NumericCell value={row.sessions.length} />,
     <NumericCell value={row.repositoryCount} />,
     <LastActivityCell lastActivity={row.lastActivity} />,
@@ -282,11 +336,12 @@ function buildRowCells(
 }
 
 export function ProjectsTable(props: ProjectsTableProps): JSX.Element {
+  const columns = columnsFor(props.archivedView ?? false);
   return (
     <table class={cx(styles, 'table')}>
       <thead>
         <tr>
-          {COLUMNS.map((column) => (
+          {columns.map((column) => (
             <th
               key={column.key}
               class={cx(styles, 'headerCell', column.align === 'right' && 'alignRight')}
@@ -311,7 +366,7 @@ export function ProjectsTable(props: ProjectsTableProps): JSX.Element {
               />
               {expanded && (
                 <tr>
-                  <td colSpan={COLUMNS.length} class={cx(styles, 'sessionsCell')}>
+                  <td colSpan={columns.length} class={cx(styles, 'sessionsCell')}>
                     <ProjectSessionsPanel project={row} {...props.sessionsPanel} />
                   </td>
                 </tr>

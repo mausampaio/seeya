@@ -127,7 +127,9 @@ describe('archive/unarchive reports', () => {
   });
 
   it('covers every unarchive result', () => {
-    expect(formatUnarchiveProjectReport({ kind: 'invalidId', projectId: 'X Y' })).toContain('"X Y"');
+    expect(formatUnarchiveProjectReport({ kind: 'invalidId', projectId: 'X Y' })).toContain(
+      '"X Y"',
+    );
     expect(formatUnarchiveProjectReport({ kind: 'notFound', projectId: 'ghost' })).toBe(
       'Project "ghost" not found.',
     );

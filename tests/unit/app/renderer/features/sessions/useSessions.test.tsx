@@ -126,6 +126,7 @@ describe('useSessions (V2-T68)', () => {
           name: 'Auth hardening',
           lockText: 'unlocked',
           lock: { kind: 'unlocked' },
+          lifecycle: { kind: 'active' },
           sessions: [session],
           favorite: false,
           repositoryCount: 0,
@@ -201,7 +202,9 @@ describe('useSessions (V2-T68)', () => {
     void act(() => result.current.setQuery('ffff'));
     await waitFor(() => expect(result.current.directSearch.kind).toBe('found'));
     expect(findSessionById).toHaveBeenCalledWith({ idOrPrefix: 'ffff' });
-    expect(result.current.rows).toEqual([{ ...found, projectId: null, projectName: null }]);
+    expect(result.current.rows).toEqual([
+      { ...found, projectId: null, projectName: null, projectArchived: false },
+    ]);
   });
 
   it('a query matching a known session never triggers the direct lookup', async () => {

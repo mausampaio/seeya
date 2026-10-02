@@ -16,6 +16,7 @@ function project(overrides: Partial<ProjectPanelRow> = {}): ProjectPanelRow {
     name: 'Auth hardening',
     lockText: 'unlocked',
     lock: { kind: 'unlocked' },
+    lifecycle: { kind: 'active' },
     sessions: [],
     favorite: false,
     repositoryCount: 0,
@@ -355,5 +356,84 @@ describe('ProjectsTable (V2-T67)', () => {
     );
     const button = getByRole('button', { name: /Manage project/ }) as HTMLButtonElement;
     expect(button.disabled).toBe(false);
+  });
+});
+
+describe('ProjectsTable archived view (V2-T84, docs/INTERFACE.md § 4b)', () => {
+  const ARCHIVED = {
+    kind: 'archived',
+    archivedAt: new Date('2026-10-02T10:00:00.000Z'),
+    note: 'Finished — shipped',
+  } as const;
+
+  function renderArchived(
+    overrides: Partial<ProjectPanelRow> = {},
+    handlers: { onRowAction?: (row: ProjectPanelRow) => void } = {},
+  ): RenderResult {
+    return render(
+      <ProjectsTable
+        {...EXPANSION_PROPS}
+        rows={[
+          project({ projectId: 'old-thing', name: 'Old thing', lifecycle: ARCHIVED, ...overrides }),
+        ]}
+        onToggleFavorite={() => {}}
+        onRowAction={handlers.onRowAction ?? (() => {})}
+        isRowActionPending={() => false}
+        archivedView
+      />,
+    );
+  }
+
+  it('heads the lock column "Archived" and shows the archive date and the note under the name', () => {
+    const { getByText, queryByText } = renderArchived();
+    expect(getByText('Archived')).not.toBeNull();
+    expect(queryByText('Lock')).toBeNull();
+    expect(getByText('2026-10-02')).not.toBeNull();
+    expect(getByText('Finished — shipped')).not.toBeNull();
+  });
+
+  it('the one action is Unarchive… (never Open, Go to tab or Read only…), and it asks via onRowAction', () => {
+    const onRowAction = vi.fn();
+    const { getByText, queryByText } = renderArchived({}, { onRowAction });
+    expect(queryByText('Open')).toBeNull();
+    expect(queryByText('Go to tab')).toBeNull();
+    expect(queryByText('Read only…')).toBeNull();
+    fireEvent.click(getByText('Unarchive…'));
+    expect(onRowAction).toHaveBeenCalledTimes(1);
+  });
+
+  it('an archived row has no sessions chevron — so there is never a Resume offered on it', () => {
+    const { queryByRole } = renderArchived({ sessions: [session()] });
+    expect(queryByRole('button', { name: /sessions of Old thing/ })).toBeNull();
+  });
+
+  it('a project locked by another session turns Unarchive… off with the reason as a tooltip', () => {
+    const { getByText } = renderArchived({
+      lock: { kind: 'lockedByOther', holderDisplaySessionId: 'abcd1234' },
+    });
+    const button = getByText('Unarchive…').closest('button') as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    expect(button.getAttribute('title')).toMatch(
+      /Locked by session abcd1234\. Unarchiving is disabled/,
+    );
+  });
+
+  it('an archived project without a note shows no second line', () => {
+    const { queryByText } = renderArchived({ lifecycle: { ...ARCHIVED, note: null } });
+    expect(queryByText('Finished — shipped')).toBeNull();
+  });
+
+  it('outside the archived view an active row still shows Lock and its ordinary action', () => {
+    const { getByText } = render(
+      <ProjectsTable
+        {...EXPANSION_PROPS}
+        rows={[project()]}
+        onToggleFavorite={() => {}}
+        onRowAction={() => {}}
+        isRowActionPending={() => false}
+      />,
+    );
+    expect(getByText('Lock')).not.toBeNull();
+    expect(getByText('Open')).not.toBeNull();
   });
 });

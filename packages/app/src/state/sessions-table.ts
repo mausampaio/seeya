@@ -202,6 +202,9 @@ export type SessionRowAction =
   | { readonly kind: 'goToTab'; readonly tabId: string }
   | { readonly kind: 'runningElsewhere' }
   | { readonly kind: 'projectResume'; readonly projectId: string }
+  /** V2-T84 (`docs/INTERFACE.md` § 4b): the same session, but its project is archived — `Resume`
+   * is shown off with the reason, never a click that fails after the fact. */
+  | { readonly kind: 'projectArchived'; readonly projectId: string }
   | { readonly kind: 'standalone'; readonly adopt: AdoptEligibility };
 
 /**
@@ -238,7 +241,9 @@ export function resolveSessionRowAction(row: SessionsPanelRow): SessionRowAction
     return processAction;
   }
   if (row.projectId !== null) {
-    return { kind: 'projectResume', projectId: row.projectId };
+    return row.projectArchived
+      ? { kind: 'projectArchived', projectId: row.projectId }
+      : { kind: 'projectResume', projectId: row.projectId };
   }
   return { kind: 'standalone', adopt: row.adopt ?? { kind: 'available' } };
 }

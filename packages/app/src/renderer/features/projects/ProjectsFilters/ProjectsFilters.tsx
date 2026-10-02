@@ -1,6 +1,6 @@
 /**
  * V2-T67 (`docs/INTERFACE.md` § 4): "Busca por nome; filtro `All` · `With a running session` ·
- * `Locked`" — the search `TextField` and the `SegmentedControl` filter together, since they always
+ * `Locked`" (V2-T84, § 4b: plus `Archived`) — the search `TextField` and the `SegmentedControl` filter together, since they always
  * sit on the same row and share no state of their own (both are controlled by `useProjects.ts`).
  *
  * @example
@@ -25,6 +25,7 @@ const FILTER_OPTIONS: readonly {
   { value: 'all', id: 'projects-filter-all', label: MESSAGES.projectsFilterAll },
   { value: 'running', id: 'projects-filter-running', label: MESSAGES.projectsFilterRunning },
   { value: 'locked', id: 'projects-filter-locked', label: MESSAGES.projectsFilterLocked },
+  { value: 'archived', id: 'projects-filter-archived', label: MESSAGES.projectsFilterArchived },
 ];
 
 export interface ProjectsFiltersProps {

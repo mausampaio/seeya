@@ -12,6 +12,7 @@
  * workspace's git history (neither of which `ProjectsPanelData` carries today).
  */
 import type { ProjectPanelRow } from './projects-panel.js';
+import { isActiveProject } from './projects-table.js';
 
 /** V2-T63 item 3 — one row per favorited project (`ProjectPanelRow.favorite`). `openHere`/`locked`
  * mirror the lateral's own two lock badges: `openHere` when one of this project's own sessions is
@@ -70,18 +71,22 @@ export function buildFavoriteProjectRows(
   projects: readonly ProjectPanelRow[],
   activeTabId: string | null,
 ): readonly FavoriteProjectRow[] {
-  return projects
-    .filter((project) => project.favorite)
-    .map((project) => {
-      const badge = resolveProjectLockBadge(project);
-      return {
-        projectId: project.projectId,
-        name: project.name,
-        badge,
-        sessions: badge === 'openHere' ? project.sessions : [],
-        activeTab: hasActiveTabSession(project.sessions, activeTabId),
-      };
-    });
+  return (
+    projects
+      // V2-T84: an archived project is out of Favorites (its favorite stays recorded in
+      // `favorite-projects.json`, so it is back here as soon as it is unarchived).
+      .filter((project) => project.favorite && isActiveProject(project))
+      .map((project) => {
+        const badge = resolveProjectLockBadge(project);
+        return {
+          projectId: project.projectId,
+          name: project.name,
+          badge,
+          sessions: badge === 'openHere' ? project.sessions : [],
+          activeTab: hasActiveTabSession(project.sessions, activeTabId),
+        };
+      })
+  );
 }
 
 export interface RecentProjectRow extends ProjectSidebarRow {
@@ -116,7 +121,7 @@ export function buildRecentProjectRows(
 ): readonly RecentProjectRow[] {
   const withActivity: RecentProjectRow[] = [];
   for (const project of projects) {
-    if (project.favorite) {
+    if (project.favorite || !isActiveProject(project)) {
       continue;
     }
     const lastActivity = mostRecentSessionActivity(project);

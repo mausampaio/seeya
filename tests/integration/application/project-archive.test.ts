@@ -17,10 +17,7 @@ import { FsWorkspaceRepository, FsProjectLock } from '@seeya-ai/engine/adapters/
 import { processControl } from '@seeya-ai/engine/adapters/process/index.js';
 import { runGit } from '@seeya-ai/engine/adapters/git/run-git.js';
 import { createProject } from '@seeya-ai/engine/application/workspace.js';
-import {
-  archiveProject,
-  unarchiveProject,
-} from '@seeya-ai/engine/application/project-archive.js';
+import { archiveProject, unarchiveProject } from '@seeya-ai/engine/application/project-archive.js';
 import type { ArchiveProjectDeps } from '@seeya-ai/engine/application/project-archive.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
@@ -69,7 +66,10 @@ async function headMessage(root: string): Promise<string> {
 }
 
 /** A plain `git commit` with NO `SEEYA_MANIFEST_WRITE_AUTHORIZED` — what a session would do. */
-function unmarkedCommit(root: string, message: string): Promise<{ exitCode: number; stderr: string }> {
+function unmarkedCommit(
+  root: string,
+  message: string,
+): Promise<{ exitCode: number; stderr: string }> {
   return new Promise((resolve) => {
     const env = { ...process.env };
     delete env['SEEYA_MANIFEST_WRITE_AUTHORIZED'];

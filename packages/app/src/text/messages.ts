@@ -1,4 +1,5 @@
 import { PROJECT_DETAILS_MESSAGES } from './project-details-messages.js';
+import { PROJECT_ARCHIVE_MESSAGES } from './project-archive-messages.js';
 
 /**
  * Every string the interface shows a person, concentrated here (D-028: English; AGENTS.md §
@@ -650,4 +651,5 @@ export const MESSAGES = {
     'Resumes this session through the same flow as Open: lock, hooks, CLAUDE.md.',
   projectSessionsDismissResult: 'Dismiss',
   ...PROJECT_DETAILS_MESSAGES,
+  ...PROJECT_ARCHIVE_MESSAGES,
 } as const;

@@ -88,8 +88,7 @@ async function commitLifecycleChange(
 }
 
 type LockOutcome =
-  | { readonly kind: 'held' }
-  | { readonly kind: 'refused'; readonly heldBy: ProjectLockInfo };
+  { readonly kind: 'held' } | { readonly kind: 'refused'; readonly heldBy: ProjectLockInfo };
 
 async function takeLock(
   deps: ArchiveProjectDeps,

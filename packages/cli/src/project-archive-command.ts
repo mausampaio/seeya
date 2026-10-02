@@ -4,10 +4,7 @@
  * workspace's own git history, and nothing is deleted. User-facing sentences come from
  * `core/project-management-message.ts`, the same words the window's dialogs show.
  */
-import {
-  archiveProject,
-  unarchiveProject,
-} from '@seeya-ai/engine/application/project-archive.js';
+import { archiveProject, unarchiveProject } from '@seeya-ai/engine/application/project-archive.js';
 import type {
   ArchiveProjectDeps,
   ArchiveProjectResult,

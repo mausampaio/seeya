@@ -329,14 +329,37 @@ describe('buildProjectsPanelData (V2-T30 item 1)', () => {
     });
 
     it('resolveProjectRowAction/formatProjectRowLockText follow the lock kind', () => {
-      expect(resolveProjectRowAction({ kind: 'unlocked' })).toEqual({ kind: 'open' });
-      expect(resolveProjectRowAction({ kind: 'openHere', tabId: 't' })).toEqual({
+      const active = { kind: 'active' } as const;
+      expect(resolveProjectRowAction({ lock: { kind: 'unlocked' }, lifecycle: active })).toEqual({
+        kind: 'open',
+      });
+      expect(
+        resolveProjectRowAction({ lock: { kind: 'openHere', tabId: 't' }, lifecycle: active }),
+      ).toEqual({
         kind: 'goToTab',
         tabId: 't',
       });
       expect(
-        resolveProjectRowAction({ kind: 'lockedByOther', holderDisplaySessionId: null }),
+        resolveProjectRowAction({
+          lock: { kind: 'lockedByOther', holderDisplaySessionId: null },
+          lifecycle: active,
+        }),
       ).toEqual({ kind: 'readOnly' });
+      // V2-T84: an archived project's one action is Unarchive…, whatever the lock says.
+      const archived = {
+        kind: 'archived',
+        archivedAt: new Date('2026-10-02T00:00:00.000Z'),
+        note: null,
+      } as const;
+      for (const lock of [
+        { kind: 'unlocked' },
+        { kind: 'openHere', tabId: 't' },
+        { kind: 'lockedByOther', holderDisplaySessionId: null },
+      ] as const) {
+        expect(resolveProjectRowAction({ lock, lifecycle: archived })).toEqual({
+          kind: 'unarchive',
+        });
+      }
       expect(formatProjectRowLockText({ kind: 'unlocked' })).toBe('Unlocked');
       expect(formatProjectRowLockText({ kind: 'openHere', tabId: 't' })).toBe(
         'Open in this window',

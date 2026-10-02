@@ -35,15 +35,18 @@ import { ProjectsFilters } from './ProjectsFilters/index.js';
 import { ProjectsTable } from './ProjectsTable/index.js';
 import { IgnoredProjectsSection } from './IgnoredProjectsSection/index.js';
 import { ProjectResumeNotice } from './ProjectResumeNotice/index.js';
+import { isActiveProject } from '../../../state/projects-table.js';
 import { useProjects } from './useProjects.js';
 
 export function Projects(): JSX.Element {
   const controls = useProjects();
   const { panel } = controls;
+  const activeCount = panel.projects.filter(isActiveProject).length;
+  const archivedView = controls.filter === 'archived';
 
   return (
     <div class={cx(styles, 'projects')}>
-      <ProjectsHeader count={panel.projects.length} onNewProject={controls.openNewProject} />
+      <ProjectsHeader count={activeCount} onNewProject={controls.openNewProject} />
       {panel.projects.length > 0 && (
         <ProjectsFilters
           query={controls.query}
@@ -66,8 +69,16 @@ export function Projects(): JSX.Element {
         />
       ) : controls.rows.length === 0 ? (
         <EmptyState
-          title={MESSAGES.projectsNoMatchTitle}
-          description={MESSAGES.projectsNoMatchDescription}
+          title={
+            archivedView && controls.query.trim() === ''
+              ? MESSAGES.projectsNoArchivedTitle
+              : MESSAGES.projectsNoMatchTitle
+          }
+          description={
+            archivedView && controls.query.trim() === ''
+              ? MESSAGES.projectsNoArchivedDescription
+              : MESSAGES.projectsNoMatchDescription
+          }
         />
       ) : (
         <ProjectsTable
@@ -79,6 +90,7 @@ export function Projects(): JSX.Element {
           onToggleExpanded={controls.onToggleExpanded}
           sessionsPanel={controls.sessionsPanel}
           onManage={controls.onManage}
+          archivedView={archivedView}
         />
       )}
       <IgnoredProjectsSection rows={panel.ignoredProjects} />
