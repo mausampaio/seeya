@@ -112,7 +112,11 @@ export function Menu(props: MenuProps): JSX.Element {
                 }
               }}
             >
-              <Text as="span" variant="body-sm">
+              <Text
+                as="span"
+                variant="body-sm"
+                {...(item.disabledReason !== undefined ? { tone: 'secondary' as const } : {})}
+              >
                 {item.label}
               </Text>
               {item.disabledReason !== undefined && (
