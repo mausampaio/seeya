@@ -4,7 +4,7 @@ title: 'V2-T69 — End day: prévia, andamento e resultado estruturados'
 status: Review
 assignee: []
 created_date: '2026-09-30 10:34'
-updated_date: '2026-10-02 00:06'
+updated_date: '2026-10-02 00:43'
 labels: []
 milestone: m-2
 dependencies:
@@ -228,5 +228,11 @@ Capturas regeneradas, as 9, limpas — conferidas nos dois temas: números consi
 Commits: `412754e`..`4fc026c` (rebase, replay das 4 commits anteriores sobre `beb731d`) e `96a8e6d` (esta rodada).
 
 Nada de `git stash`. Nenhuma recusa contornada nesta rodada.
+---
+
+author: PO
+created: 2026-10-02 00:43
+---
+Revisão do PO (2026-10-01): três rodadas. Rodada 1 devolveu largura, rodapé cortado, motivo cru da falha, D-031 na tela, etiquetas e duplicação com a V2-T66. Rodada 2 devolveu números divergentes (prévia 3, custo 5, andamento 4), capturas contaminadas pelo diálogo de transição de posse e um contorno de recusa (comando reescrito como .sh) — registrado como falha de processo. Rodada 3: teto de custo, M do andamento e 'Will be captured' agora são o mesmo willBeCaptured.length, travado por end-day-number-consistency.test.ts; rebase sobre a V2-T66 usando formatDirectoryPathForDisplay/collapseHomeDirectory. Nove capturas reais conferidas nos dois temas contra docs/INTERFACE.md § 6. Mesclada no po-gate; npm run verificar do zero e npm test sem identidade git verdes (3530 testes). Publicada; aguarda aceite do mantenedor pelo instalador.
 ---
 <!-- COMMENTS:END -->
