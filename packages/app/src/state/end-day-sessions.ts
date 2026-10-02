@@ -11,17 +11,23 @@
  * here (D-024), never a second read of `EndDayResult` reshaped ad hoc in a component.
  */
 import type { EndDayResult } from '@seeya-ai/engine/application/types.js';
+import type { PathPlatformHint } from '@seeya-ai/engine/core/cwd-normalization.js';
 import type {
   CaptureMode,
   Handoff,
   SessionListing,
   SessionState,
 } from '@seeya-ai/engine/core/types.js';
-import { formatSessionDirectory } from '../sidebar/directory-label.js';
+import { formatDirectoryPathForDisplay } from '../sidebar/directory-label.js';
 import { CLOSED_SESSION_REASON, formatIneligibilityReasons } from './end-day-reasons.js';
 import { summarizeFailureReason } from './end-day-failure-reason.js';
 
-export type EndDayDirectoryPlatform = 'win32' | 'posix';
+/** PO review round 2 (V2-T69, item 2): rebased onto V2-T66's `sidebar/directory-label.ts` —
+ * `EndDayDirectoryPlatform` used to be its own local alias of the identical `'win32' | 'posix'`
+ * union; now it just re-exports the engine's own `PathPlatformHint`, the same type
+ * `formatDirectoryPathForDisplay` already takes, so this module and its caller (`main.ts`) never
+ * carry two names for the same shape. */
+export type EndDayDirectoryPlatform = PathPlatformHint;
 
 /** A session that passed (or, for `result.captured`, DID) capture — `docs/INTERFACE.md` § 6's own
  * "nome, diretório, estado e modo (lean/deep)". */
@@ -85,7 +91,7 @@ function toSummaryRow(
   return {
     sessionId: handoff.sessionId,
     name: handoff.name,
-    cwd: formatSessionDirectory(handoff.cwd, homeDir, platform),
+    cwd: formatDirectoryPathForDisplay(handoff.cwd, homeDir, platform),
     state: handoff.sessionState,
     mode: handoff.captureMode,
   };
@@ -104,7 +110,7 @@ function toReasonRow(
   return {
     sessionId,
     name,
-    cwd: formatSessionDirectory(cwd, homeDir, platform),
+    cwd: formatDirectoryPathForDisplay(cwd, homeDir, platform),
     reason: summary.text,
     fullReason: summary.fullText,
   };

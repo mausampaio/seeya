@@ -10,11 +10,16 @@
  * itself lives for the life of the window, so `onEndDayProgress`'s own listener (no unsubscribe —
  * `main/preload.ts`'s own `SeeyaApi` never gave this particular channel one, unlike
  * `onScheduleUpdate`/`onDaemonAvailabilityUpdate`) never needs cleanup either.
+ *
+ * Rebase onto V2-T66 (PO review round 2, item 2): no longer calls `today-panel-view.ts
+ * #refreshTodayPanel()` after `endDayRun` resolves — that module is apagado by V2-T66 (the Today
+ * tab is a real, independently-mounted component now, `renderer/features/today/Today.tsx`).
+ * `main/main.ts#CHANNELS.endDayRun`'s own handler pushes a fresh `todayUpdate` itself once the run
+ * finishes, the same push `<Today/>`'s own `useToday` hook already subscribes to.
  */
 import { useCallback, useEffect, useReducer, useRef } from 'preact/hooks';
 import { getSeeyaApi } from '../../ipc/client.js';
 import { reduceEndDayPanel, type EndDayPanelState } from '../../../state/end-day-panel.js';
-import { refreshTodayPanel } from '../../legacy/today-panel-view.js';
 import { openOrFocusPageTab } from '../tabs/index.js';
 
 export interface EndDayControls {
@@ -85,7 +90,6 @@ export function useEndDay(): EndDayControls {
     dispatch({ kind: 'runClicked' });
     void api.endDayRun().then((response) => {
       dispatch({ kind: 'runFinished', ...response });
-      void refreshTodayPanel();
     });
   }, [api]);
 

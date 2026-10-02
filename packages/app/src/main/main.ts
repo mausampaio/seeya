@@ -1954,6 +1954,17 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
   // already reads its own fresh copy internally (`application/end-day.ts`'s own
   // `storage.readConfig()` call), so this was never about `endDay`'s behavior; it was `main.ts`
   // formatting the RESULT against a config snapshot taken at window startup.
+  //
+  // PO review round 2 (V2-T69, item 1): the cost ceiling counts `willBeCaptured.length`, never the
+  // engine's own `result.sessionsInScope` — three different numbers (the cost ceiling, the running
+  // view's own "i of M", and "Will be captured"'s own total) all described slightly different
+  // populations before this fix. `sessionsInScope` also counts cheap-ineligible AND genuinely-
+  // failing sessions, neither of which ever reaches the paid generation step (a `CaptureFailure`
+  // can ONLY arise from `gatherEvidence`/eligibility-assembly I/O — `end-day.ts#captureSessionOutcome`
+  // never lets a GENERATOR failure become one; that's swallowed into a `deterministic` handoff
+  // instead), so counting them toward "how much could this cost" overstated the ceiling. The SAME
+  // `willBeCaptured.length` also seeds `state/end-day-panel.ts#seedTrackedSessions`'s own `total` —
+  // one number, three readers.
   ipcMain.handle(CHANNELS.endDayPreview, async (): Promise<EndDayPreviewResponse> => {
     const result = await endDay(toEndDayDeps(context), {
       dryRun: true,
@@ -1969,7 +1980,7 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
     return {
       willBeCaptured,
       notCaptured,
-      costCeiling: buildEndDayCostCeiling(result.sessionsInScope, config),
+      costCeiling: buildEndDayCostCeiling(willBeCaptured.length, config),
     };
   });
 

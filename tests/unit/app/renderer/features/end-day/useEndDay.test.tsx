@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, renderHook } from '@testing-library/preact';
 import { createFakeSeeyaApi } from '../../_fake-seeya-api.js';
 import { useEndDay } from '../../../../../../packages/app/src/renderer/features/end-day/useEndDay.js';
@@ -23,24 +23,13 @@ type ProgressListener = (event: EndDayProgressUpdateEvent) => void;
 // `.then()` callback run against the now-current ref is what actually exercises the real ordering
 // a live window has (`queueMicrotask`-based rendering, no `act()` deferral at all).
 //
-// `run()` calls the LEGACY `refreshTodayPanel()` on finish (this hook's own docstring: "use o
-// canal/dado que já existe", V2-T69's own instruction not to touch the Today feature) — that
-// function reaches for `document.getElementById('today-panel')` directly (`today-panel-view.ts`),
-// which only exists because `app-shell.tsx` renders it as part of the full window. This stub
-// stands in for that element so the real function doesn't throw against a bare happy-dom document
-// — the SAME role a real render of `<AppShell/>` would play, just without mounting the whole tree
-// for a test that's only about `useEndDay`'s own state machine.
-let todayPanelStub: HTMLElement;
-
-beforeEach(() => {
-  todayPanelStub = document.createElement('div');
-  todayPanelStub.id = 'today-panel';
-  document.body.appendChild(todayPanelStub);
-});
-
+// Rebase onto V2-T66 (PO review round 2, item 2): `run()` used to call the LEGACY
+// `refreshTodayPanel()` on finish, which needed a `#today-panel` stub in the DOM for a bare
+// happy-dom document not to throw — V2-T66 apagou `today-panel-view.ts` entirely (the Today tab is
+// a real component now) and `main.ts#CHANNELS.endDayRun`'s own handler pushes `todayUpdate` itself,
+// so `useEndDay.ts` no longer touches the DOM at all and this test needs no stub for it.
 afterEach(() => {
   cleanup();
-  todayPanelStub.remove();
 });
 
 const EMPTY_PREVIEW: EndDayPreviewResponse = {

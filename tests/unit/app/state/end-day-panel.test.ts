@@ -53,7 +53,7 @@ const DELTA_FAILED: EndDayNotCapturedRow = {
 };
 
 describe('reduceEndDayPanel — the happy path (idle → preview → starting → running → result)', () => {
-  it('walks the whole lifecycle in order, tracking the captured and the failed session by id', () => {
+  it('walks the whole lifecycle in order, tracking only the session that will be captured', () => {
     let state: EndDayPanelState = { kind: 'idle' };
 
     state = reduceEndDayPanel(state, { kind: 'openClicked' });
@@ -80,37 +80,40 @@ describe('reduceEndDayPanel — the happy path (idle → preview → starting �
       costCeiling: CEILING,
     });
 
-    // PO review round 1 (V2-T69, item 2): beta is cheap-ineligible — the ENGINE still sends it a
-    // `captureStarted` (it genuinely goes through `runSession`), but this panel doesn't track it
-    // (`seedTrackedSessions`'s own docstring), so the event is a no-op: still `starting`, nothing
-    // moved. Gamma (closed, D-031) never gets an event at all from the engine, for a different
-    // reason — it's not in this scenario's events at all.
+    // PO review round 2 (V2-T69, item 1): both beta (cheap-ineligible) AND delta (a genuine
+    // `CaptureFailure`) still get a real `captureStarted`/`captureFinished` pair from the ENGINE —
+    // neither is tracked here, so both events are no-ops: still `starting`, nothing moved. Gamma
+    // (closed, D-031) never gets an event at all from the engine, for a different reason — it's not
+    // in this scenario's events at all.
     state = reduceEndDayPanel(state, { kind: 'sessionStarted', sessionId: 'beta', name: 'beta' });
-    expect(state).toEqual({
-      kind: 'starting',
-      willBeCaptured: [ALPHA],
-      notCaptured: [BETA_INELIGIBLE, GAMMA_CLOSED, DELTA_FAILED],
-      costCeiling: CEILING,
-    });
+    expect(state.kind).toBe('starting');
     state = reduceEndDayPanel(state, {
       kind: 'sessionFinished',
       sessionId: 'beta',
       outcome: 'ineligible',
     });
     expect(state.kind).toBe('starting');
+    state = reduceEndDayPanel(state, { kind: 'sessionStarted', sessionId: 'delta', name: 'delta' });
+    expect(state.kind).toBe('starting');
+    state = reduceEndDayPanel(state, {
+      kind: 'sessionFinished',
+      sessionId: 'delta',
+      outcome: 'failed',
+    });
+    expect(state.kind).toBe('starting');
 
-    // The first TRACKED progress event is what actually seeds the running view — alpha and delta
-    // only; `total` is 2 (the tracked count), never the engine's own `sessionsInScope` (which would
-    // be 3, counting beta too).
+    // The first (and only) TRACKED progress event is what actually seeds the running view — alpha
+    // alone; `total` is 1 (`willBeCaptured.length`), never the engine's own `sessionsInScope`
+    // (which would be 3, counting beta and delta too) — the SAME number the cost ceiling uses
+    // (`CEILING.sessionsInScope` above is set to 2 only as an independent fixture value; the real
+    // wiring in `main.ts` always derives both from `willBeCaptured.length`, proven in
+    // `end-day-number-consistency.test.ts`).
     state = reduceEndDayPanel(state, { kind: 'sessionStarted', sessionId: 'alpha', name: 'alpha' });
     expect(state).toEqual({
       kind: 'running',
       visible: true,
-      current: { index: 1, total: 2, name: 'alpha' },
-      sessions: [
-        { sessionId: 'alpha', name: 'alpha', status: 'capturing' },
-        { sessionId: 'delta', name: 'delta', status: 'waiting' },
-      ],
+      current: { index: 1, total: 1, name: 'alpha' },
+      sessions: [{ sessionId: 'alpha', name: 'alpha', status: 'capturing' }],
     });
 
     state = reduceEndDayPanel(state, {
@@ -118,20 +121,11 @@ describe('reduceEndDayPanel — the happy path (idle → preview → starting �
       sessionId: 'alpha',
       outcome: 'captured',
     });
-    state = reduceEndDayPanel(state, { kind: 'sessionStarted', sessionId: 'delta', name: 'delta' });
-    state = reduceEndDayPanel(state, {
-      kind: 'sessionFinished',
-      sessionId: 'delta',
-      outcome: 'failed',
-    });
     expect(state).toEqual({
       kind: 'running',
       visible: true,
-      current: { index: 2, total: 2, name: 'delta' },
-      sessions: [
-        { sessionId: 'alpha', name: 'alpha', status: 'captured' },
-        { sessionId: 'delta', name: 'delta', status: 'failed' },
-      ],
+      current: { index: 1, total: 1, name: 'alpha' },
+      sessions: [{ sessionId: 'alpha', name: 'alpha', status: 'captured' }],
     });
 
     state = reduceEndDayPanel(state, {
@@ -202,19 +196,39 @@ describe('reduceEndDayPanel — the happy path (idle → preview → starting �
 
   // Regression test (PO review round 1, V2-T69 item 2) — this exact scenario is what the PO's own
   // screenshot showed: an ignored session ("delta-ignored") stuck on "Waiting" forever in the
-  // running list, with "i of M" counting it anyway. Before this fix, `seedTrackedSessions` only
-  // excluded `kind: 'closed'` rows, so BETA_INELIGIBLE (an `ignoredCwd` session) was tracked and
-  // seeded as `waiting` — a `sessionStarted` for it moved it to `capturing`, but nothing in this
-  // reducer ever moves an `ineligible`-bound session back out of `capturing` on its own
-  // `sessionFinished(outcome: 'ineligible')`... except it DOES (the old code had no bug there); the
-  // actual user-visible defect was the inflated `total`/`M` and the row existing in the list at
-  // all. This test fails against the pre-fix `seedTrackedSessions` (which keeps `kind: 'ineligible'`
-  // rows) because `total` would be 2 (alpha + beta) instead of 1, and `sessions` would include beta.
+  // running list, with "i of M" counting it anyway. This test fails against the pre-fix
+  // `seedTrackedSessions` (which kept `kind: 'ineligible'` rows) because `total` would be 2
+  // (alpha + beta) instead of 1, and `sessions` would include beta.
   it('a cheap-ineligible session never enters the tracked list or counts toward "M"', () => {
     const starting: EndDayPanelState = {
       kind: 'starting',
       willBeCaptured: [ALPHA],
       notCaptured: [BETA_INELIGIBLE],
+      costCeiling: CEILING,
+    };
+    const state = reduceEndDayPanel(starting, {
+      kind: 'sessionStarted',
+      sessionId: 'alpha',
+      name: 'alpha',
+    });
+    expect(state).toEqual({
+      kind: 'running',
+      visible: true,
+      current: { index: 1, total: 1, name: 'alpha' },
+      sessions: [{ sessionId: 'alpha', name: 'alpha', status: 'capturing' }],
+    });
+  });
+
+  // Regression test (PO review round 2, V2-T69 item 1) — a genuine `CaptureFailure` (a corrupted
+  // handoff, `delta`) ALSO used to be tracked (round 1's own fix), making `M` disagree with "Will
+  // be captured"'s own total and the cost ceiling (both 1 here). This test fails against the
+  // round-1 `seedTrackedSessions` (which kept `kind: 'failed'` rows) because `total` would be 2
+  // (alpha + delta) instead of 1, and `sessions` would include delta.
+  it('a session that will genuinely fail never enters the tracked list or counts toward "M" either', () => {
+    const starting: EndDayPanelState = {
+      kind: 'starting',
+      willBeCaptured: [ALPHA],
+      notCaptured: [DELTA_FAILED],
       costCeiling: CEILING,
     };
     const state = reduceEndDayPanel(starting, {

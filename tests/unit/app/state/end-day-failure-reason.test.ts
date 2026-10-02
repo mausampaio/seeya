@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { summarizeFailureReason } from '../../../../packages/app/src/state/end-day-failure-reason.js';
 
-describe('summarizeFailureReason (V2-T69, PO review round 1 item 5)', () => {
+describe('summarizeFailureReason (V2-T69, PO review round 1 item 5; round 2 item 2)', () => {
   it('a short reason with no home path passes through unchanged, fullText identical', () => {
     const result = summarizeFailureReason('claude binary not found', '/home/x', 'posix');
     expect(result).toEqual({
@@ -10,10 +10,26 @@ describe('summarizeFailureReason (V2-T69, PO review round 1 item 5)', () => {
     });
   });
 
-  it('abbreviates every occurrence of homeDir with ~ on posix', () => {
-    const reason = '/home/x/.seeya/days/x.json is not valid JSON, see /home/x/.seeya/config.json';
+  // PO review round 2 (item 2): abbreviation now goes through `collapseHomeDirectory`, never a
+  // third implementation — the real `CaptureFailure` shape this module exists for always has the
+  // path LEADING the message (`adapters/storage/index.ts`'s own `${filePath} is not valid JSON:
+  // ...`), which is exactly what `collapseHomeDirectory` matches (a whole-string prefix).
+  it('abbreviates the home-rooted path that leads the message, posix', () => {
+    const reason = '/home/x/.seeya/days/x.json is not valid JSON: SyntaxError';
     const result = summarizeFailureReason(reason, '/home/x', 'posix');
-    expect(result.text).toBe('~/.seeya/days/x.json is not valid JSON, see ~/.seeya/config.json');
+    expect(result.text).toBe('~/.seeya/days/x.json is not valid JSON: SyntaxError');
+    expect(result.fullText).toBe(reason);
+  });
+
+  // Where this guard rail ends (AGENTS.md: "diga onde o guarda-corpo termina"): `collapseHomeDirectory`
+  // only matches a prefix of the WHOLE string — a home-rooted path embedded further inside the
+  // sentence (not at the start) passes through unabbreviated, never garbled. No known
+  // `CaptureFailure` shape in this codebase does this today (the path always leads), so this is a
+  // documented limitation, not an observed defect.
+  it('a home-rooted path that is NOT at the start of the message is left unabbreviated', () => {
+    const reason = 'while reading /home/x/.seeya/days/x.json: unexpected token';
+    const result = summarizeFailureReason(reason, '/home/x', 'posix');
+    expect(result.text).toBe(reason);
     expect(result.fullText).toBe(reason);
   });
 

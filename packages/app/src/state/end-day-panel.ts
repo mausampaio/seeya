@@ -109,30 +109,29 @@ export type EndDayPanelEvent =
   | { readonly kind: 'reopened' }
   | { readonly kind: 'closed' };
 
-/** Seeds the running view's own tracked rows from the preview's two lists — `willBeCaptured` plus
- * `notCaptured` rows whose `kind` is `'failed'` only.
+/** Seeds the running view's own tracked rows from the preview's `willBeCaptured` list ONLY.
  *
- * PO review round 1 (V2-T69, item 2): this list — and the `M` in "i of M" it sizes — reads as "the
- * sessions this run will actually attempt to capture, or that fail trying", never the engine's own
- * `sessionsInScope` (`application/end-day.ts`), which is bigger: it also includes cheap-ineligible
- * sessions (an ignored directory, a duplicate already captured today) that genuinely DO get a
- * `captureStarted`/`captureFinished` pair from the engine — correctly, from the engine's own
- * accounting — but showing them here read as "stuck on Waiting forever" (the person watches a
- * session that will never move) and inflated `M` past what "captures remaining" means to a reader.
- * `kind: 'closed'` sessions (D-031) never go through `runSession` at all, so they never get an
- * event either way; `kind: 'ineligible'` now gets excluded for a different reason — it DOES get
- * events, this view just isn't where that fact belongs (the frozen preview already said so, and
- * the result view's own "Skipped" list says so again once the run is over). */
+ * PO review round 2 (V2-T69, item 1): this is the SAME collection the cost ceiling's own `N` now
+ * counts (`state/end-day-preview.ts#buildEndDayCostCeiling`'s own docstring) — "the N of the cost
+ * ceiling = the number of sessions the run will actually attempt to capture = the M of the running
+ * view = the total of the 'Will be captured' list", one number, never three. PO review round 1 had
+ * this list ALSO include `notCaptured` rows with `kind: 'failed'` (a session that genuinely fails,
+ * like a corrupted handoff, still gets a real `captureStarted`/`captureFinished` pair from the
+ * engine) — correct about the engine's own accounting, but it made `M` (then 4) disagree with "Will
+ * be captured"'s own heading (3) and the cost ceiling (fixed at 3 in this same round), three
+ * numbers again. A `CaptureFailure` can only arise from `gatherEvidence`/eligibility-assembly I/O,
+ * never from a generator call (`application/end-day.ts#captureSessionOutcome`'s own docstring: a
+ * generator failure becomes a `deterministic` handoff, never a `CaptureFailure`) — it costs nothing
+ * and was never going to be "captured" either — the preview already shows it (`kind: 'failed'`,
+ * its own badge, inside "Not captured") and the result view's own "Failed" section says so again
+ * once the run is over; it just never gets a LIVE row in the running view, the same as `kind:
+ * 'ineligible'`/`'closed'`. */
 function seedTrackedSessions(preview: EndDayPreviewData): EndDaySessionProgress[] {
-  const fromCaptured = preview.willBeCaptured.map((row) => ({
+  return preview.willBeCaptured.map((row) => ({
     sessionId: row.sessionId,
     name: row.name,
     status: 'waiting' as const,
   }));
-  const fromFailed = preview.notCaptured
-    .filter((row) => row.kind === 'failed')
-    .map((row) => ({ sessionId: row.sessionId, name: row.name, status: 'waiting' as const }));
-  return [...fromCaptured, ...fromFailed];
 }
 
 function isTracked(sessions: readonly EndDaySessionProgress[], sessionId: string): boolean {
