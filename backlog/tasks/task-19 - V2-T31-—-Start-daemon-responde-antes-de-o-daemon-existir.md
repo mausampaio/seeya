@@ -1,7 +1,7 @@
 ---
 id: TASK-19
 title: V2-T31 — Start daemon responde antes de o daemon existir
-status: To Do
+status: Review
 assignee: []
 created_date: '2026-09-22 11:11'
 updated_date: '2026-09-23 10:46'
@@ -57,3 +57,39 @@ dependência nova; nada no `~/.seeya` real.
 **Aceite do mantenedor:** clicar em "Start daemon", ver o botão em "carregando" por um
 instante e virar "Stop daemon" sozinho, sem esperar o ciclo.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+**Entrega (2026-10-02).** `packages/app/src/composition/daemon-start.ts#startDaemonAndWait` lança o
+daemon e espera o `daemon.lock` aparecer vivo (`checkLiveLock`, a mesma de sempre) pela porta
+`Clock` (D-019), antes de responder. `AppContext.startDaemon` (`composition/index.ts`) agora só
+chama isso e `formatDaemonStartOutcome`. Resultado como união discriminada (D-024/D-025):
+`alreadyRunning` / `confirmed` (lock visto, pid do lock) / `launchedUnconfirmed` ("Launched the
+daemon (pid N), but it has not written its lock within 10s, so it is not confirmed as running" —
+nunca "started", nunca "failed"). O botão já tinha `loading={daemon.kind === 'running'}` e o
+rodapé já mostra `resultText`; a resposta do IPC já recomputa a disponibilidade, então nenhuma
+mudança de tela foi necessária.
+
+**Medição (Windows 11, Node 22 rodando o `packages/cli/dist` compilado contra uma home
+descartável via `USERPROFILE`/`HOME`, `SEEYA_DAEMON_CHILD=1`, 32 lançamentos, do retorno do spawn
+até `daemon.lock` legível em disco, sondado a cada 5ms; cada daemon encerrado e a home apagada):**
+12 primeiras: 2286 1024 822 887 782 761 1143 791 868 974 951 776 ms; 20 seguintes: 781 879 952
+1200 757 820 874 762 780 827 743 746 743 772 759 760 741 822 760 745 ms. Mediana ~790ms, 31 de 32
+entre 741 e 1200ms, um outlier frio de 2286ms (o primeiro lançamento). Escolhas: prazo 10s (~4x o
+pior caso visto), intervalo 100ms (~8 leituras por subida típica). **Não medido:** o Electron como
+Node (`ELECTRON_RUN_AS_NODE`) — o binário não estava instalado na worktree de verificação; a
+margem do prazo cobre a subida mais lenta esperada dele. O prazo conta só os `sleep`, então o
+tempo real pode exceder um pouco por causa do custo de cada `isAlive`.
+
+**Stop daemon (item 3).** Conferido por teste: depois de `runDaemonStop`, a disponibilidade que o
+handler recomputa (`checkLiveLock` + `resolveDaemonControlAvailability`) é `start`. Não precisou
+de correção.
+
+**Testes:** `tests/unit/app/composition/daemon-start.test.ts` — imediato, lento (3 sondagens),
+prazo vencido (100 sleeps de 100ms, texto sem "started"/"failed"), recusado, e o Stop; duplos
+nomeados, nenhuma espera real.
+
+**Capturas:** não feitas — o binário do Electron não existe nesta worktree, então não há janela
+real para fotografar; prova por teste e medição.
+<!-- SECTION:NOTES:END -->
