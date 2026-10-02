@@ -6,6 +6,9 @@
   align-items: center;
   justify-content: center;
   gap: var(--seeya-space-2);
+  /* V2-T79: the anchor for `.spinnerOverlay` below — `loading`'s own `Spinner` is positioned
+   * relative to THIS box, never to some further-out ancestor the button happens to sit inside. */
+  position: relative;
   border: 1px solid transparent;
   border-radius: var(--seeya-radius-md);
   font-family: var(--seeya-font-sans);
@@ -36,26 +39,28 @@
   width: 100%;
 }
 
-/* `Button.tsx`'s own `loading` prop docstring has the full reasoning: the `Spinner` inside is
- * ALWAYS mounted once `loading` is anything but `undefined`, so its box (and this slot's) never
- * appears/disappears — only `visibility` toggles (`.spinnerSlotHidden` below), which keeps the
- * button's own width constant across the loading transition itself, the one requirement that
- * actually matters here. */
-.spinnerSlot {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.spinnerSlotHidden {
+/* V2-T79 (fixes a real off-center defect — Open/Skip today/Create read shifted right in the
+ * installer screenshot that found this): the OLD shape put a `Spinner`-sized flex-flow slot BESIDE
+ * the label, mounted the moment `loading` was anything but `undefined` (`true` OR `false`) — that
+ * slot itself, sitting to the label's left inside a `justify-content: center` button, is what
+ * pushed the label off-center even while nothing was loading. The new shape never adds a flow
+ * sibling at all: the label keeps its OWN box (`.labelHidden` only flips `visibility`, the box
+ * stays exactly where a plain label would put it, keeping the button's width stable across the
+ * transition) and the `Spinner` overlays it via `position: absolute` (anchored to `.button`'s own
+ * `position: relative` above) — centering a loading button is therefore pixel-identical to
+ * centering its own label, because there is no second box competing for the same row. */
+.labelHidden {
   visibility: hidden;
 }
 
-/* `visibility: hidden` alone leaves the spinner's own CSS animation running (invisibly) forever —
- * pausing it while hidden costs nothing visually and avoids spinning a hundred idle buttons' worth
- * of animation frames in a window that's otherwise at rest. */
-.spinnerSlotHidden :global(svg) {
-  animation-play-state: paused;
+.spinnerOverlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Sizes — padding, PLUS font-size/line-height matching `Text`'s own body-sm/body-md/body-lg

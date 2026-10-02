@@ -48,15 +48,17 @@ export interface ButtonProps {
   /** D-052, maintainer's own complement (V2-T65-estado-na-tela item 2): "estado de trabalho vira
    * prop do componente, não lógica espalhada" — an in-flight action (Skip, Snooze, the daemon
    * button, …) sets this instead of each caller inventing its own disabled-plus-spinner markup.
-   * **Omitted (the default), a `Button` behaves exactly as before this prop existed** — no reserved
-   * spinner gutter, no width change, ever — only a caller that explicitly passes `true`/`false`
-   * opts into the reserved slot below, so every pre-existing `Button` in this app is byte-for-byte
-   * unaffected. `true`: disables the button, sets `aria-busy="true"`, and shows a `Spinner` to the
-   * LEFT of the label in a slot that's already reserved the instant this prop is anything but
-   * `undefined` — reserving it on BOTH `true` and `false` is what keeps the button's own width
-   * stable across the loading transition itself ("mantém a largura, sem pular o layout"), the one
-   * hard requirement here; the trade-off is a permanent small gutter for the handful of buttons
-   * that opt in at all, which is cheaper than a width that jumps the instant someone clicks. */
+   * **Omitted OR `false`, a `Button` is now structurally IDENTICAL to one that never named this
+   * prop at all** — no spinner element in the DOM, no extra wrapper, same centering as a plain
+   * button (V2-T79's own fix: Open/Skip today/Create used to read shifted off-center, because the
+   * previous shape reserved a `Spinner`-sized gutter to the LEFT of the label the instant `loading`
+   * was anything but `undefined` — including `false` — which is exactly what the maintainer's
+   * installer screenshot caught). `true`: disables the button, sets `aria-busy="true"`, keeps the
+   * label mounted but `visibility: hidden` (so the button's own width never changes across the
+   * transition — the label's own box still occupies it), and overlays a `Spinner` absolutely
+   * centered on top of the button (`position: relative` on `.button`, `Button.module.css`) — an
+   * overlay, never a sibling in the flex flow, so centering a loading button is pixel-identical to
+   * centering its own label. */
   readonly loading?: boolean;
   /** D-052 (V2-T66, same shape as `Switch.tsx`'s own `disabledReason`) — `docs/INTERFACE.md` §
    * 3's own "desabilitado sem seleção, com o motivo" (Today's "Resume selected"): a line under the
@@ -106,22 +108,27 @@ export function Button(props: ButtonProps): JSX.Element {
       title={props.title}
       onClick={props.onClick}
     >
-      {props.loading !== undefined && (
-        // The `Spinner` is always MOUNTED once this prop is in play (never conditionally added),
-        // just toggled between `visible`/`hidden` — a slot whose box only appears while loading
-        // would itself change the button's width at the exact moment loading starts, the opposite
-        // of what this prop exists for. `visibility` (not `display`) is what keeps the box's own
-        // footprint in the layout while painting nothing.
-        <span
-          class={cx(styles, 'spinnerSlot', props.loading !== true && 'spinnerSlotHidden')}
-          aria-hidden="true"
-        >
+      {/* The label stays in the DOM and keeps its own box even while loading — `visibility:
+       * hidden` (never `display: none`, never removed) is what keeps the button's width exactly
+       * where the label itself put it, with no separate gutter to account for. */}
+      <Text
+        as="span"
+        variant={TEXT_VARIANT_BY_SIZE[props.size ?? 'md']}
+        weight={500}
+        className={cx(styles, loading && 'labelHidden')}
+      >
+        {props.children}
+      </Text>
+      {loading && (
+        // An overlay, not a flow sibling: `position: absolute` (`.spinnerOverlay`, relative to
+        // `.button`'s own `position: relative`) centers the `Spinner` over the button's own box
+        // without adding a single pixel to its layout width — the defect this replaces reserved a
+        // flex-flow slot BESIDE the label instead, which is what pushed the label off-center the
+        // instant `loading` was passed at all (V2-T79).
+        <span class={cx(styles, 'spinnerOverlay')} aria-hidden="true">
           <Spinner size={SPINNER_SIZE_BY_SIZE[props.size ?? 'md']} />
         </span>
       )}
-      <Text as="span" variant={TEXT_VARIANT_BY_SIZE[props.size ?? 'md']} weight={500}>
-        {props.children}
-      </Text>
     </button>
   );
   if (!disabled || loading || props.disabledReason === undefined) {

@@ -238,6 +238,29 @@ async function quitAfterConfiguredDelay(clock: Clock): Promise<void> {
 }
 
 /**
+ * SEEYA_APP_VERIFY_HOLD_SKIP_MS (V2-T79): holds the real `CHANNELS.skipToday` IPC response
+ * pending for the given number of milliseconds before it resolves — "instrumentação que segura
+ * uma ação pendente" (this task's own prescribed technique for proving a `loading` button stays
+ * centered), rather than racing a screenshot against `skipTodayNow`'s own near-instant local
+ * write (which a fixed sleep before capturing could miss on a slower CI machine, or catch too
+ * early on a faster one). `skipTodayNow` itself is unchanged — this only delays HANDING BACK its
+ * already-computed result, so the write to the disposable `estado.json` this runs against still
+ * happens exactly once, synchronously with the real call, never duplicated or faked. Never read
+ * by `npm run app` or the README; absent, this is a no-op (`undefined`/non-finite both pass
+ * straight through, same guard shape as `quitAfterConfiguredDelay` above).
+ */
+async function holdForVerification(clock: Clock): Promise<void> {
+  const raw = process.env.SEEYA_APP_VERIFY_HOLD_SKIP_MS;
+  if (raw === undefined) {
+    return;
+  }
+  const holdMs = Number(raw);
+  if (Number.isFinite(holdMs)) {
+    await clock.sleep(holdMs);
+  }
+}
+
+/**
  * `screenshotPath`/`quitAfterMs` back a single verification hook (undocumented, internal, unset
  * in every normal run): write one real `webContents.capturePage()` PNG shortly after load, then
  * optionally quit — the exact "instrumentação só do spike" pattern
@@ -503,6 +526,56 @@ async function captureProjectsTabStatesVerification(
   await click('new-project-button');
   await clock.sleep(300);
   await shoot('06-new-project-dialog.png');
+
+  await quitAfterConfiguredDelay(clock);
+}
+
+/**
+ * V2-T79 (`Button.tsx`'s own off-center defect, found in a real installer screenshot): three
+ * screenshots proving the fix — Open (Projects tab, one unlocked project), Skip today (sidebar
+ * footer, schedule configured so `canSkip` is true) and Create (New project dialog) all centered
+ * at rest, plus Skip today again while `loading` is true (the exact shape the defect broke).
+ *
+ * Far simpler than `captureProjectsTabStatesVerification` above: this task needs only ONE
+ * unlocked project (no `openHere`/`lockedByOther` decoys, so none of that function's own pid/decoy
+ * fixture machinery applies here) and the sidebar footer, which renders beside every main tab, so
+ * the very first screenshot already proves Open AND Skip today at once. `03-loading.png` relies on
+ * `SEEYA_APP_VERIFY_HOLD_SKIP_MS` (this file's own `holdForVerification`) being set alongside this
+ * directory — a real click on the real button, with the real IPC response held open long enough
+ * for the capture below to land inside the loading window instead of racing it.
+ */
+async function captureButtonCenteringVerification(
+  window: BrowserWindow,
+  clock: Clock,
+  outDir: string,
+): Promise<void> {
+  const { writeFile } = await import('node:fs/promises');
+  async function shoot(name: string): Promise<void> {
+    const image = await window.webContents.capturePage();
+    await writeFile(path.join(outDir, name), image.toPNG());
+  }
+  function click(id: string): Promise<unknown> {
+    return window.webContents.executeJavaScript(`document.getElementById('${id}')?.click();`);
+  }
+
+  await clock.sleep(2000); // initial load + the ambient daemon-ownership-transition dismiss, if any
+  await click('all-projects-link');
+  await clock.sleep(2500); // the first getProjectsPanel fetch/render
+  // Open (the table's lone unlocked project) AND Skip today (the footer, always rendered beside
+  // whichever main tab is active) — both at rest, in the same frame.
+  await shoot('01-open-and-skip.png');
+
+  await click('new-project-button');
+  await clock.sleep(300);
+  await shoot('02-create.png');
+
+  await click('new-project-cancel');
+  await clock.sleep(300);
+  await click('schedule-strip-skip-button');
+  // `SEEYA_APP_VERIFY_HOLD_SKIP_MS` keeps the real response pending well past this sleep — see
+  // that flag's own docstring for why a fixed delay here never has to race the real write.
+  await clock.sleep(300);
+  await shoot('03-loading.png');
 
   await quitAfterConfiguredDelay(clock);
 }
@@ -857,6 +930,16 @@ function createWindow(clock: Clock): BrowserWindow {
   if (projectsTabStatesDir !== undefined) {
     window.webContents.once('did-finish-load', () => {
       void captureProjectsTabStatesVerification(window, clock, projectsTabStatesDir);
+    });
+  }
+  // SEEYA_APP_VERIFY_BUTTON_CENTERING_DIR (V2-T79): same "a DIRECTORY, not a single file" shape as
+  // the flag right above — see `captureButtonCenteringVerification`'s own docstring for the
+  // sequence. Combine with `SEEYA_APP_VERIFY_HOLD_SKIP_MS` for the loading screenshot. Never set
+  // by `npm run app` or the README.
+  const buttonCenteringDir = process.env.SEEYA_APP_VERIFY_BUTTON_CENTERING_DIR;
+  if (buttonCenteringDir !== undefined) {
+    window.webContents.once('did-finish-load', () => {
+      void captureButtonCenteringVerification(window, clock, buttonCenteringDir);
     });
   }
   // SEEYA_APP_AUTO_OPEN_SHELL_TAB: same "instrumentação só do spike" class as SEEYA_APP_OFFSCREEN
@@ -2133,9 +2216,13 @@ function wireIpc(window: BrowserWindow, context: AppContext): void {
       snoozeTodayNow(context.storage, context.clock, request.minutes),
   );
 
-  ipcMain.handle(CHANNELS.skipToday, async (): Promise<ScheduleUpdateEvent> =>
-    skipTodayNow(context.storage, context.clock),
-  );
+  ipcMain.handle(CHANNELS.skipToday, async (): Promise<ScheduleUpdateEvent> => {
+    const result = await skipTodayNow(context.storage, context.clock);
+    // SEEYA_APP_VERIFY_HOLD_SKIP_MS (V2-T79): see `holdForVerification`'s own docstring — a no-op
+    // outside a verification run, so the real button's own latency is exactly what it always was.
+    await holdForVerification(context.clock);
+    return result;
+  });
 
   // V2-T5b item 3: "Start daemon"/"Stop daemon" — the renderer decides WHICH action from its own
   // last-known `DaemonControlAvailability` (never re-derived here, D-041); this handler just runs
