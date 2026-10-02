@@ -1103,6 +1103,11 @@ export interface AppInstallation {
   find(): Promise<AppInstallationStatus>;
 }
 
+// Own import line on purpose (V2-T71), same self-contained pattern already established above
+// (`SessionIdLookupOutcome`, `DayState`): `ChangedFileEntry` is this task's own new type, used
+// only by `WorkspaceRepository.listChangedFilesWithStatus` below.
+import type { ChangedFileEntry } from './changed-file-status.js';
+
 /**
  * V2-T27: write access to the workspace — the single git repository `docs/V2-RUMO.md` § "Um
  * repositório para todos os projetos" describes, holding every project as a subdirectory.
@@ -1263,6 +1268,16 @@ export interface WorkspaceRepository {
    * to confirm".
    */
   listChangedFiles(root: string, projectId: string): Promise<readonly string[]>;
+
+  /**
+   * V2-T71 (`docs/INTERFACE.md` § 9's own "a lista de arquivos (M/A)"): the SAME `git status`
+   * query as `listChangedFiles` above, keeping each entry's status (`core/changed-file-status.ts`)
+   * instead of discarding it — additive on purpose, so `listChangedFiles`'s own callers (the
+   * adoption flow's commit-review dialog, V2-T29/V2-T30) never have to change. Only
+   * `application/project-open.ts`'s leftover-changes confirmation (`openProject`) and the
+   * window's own IPC handler for it call this one.
+   */
+  listChangedFilesWithStatus(root: string, projectId: string): Promise<readonly ChangedFileEntry[]>;
 
   /**
    * V2-T32: deletes `root/projectId` recursively — `seeya project remove`'s own physical removal.
