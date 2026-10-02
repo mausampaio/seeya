@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { afterAll, afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import {
   APP_SRC_ROOT,
   PROJECT_ROOT,
@@ -9,9 +9,14 @@ import {
   writeTempFile,
   cleanUpGuardResidue,
   runEslint,
+  warmUpEslint,
+  ESLINT_WARM_UP_TIMEOUT_MS,
 } from './_support.js';
 
 const GUARD_NAME = 'app-eslint';
+
+// One-time cold type-aware program load, outside any single case (V2-T80, see _support.ts).
+beforeAll(warmUpEslint, ESLINT_WARM_UP_TIMEOUT_MS);
 
 /**
  * Shortcut for a fixture path in this file, isolated in packages/app/src/<subdir>/_guard-app-eslint/.
@@ -48,14 +53,14 @@ describe('guard: eslint restricts electron/node-pty to their own directories ins
 
   it(
     'rejects electron imported outside packages/app/src/main/**, with a message pointing at main/',
-    () => {
+    async () => {
       const filePath = writeTempFile(
         fixture('tabs', 'violation-test-electron.ts'),
         "import { BrowserWindow } from 'electron';\nexport const w = BrowserWindow;\n",
       );
       created.push(filePath);
 
-      const result = runEslint([filePath]);
+      const result = await runEslint([filePath]);
 
       expect(result.exitCode, result.output).not.toBe(0);
       expect(result.output).toContain('no-restricted-imports');
@@ -66,14 +71,14 @@ describe('guard: eslint restricts electron/node-pty to their own directories ins
 
   it(
     'rejects node-pty imported outside packages/app/src/pty/**, with a message pointing at pty/',
-    () => {
+    async () => {
       const filePath = writeTempFile(
         fixture('tabs', 'violation-test-node-pty.ts'),
         "import * as pty from 'node-pty';\nexport const spawnFn = pty.spawn;\n",
       );
       created.push(filePath);
 
-      const result = runEslint([filePath]);
+      const result = await runEslint([filePath]);
 
       expect(result.exitCode, result.output).not.toBe(0);
       expect(result.output).toContain('no-restricted-imports');
@@ -84,14 +89,14 @@ describe('guard: eslint restricts electron/node-pty to their own directories ins
 
   it(
     'rejects node-pty imported inside packages/app/src/main/** too (main/ is exempt from the electron ban, not the node-pty one)',
-    () => {
+    async () => {
       const filePath = writeTempFile(
         fixture('main', 'violation-test-node-pty-from-main.ts'),
         "import * as pty from 'node-pty';\nexport const spawnFn = pty.spawn;\n",
       );
       created.push(filePath);
 
-      const result = runEslint([filePath]);
+      const result = await runEslint([filePath]);
 
       expect(result.exitCode, result.output).not.toBe(0);
       expect(result.output).toContain('no-restricted-imports');
@@ -101,14 +106,14 @@ describe('guard: eslint restricts electron/node-pty to their own directories ins
 
   it(
     'rejects electron imported inside packages/app/src/pty/** too (pty/ is exempt from the node-pty ban, not the electron one)',
-    () => {
+    async () => {
       const filePath = writeTempFile(
         fixture('pty', 'violation-test-electron-from-pty.ts'),
         "import { app } from 'electron';\nexport const application = app;\n",
       );
       created.push(filePath);
 
-      const result = runEslint([filePath]);
+      const result = await runEslint([filePath]);
 
       expect(result.exitCode, result.output).not.toBe(0);
       expect(result.output).toContain('no-restricted-imports');
@@ -118,14 +123,14 @@ describe('guard: eslint restricts electron/node-pty to their own directories ins
 
   it(
     'approves node-pty imported inside packages/app/src/pty/** (control for the exemption)',
-    () => {
+    async () => {
       const filePath = writeTempFile(
         fixture('pty', 'control-test-node-pty.ts'),
         "import * as pty from 'node-pty';\nexport const spawnFn = pty.spawn;\n",
       );
       created.push(filePath);
 
-      const result = runEslint([filePath]);
+      const result = await runEslint([filePath]);
 
       expect(result.exitCode, result.output).toBe(0);
     },
@@ -134,8 +139,8 @@ describe('guard: eslint restricts electron/node-pty to their own directories ins
 
   it(
     'approves the real packages/app/src/pty adapter importing node-pty (control against the real file, once it exists)',
-    () => {
-      const result = runEslint([
+    async () => {
+      const result = await runEslint([
         path.join(PROJECT_ROOT, 'packages/app/src/pty/node-pty-adapter.ts'),
       ]);
 
@@ -146,8 +151,8 @@ describe('guard: eslint restricts electron/node-pty to their own directories ins
 
   it(
     'approves the real packages/app/src/main files importing electron (control against the real files)',
-    () => {
-      const result = runEslint(
+    async () => {
+      const result = await runEslint(
         ['packages/app/src/main/main.ts', 'packages/app/src/main/preload.ts'].map((relativePath) =>
           path.join(PROJECT_ROOT, relativePath),
         ),
