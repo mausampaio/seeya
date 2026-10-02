@@ -49,6 +49,7 @@ import {
 } from '@seeya-ai/engine/adapters/generation/index.js';
 import { notifier as realNotifier } from '@seeya-ai/engine/adapters/notification/index.js';
 import { checkDaemonLock } from '@seeya-ai/engine/scheduler/index.js';
+import { formatDaemonStartOutcome, startDaemonAndWait } from './daemon-start.js';
 import { checkLiveLock } from '@seeya-ai/engine/scheduler/daemon-state.js';
 import { runDaemonStop } from '@seeya-ai/engine/scheduler/daemon-control.js';
 import {
@@ -604,16 +605,16 @@ export async function buildAppContext(
   };
   // Mirrors cli/daemon-command.ts#runDaemonLauncher's own two branches and wording exactly — see
   // AppContext's own docstring on `startDaemon` for why this can't just BE that function.
+  // V2-T31: answers only once `daemon.lock` is seen alive — see `composition/daemon-start.ts`.
   async function startDaemon(): Promise<string> {
-    const decision = await checkDaemonLock(storage, realProcessControl);
-    if (decision.kind === 'refuse') {
-      return `seeya daemon is already running (pid ${decision.heldByPid}). Nothing started.`;
-    }
-    const pid = await spawnDetachedDaemon(daemonLaunchTarget);
-    return (
-      `seeya daemon started (pid ${pid}), detached from this window — closing seeya or logging ` +
-      'out will not stop it.'
-    );
+    const outcome = await startDaemonAndWait({
+      storage,
+      processControl: realProcessControl,
+      clock,
+      checkLock: () => checkDaemonLock(storage, realProcessControl),
+      spawnDaemon: () => spawnDetachedDaemon(daemonLaunchTarget),
+    });
+    return formatDaemonStartOutcome(outcome);
   }
   function stopDaemon(): Promise<string> {
     return runDaemonStop({ storage, processControl: realProcessControl, clock });
