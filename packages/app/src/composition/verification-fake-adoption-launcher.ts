@@ -17,7 +17,12 @@
  * **`delayMs` via `clock.sleep` (D-019), never a raw `setTimeout`** — same discipline
  * `verification-fake-generator.ts`'s own docstring already states for this exact category of
  * verification-only code.
+ *
+ * Writes `EXTRA_FIXTURE_FILE_COUNT` extra small files on top of the three described above, so the
+ * review step's own list is long enough to prove it scrolls (the task's own "uma lista longa,
+ * provando a rolagem") rather than just fitting on screen by coincidence.
  */
+const EXTRA_FIXTURE_FILE_COUNT = 14;
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type {
@@ -67,6 +72,16 @@ export class VerificationFakeAdoptionLauncher implements SessionAdoptionLauncher
     // project only ever exists inside a disposable `SEEYA_APP_HOME_OVERRIDE` workspace, never a
     // real one, and the fork is discarded/committed from this call's own fixture regardless.
     await rm(path.join(projectDir, 'AGENTS.md'), { force: true });
+    const notesDir = path.join(projectDir, 'context', 'notes');
+    await mkdir(notesDir, { recursive: true });
+    for (let index = 1; index <= EXTRA_FIXTURE_FILE_COUNT; index += 1) {
+      const label = String(index).padStart(2, '0');
+      await writeFile(
+        path.join(notesDir, `fixture-note-${label}.md`),
+        `(Verification fixture, V2-T70 — extra file #${label} proving the review list scrolls.)\n`,
+        'utf8',
+      );
+    }
     return { kind: 'opened', exitCode: 0 };
   }
 }

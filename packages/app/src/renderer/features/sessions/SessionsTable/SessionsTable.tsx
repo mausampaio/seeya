@@ -150,28 +150,32 @@ function ActionCell(props: {
       >
         {MESSAGES.sessionsActionResume}
       </Button>
-      <Button
-        size="sm"
-        disabled={action.adopt.kind === 'unavailable'}
-        className={cx(styles, 'actionButton')}
-        // PO review round 1 (`docs/INTERFACE.md` § 5's own "dica no botão desabilitado"): `title`
-        // ONLY, never `disabledReason` — that prop renders a sibling line of text IN the table
-        // cell, doubling the row's height and pushing `lastActivity` out of its own column, exactly
-        // the defect a real capture found. A tooltip is the dica the spec actually asks for.
-        // Conditional spread, not `title={... : undefined}` — `Button.tsx`'s own `title?: string`
-        // has no `| undefined` escape hatch, and this package's `exactOptionalPropertyTypes`
-        // refuses a present-but-`undefined` value for it (same reasoning `Button.tsx`'s own
-        // `buttonRef` conditional spread already documents).
-        {...(action.adopt.kind === 'unavailable' ? { title: action.adopt.reason } : {})}
-        // V2-T70's own `main/main.ts` verification instrumentation clicks the first
-        // `[data-adopt-session-id]` it finds — same reasoning `SessionIdCopyButton`'s own
-        // `data-session-id` already documents (a stable id survives the batch-scoped
-        // `displaySessionId`).
-        data-adopt-session-id={row.sessionId}
-        onClick={() => props.onAdopt(row)}
-      >
-        {MESSAGES.adoptButton}
-      </Button>
+      {/* V2-T70's own `main/main.ts` verification instrumentation clicks the first
+       * `[data-adopt-session-id] button` it finds — `Button.tsx`'s own `ButtonProps` is a closed
+       * interface with no passthrough for an arbitrary `data-*` attribute (confirmed against a
+       * real build: the attribute never reached the DOM when passed to `Button` directly), so the
+       * marker lives on this wrapping `span` instead, same reasoning `SessionIdCopyButton`'s own
+       * `data-session-id` already documents (a stable id survives the batch-scoped
+       * `displaySessionId`). */}
+      <span data-adopt-session-id={row.sessionId}>
+        <Button
+          size="sm"
+          disabled={action.adopt.kind === 'unavailable'}
+          className={cx(styles, 'actionButton')}
+          // PO review round 1 (`docs/INTERFACE.md` § 5's own "dica no botão desabilitado"): `title`
+          // ONLY, never `disabledReason` — that prop renders a sibling line of text IN the table
+          // cell, doubling the row's height and pushing `lastActivity` out of its own column,
+          // exactly the defect a real capture found. A tooltip is the dica the spec actually asks
+          // for. Conditional spread, not `title={... : undefined}` — `Button.tsx`'s own
+          // `title?: string` has no `| undefined` escape hatch, and this package's
+          // `exactOptionalPropertyTypes` refuses a present-but-`undefined` value for it (same
+          // reasoning `Button.tsx`'s own `buttonRef` conditional spread already documents).
+          {...(action.adopt.kind === 'unavailable' ? { title: action.adopt.reason } : {})}
+          onClick={() => props.onAdopt(row)}
+        >
+          {MESSAGES.adoptButton}
+        </Button>
+      </span>
     </div>
   );
 }
