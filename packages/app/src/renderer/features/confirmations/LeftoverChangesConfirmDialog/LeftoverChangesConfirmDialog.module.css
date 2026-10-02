@@ -3,3 +3,12 @@
 .dialog {
   width: min(560px, calc(100vw - var(--seeya-space-8)));
 }
+
+/* Each footer option (explanation + its own button, `LeftoverChangesConfirmDialog.tsx`'s own
+ * docstring on why these live in the footer, not the scrollable body) gets half the footer's own
+ * width, right-aligned text over a right-aligned button — a caption this narrow still reads as
+ * "belonging to" the button under it instead of drifting into the other option's column. */
+.footerOption {
+  max-width: 220px;
+  text-align: right;
+}

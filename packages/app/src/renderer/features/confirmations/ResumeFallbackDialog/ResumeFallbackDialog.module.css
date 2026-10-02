@@ -6,3 +6,13 @@
 .card {
   width: 100%;
 }
+
+/* A real capture with all three cards (`offersResumeWithoutPlan: true`) showed the third one's
+ * own button pushed below the window's edge — this dialog has no single shared footer to pin
+ * the way `Dialog`'s own `footer` prop does (each card carries its own button), so the cards
+ * area gets its own bounded, scrollable region instead: every card, including the recommended
+ * one, stays reachable regardless of how many are shown or how short the window is. */
+.cardsScroll {
+  max-height: 60vh;
+  overflow-y: auto;
+}

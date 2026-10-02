@@ -8,6 +8,11 @@
  * Uses `Dialog`'s own `footer` prop (the same pinned-header/pinned-footer/scrolling-body shape
  * `EndDayDialog` already established) so a long file list scrolls WITHOUT pushing the two buttons
  * below the window's own bottom edge — exactly the "com rolagem se longa" the spec asks for.
+ * **Each option's explanation lives IN the footer, stacked above its own button** (not in the
+ * scrollable body with the file list) — a real capture with a long list showed why: text placed
+ * above the list inside the scrollable area scrolls out of view right along with it, so "cada um
+ * explicado" was only ever true for a list short enough to never need the scrollbar this dialog
+ * exists to add.
  *
  * @example
  * <LeftoverChangesConfirmDialog/> // mounted once, in App.tsx
@@ -84,16 +89,26 @@ export function LeftoverChangesConfirmDialog(): JSX.Element {
       className={cx(styles, 'dialog')}
       footer={
         <>
-          <Button
-            id="leftover-changes-confirm-proceed"
-            variant="secondary"
-            onClick={() => answer('proceedWithoutCommitting')}
-          >
-            {MESSAGES.leftoverChangesConfirmProceed}
-          </Button>
-          <Button id="leftover-changes-confirm-commit" onClick={() => answer('commitNow')}>
-            {MESSAGES.leftoverChangesConfirmCommit}
-          </Button>
+          <Stack gap="xs" align="end" className={cx(styles, 'footerOption')}>
+            <Text as="p" variant="caption" tone="secondary">
+              {MESSAGES.leftoverChangesConfirmProceedExplanation}
+            </Text>
+            <Button
+              id="leftover-changes-confirm-proceed"
+              variant="secondary"
+              onClick={() => answer('proceedWithoutCommitting')}
+            >
+              {MESSAGES.leftoverChangesConfirmProceed}
+            </Button>
+          </Stack>
+          <Stack gap="xs" align="end" className={cx(styles, 'footerOption')}>
+            <Text as="p" variant="caption" tone="secondary">
+              {MESSAGES.leftoverChangesConfirmCommitExplanation}
+            </Text>
+            <Button id="leftover-changes-confirm-commit" onClick={() => answer('commitNow')}>
+              {MESSAGES.leftoverChangesConfirmCommit}
+            </Button>
+          </Stack>
         </>
       }
     >
@@ -106,16 +121,6 @@ export function LeftoverChangesConfirmDialog(): JSX.Element {
             items={request.changedFiles.map(toStatusListItem)}
             emptyMessage={MESSAGES.endDayNothingToShow}
           />
-          <Stack gap="xs">
-            <Text as="p" variant="body-sm" tone="secondary">
-              <strong>{MESSAGES.leftoverChangesConfirmProceed}:</strong>{' '}
-              {MESSAGES.leftoverChangesConfirmProceedExplanation}
-            </Text>
-            <Text as="p" variant="body-sm" tone="secondary">
-              <strong>{MESSAGES.leftoverChangesConfirmCommit}:</strong>{' '}
-              {MESSAGES.leftoverChangesConfirmCommitExplanation}
-            </Text>
-          </Stack>
         </Stack>
       )}
     </Dialog>

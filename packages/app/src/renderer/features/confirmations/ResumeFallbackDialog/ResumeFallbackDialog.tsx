@@ -107,7 +107,7 @@ export function ResumeFallbackDialog(): JSX.Element {
       {request !== null && (
         <Stack gap="md">
           {context}
-          <Stack gap="sm">
+          <Stack gap="sm" className={cx(styles, 'cardsScroll')}>
             <OutcomeCard
               id="fallback-dialog-skip"
               title={MESSAGES.fallbackCardSkipTitle}
