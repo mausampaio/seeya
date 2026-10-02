@@ -12,7 +12,7 @@
  * 3's own "o `open` deixa de bloquear"): both block for as long as their harness tab stays open,
  * so `ipcMain.handle`'s promise for `CHANNELS.openProject`/`CHANNELS.adoptSession` can legitimately
  * take hours to settle — that's fine, because nothing in the renderer blocks waiting for it either
- * (`electron/projects-list-view.ts`/`adopt-flow-view.ts`'s own click handlers fire-and-forget them). What makes a tab
+ * (`renderer/features/projects/useProjects.ts`/`adopt-flow-view.ts`'s own click handlers fire-and-forget them). What makes a tab
  * appear immediately is the reused `CHANNELS.resumeTabOpened` push
  * (`resume/project-tab-launcher.ts`'s own `TabResumeOpener`, the SAME mechanism V2-T4's resume flow
  * already uses) — mounting a tab UI for an already-spawned pty has never been resume-specific.
@@ -175,7 +175,7 @@ export function wireProjectIpc(
     window.webContents.send(CHANNELS.projectsUpdate, await computeProjectsPanelData());
   }
 
-  // V2-T30 item 1: fetched once, at startup (`electron/projects-list-view.ts#wireProjectsListView`),
+  // V2-T30 item 1: fetched once, at startup (`renderer/features/projects/useProjects.ts`),
   // the same "explicit request-response for the FIRST paint, push for every refresh after that"
   // shape `CHANNELS.getTodayPanel`/`onTodayUpdate` already establish. Needed because the ambient
   // refresh loop's own FIRST tick starts as soon as `wireIpc` runs — before the renderer's own

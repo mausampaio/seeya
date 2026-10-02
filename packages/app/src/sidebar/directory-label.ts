@@ -4,7 +4,8 @@
  * that actually distinguishes one directory from another; a person recognizes
  * "…\projeto-alpha", not the drive/parent chain leading to it — with an ellipsis PREFIX when it
  * doesn't fit in `maxLength` characters. The full path is never lost: the caller
- * (`electron/projects-list-view.ts`) still puts it in the row's own `title` attribute.
+ * (`renderer/legacy/other-sessions-and-ignored-view.ts`) still puts it in the row's own `title`
+ * attribute.
  *
  * A fixed character budget, not a live pixel measurement (`element.scrollWidth` etc.): the
  * sidebar's own CSS (`#sidebar-content { overflow-x: hidden }`, `index.css`) is the hard backstop

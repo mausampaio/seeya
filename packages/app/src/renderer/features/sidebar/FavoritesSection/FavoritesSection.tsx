@@ -23,6 +23,7 @@ import { PlusIcon } from '../../../components/Icon/index.js';
 import { MESSAGES } from '../../../../text/messages.js';
 import type { FavoriteProjectRow } from '../../../../state/sidebar-summary.js';
 import { ProjectRow } from '../ProjectRow/index.js';
+import { openNewProjectDialog } from '../../projects/new-project-dialog-bridge.js';
 
 export interface FavoritesSectionProps {
   readonly rows: readonly FavoriteProjectRow[];
@@ -36,11 +37,17 @@ export function FavoritesSection(props: FavoritesSectionProps): JSX.Element {
       id="favorites-section"
       title={MESSAGES.sidebarFavoritesHeading}
       action={
-        // No `onClick` here on purpose — `renderer/legacy/new-project-dialog-view.ts#wireNewProjectDialog`
-        // attaches the real click handler to this exact `id` after mount (unchanged by this task,
-        // D-052's own "o que ainda não é reescrito... fica funcionando") — the same passthrough-anchor
-        // pattern `#end-day-button` used before V2-T69 made it a real reactive `<Button>`.
-        <IconButton id="new-project-button" size="sm" aria-label={MESSAGES.newProjectButton}>
+        // V2-T67: `onClick` opens the SAME reactive `NewProjectDialog` the Projects tab's own
+        // "New project" button opens, through `new-project-dialog-bridge.ts` — replaces
+        // `renderer/legacy/new-project-dialog-view.ts#wireNewProjectDialog`'s own imperative
+        // `document.getElementById('new-project-button').addEventListener(...)` (apagado by this
+        // task).
+        <IconButton
+          id="new-project-button"
+          size="sm"
+          aria-label={MESSAGES.newProjectButton}
+          onClick={openNewProjectDialog}
+        >
           {/* PO review (defect 2, V2-T75): 24px — fills this button's own 24px (`size="sm"`) box
            * exactly, the identity's own preferred grid (§ 6.4). The real legibility bug this icon
            * exposed wasn't the size or the stroke width (both already correct) — see

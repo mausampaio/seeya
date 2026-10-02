@@ -7,18 +7,24 @@
  * BOTH kinds of pane through one function), so splitting them across two components here would
  * only recreate the coupling with extra prop-drilling.
  *
- * **What's still static, unmoved markup inside `#terminal-host`.** The Projects/Sessions page
- * panes (`#page-projects`/`#page-sessions` and everything inside each) are NOT this task's region
- * (`docs/INTERFACE.md` §§ 4–5 are separate, later tasks) — same ids, same nesting, unchanged, so
- * `renderer/legacy/projects-list-view.tsx`/`session-search-view.ts`/
- * `other-sessions-dir-dialog-view.ts` keep working exactly as before. Only `hidden` is new: it is
- * now computed from `activeId`, the same single source of truth every other pane in this component
- * uses, instead of each page tab button toggling it by hand.
+ * **What's still static, unmoved markup inside `#terminal-host`.** The Sessions page pane
+ * (`#page-sessions` and everything inside it) is NOT this task's region (`docs/INTERFACE.md` § 5
+ * is a separate, later task) — same id, same nesting, unchanged, so `renderer/legacy/
+ * session-search-view.ts`/`other-sessions-dir-dialog-view.ts` keep working exactly as before. Only
+ * `hidden` is new: it is computed from `activeId`, the same single source of truth every other
+ * pane in this component uses, instead of each page tab button toggling it by hand.
  *
- * `#page-today` (V2-T66, `docs/INTERFACE.md` § 3) is the one exception: its content is now
- * `<Today/>` (`renderer/features/today/`), a real component, replacing the `#today-panel` anchor
- * `renderer/legacy/today-panel-view.ts` used to fill by hand (apagado by that task) — same `id`,
- * same position in the tree, so nothing else in this file changes.
+ * `#page-today` (V2-T66) and `#page-projects` (V2-T67, `docs/INTERFACE.md` § 4) are real
+ * components now — `<Today/>` and `<Projects/>` (`renderer/features/today/`,
+ * `renderer/features/projects/`) — replacing the `#today-panel`/`#projects-list` anchors their own
+ * legacy views used to fill by hand (both apagados by their own task). Same `id`s, same position
+ * in the tree, so nothing else in this file changes. The bare `<p id="project-open-result-text">`
+ * sibling of `<Projects/>` is a LEFTOVER, not part of this tab's own designed content
+ * (`docs/INTERFACE.md` § 4 never mentions it) — `renderer/legacy/adopt-flow-view.ts`'s own
+ * post-adoption "Open project" follow-up button (V2-T30 item 5, untouched by V2-T67) still writes
+ * its short outcome text here via `renderer/legacy/projects-panel-cache.ts#triggerProjectOpen`;
+ * kept exactly as before so that flow's own "never fails in silence" fix (V2-T34) keeps working,
+ * out of this task's scope to redesign.
  *
  * **Settings** (`docs/INTERFACE.md` § 2 item 2) is an `IconButton` with a gear icon and
  * `aria-label`; its click opens `renderer/features/settings/SettingsDialog` (V2-T65) via
@@ -47,6 +53,7 @@ import { useTabStrip } from './useTabStrip.js';
 import { watchSidebarWidthTransition } from './sidebar-transition-watcher.js';
 import { MESSAGES } from '../../../text/messages.js';
 import { Today } from '../today/index.js';
+import { Projects } from '../projects/index.js';
 
 export interface TabStripProps {
   /** `App.tsx`'s own sidebar-reopen button — rendered as the first element of this component's
@@ -166,8 +173,7 @@ export function TabStrip(props: TabStripProps): JSX.Element {
           <Today />
         </div>
         <div id="page-projects" class="page-pane" hidden={data.activeId !== 'page-projects'}>
-          <h2>Projects</h2>
-          <div id="projects-list"></div>
+          <Projects />
           <p id="project-open-result-text"></p>
         </div>
         <div id="page-sessions" class="page-pane" hidden={data.activeId !== 'page-sessions'}>

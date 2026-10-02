@@ -19,6 +19,7 @@ import { DialogsShell } from './legacy/dialogs-shell.js';
 import { Sidebar, useSidebarCollapse } from './features/sidebar/index.js';
 import { TabStrip } from './features/tabs/index.js';
 import { SettingsDialog } from './features/settings/index.js';
+import { NewProjectDialog } from './features/projects/index.js';
 
 export function AppShell() {
   const { collapsed, toggle } = useSidebarCollapse();
@@ -64,6 +65,12 @@ export function AppShell() {
       </div>
       <DialogsShell />
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      {/* V2-T67: mounted here, not inside the Projects tab itself — `Projects.tsx`'s own
+       * docstring explains why a `<dialog>` inside a possibly-`display:none` page pane never
+       * shows via `.showModal()`. Opened from both the sidebar's own `+`
+       * (`FavoritesSection.tsx`) and this tab's own "New project" button through
+       * `new-project-dialog-bridge.ts`. */}
+      <NewProjectDialog />
     </>
   );
 }

@@ -7,8 +7,9 @@
   gap: var(--seeya-space-1);
 }
 
-/* V2-T72 item 2 — hidden until `renderer/legacy/projects-list-view.tsx` has something to show;
- * that legacy module still owns 100% of this heading/list's content (unchanged by this task) —
+/* V2-T72 item 2 — hidden until `renderer/legacy/other-sessions-and-ignored-view.ts` (split out of
+ * `renderer/legacy/projects-list-view.tsx` by V2-T67) has something to show; that legacy module
+ * still owns 100% of this heading/list's content (unchanged by this task) —
  * this component only ever renders the stable anchor it appends into. Font sizing is the one
  * documented exception to "use Text" in this file (D-052 item 7, PO review 2026-10-01): legacy
  * code sets `.textContent`/appends `<li>`s directly on these two ids, never through a Preact
