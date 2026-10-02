@@ -154,6 +154,34 @@ autostart (vai para Settings).
   único jeito de tocar `seeya.json` continua sendo `seeya project add-repo`/comandos do `seeya`,
   nunca um editor pela janela).
 
+## 4a. Detalhes do projeto (V2-T83)
+
+Pedido do mantenedor em 2026-10-02: trazer para a janela o que ainda só existe na CLI — `add-repo`,
+`remove-repo`, `revert-adoption` e `remove`. Um diálogo **Project details**, aberto por um botão de
+ícone (`Manage project`) na linha do projeto na aba Projects — a ação principal da linha (`Go to
+tab` / `Open` / `Read only…`) continua como está.
+
+- **Cabeçalho:** nome, id (mono), estado do lock (o mesmo texto da coluna Lock) e o caminho do
+  projeto abreviado com `~` (completo no `title`).
+- **Repositories:** uma linha por repositório associado — nome, remoto (ou `No remote`) e o caminho
+  neste dispositivo (`Not on this device` quando o mapa não tem entrada ou o caminho sumiu, D-025).
+  `Add repository…` abre o seletor de pasta do sistema e chama o mesmo `addRepository` da CLI;
+  `Remove` em cada linha chama o mesmo `removeRepository`, sem confirmação (precedente da CLI:
+  reversível pelo histórico do espaço de trabalho). Repositório já associado é dito, não duplicado.
+- **Adopted sessions:** uma linha por adoção registrada — id curto da cópia e da original, quando
+  foi adotada — com `Revert…`, que abre uma confirmação (seção 9) dizendo quantos commits serão
+  revertidos; a recusa por commit posterior nos mesmos arquivos aparece com o motivo; quando a cópia
+  escreveu depois da adoção, a pergunta "manter ou apagar a cópia" aparece com `Keep` como padrão.
+  Seção escondida quando o projeto não tem adoção.
+- **Remove project:** área separada no fim, botão de tom `error`. Abre uma confirmação (seção 9)
+  com o nome do projeto, quantos arquivos ele tem e o que **não** é apagado (repositórios
+  associados, sessões, transcripts). Feito, o resultado mostra o commit de antes da remoção como
+  "como recuperar" — o mesmo texto da CLI.
+- **Projeto travado por outra sessão:** as ações que escrevem ficam desabilitadas com o motivo (o
+  motor recusaria de qualquer jeito, D-047 item 8); a leitura continua disponível.
+- Toda ação mostra `loading`, aplica o resultado na hora (a lista de projetos é reempurrada) e nunca
+  falha em silêncio — o motivo do motor aparece no próprio diálogo.
+
 ## 5. Aba Sessions
 
 - Título `Sessions`, total e quantas rodando.
