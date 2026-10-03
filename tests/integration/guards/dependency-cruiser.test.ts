@@ -6,6 +6,7 @@ import {
   PROJECT_ROOT,
   ENGINE_SRC_ROOT,
   TEST_TIMEOUT_MS,
+  FULL_TREE_TEST_TIMEOUT_MS,
   deleteTempFile,
   guardFixturePath,
   writeTempFile,
@@ -75,7 +76,7 @@ describe('guard: dependency-cruiser rejects a layer violation', () => {
       const realViolations = violationsOutsideGuardFixtures(result.violations);
       expect(realViolations, result.raw).toEqual([]);
     },
-    TEST_TIMEOUT_MS,
+    FULL_TREE_TEST_TIMEOUT_MS,
   );
 
   it(

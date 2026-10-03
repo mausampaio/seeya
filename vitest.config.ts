@@ -234,21 +234,29 @@ const SERIALIZED_RESOURCE_HEAVY_FILES = [
  *   with 32-38 tests dying at exactly the 5000ms default (every `fs-workspace-repository` and
  *   `changed-file-stats` case, plus single cases in `app/composition`, `deep-generator` and
  *   `spawn-interactive`), and the slowest test that had an explicit 30s budget finishing at 21.8s.
- *   With this deadline, same load, 3 runs out of 3: 0 failures; the slowest test is 23.0s
+ *   With a 30s deadline, same load, 3 runs out of 3: 0 failures; the slowest test is 23.0s
  *   (`commit-msg-hook`, which it already survived) and the slowest of the cases that used to die
  *   at 5s is 13.8s (`fs-workspace-repository`).
- * 30_000ms is that worst observed case plus ~30% margin, and the figure the heaviest files
- * (`commit-msg-hook`, `local-identity`) were already carrying by hand. It is a ceiling for a
- * stuck process, not a wait: a passing test never spends it, so the suite is no slower when the
- * machine is idle. Still far short of "never times out" (AGENTS.md: don't trade away the ability
- * to catch a real hang) — a test that hangs still fails, 30s later, instead of 5s.
- * A file whose own measurement needs more keeps an explicit per-test number with its own
- * justification (e.g. `listing-matches-commit`, 60s); one that wants LESS than this keeps its own
- * tighter budget on purpose (the `termination` cases whose budget is internal-operation + slack,
- * `docs/TESTES.md` § S4-T10).
+ * - the whole `npm run cobertura` step (all four projects and v8 coverage in ONE vitest process,
+ *   which is what `npm run verificar` runs, and heavier than the integration-only runs above
+ *   because the guards' ESLint/dependency-cruiser children compete with it) with only 6 busy-loop
+ *   processes: 1244s wall, and a 30s deadline was NOT enough — `app/daemon-launch` (2 cases,
+ *   31.8s/32.0s, explicit 20s before, 30s after) and `commit-msg-hook` (32.4s) ran out of time.
+ *   Nothing in those cases was stuck: the operation (a real detached daemon, a real `git commit`
+ *   through a hook that starts the compiled CLI) just takes that long when the process table is
+ *   that contended.
+ * 60_000ms is that worst observed case (32.4s) with ~1.8x margin. It is a ceiling for a stuck
+ * process, not a wait: a passing test never spends it, so the suite is no slower when the machine
+ * is idle. Still far short of "never times out" (AGENTS.md: don't trade away the ability to catch
+ * a real hang) — a test that hangs still fails, 60s later, instead of 5s.
+ * What is deliberately NOT widened by this number, each with its own reason (`docs/QUESTOES.md`
+ * Q-112 lists the residual failures measured under the same loads): the `termination` cases,
+ * whose budget is internal-operation + slack and exists to catch a target that never reacts
+ * (`docs/TESTES.md` § S4-T10); the two `*-concurrent-write` cases, an explicit 30s on real fs I/O
+ * (Q-056/Q-058); and the `guards` project, which has its own budget (`guards/_support.ts`).
  */
-const INTEGRATION_TEST_TIMEOUT_MS = 30_000;
-const INTEGRATION_HOOK_TIMEOUT_MS = 30_000;
+const INTEGRATION_TEST_TIMEOUT_MS = 60_000;
+const INTEGRATION_HOOK_TIMEOUT_MS = 60_000;
 
 /**
  * Per-directory coverage (docs/TESTES.md): `core/` 95%, every other production directory 80%.

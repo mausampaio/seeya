@@ -210,7 +210,6 @@ describe.skipIf(process.platform === 'win32')(
           await fixture.cleanup();
         }
       },
-      20_000, // real SIGTERM to a fixture that responds almost immediately — generous, not tight
     );
   },
 );

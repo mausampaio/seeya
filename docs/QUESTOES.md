@@ -9607,3 +9607,33 @@ aberto que a implementação precisou decidir agora.
    da CLI".
 
 **Resposta:** (preenchida pelo PO)
+
+## Q-112 — V2-T85: o prazo padrão dos testes de integração, e o que `docs/TESTES.md` diz sobre alargar prazo
+
+**Bloqueia:** não — registro, solução mínima já aplicada.
+
+**Contexto.** `docs/TESTES.md` § S4-T10 diz "o que NÃO fazer: alargar os prazos de 5s/8s até
+'caber'" — o argumento é sobre os casos de `termination.test.ts`, cujo prazo é orçamento interno
+da operação **mais** uma folga fixa que ainda pega um alvo que nunca reage ao sinal. A V2-T85
+mediu (2026-10-02, 12 processos em laço de CPU sobre 8 núcleos, `integration` +
+`integration-process`): sem carga, 90s e o caso mais lento 3,1s; com carga, ~575s e 32-38 testes
+morrendo no 5000ms padrão do vitest em 3 rodadas de 3 (todo caso de `fs-workspace-repository` e de
+`changed-file-stats`, mais casos soltos de `app/composition`, `deep-generator` e
+`spawn-interactive`). Esses testes não têm prazo próprio pensado como "operação + folga": usam o
+padrão do vitest, e a operação deles (um `git init`/`commit` real, o CLI compilado num gancho) já
+custa 20-60% dele sem contenção nenhuma.
+
+**Decisão aplicada.** `vitest.config.ts#INTEGRATION_TEST_TIMEOUT_MS`/`INTEGRATION_HOOK_TIMEOUT_MS`
+= 30 000ms nos dois projetos de integração (um número só, justificado pela medição, no lugar de
+prazo por arquivo). Os prazos que SÃO "operação + folga" (`termination.test.ts`, 8 000/5 000)
+ficam como estavam, de propósito — o parágrafo de `docs/TESTES.md` continua verdadeiro para eles.
+Depois: 3 rodadas de 3 sem nenhuma falha, mesma carga; o mais lento 23,0s. Também: o
+`fastFailureGraceMs` de 2 000ms dos testes de retomada (`resumption/`) era a janela de
+classificação "falha rápida", que inclui a partida do próprio `node` do falso `claude` — sob carga
+ela estourava e invertia a asserção (não era timeout); virou 20 000ms numa constante nomeada.
+
+**Pergunta.** O PO quer que `docs/TESTES.md` ganhe um parágrafo dizendo que o prazo padrão dos
+projetos de integração é o de `vitest.config.ts` (e por quê), distinguindo-o do prazo "operação +
+folga" de `termination`? Não editei o documento.
+
+**Resposta:** (preenchida pelo PO)

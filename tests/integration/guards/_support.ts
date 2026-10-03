@@ -94,6 +94,21 @@ export const CHILD_PROCESS_BUDGET_MS = 30_000;
  */
 export const TEST_TIMEOUT_MS = CHILD_PROCESS_BUDGET_MS + 15_000;
 
+/**
+ * Budget (ms) for the ONE child that cruises the whole production tree (860 modules,
+ * `runDependencyCruiserOnFullTree`), V2-T85 — every other guard child cruises one fixture file
+ * and keeps `CHILD_PROCESS_BUDGET_MS`. Measured 2026-10-02: unloaded the full-tree control takes
+ * 3.9s (V2-T80 measured the one-file cases at ~2.5s each); inside `npm run cobertura` with only 4
+ * busy-loop processes alongside it was killed by the 30s child budget in 4 runs out of 4 (30.3s,
+ * 30.9s, ...) — not hung, starved: that run also has ESLint children, v8 coverage and every other
+ * project competing. 90s keeps a hung child failing in well under two minutes; see
+ * `FULL_TREE_TEST_TIMEOUT_MS` for the test-side gap.
+ */
+export const FULL_TREE_CHILD_PROCESS_BUDGET_MS = 90_000;
+
+/** The test-side budget for the full-tree control: same 15s gap as `TEST_TIMEOUT_MS` (see there). */
+export const FULL_TREE_TEST_TIMEOUT_MS = FULL_TREE_CHILD_PROCESS_BUDGET_MS + 15_000;
+
 export interface CommandResult {
   exitCode: number | null;
   output: string;
@@ -294,7 +309,10 @@ function extractViolations(jsonOutput: string): {
  * `runDependencyCruiserOnFullTree`, which already hands over a list of FILES (never the `src`
  * directory) to avoid reopening that same problem.
  */
-export function runDependencyCruiser(entries: readonly string[]): DependencyCruiserResult {
+export function runDependencyCruiser(
+  entries: readonly string[],
+  timeoutMs: number = CHILD_PROCESS_BUDGET_MS,
+): DependencyCruiserResult {
   const binary = path.join(
     PROJECT_ROOT,
     'node_modules',
@@ -302,14 +320,10 @@ export function runDependencyCruiser(entries: readonly string[]): DependencyCrui
     'bin',
     'dependency-cruise.mjs',
   );
-  const result = run([
-    binary,
-    ...entries,
-    '--config',
-    '.dependency-cruiser.cjs',
-    '--output-type',
-    'json',
-  ]);
+  const result = run(
+    [binary, ...entries, '--config', '.dependency-cruiser.cjs', '--output-type', 'json'],
+    { timeoutMs },
+  );
   const { violations, jsonValid } = extractViolations(result.output);
   return { violations, jsonValid, raw: result.output };
 }
@@ -409,7 +423,7 @@ export function runDependencyCruiserOnFullTree(): DependencyCruiserResult {
     ...listProductionTsFiles(path.join(PROJECT_ROOT, CLI_SRC_ROOT)),
     ...listProductionTsFiles(path.join(PROJECT_ROOT, APP_SRC_ROOT)),
   ];
-  return runDependencyCruiser(entries);
+  return runDependencyCruiser(entries, FULL_TREE_CHILD_PROCESS_BUDGET_MS);
 }
 
 /**

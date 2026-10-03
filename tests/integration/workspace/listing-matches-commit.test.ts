@@ -48,7 +48,7 @@ describe('pending-change listings match what commitAll commits', () => {
       await removeTempDir(root);
       root = undefined;
     }
-  }, 60_000);
+  });
 
   const know = path.posix.join(PROJECT, 'context', 'know-how.md');
 
@@ -57,7 +57,7 @@ describe('pending-change listings match what commitAll commits', () => {
     root = built.root;
     const entries = await built.workspace.listChangedFilesWithStats(root, PROJECT);
     expect(entries.map((entry) => entry.path)).toEqual([know]);
-  }, 60_000);
+  });
 
   it('listChangedFiles and listChangedFilesWithStatus agree', async () => {
     const built = await buildOldWorkspace();
@@ -65,7 +65,7 @@ describe('pending-change listings match what commitAll commits', () => {
     expect(await built.workspace.listChangedFiles(root, PROJECT)).toEqual([know]);
     const withStatus = await built.workspace.listChangedFilesWithStatus(root, PROJECT);
     expect(withStatus.map((entry) => entry.path)).toEqual([know]);
-  }, 60_000);
+  });
 
   it('the listing equals the files the commit actually contains', async () => {
     const built = await buildOldWorkspace();
@@ -79,5 +79,5 @@ describe('pending-change listings match what commitAll commits', () => {
       ? shown.stdout.split('\n').filter((line) => line.length > 0 && line !== '.gitignore')
       : [];
     expect(committed).toEqual(listed);
-  }, 60_000);
+  });
 });
