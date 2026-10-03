@@ -1216,9 +1216,9 @@ export interface WorkspaceRepository {
    * workspace-commit-guard.ts`'s own docstring has the full reasoning for why session id alone
    * can't. `undefined` for `createProject`/`addRepository`, which never take a lock at all.
    *
-   * `manifestWriteAuthorized` (V2-T73 item 1): `true` for `seeya`'s own four legitimate writes to
+   * `manifestWriteAuthorized` (V2-T73 item 1): `true` for `seeya`'s own legitimate writes to
    * the touched project's `seeya.json` (`createProject`, `addRepository`, `removeRepository`,
-   * `removeProject` — the last one via the whole project directory's own deletion) — folded into
+   * `archiveProject`/`unarchiveProject` (V2-T84), `removeProject` — the last one via the whole project directory's own deletion) — folded into
    * the spawned `git commit`'s own environment (`adapters/workspace/manifest-write-env.ts
    * #buildManifestWriteEnv`) so the workspace's own commit-msg hook can tell those apart from every
    * OTHER commit that happens to touch a project while holding its lock (`open`'s own

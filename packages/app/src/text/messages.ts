@@ -1,4 +1,5 @@
 import { PROJECT_DETAILS_MESSAGES } from './project-details-messages.js';
+import { PROJECT_ARCHIVE_MESSAGES } from './project-archive-messages.js';
 
 /**
  * Every string the interface shows a person, concentrated here (D-028: English; AGENTS.md §
@@ -597,6 +598,11 @@ export const MESSAGES = {
   projectsLockLockedBy: (displaySessionId: string): string =>
     `Locked by session ${displaySessionId}`,
   projectsLockLockedByUnknown: 'Locked by an unidentified session',
+  // V2-T84 (PO's own pending item on this table): the Lock COLUMN's shorter spelling — the full
+  // sentence above stays on the cell's `title` and everywhere else a lock is described. At the
+  // window's 1200px floor the full text lost the last characters of the session id.
+  projectsLockLockedByCompact: (displaySessionId: string): string => `Locked · ${displaySessionId}`,
+  projectsLockLockedByUnknownCompact: 'Locked · unknown',
   projectsActionGoToTab: 'Go to tab',
   projectsActionOpen: 'Open',
   projectsActionReadOnly: 'Read only…',
@@ -650,4 +656,5 @@ export const MESSAGES = {
     'Resumes this session through the same flow as Open: lock, hooks, CLAUDE.md.',
   projectSessionsDismissResult: 'Dismiss',
   ...PROJECT_DETAILS_MESSAGES,
+  ...PROJECT_ARCHIVE_MESSAGES,
 } as const;

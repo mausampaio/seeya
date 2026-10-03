@@ -40,6 +40,14 @@
   min-width: 0;
 }
 
+/* V2-T84: the name, and — for an archived row — its note on a second line. `min-width: 0` lets
+ * both lines ellipsize inside the fixed-layout column. */
+.nameText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 /* The full-width cell under an expanded row: no padding of its own, the sessions panel inside it
  * (`ProjectSessionsPanel.module.css`) owns its spacing and background. */
 .sessionsCell {

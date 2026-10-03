@@ -36,6 +36,7 @@ import { ProjectDetailsHeader } from './ProjectDetailsHeader/index.js';
 import { RepositoriesSection } from './RepositoriesSection/index.js';
 import { AdoptionsSection } from './AdoptionsSection/index.js';
 import { RemoveProjectSection } from './RemoveProjectSection/index.js';
+import { ArchiveSection } from './ArchiveSection/index.js';
 import { useProjectDetails, type ProjectDetailsControls } from './useProjectDetails.js';
 
 function ActionResult(props: { readonly result: ProjectActionResponse }): JSX.Element {
@@ -127,6 +128,13 @@ function ProjectBody(props: { readonly controls: ProjectDetailsControls }): JSX.
         writeBlockedReason={blockedReason}
         pending={controls.pending}
         onRevert={controls.onRevertAdoption}
+      />
+      <ArchiveSection
+        lifecycle={details.lifecycle}
+        writeBlockedReason={blockedReason}
+        pending={controls.pending}
+        onArchive={controls.onArchiveProject}
+        onUnarchive={controls.onUnarchiveProject}
       />
       <RemoveProjectSection
         writeBlockedReason={blockedReason}

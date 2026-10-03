@@ -12,11 +12,29 @@
  * the rest of the file.
  */
 import { z } from 'zod';
-import type { AssociatedRepository, ProjectManifest, ProjectTracker } from '../../core/types.js';
+import type {
+  AssociatedRepository,
+  ProjectLifecycle,
+  ProjectManifest,
+  ProjectTracker,
+} from '../../core/types.js';
+import type { SchemaMigration } from '../storage/schema-version.js';
 
 /** Current `schemaVersion` for a project's `seeya.json`. Passed to `resolveSchemaVersion` by the
- * adapter (`index.ts`) before this module ever sees the document. */
-export const PROJECT_MANIFEST_SCHEMA_VERSION = 1;
+ * adapter (`index.ts`) before this module ever sees the document. V2-T84: 1 → 2 (`archivedAt`/
+ * `archiveNote`, `docs/INTERFACE.md` § 4b). */
+export const PROJECT_MANIFEST_SCHEMA_VERSION = 2;
+
+/** V2-T84: a v1 document has no archive keys at all — nothing to add, since an absent
+ * `archivedAt` already reads as `active` (D-025: the least specific state the evidence supports).
+ * Only the version advances. */
+function migrateProjectManifestV1ToV2(document: Record<string, unknown>): Record<string, unknown> {
+  return { ...document, schemaVersion: 2 };
+}
+
+export const PROJECT_MANIFEST_SCHEMA_MIGRATIONS: Readonly<Record<number, SchemaMigration>> = {
+  1: migrateProjectManifestV1ToV2,
+};
 
 const repositoryIdentitySchema = z
   .object({
@@ -62,8 +80,43 @@ const projectManifestDocumentSchema = z
     defaultHarness: z.string().min(1).nullable(),
     repositories: z.array(associatedRepositorySchema),
     trackers: z.array(projectTrackerSchema),
+    archivedAt: z
+      .string()
+      .refine((value) => !Number.isNaN(new Date(value).getTime()), {
+        message: 'archivedAt must be an ISO 8601 date-time',
+      })
+      .optional(),
+    archiveNote: z.string().optional(),
   })
-  .passthrough();
+  .passthrough()
+  .refine((value) => value.archiveNote === undefined || value.archivedAt !== undefined, {
+    message: 'archiveNote requires archivedAt',
+    path: ['archiveNote'],
+  });
+
+function toLifecycle(raw: {
+  archivedAt?: string | undefined;
+  archiveNote?: string | undefined;
+}): ProjectLifecycle {
+  if (raw.archivedAt === undefined) {
+    return { kind: 'active' };
+  }
+  return {
+    kind: 'archived',
+    archivedAt: new Date(raw.archivedAt),
+    note: raw.archiveNote ?? null,
+  };
+}
+
+/** The inverse of `toLifecycle` — an active project writes NO archive keys at all. */
+function serializeLifecycle(lifecycle: ProjectLifecycle): Record<string, unknown> {
+  if (lifecycle.kind === 'active') {
+    return {};
+  }
+  return lifecycle.note === null
+    ? { archivedAt: lifecycle.archivedAt.toISOString() }
+    : { archivedAt: lifecycle.archivedAt.toISOString(), archiveNote: lifecycle.note };
+}
 
 function toAssociatedRepository(
   raw: z.infer<typeof associatedRepositorySchema>,
@@ -103,6 +156,7 @@ export function parseProjectManifestDocument(raw: unknown): ProjectManifest {
     defaultHarness,
     repositories: repositories.map(toAssociatedRepository),
     trackers: trackers.map(toProjectTracker),
+    lifecycle: toLifecycle(result.data),
   };
 }
 
@@ -118,5 +172,6 @@ export function serializeProjectManifestDocument(
     defaultHarness: manifest.defaultHarness,
     repositories: manifest.repositories.map(serializeAssociatedRepository),
     trackers: manifest.trackers,
+    ...serializeLifecycle(manifest.lifecycle),
   };
 }

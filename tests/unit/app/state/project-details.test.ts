@@ -20,6 +20,7 @@ function manifest(overrides: Partial<ProjectManifest> = {}): ProjectManifest {
     defaultHarness: null,
     repositories: [],
     trackers: [],
+    lifecycle: { kind: 'active' },
     ...overrides,
   };
 }

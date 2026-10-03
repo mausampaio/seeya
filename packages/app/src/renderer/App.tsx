@@ -28,6 +28,8 @@ import {
   RevertAdoptionConfirmDialog,
   DeleteAdoptedCopyConfirmDialog,
   RemoveProjectConfirmDialog,
+  ArchiveProjectConfirmDialog,
+  UnarchiveProjectConfirmDialog,
 } from './features/confirmations/index.js';
 import { ProjectDetailsDialog } from './features/project-details/index.js';
 import { AdoptionDialog } from './features/adoption/index.js';
@@ -104,6 +106,11 @@ export function AppShell() {
       <RevertAdoptionConfirmDialog />
       <DeleteAdoptedCopyConfirmDialog />
       <RemoveProjectConfirmDialog />
+      {/* V2-T84: the archive/unarchive confirmations — opened through
+       * `features/confirmations/archive-confirm-bridge.ts` from the Project details dialog and
+       * the Projects tab's `Unarchive…`, mounted here for the same hidden-pane reason. */}
+      <ArchiveProjectConfirmDialog />
+      <UnarchiveProjectConfirmDialog />
     </>
   );
 }

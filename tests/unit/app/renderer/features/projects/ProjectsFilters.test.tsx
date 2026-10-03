@@ -6,7 +6,7 @@ import { ProjectsFilters } from '../../../../../../packages/app/src/renderer/fea
 afterEach(cleanup);
 
 describe('ProjectsFilters (V2-T67)', () => {
-  it('shows the three filter options, with the current one pressed', () => {
+  it('shows the filter options, with the current one pressed', () => {
     const { getByRole, container } = render(
       <ProjectsFilters
         query=""
@@ -20,6 +20,9 @@ describe('ProjectsFilters (V2-T67)', () => {
       getByRole('radio', { name: 'With a running session' }).getAttribute('aria-pressed'),
     ).toBe('true');
     expect(getByRole('radio', { name: 'Locked' })).not.toBeNull();
+    // V2-T84 (docs/INTERFACE.md § 4b): the fourth option, ordered after the three above.
+    expect(getByRole('radio', { name: 'Archived' })).not.toBeNull();
+    expect(container.querySelector('#projects-filter-archived')).not.toBeNull();
     // Stable ids — this tab's own verification instrumentation (`main/main.ts`) targets these.
     expect(container.querySelector('#projects-filter-all')).not.toBeNull();
     expect(container.querySelector('#projects-filter-running')).not.toBeNull();

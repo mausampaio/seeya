@@ -146,6 +146,25 @@ function ActionCell(props: {
     // nada clicável, nunca um `Resume` que abriria uma segunda cópia do que já está rodando.
     return <div class={cx(styles, 'actionCell')} />;
   }
+  if (action.kind === 'projectArchived') {
+    // V2-T84 (`docs/INTERFACE.md` § 4b): the project is archived — `Resume` stays visible but off,
+    // with the reason as a tooltip (never `disabledReason`, which would add a line to the cell and
+    // double the row's height, same reasoning `Adopt…`'s own `title` below documents).
+    return (
+      <div class={cx(styles, 'actionCell')}>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled
+          title={MESSAGES.sessionsResumeArchivedReason}
+          className={cx(styles, 'actionButton')}
+          onClick={() => props.onRowAction(row)}
+        >
+          {MESSAGES.sessionsActionResume}
+        </Button>
+      </div>
+    );
+  }
   const resumeButton = (
     <Button
       size="sm"

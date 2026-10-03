@@ -1183,7 +1183,21 @@ export interface ProjectManifest {
   readonly defaultHarness: string | null;
   readonly repositories: readonly AssociatedRepository[];
   readonly trackers: readonly ProjectTracker[];
+  readonly lifecycle: ProjectLifecycle;
 }
+
+/**
+ * V2-T84 (`docs/INTERFACE.md` § 4b): archiving is the project's only lifecycle state — a
+ * discriminated union (D-024), never two loose optional fields (`archivedAt` without `note`, or the
+ * reverse, would be representable). `note` is `null` when none was given. On disk this is
+ * `archivedAt`/`archiveNote` in `seeya.json`, present only for `archived`
+ * (`adapters/workspace/project-manifest-schema.ts`); a manifest without them reads as `active`
+ * (D-025). Archiving changes visibility only — nothing about session discovery or the End day
+ * capture looks at this.
+ */
+export type ProjectLifecycle =
+  | { readonly kind: 'active' }
+  | { readonly kind: 'archived'; readonly archivedAt: Date; readonly note: string | null };
 
 /**
  * V2-T27: one file `WorkspaceRepository.writeProjectSkeleton` (`core/ports.ts`) writes into a

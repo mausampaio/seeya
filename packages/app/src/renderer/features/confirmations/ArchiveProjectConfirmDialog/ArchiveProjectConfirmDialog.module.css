@@ -1,0 +1,5 @@
+/* V2-T84 — width only; the shared `.seeya-dialog` chrome and `Dialog`'s own footer shape do the
+ * rest. `display` is deliberately NOT set (`tests/integration/guards/dialog-display-css.test.ts`). */
+.dialog {
+  width: min(520px, calc(100vw - var(--seeya-space-8)));
+}

@@ -36,7 +36,8 @@ export function formatProjectNotFoundLine(projectId: string): string {
 
 /** What the refused command was about to do, completing "refusing to ...": `remove it`,
  * `change it`, or `revert`. */
-export type LockedRefusalAction = 'remove it' | 'change it' | 'revert';
+export type LockedRefusalAction =
+  'remove it' | 'change it' | 'revert' | 'archive it' | 'unarchive it';
 
 export function formatProjectLockedRefusalLine(
   projectId: string,
@@ -194,4 +195,55 @@ export function renderDeleteAdoptedCopyQuestionLine(info: {
         `${info.growth.lastWriteText}`
       : "has no transcript we could find, so we can't tell whether it was written to since it was adopted";
   return `The adopted copy (session ${info.forkSessionIdText}) ${description}. Delete it anyway?`;
+}
+
+/** V2-T84: the date part of an archive timestamp, `YYYY-MM-DD` (UTC) — the same text on every
+ * surface (CLI lines and window rows), so a date never reads differently in the two. */
+export function formatArchiveDate(archivedAt: Date): string {
+  return archivedAt.toISOString().slice(0, 10);
+}
+
+/** V2-T84: what a project's archive state looks like in a row or a `show` — `Archived on
+ * 2026-10-02` plus ` — <note>` when a note was given. */
+export function formatArchiveStateText(
+  archivedAt: Date,
+  note: string | null,
+  /** The window passes its own locale day (same as the Last activity column); the CLI keeps ISO. */
+  dateText: string = formatArchiveDate(archivedAt),
+): string {
+  const base = `Archived on ${dateText}`;
+  return note === null ? base : `${base} — ${note}`;
+}
+
+export function formatProjectArchivedLine(projectId: string, note: string | null): string {
+  return (
+    `Project "${projectId}" archived${note === null ? '' : ` — ${note}`}. It is hidden from the ` +
+    'day-to-day views; nothing was deleted. Run "seeya project unarchive ' +
+    `${projectId}" to bring it back.`
+  );
+}
+
+export function formatProjectAlreadyArchivedLine(
+  projectId: string,
+  archivedAt: Date,
+  dateText: string = formatArchiveDate(archivedAt),
+): string {
+  return `Project "${projectId}" is already archived (since ${dateText}).`;
+}
+
+export function formatProjectUnarchivedLine(projectId: string): string {
+  return `Project "${projectId}" unarchived. It is back in the day-to-day views.`;
+}
+
+export function formatProjectAlreadyActiveLine(projectId: string): string {
+  return `Project "${projectId}" is not archived — nothing to do.`;
+}
+
+/** V2-T84: `open` (and `open --resume`) refuse an archived project before touching anything —
+ * the line says how to bring it back. */
+export function formatArchivedProjectRefusalLine(projectId: string): string {
+  return (
+    `seeya: project "${projectId}" is archived — run "seeya project unarchive ${projectId}" ` +
+    'first, then open it again.'
+  );
 }

@@ -18,11 +18,14 @@ import { ipcMain, type BrowserWindow } from 'electron';
 import { addRepository } from '@seeya-ai/engine/application/repository-association.js';
 import { removeRepository } from '@seeya-ai/engine/application/project-remove-repo.js';
 import { removeProject } from '@seeya-ai/engine/application/project-remove.js';
+import { archiveProject, unarchiveProject } from '@seeya-ai/engine/application/project-archive.js';
 import { revertAdoption } from '@seeya-ai/engine/application/project-revert-adoption.js';
 import { renderDeleteAdoptedCopyQuestionLine } from '@seeya-ai/engine/core/project-management-message.js';
 import { CHANNELS } from '../ipc/channels.js';
 import type {
   AddProjectRepositoryRequest,
+  ArchiveProjectRequest,
+  UnarchiveProjectRequest,
   AnswerDeleteAdoptedCopyConfirmRequest,
   AnswerRemoveProjectConfirmRequest,
   AnswerRevertAdoptionConfirmRequest,
@@ -38,6 +41,7 @@ import type {
 } from '../ipc/channels.js';
 import {
   buildAddRepositoryDeps,
+  buildArchiveProjectDeps,
   buildRemoveProjectDeps,
   buildRemoveRepositoryDeps,
   buildRevertAdoptionDeps,
@@ -48,6 +52,8 @@ import { computeDisplaySessionIds } from '@seeya-ai/engine/application/session-i
 import { PendingConfirmations } from '../resume/pending-confirmations.js';
 import {
   formatAddRepositoryActionResult,
+  formatArchiveProjectActionResult,
+  formatUnarchiveProjectActionResult,
   formatRemoveProjectActionResult,
   formatRemoveRepositoryActionResult,
   formatRevertAdoptionActionResult,
@@ -176,6 +182,33 @@ export function wireProjectDetailsIpc(
       );
       await pushProjectsUpdate();
       return formatRemoveProjectActionResult(result);
+    },
+  );
+
+  ipcMain.handle(
+    CHANNELS.archiveProject,
+    async (_event, request: ArchiveProjectRequest): Promise<ProjectDetailsActionResponse> => {
+      const identity = await context.resolveProcessIdentity();
+      const result = await archiveProject(
+        buildArchiveProjectDeps(context, identity),
+        request.projectId,
+        request.note ?? undefined,
+      );
+      await pushProjectsUpdate();
+      return formatArchiveProjectActionResult(result);
+    },
+  );
+
+  ipcMain.handle(
+    CHANNELS.unarchiveProject,
+    async (_event, request: UnarchiveProjectRequest): Promise<ProjectDetailsActionResponse> => {
+      const identity = await context.resolveProcessIdentity();
+      const result = await unarchiveProject(
+        buildArchiveProjectDeps(context, identity),
+        request.projectId,
+      );
+      await pushProjectsUpdate();
+      return formatUnarchiveProjectActionResult(result);
     },
   );
 

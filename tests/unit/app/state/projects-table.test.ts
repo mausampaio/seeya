@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildProjectsTableRows } from '../../../../packages/app/src/state/projects-table.js';
+import {
+  buildProjectsTableRows,
+  isActiveProject,
+} from '../../../../packages/app/src/state/projects-table.js';
 import type { ProjectPanelRow } from '../../../../packages/app/src/state/projects-panel.js';
 
 function project(overrides: Partial<ProjectPanelRow> = {}): ProjectPanelRow {
@@ -8,6 +11,7 @@ function project(overrides: Partial<ProjectPanelRow> = {}): ProjectPanelRow {
     name: 'Auth hardening',
     lockText: 'unlocked',
     lock: { kind: 'unlocked' },
+    lifecycle: { kind: 'active' },
     sessions: [],
     favorite: false,
     repositoryCount: 0,
@@ -15,6 +19,17 @@ function project(overrides: Partial<ProjectPanelRow> = {}): ProjectPanelRow {
     ...overrides,
   };
 }
+
+const RUNNING_SESSION = {
+  sessionId: '11111111-1111-4111-8111-111111111111',
+  displaySessionId: '11111111',
+  name: 'alpha',
+  cwd: '/ws/alpha',
+  state: 'alive',
+  stateLabel: 'alive',
+  lastActivity: null,
+  matchedTabId: null,
+} as const;
 
 describe('buildProjectsTableRows (V2-T67)', () => {
   it('with filter "all" and no query, keeps every row', () => {
@@ -110,5 +125,58 @@ describe('buildProjectsTableRows (V2-T67)', () => {
     expect(
       buildProjectsTableRows([unknown, unknownB], 'all', '').map((row) => row.projectId),
     ).toEqual(['unknown', 'unknown-b']);
+  });
+});
+
+describe('buildProjectsTableRows with archived projects (V2-T84)', () => {
+  const archived = (overrides: Partial<ProjectPanelRow> = {}): ProjectPanelRow =>
+    project({
+      projectId: 'old-thing',
+      name: 'Old thing',
+      lifecycle: {
+        kind: 'archived',
+        archivedAt: new Date('2026-10-02T00:00:00.000Z'),
+        note: 'Finished',
+      },
+      ...overrides,
+    });
+
+  it('"all", "running" and "locked" look only at ACTIVE projects', () => {
+    const rows = [
+      project({
+        projectId: 'live',
+        sessions: [{ ...RUNNING_SESSION }],
+        lock: { kind: 'lockedByOther', holderDisplaySessionId: 'abcd1234' },
+      }),
+      archived({
+        sessions: [{ ...RUNNING_SESSION }],
+        lock: { kind: 'lockedByOther', holderDisplaySessionId: 'abcd1234' },
+      }),
+    ];
+    for (const filter of ['all', 'running', 'locked'] as const) {
+      expect(buildProjectsTableRows(rows, filter, '').map((row) => row.projectId)).toEqual([
+        'live',
+      ]);
+    }
+  });
+
+  it('"archived" shows only the archived ones', () => {
+    const rows = [project({ projectId: 'live' }), archived()];
+    expect(buildProjectsTableRows(rows, 'archived', '').map((row) => row.projectId)).toEqual([
+      'old-thing',
+    ]);
+  });
+
+  it('the search applies inside "archived", and never finds an archived project under "all"', () => {
+    const rows = [archived(), archived({ projectId: 'older', name: 'Older' })];
+    expect(buildProjectsTableRows(rows, 'archived', 'older').map((row) => row.projectId)).toEqual([
+      'older',
+    ]);
+    expect(buildProjectsTableRows(rows, 'all', 'older')).toEqual([]);
+  });
+
+  it('isActiveProject reads the lifecycle', () => {
+    expect(isActiveProject(project())).toBe(true);
+    expect(isActiveProject(archived())).toBe(false);
   });
 });

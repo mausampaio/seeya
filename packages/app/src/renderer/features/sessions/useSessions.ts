@@ -80,7 +80,13 @@ export type DirectIdSearchState =
  * always shown as having no project, even on the rare chance its `cwd` happens to match one
  * (D-025: only evidence this window actually computed counts). */
 function toSessionsPanelRow(session: ProjectPanelOtherSessionRow): SessionsPanelRow {
-  return { ...session, projectId: null, projectName: null, adopt: session.adopt };
+  return {
+    ...session,
+    projectId: null,
+    projectName: null,
+    projectArchived: false,
+    adopt: session.adopt,
+  };
 }
 
 export interface SessionsControls {

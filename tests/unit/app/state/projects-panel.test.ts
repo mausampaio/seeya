@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildProjectsPanelData,
+  formatProjectRowLockCellText,
   formatProjectRowLockText,
   resolveProjectRowAction,
 } from '../../../../packages/app/src/state/projects-panel.js';
@@ -28,6 +29,7 @@ function manifest(overrides: Partial<ProjectManifest> = {}): ProjectManifest {
     defaultHarness: 'claude',
     repositories: [],
     trackers: [],
+    lifecycle: { kind: 'active' },
     ...overrides,
   };
 }
@@ -328,14 +330,37 @@ describe('buildProjectsPanelData (V2-T30 item 1)', () => {
     });
 
     it('resolveProjectRowAction/formatProjectRowLockText follow the lock kind', () => {
-      expect(resolveProjectRowAction({ kind: 'unlocked' })).toEqual({ kind: 'open' });
-      expect(resolveProjectRowAction({ kind: 'openHere', tabId: 't' })).toEqual({
+      const active = { kind: 'active' } as const;
+      expect(resolveProjectRowAction({ lock: { kind: 'unlocked' }, lifecycle: active })).toEqual({
+        kind: 'open',
+      });
+      expect(
+        resolveProjectRowAction({ lock: { kind: 'openHere', tabId: 't' }, lifecycle: active }),
+      ).toEqual({
         kind: 'goToTab',
         tabId: 't',
       });
       expect(
-        resolveProjectRowAction({ kind: 'lockedByOther', holderDisplaySessionId: null }),
+        resolveProjectRowAction({
+          lock: { kind: 'lockedByOther', holderDisplaySessionId: null },
+          lifecycle: active,
+        }),
       ).toEqual({ kind: 'readOnly' });
+      // V2-T84: an archived project's one action is Unarchive…, whatever the lock says.
+      const archived = {
+        kind: 'archived',
+        archivedAt: new Date('2026-10-02T00:00:00.000Z'),
+        note: null,
+      } as const;
+      for (const lock of [
+        { kind: 'unlocked' },
+        { kind: 'openHere', tabId: 't' },
+        { kind: 'lockedByOther', holderDisplaySessionId: null },
+      ] as const) {
+        expect(resolveProjectRowAction({ lock, lifecycle: archived })).toEqual({
+          kind: 'unarchive',
+        });
+      }
       expect(formatProjectRowLockText({ kind: 'unlocked' })).toBe('Unlocked');
       expect(formatProjectRowLockText({ kind: 'openHere', tabId: 't' })).toBe(
         'Open in this window',
@@ -466,5 +491,20 @@ describe('buildProjectsPanelData (V2-T30 item 1)', () => {
       ]);
       expect(data.ignoredProjects.map((row) => row.projectId)).toEqual(['a', 'b']);
     });
+  });
+});
+
+describe("formatProjectRowLockCellText (V2-T84, the Lock column's compact spelling)", () => {
+  it('spells the locked case "Locked · <id>" and leaves the other two as the full text', () => {
+    expect(
+      formatProjectRowLockCellText({ kind: 'lockedByOther', holderDisplaySessionId: '33333333' }),
+    ).toBe('Locked · 33333333');
+    expect(
+      formatProjectRowLockCellText({ kind: 'lockedByOther', holderDisplaySessionId: null }),
+    ).toBe('Locked · unknown');
+    expect(formatProjectRowLockCellText({ kind: 'unlocked' })).toBe('Unlocked');
+    expect(formatProjectRowLockCellText({ kind: 'openHere', tabId: 't' })).toBe(
+      'Open in this window',
+    );
   });
 });

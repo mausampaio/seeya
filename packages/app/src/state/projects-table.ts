@@ -5,8 +5,14 @@
  */
 import type { ProjectPanelRow } from './projects-panel.js';
 
-/** `docs/INTERFACE.md` § 4's own three filters — a closed set, never a free string (D-024). */
-export type ProjectsTableFilter = 'all' | 'running' | 'locked';
+/** `docs/INTERFACE.md` § 4's own three filters plus § 4b's `archived` (V2-T84) — a closed set,
+ * never a free string (D-024). `all`/`running`/`locked` (and the search, and the tab's count) look
+ * only at ACTIVE projects; `archived` shows only the archived ones. */
+export type ProjectsTableFilter = 'all' | 'running' | 'locked' | 'archived';
+
+export function isActiveProject(row: ProjectPanelRow): boolean {
+  return row.lifecycle.kind === 'active';
+}
 
 /** A project counts as "running" when at least one of its OWN sessions has a live process
  * (`alive`/`idle` — `unknown` means "no pid to check", never "running", D-016/D-025), the same
@@ -16,6 +22,12 @@ function hasRunningSession(row: ProjectPanelRow): boolean {
 }
 
 function matchesFilter(row: ProjectPanelRow, filter: ProjectsTableFilter): boolean {
+  if (filter === 'archived') {
+    return !isActiveProject(row);
+  }
+  if (!isActiveProject(row)) {
+    return false;
+  }
   switch (filter) {
     case 'all':
       return true;

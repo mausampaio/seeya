@@ -114,6 +114,54 @@ describe('openProject', () => {
     expect(result).toEqual({ kind: 'notFound', projectId: 'ghost' });
   });
 
+  describe('an archived project (V2-T84)', () => {
+    async function archiveAuthHardening(): Promise<void> {
+      const manifest = await workspace.readProjectManifest(WORKSPACE_ROOT, 'auth-hardening');
+      if (manifest === null) {
+        throw new Error('fixture project missing');
+      }
+      await workspace.writeProjectManifest(WORKSPACE_ROOT, 'auth-hardening', {
+        ...manifest,
+        lifecycle: {
+          kind: 'archived',
+          archivedAt: new Date('2026-10-01T00:00:00.000Z'),
+          note: 'Finished',
+        },
+      });
+    }
+
+    it('refuses before any hook, CLAUDE.md, lock or launch side effect', async () => {
+      await archiveAuthHardening();
+      const harnessLauncher = new FakeHarnessLauncher();
+      const projectLock = new FakeProjectLock();
+      const hooksBefore = workspace.installedCommitMsgHookCalls.length;
+      const harnessHooksBefore = workspace.installedHarnessHookCalls.length;
+
+      const result = await openProject(
+        buildOpenDeps(storage, workspace, { harnessLauncher, projectLock }),
+        'auth-hardening',
+        'claude',
+      );
+
+      expect(result).toEqual({
+        kind: 'projectArchived',
+        projectId: 'auth-hardening',
+        archivedAt: new Date('2026-10-01T00:00:00.000Z'),
+        note: 'Finished',
+      });
+      expect(harnessLauncher.calls).toHaveLength(0);
+      expect(workspace.installedCommitMsgHookCalls).toHaveLength(hooksBefore);
+      expect(workspace.installedHarnessHookCalls).toHaveLength(harnessHooksBefore);
+      expect(await projectLock.read(WORKSPACE_ROOT, 'auth-hardening')).toBeNull();
+    });
+
+    it('an archived project with no default harness is still reported archived, not noHarnessChosen', async () => {
+      await archiveAuthHardening();
+      const result = await openProject(buildOpenDeps(storage, workspace), 'auth-hardening');
+      expect(result.kind).toBe('projectArchived');
+    });
+  });
+
   it('reports noHarnessChosen when the project has no defaultHarness and none is given', async () => {
     const result = await openProject(buildOpenDeps(storage, workspace), 'auth-hardening');
     expect(result).toEqual({ kind: 'noHarnessChosen', projectId: 'auth-hardening' });

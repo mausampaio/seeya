@@ -99,6 +99,8 @@ export function createFakeSeeyaApi(overrides: Partial<SeeyaApi> = {}): SeeyaApi 
     removeProjectRepository: neverCalled('removeProjectRepository'),
     revertProjectAdoption: neverCalled('revertProjectAdoption'),
     removeProject: neverCalled('removeProject'),
+    archiveProject: neverCalled('archiveProject'),
+    unarchiveProject: neverCalled('unarchiveProject'),
     onConfirmRevertAdoptionRequest: vi.fn(),
     answerRevertAdoptionConfirm: vi.fn(),
     onConfirmDeleteAdoptedCopyRequest: vi.fn(),

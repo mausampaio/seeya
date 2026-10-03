@@ -21,6 +21,7 @@ function row(overrides: Partial<SessionsPanelRow> = {}): SessionsPanelRow {
     matchedTabId: null,
     projectId: null,
     projectName: null,
+    projectArchived: false,
     adopt: { kind: 'available' },
     ...overrides,
   };
@@ -165,6 +166,21 @@ describe('resolveSessionRowAction (V2-T68)', () => {
       row({ state: 'ended', projectId: 'p', projectName: 'P', adopt: null }),
     );
     expect(action).toEqual({ kind: 'projectResume', projectId: 'p' });
+  });
+
+  it('a not-running session of an ARCHIVED project is "projectArchived" — Resume off, never a click that fails later (V2-T84)', () => {
+    const action = resolveSessionRowAction(
+      row({ state: 'ended', projectId: 'p', projectName: 'P', projectArchived: true, adopt: null }),
+    );
+    expect(action).toEqual({ kind: 'projectArchived', projectId: 'p' });
+  });
+
+  it('an archived project\'s session open in a tab is still "goToTab" (the tab exists, nothing to resume)', () => {
+    expect(
+      resolveSessionRowAction(
+        row({ projectId: 'p', projectArchived: true, matchedTabId: 'tab-1', adopt: null }),
+      ),
+    ).toEqual({ kind: 'goToTab', tabId: 'tab-1' });
   });
 
   it('a project session open in a tab is still "goToTab", and a running one has no action', () => {

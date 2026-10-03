@@ -16,6 +16,7 @@ const FAVORITE_PROJECT: ProjectsPanelData = {
       name: 'Payments webhooks',
       lockText: 'unlocked',
       lock: { kind: 'unlocked' },
+      lifecycle: { kind: 'active' },
       sessions: [],
       favorite: true,
       repositoryCount: 0,

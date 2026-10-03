@@ -19,6 +19,7 @@ function row(overrides: Partial<SessionsPanelRow> = {}): SessionsPanelRow {
     matchedTabId: null,
     projectId: null,
     projectName: null,
+    projectArchived: false,
     adopt: { kind: 'available' },
     ...overrides,
   };
@@ -171,5 +172,30 @@ describe('SessionsTable (V2-T68)', () => {
       const total = fixedKeys.reduce((sum, key) => sum + widthOf(key), 0);
       expect(total).toBeLessThanOrEqual(660);
     });
+  });
+});
+
+describe('SessionsTable archived project (V2-T84, docs/INTERFACE.md § 4b)', () => {
+  it('keeps the session listed with its project name, with Resume off and the reason as a tooltip', () => {
+    const onRowAction = vi.fn();
+    const r = row({
+      state: 'ended',
+      projectId: 'old-thing',
+      projectName: 'Old thing',
+      projectArchived: true,
+      adopt: null,
+    });
+    const { getByText, queryByText } = render(
+      <SessionsTable {...BASE_PROPS} rows={[r]} onRowAction={onRowAction} />,
+    );
+    expect(getByText('Old thing')).not.toBeNull();
+    expect(queryByText('Adopt…')).toBeNull();
+    const button = getByText('Resume').closest('button') as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    expect(button.getAttribute('title')).toBe(
+      'This project is archived. Unarchive it to resume its sessions.',
+    );
+    fireEvent.click(button);
+    expect(onRowAction).not.toHaveBeenCalled();
   });
 });

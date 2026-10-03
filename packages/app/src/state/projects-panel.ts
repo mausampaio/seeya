@@ -10,7 +10,12 @@
 import { formatLockHolderDescription } from '@seeya-ai/engine/core/project-lock-message.js';
 import { formatSessionStateLabel } from '@seeya-ai/engine/core/session-state-label.js';
 import type { PathPlatformHint } from '@seeya-ai/engine/core/cwd-normalization.js';
-import type { AdoptionRecord, ProjectManifest, SessionState } from '@seeya-ai/engine/core/types.js';
+import type {
+  AdoptionRecord,
+  ProjectLifecycle,
+  ProjectManifest,
+  SessionState,
+} from '@seeya-ai/engine/core/types.js';
 import type { RejectedDiscoveryRecord } from '@seeya-ai/engine/core/ports.js';
 import type { ProjectLockStatus } from '@seeya-ai/engine/application/project-lock.js';
 import { computeDisplaySessionIds } from '@seeya-ai/engine/application/session-id-display.js';
@@ -84,7 +89,10 @@ export type ProjectRowLock =
 export type ProjectRowAction =
   | { readonly kind: 'goToTab'; readonly tabId: string }
   | { readonly kind: 'open' }
-  | { readonly kind: 'readOnly' };
+  | { readonly kind: 'readOnly' }
+  /** V2-T84 (`docs/INTERFACE.md` § 4b): an archived project's row never offers `Open`/`Resume` —
+   * the one action is `Unarchive…`, whatever the lock says. */
+  | { readonly kind: 'unarchive' };
 
 export interface ProjectPanelRow {
   readonly projectId: string;
@@ -97,6 +105,10 @@ export interface ProjectPanelRow {
   readonly lockText: string;
   /** V2-T67 — see this field's own type's docstring above. */
   readonly lock: ProjectRowLock;
+  /** V2-T84: `ProjectManifest.lifecycle`, carried whole (D-024) — an archived project is hidden
+   * from the day-to-day views (`state/projects-table.ts`, `state/sidebar-summary.ts`) but its
+   * sessions stay in `sessions` (and in the Sessions tab): archiving changes visibility only. */
+  readonly lifecycle: ProjectLifecycle;
   readonly sessions: readonly ProjectPanelSessionRow[];
   /** V2-T63: whether this project is starred on THIS machine
    * (`@seeya-ai/engine/core/favorite-projects.js`'s own `favorite-projects.json`, read once per
@@ -140,9 +152,16 @@ function resolveProjectRowLock(
 
 /**
  * @example
- * resolveProjectRowAction({ kind: 'unlocked' }) // { kind: 'open' }
+ * resolveProjectRowAction({ lock: { kind: 'unlocked' }, lifecycle: { kind: 'active' } })
+ * // { kind: 'open' }
  */
-export function resolveProjectRowAction(lock: ProjectRowLock): ProjectRowAction {
+export function resolveProjectRowAction(
+  row: Pick<ProjectPanelRow, 'lock' | 'lifecycle'>,
+): ProjectRowAction {
+  if (row.lifecycle.kind === 'archived') {
+    return { kind: 'unarchive' };
+  }
+  const lock = row.lock;
   switch (lock.kind) {
     case 'openHere':
       return { kind: 'goToTab', tabId: lock.tabId };
@@ -169,6 +188,23 @@ export function formatProjectRowLockText(lock: ProjectRowLock): string {
         ? MESSAGES.projectsLockLockedByUnknown
         : MESSAGES.projectsLockLockedBy(lock.holderDisplaySessionId);
   }
+}
+
+/** The Lock COLUMN's own text (V2-T84): the same three facts as `formatProjectRowLockText`, with
+ * the locked case spelled `Locked · <id>` so the session id is never cut at the table's narrowest
+ * width — the full sentence stays on the cell's `title`.
+ *
+ * @example
+ * formatProjectRowLockCellText({ kind: 'lockedByOther', holderDisplaySessionId: '33333333' })
+ * // 'Locked · 33333333'
+ */
+export function formatProjectRowLockCellText(lock: ProjectRowLock): string {
+  if (lock.kind !== 'lockedByOther') {
+    return formatProjectRowLockText(lock);
+  }
+  return lock.holderDisplaySessionId === null
+    ? MESSAGES.projectsLockLockedByUnknownCompact
+    : MESSAGES.projectsLockLockedByCompact(lock.holderDisplaySessionId);
 }
 
 /** Every distinct `sessionId` currently holding a project's lock, across the whole push — the
@@ -294,6 +330,12 @@ export function formatLockText(status: ProjectLockStatus): string {
   }
 }
 
+/** V2-T84: a DAY (no time) in the window's locale format — the same `toLocale…` family
+ * `formatSessionLastActivityText` uses for the Last activity column. Used for the archive date. */
+export function formatArchiveDayText(archivedAt: Date): string {
+  return archivedAt.toLocaleDateString();
+}
+
 /** V2-T55 item 3/4 — the modal's/search result's own "last activity" text, exported so both reuse
  * the identical formatting instead of each rendering `Date` differently. `null` is absence of
  * data (D-025), never a real instant; `toLocaleString()` gives a date AND time, per the task's
@@ -376,6 +418,7 @@ export function buildProjectsPanelData(
       name: project.manifest.name,
       lockText: formatLockText(status),
       lock: resolveProjectRowLock(sessions, status, holderDisplaySessionIds),
+      lifecycle: project.manifest.lifecycle,
       sessions,
       favorite: favoriteProjectIds.has(project.manifest.id),
       repositoryCount: project.manifest.repositories.length,

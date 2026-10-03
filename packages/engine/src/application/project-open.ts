@@ -194,6 +194,14 @@ export type OpenProjectResult =
   | { readonly kind: 'invalidId'; readonly projectId: string }
   | { readonly kind: 'notFound'; readonly projectId: string }
   | { readonly kind: 'noHarnessChosen'; readonly projectId: string }
+  /** V2-T84: an archived project is never opened (nor resumed) — refused before any hook, lock or
+   * `CLAUDE.md` side effect; the caller says how to unarchive. */
+  | {
+      readonly kind: 'projectArchived';
+      readonly projectId: string;
+      readonly archivedAt: Date;
+      readonly note: string | null;
+    }
   | { readonly kind: 'unsupportedHarness'; readonly harness: string }
   | { readonly kind: 'failedToStart'; readonly projectId: string; readonly harness: string }
   /** V2-T35 item 1: the person was asked (the warning was already on screen) and explicitly said
@@ -530,6 +538,12 @@ export async function openProject(
   const manifest = await deps.workspace.readProjectManifest(root, projectId);
   if (manifest === null) {
     return { kind: 'notFound', projectId };
+  }
+  // V2-T84: before the harness is even resolved and before every hook/lock/CLAUDE.md side effect
+  // below — an archived project is only reachable again through `unarchive`.
+  if (manifest.lifecycle.kind === 'archived') {
+    const { archivedAt, note } = manifest.lifecycle;
+    return { kind: 'projectArchived', projectId, archivedAt, note };
   }
 
   const harness = resolveHarness(manifest, harnessOverride);

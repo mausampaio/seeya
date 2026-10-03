@@ -24,6 +24,7 @@ import type { ProjectActionResponse } from '../../../state/project-details-resul
 import type { PathPlatformHint } from '@seeya-ai/engine/core/cwd-normalization.js';
 import { MESSAGES } from '../../../text/messages.js';
 import { registerProjectDetailsOpener } from './project-details-bridge.js';
+import { openArchiveConfirm } from '../confirmations/archive-confirm-bridge.js';
 
 const AWAITING_FIRST_PROJECTS_PANEL: ProjectsPanelData = {
   projects: [],
@@ -36,7 +37,8 @@ export type PendingProjectAction =
   | { readonly kind: 'addRepository' }
   | { readonly kind: 'removeRepository'; readonly name: string }
   | { readonly kind: 'revertAdoption'; readonly forkSessionId: string }
-  | { readonly kind: 'removeProject' };
+  | { readonly kind: 'removeProject' }
+  | { readonly kind: 'unarchiveProject' };
 
 export interface ProjectDetailsControls {
   readonly open: boolean;
@@ -59,6 +61,10 @@ export interface ProjectDetailsControls {
   readonly onRemoveRepository: (name: string) => void;
   readonly onRevertAdoption: (forkSessionId: string) => void;
   readonly onRemoveProject: () => void;
+  /** V2-T84: opens the archive confirmation (with the optional note) — the call itself runs in
+   * that dialog. */
+  readonly onArchiveProject: () => void;
+  readonly onUnarchiveProject: () => void;
 }
 
 function describeError(error: unknown): string {
@@ -204,6 +210,20 @@ export function useProjectDetails(): ProjectDetailsControls {
     void runAction({ kind: 'removeProject' }, () => api.removeProject({ projectId }));
   }, [api, projectId, runAction]);
 
+  const onArchiveProject = useCallback(() => {
+    if (projectId === null || details === null || details.kind !== 'found') {
+      return;
+    }
+    openArchiveConfirm({ projectId, name: details.name });
+  }, [projectId, details]);
+
+  const onUnarchiveProject = useCallback(() => {
+    if (projectId === null) {
+      return;
+    }
+    void runAction({ kind: 'unarchiveProject' }, () => api.unarchiveProject({ projectId }));
+  }, [api, projectId, runAction]);
+
   return {
     open,
     projectId,
@@ -220,5 +240,7 @@ export function useProjectDetails(): ProjectDetailsControls {
     onRemoveRepository,
     onRevertAdoption,
     onRemoveProject,
+    onArchiveProject,
+    onUnarchiveProject,
   };
 }

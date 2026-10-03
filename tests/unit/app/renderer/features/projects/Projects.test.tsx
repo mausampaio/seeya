@@ -14,6 +14,7 @@ function project(overrides: Partial<ProjectPanelRow> = {}): ProjectPanelRow {
     name: 'Auth hardening',
     lockText: 'unlocked',
     lock: { kind: 'unlocked' },
+    lifecycle: { kind: 'active' },
     sessions: [],
     favorite: false,
     repositoryCount: 0,
@@ -108,5 +109,63 @@ describe('Projects (V2-T67)', () => {
     registerNewProjectDialogOpener(opener);
     fireEvent.click(getByText('New project'));
     expect(opener).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Projects with archived projects (V2-T84, docs/INTERFACE.md § 4b)', () => {
+  const ARCHIVED = {
+    kind: 'archived',
+    archivedAt: new Date('2026-10-02T10:00:00.000Z'),
+    note: 'Finished — shipped',
+  } as const;
+
+  function install(rows: readonly ProjectPanelRow[]): void {
+    window.seeya = createFakeSeeyaApi({
+      getProjectsPanel: vi.fn(() =>
+        Promise.resolve({ projects: rows, otherSessionsByDirectory: [], ignoredProjects: [] }),
+      ),
+    });
+  }
+
+  it('the default view and the header count consider only the active projects', async () => {
+    install([
+      project({ projectId: 'a', name: 'Alpha' }),
+      project({ projectId: 'old', name: 'Old thing', lifecycle: ARCHIVED }),
+    ]);
+    const { getByText, queryByText } = render(<Projects />);
+    await waitFor(() => expect(getByText('1 project')).not.toBeNull());
+    expect(getByText('Alpha')).not.toBeNull();
+    expect(queryByText('Old thing')).toBeNull();
+  });
+
+  it('the Archived filter shows only the archived ones, with date and note', async () => {
+    install([
+      project({ projectId: 'a', name: 'Alpha' }),
+      project({ projectId: 'old', name: 'Old thing', lifecycle: ARCHIVED }),
+    ]);
+    const { getByText, queryByText, getByRole } = render(<Projects />);
+    await waitFor(() => expect(getByText('Alpha')).not.toBeNull());
+    fireEvent.click(getByRole('radio', { name: 'Archived' }));
+    await waitFor(() => expect(getByText('Old thing')).not.toBeNull());
+    expect(queryByText('Alpha')).toBeNull();
+    expect(getByText(new Date('2026-10-02T10:00:00.000Z').toLocaleDateString())).not.toBeNull();
+    expect(getByText('Finished — shipped')).not.toBeNull();
+    expect(getByText('Unarchive…')).not.toBeNull();
+  });
+
+  it('the Archived filter with nothing archived says so, instead of the generic no-match text', async () => {
+    install([project({ projectId: 'a', name: 'Alpha' })]);
+    const { getByText, getByRole } = render(<Projects />);
+    await waitFor(() => expect(getByText('Alpha')).not.toBeNull());
+    fireEvent.click(getByRole('radio', { name: 'Archived' }));
+    await waitFor(() => expect(getByText('No archived projects')).not.toBeNull());
+  });
+
+  it('a workspace with only archived projects still offers the filters (the Archived one reaches them)', async () => {
+    install([project({ projectId: 'old', name: 'Old thing', lifecycle: ARCHIVED })]);
+    const { getByText, getByRole } = render(<Projects />);
+    await waitFor(() => expect(getByText('0 projects')).not.toBeNull());
+    fireEvent.click(getByRole('radio', { name: 'Archived' }));
+    await waitFor(() => expect(getByText('Old thing')).not.toBeNull());
   });
 });

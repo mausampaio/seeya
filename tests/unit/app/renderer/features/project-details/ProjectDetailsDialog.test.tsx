@@ -18,6 +18,7 @@ import type {
   ProjectDetailsData,
   ProjectDetailsRepositoryRow,
 } from '../../../../../../packages/app/src/state/project-details.js';
+import { registerArchiveConfirmOpener } from '../../../../../../packages/app/src/renderer/features/confirmations/archive-confirm-bridge.js';
 import type { ProjectActionResponse } from '../../../../../../packages/app/src/state/project-details-result.js';
 import type {
   ProjectPanelRow,
@@ -57,6 +58,7 @@ function found(
     name: 'Auth hardening',
     dir: '/home/<usuario>/seeya/workspace/auth-hardening',
     writeAccess: { kind: 'open' },
+    lifecycle: { kind: 'active' },
     repositories: REPOSITORIES,
     adoptions: [],
     fileCount: 7,
@@ -70,6 +72,7 @@ function panelRow(overrides: Partial<ProjectPanelRow> = {}): ProjectPanelRow {
     name: 'Auth hardening',
     lockText: 'unlocked',
     lock: { kind: 'unlocked' },
+    lifecycle: { kind: 'active' },
     sessions: [],
     favorite: false,
     repositoryCount: 3,
@@ -93,6 +96,7 @@ interface Api {
   readonly removeProjectRepository: ReturnType<typeof vi.fn>;
   readonly revertProjectAdoption: ReturnType<typeof vi.fn>;
   readonly removeProject: ReturnType<typeof vi.fn>;
+  readonly unarchiveProject: ReturnType<typeof vi.fn>;
 }
 
 function installApi(
@@ -112,6 +116,7 @@ function installApi(
     removeProjectRepository: vi.fn(() => Promise.resolve(response())),
     revertProjectAdoption: vi.fn(() => Promise.resolve(response())),
     removeProject: vi.fn(() => Promise.resolve(response())),
+    unarchiveProject: vi.fn(() => Promise.resolve(response())),
     ...options.overrides,
   };
   const row = options.row === undefined ? panelRow() : options.row;
@@ -498,5 +503,62 @@ describe('ProjectDetailsDialog (V2-T83, docs/INTERFACE.md § 4a)', () => {
         'Could not read the project: disk on fire',
       ),
     );
+  });
+});
+
+describe('ProjectDetailsDialog archive section (V2-T84, docs/INTERFACE.md § 4b)', () => {
+  it('Archive project… sits above Remove project, and asks the confirmation for THIS project', async () => {
+    installApi();
+    const opener = vi.fn();
+    registerArchiveConfirmOpener(opener);
+    const view = await openDialog();
+    const archive = view.container.querySelector('#project-details-archive');
+    const remove = view.container.querySelector('#project-details-remove');
+    expect(archive).not.toBeNull();
+    expect(
+      archive!.compareDocumentPosition(remove!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // Remove now says it is for a project created by mistake.
+    expect(view.getByText(/For a project created by mistake/)).not.toBeNull();
+    fireEvent.click(view.container.querySelector('#project-details-archive-project')!);
+    expect(opener).toHaveBeenCalledWith({ projectId: 'auth-hardening', name: 'Auth hardening' });
+  });
+
+  it('an archived project shows its state and Unarchive; clicking it runs the action and re-reads the project', async () => {
+    const archived = found({
+      lifecycle: {
+        kind: 'archived',
+        archivedAt: new Date('2026-10-02T10:00:00.000Z'),
+        note: 'Finished — shipped',
+      },
+    });
+    const api = installApi({ details: archived });
+    const view = await openDialog();
+    expect(view.container.querySelector('#project-details-archived-state')?.textContent).toBe(
+      `Archived on ${new Date('2026-10-02T10:00:00.000Z').toLocaleDateString()} — Finished — shipped`,
+    );
+    expect(view.container.querySelector('#project-details-archive-project')).toBeNull();
+    const reads = api.getProjectDetails.mock.calls.length;
+
+    fireEvent.click(view.container.querySelector('#project-details-unarchive')!);
+
+    await waitFor(() =>
+      expect(api.unarchiveProject).toHaveBeenCalledWith({ projectId: 'auth-hardening' }),
+    );
+    await waitFor(() => expect(api.getProjectDetails.mock.calls.length).toBeGreaterThan(reads));
+    expect(view.container.querySelector('#project-details-result')?.textContent).toBe('done');
+  });
+
+  it('a project locked by another session disables Archive project… with the reason', async () => {
+    installApi({
+      details: found({ writeAccess: { kind: 'blocked', heldByText: 'held by session abc' } }),
+      row: panelRow({ lock: { kind: 'lockedByOther', holderDisplaySessionId: 'abcd1234' } }),
+    });
+    const view = await openDialog();
+    const button = view.container.querySelector(
+      '#project-details-archive-project',
+    ) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    expect(button.getAttribute('title')).toMatch(/Locked by session abcd1234/);
   });
 });

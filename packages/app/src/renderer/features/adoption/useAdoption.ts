@@ -25,6 +25,7 @@ import type { AdoptPanelState } from '../../../state/adopt-panel.js';
 import { resolveChosenAdoptProjectId } from '../../../state/adopt-picker.js';
 import { buildAdoptionReviewRows, type AdoptionReviewRow } from '../../../state/adoption-review.js';
 import { getLatestProjectsPanelData } from '../../legacy/projects-panel-cache.js';
+import { isActiveProject } from '../../../state/projects-table.js';
 import {
   dispatchAdoptPanel,
   getAdoptPanelState,
@@ -115,16 +116,20 @@ export function useAdoption(): AdoptionControls {
 
   const existingProjectOptions = useMemo<readonly AdoptionExistingProjectOption[]>(
     () =>
-      getLatestProjectsPanelData().projects.map((project) => ({
-        value: project.projectId,
-        // PO review round 2: the id repeated the name for every ordinary project (a fresh
-        // project's `name` defaults to its `projectId`) — "payments-webhooks (payments-webhooks)"
-        // said nothing twice. The id is only useful when it's a DIFFERENT fact from the name.
-        label:
-          project.name === project.projectId
-            ? project.name
-            : `${project.name} (${project.projectId})`,
-      })),
+      // V2-T84 (Q-113 item 5): an archived project left the day-to-day views — adopting a session
+      // INTO it makes no sense, so it is not offered.
+      getLatestProjectsPanelData()
+        .projects.filter(isActiveProject)
+        .map((project) => ({
+          value: project.projectId,
+          // PO review round 2: the id repeated the name for every ordinary project (a fresh
+          // project's `name` defaults to its `projectId`) — "payments-webhooks (payments-webhooks)"
+          // said nothing twice. The id is only useful when it's a DIFFERENT fact from the name.
+          label:
+            project.name === project.projectId
+              ? project.name
+              : `${project.name} (${project.projectId})`,
+        })),
     // Recomputed fresh every time the picker opens — a project created in an earlier adoption
     // (or from the Projects tab, in the same session) should show up without this hook having its
     // own second subscription to `onProjectsUpdate`.

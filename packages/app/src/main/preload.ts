@@ -51,6 +51,8 @@ import type {
   ProjectsUpdateEvent,
   ProjectsPanelResponse,
   AddProjectRepositoryRequest,
+  ArchiveProjectRequest,
+  UnarchiveProjectRequest,
   AnswerDeleteAdoptedCopyConfirmRequest,
   AnswerRemoveProjectConfirmRequest,
   AnswerRevertAdoptionConfirmRequest,
@@ -188,6 +190,9 @@ export interface SeeyaApi {
     request: RevertProjectAdoptionRequest,
   ): Promise<ProjectDetailsActionResponse>;
   removeProject(request: RemoveProjectRequest): Promise<ProjectDetailsActionResponse>;
+  /** V2-T84: archive/unarchive a project — see each channel's own docstring. */
+  archiveProject(request: ArchiveProjectRequest): Promise<ProjectDetailsActionResponse>;
+  unarchiveProject(request: UnarchiveProjectRequest): Promise<ProjectDetailsActionResponse>;
   onConfirmRevertAdoptionRequest(
     listener: (event: ConfirmRevertAdoptionRequestEvent) => void,
   ): void;
@@ -346,6 +351,8 @@ const api: SeeyaApi = {
     ipcRenderer.invoke(CHANNELS.removeProjectRepository, request),
   revertProjectAdoption: (request) => ipcRenderer.invoke(CHANNELS.revertProjectAdoption, request),
   removeProject: (request) => ipcRenderer.invoke(CHANNELS.removeProject, request),
+  archiveProject: (request) => ipcRenderer.invoke(CHANNELS.archiveProject, request),
+  unarchiveProject: (request) => ipcRenderer.invoke(CHANNELS.unarchiveProject, request),
   onConfirmRevertAdoptionRequest: (listener) => {
     ipcRenderer.on(
       CHANNELS.confirmRevertAdoptionRequest,
