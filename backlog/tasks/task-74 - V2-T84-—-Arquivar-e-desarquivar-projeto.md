@@ -1,7 +1,7 @@
 ---
 id: TASK-74
 title: V2-T84 — Arquivar e desarquivar projeto
-status: To Do
+status: Review
 assignee: []
 created_date: '2026-10-02 21:17'
 labels:
