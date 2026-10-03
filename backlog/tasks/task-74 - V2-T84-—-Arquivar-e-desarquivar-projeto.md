@@ -4,6 +4,7 @@ title: V2-T84 — Arquivar e desarquivar projeto
 status: Review
 assignee: []
 created_date: '2026-10-02 21:17'
+updated_date: '2026-10-03 02:53'
 labels:
   - feature
 dependencies: []
@@ -33,3 +34,13 @@ Entregue (docs/INTERFACE.md § 4b/§ 9). Glossário do `AGENTS.md` primeiro (cha
 
 **Prova.** Unidade (schema/migração, união, filtro/contagens, ação da linha, mensagens, dois diálogos, `ArchiveSection`, Sessions), aplicação com os fakes nomeados, integração contra git real (`tests/integration/application/project-archive.test.ts`: o commit passa pelo gancho `commit-msg` de verdade, e o MESMO manifesto commitado sem a marca é recusado), CLI. Janela real, bundle não-`--dev`, `SEEYA_APP_HOME_OVERRIDE` descartável, `--user-data-dir` descartável, 11 capturas por tema + `metrics.json` (`SEEYA_APP_VERIFY_ARCHIVE_DIR`, `main/verification-archive.ts`): arquivar de verdade (lock, manifesto, commit pelo gancho — o `git log` do espaço de trabalho descartável lê `Archive project payments-api` e `Unarchive project payments-api` com trailers), `Unarchive and open` pelo `openProject` real até o harness fictício (linha do projeto no log). Registro (`seeya`, `seeya-dev`) e hash de `~/.seeya/protocol-handler.json` (`E3D8A283…`) iguais antes e depois.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: Dev
+created: 2026-10-03 02:53
+---
+Revisão do PO aplicada (2026-10-02): data do arquivamento na janela em formato local (dia, como a coluna Last activity; CLI segue em ISO), seletor de projeto da adoção sem arquivados (teste renderizado, falha sem o filtro), questão renumerada para Q-113 após o rebase sobre a V2-T85, capturas refeitas nos dois temas.
+---
+<!-- COMMENTS:END -->
