@@ -21,6 +21,7 @@ import { Text } from '../../../components/Text/index.js';
 import { Button } from '../../../components/Button/index.js';
 import { MESSAGES } from '../../../../text/messages.js';
 import { formatArchiveStateText } from '@seeya-ai/engine/core/project-management-message.js';
+import { formatArchiveDayText } from '../../../../state/projects-panel.js';
 import type { ProjectLifecycle } from '@seeya-ai/engine/core/types.js';
 import type { PendingProjectAction } from '../useProjectDetails.js';
 
@@ -43,7 +44,11 @@ export function ArchiveSection(props: ArchiveSectionProps): JSX.Element {
         className={cx(styles, 'section')}
       >
         <Text as="div" variant="body-sm" id="project-details-archived-state">
-          {formatArchiveStateText(lifecycle.archivedAt, lifecycle.note)}
+          {formatArchiveStateText(
+            lifecycle.archivedAt,
+            lifecycle.note,
+            formatArchiveDayText(lifecycle.archivedAt),
+          )}
         </Text>
         <Text as="div" variant="body-sm" tone="secondary">
           {MESSAGES.projectDetailsArchivedDescription}

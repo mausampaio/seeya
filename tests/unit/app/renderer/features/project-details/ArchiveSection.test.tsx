@@ -42,7 +42,7 @@ describe('ArchiveSection (V2-T84, docs/INTERFACE.md § 4b)', () => {
       />,
     );
     expect(container.querySelector('#project-details-archived-state')?.textContent).toBe(
-      'Archived on 2026-10-02 — Finished — shipped',
+      `Archived on ${new Date('2026-10-02T10:00:00.000Z').toLocaleDateString()} — Finished — shipped`,
     );
     expect(container.querySelector('#project-details-archive-project')).toBeNull();
     fireEvent.click(container.querySelector('#project-details-unarchive')!);
@@ -60,7 +60,7 @@ describe('ArchiveSection (V2-T84, docs/INTERFACE.md § 4b)', () => {
       />,
     );
     expect(container.querySelector('#project-details-archived-state')?.textContent).toBe(
-      'Archived on 2026-10-02',
+      `Archived on ${new Date('2026-10-02T10:00:00.000Z').toLocaleDateString()}`,
     );
   });
 

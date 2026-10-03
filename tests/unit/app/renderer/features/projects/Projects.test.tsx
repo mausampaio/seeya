@@ -148,7 +148,7 @@ describe('Projects with archived projects (V2-T84, docs/INTERFACE.md § 4b)', ()
     fireEvent.click(getByRole('radio', { name: 'Archived' }));
     await waitFor(() => expect(getByText('Old thing')).not.toBeNull());
     expect(queryByText('Alpha')).toBeNull();
-    expect(getByText('2026-10-02')).not.toBeNull();
+    expect(getByText(new Date('2026-10-02T10:00:00.000Z').toLocaleDateString())).not.toBeNull();
     expect(getByText('Finished — shipped')).not.toBeNull();
     expect(getByText('Unarchive…')).not.toBeNull();
   });

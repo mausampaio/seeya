@@ -35,8 +35,8 @@ import {
 } from '../../../components/Icon/index.js';
 import { ProjectSessionsPanel, type ProjectSessionsPanelProps } from './ProjectSessionsPanel.js';
 import { MESSAGES } from '../../../../text/messages.js';
-import { formatArchiveDate } from '@seeya-ai/engine/core/project-management-message.js';
 import {
+  formatArchiveDayText,
   formatProjectRowLockCellText,
   formatProjectRowLockText,
   formatSessionLastActivityText,
@@ -290,7 +290,7 @@ function NameCell(props: {
 function LockOrArchivedCell(props: { readonly row: ProjectPanelRow }): JSX.Element {
   const { row } = props;
   if (row.lifecycle.kind === 'archived') {
-    const date = formatArchiveDate(row.lifecycle.archivedAt);
+    const date = formatArchiveDayText(row.lifecycle.archivedAt);
     return (
       <Text as="span" variant="body-sm" tone="secondary" truncate title={date}>
         {date}

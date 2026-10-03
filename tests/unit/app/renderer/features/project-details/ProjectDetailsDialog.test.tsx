@@ -535,7 +535,7 @@ describe('ProjectDetailsDialog archive section (V2-T84, docs/INTERFACE.md § 4b)
     const api = installApi({ details: archived });
     const view = await openDialog();
     expect(view.container.querySelector('#project-details-archived-state')?.textContent).toBe(
-      'Archived on 2026-10-02 — Finished — shipped',
+      `Archived on ${new Date('2026-10-02T10:00:00.000Z').toLocaleDateString()} — Finished — shipped`,
     );
     expect(view.container.querySelector('#project-details-archive-project')).toBeNull();
     const reads = api.getProjectDetails.mock.calls.length;

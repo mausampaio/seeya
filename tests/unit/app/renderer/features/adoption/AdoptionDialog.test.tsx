@@ -2,6 +2,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/preact';
 import { createFakeSeeyaApi } from '../../_fake-seeya-api.js';
+import {
+  getLatestProjectsPanelData,
+  wireProjectsPanelCache,
+} from '../../../../../../packages/app/src/renderer/legacy/projects-panel-cache.js';
 import { AdoptionDialog } from '../../../../../../packages/app/src/renderer/features/adoption/index.js';
 import {
   dispatchAdoptPanel,
@@ -308,5 +312,46 @@ describe('AdoptionDialog (V2-T70)', () => {
       expect(openProject).toHaveBeenCalledTimes(1);
       expect(openProject).toHaveBeenCalledWith({ projectId: 'auth-hardening' });
     });
+  });
+});
+
+describe('AdoptionDialog project picker with archived projects (V2-T84, Q-113 item 5)', () => {
+  function row(projectId: string, name: string, archived: boolean): never {
+    return {
+      projectId,
+      name,
+      lockText: 'unlocked',
+      lock: { kind: 'unlocked' },
+      lifecycle: archived
+        ? { kind: 'archived', archivedAt: new Date('2026-10-02T00:00:00.000Z'), note: null }
+        : { kind: 'active' },
+      sessions: [],
+      favorite: false,
+      repositoryCount: 0,
+      lastActivity: null,
+    } as never;
+  }
+
+  it('lists only active projects — an archived one is never offered as the adoption target', async () => {
+    const panel = {
+      // Archived FIRST: were it not filtered out it would be the default selection.
+      projects: [row('old-thing', 'Old thing', true), row('live-one', 'Live one', false)],
+      otherSessionsByDirectory: [],
+      ignoredProjects: [],
+    };
+    window.seeya = createFakeSeeyaApi({
+      onProjectsUpdate: vi.fn(() => () => {}),
+      getProjectsPanel: vi.fn(() => Promise.resolve(panel)),
+      previewAdoptionLaunch: vi.fn(() => Promise.resolve({ explanationLines: [] })),
+    });
+    wireProjectsPanelCache();
+    await waitFor(() => expect(getLatestProjectsPanelData().projects).toHaveLength(2));
+    const { container } = render(<AdoptionDialog />);
+    openAdoptionDialog(SESSION);
+    await waitFor(() => expect(getDialog().open).toBe(true));
+
+    const picker = container.querySelector('#adoption-pick-existing-select');
+    expect(picker?.textContent).toContain('Live one');
+    expect(container.textContent).not.toContain('Old thing');
   });
 });

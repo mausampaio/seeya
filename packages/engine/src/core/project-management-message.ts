@@ -205,8 +205,13 @@ export function formatArchiveDate(archivedAt: Date): string {
 
 /** V2-T84: what a project's archive state looks like in a row or a `show` — `Archived on
  * 2026-10-02` plus ` — <note>` when a note was given. */
-export function formatArchiveStateText(archivedAt: Date, note: string | null): string {
-  const base = `Archived on ${formatArchiveDate(archivedAt)}`;
+export function formatArchiveStateText(
+  archivedAt: Date,
+  note: string | null,
+  /** The window passes its own locale day (same as the Last activity column); the CLI keeps ISO. */
+  dateText: string = formatArchiveDate(archivedAt),
+): string {
+  const base = `Archived on ${dateText}`;
   return note === null ? base : `${base} — ${note}`;
 }
 
@@ -218,8 +223,12 @@ export function formatProjectArchivedLine(projectId: string, note: string | null
   );
 }
 
-export function formatProjectAlreadyArchivedLine(projectId: string, archivedAt: Date): string {
-  return `Project "${projectId}" is already archived (since ${formatArchiveDate(archivedAt)}).`;
+export function formatProjectAlreadyArchivedLine(
+  projectId: string,
+  archivedAt: Date,
+  dateText: string = formatArchiveDate(archivedAt),
+): string {
+  return `Project "${projectId}" is already archived (since ${dateText}).`;
 }
 
 export function formatProjectUnarchivedLine(projectId: string): string {

@@ -391,7 +391,7 @@ describe('ProjectsTable archived view (V2-T84, docs/INTERFACE.md § 4b)', () => 
     const { getByText, queryByText } = renderArchived();
     expect(getByText('Archived')).not.toBeNull();
     expect(queryByText('Lock')).toBeNull();
-    expect(getByText('2026-10-02')).not.toBeNull();
+    expect(getByText(new Date('2026-10-02T10:00:00.000Z').toLocaleDateString())).not.toBeNull();
     expect(getByText('Finished — shipped')).not.toBeNull();
   });
 

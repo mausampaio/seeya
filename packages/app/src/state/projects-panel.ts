@@ -330,6 +330,12 @@ export function formatLockText(status: ProjectLockStatus): string {
   }
 }
 
+/** V2-T84: a DAY (no time) in the window's locale format — the same `toLocale…` family
+ * `formatSessionLastActivityText` uses for the Last activity column. Used for the archive date. */
+export function formatArchiveDayText(archivedAt: Date): string {
+  return archivedAt.toLocaleDateString();
+}
+
 /** V2-T55 item 3/4 — the modal's/search result's own "last activity" text, exported so both reuse
  * the identical formatting instead of each rendering `Date` differently. `null` is absence of
  * data (D-025), never a real instant; `toLocaleString()` gives a date AND time, per the task's

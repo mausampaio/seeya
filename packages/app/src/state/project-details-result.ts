@@ -38,6 +38,7 @@ import {
   formatRevertedLine,
 } from '@seeya-ai/engine/core/project-management-message.js';
 import { MESSAGES } from '../text/messages.js';
+import { formatArchiveDayText } from './projects-panel.js';
 
 export type ProjectActionTone = 'success' | 'info' | 'error';
 
@@ -199,7 +200,14 @@ export function formatArchiveProjectActionResult(
         formatProjectLockedRefusalLine(result.projectId, result.heldBy, 'archive it'),
       );
     case 'alreadyArchived':
-      return say('info', formatProjectAlreadyArchivedLine(result.projectId, result.archivedAt));
+      return say(
+        'info',
+        formatProjectAlreadyArchivedLine(
+          result.projectId,
+          result.archivedAt,
+          formatArchiveDayText(result.archivedAt),
+        ),
+      );
     case 'archived':
       return say('success', formatProjectArchivedLine(result.projectId, result.note));
   }
