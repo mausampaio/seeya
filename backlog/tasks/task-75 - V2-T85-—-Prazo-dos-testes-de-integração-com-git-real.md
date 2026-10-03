@@ -4,6 +4,7 @@ title: V2-T85 — Prazo dos testes de integração com git real
 status: Review
 assignee: []
 created_date: '2026-10-02 21:17'
+updated_date: '2026-10-03 02:48'
 labels:
   - test
 dependencies: []
@@ -40,3 +41,13 @@ Com cinco agentes rodando em paralelo (2026-10-02), npm run verificar do agente 
 
 **Recusas:** nenhuma de comando; a ferramenta de shell recusou vários comandos compostos por conterem "git" em nome de arquivo ou heredoc — dividi em comandos simples, sem contornar.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-10-03 02:48
+---
+Revisão do PO (2026-10-02): aprovada numa rodada. Medido sob 12 busy-loops: antes 32–38 falhas por execução (3/3), depois 0 (3/3), mais lento 23s. Prazo de integração 60s num lugar só (vitest.config.ts, com a medição no comentário); unidade continua em 5s; helper único removeTempDir com maxRetries em ~20 arquivos; folga de falha rápida do claude fictício 2s→20s (5 testes invertiam o resultado, não estavam lentos); guarda full-tree do dependency-cruiser com prazo próprio; prazos por arquivo redundantes removidos. Nenhuma corrida real nem defeito de produção. Limite registrado: com 6–12 loops ainda falham os dois casos de termination com orçamento apertado de propósito (docs/TESTES.md S4-T10 manda não alargar) — Q-112 pergunta se docs/TESTES.md ganha um parágrafo sobre o prazo padrão de integração. Mesclada no po-gate; portão do zero e npm test sem identidade git verdes (3912 testes). Agente Sonnet 5.5.
+---
+<!-- COMMENTS:END -->
