@@ -157,7 +157,7 @@ describe('UnarchiveProjectConfirmDialog (V2-T84, docs/INTERFACE.md § 4b/§ 9)',
   it('Unarchive and open calls unarchiveProject, then openProject for the same project', async () => {
     const unarchiveProject = vi.fn(() => Promise.resolve(ok()));
     const openProject = vi.fn(() => Promise.resolve({ outcomeText: 'x' }));
-    window.seeya = createFakeSeeyaApi({ unarchiveProject, openProject: openProject as never });
+    window.seeya = createFakeSeeyaApi({ unarchiveProject, openProject });
     render(<UnarchiveProjectConfirmDialog />);
     void act(() => openUnarchiveConfirm(TARGET));
     await waitFor(() => expect(dialogById('unarchive-project-confirm-dialog').open).toBe(true));
