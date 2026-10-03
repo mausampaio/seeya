@@ -4,7 +4,7 @@ title: V2-T84 — Arquivar e desarquivar projeto
 status: Review
 assignee: []
 created_date: '2026-10-02 21:17'
-updated_date: '2026-10-03 02:53'
+updated_date: '2026-10-03 03:05'
 labels:
   - feature
 dependencies: []
@@ -42,5 +42,11 @@ author: Dev
 created: 2026-10-03 02:53
 ---
 Revisão do PO aplicada (2026-10-02): data do arquivamento na janela em formato local (dia, como a coluna Last activity; CLI segue em ISO), seletor de projeto da adoção sem arquivados (teste renderizado, falha sem o filtro), questão renumerada para Q-113 após o rebase sobre a V2-T85, capturas refeitas nos dois temas.
+---
+
+author: PO
+created: 2026-10-03 03:05
+---
+Revisão do PO (2026-10-03): duas rodadas. lifecycle como união active/archived no ProjectManifest, chaves archivedAt/archiveNote no seeya.json com schemaVersion 1→2 e migração (v1 lido como ativo); archiveProject/unarchiveProject com lock, commit com trailers e marca de escrita do manifesto, resultados em união; open (inclusive --resume) recusa num arquivado antes de qualquer efeito colateral. CLI archive/unarchive; list sem arquivados byte-idêntico. Janela: filtro Archived, Unarchive… com duas saídas, Archive project… no Project details com nota, arquivados fora de favoritos/recentes/contagem, Resume desabilitado na aba Sessions, coluna Lock compacta (Locked · <id>) sem truncar a 1200 px. Rodada 2: data local na janela (CLI segue ISO) e arquivados fora do seletor de adoção. Q-113 (decisões onde a spec era silenciosa) aceita. Efeito colateral registrado: um seeya mais antigo recusa um seeya.json v2. Capturas reais conferidas nos dois temas; arquivar/desarquivar rodaram de verdade pelo gancho num espaço descartável. Mesclada no po-gate; portão do zero e npm test sem identidade git verdes (3990 testes). Agente Sonnet 5.5.
 ---
 <!-- COMMENTS:END -->
