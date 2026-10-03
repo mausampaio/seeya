@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { runInteractive } from '@seeya-ai/engine/adapters/resumption/spawn-interactive.js';
 import {
   createFakeInteractiveClaudeFixture,
+  FAKE_CLAUDE_FAST_FAILURE_GRACE_MS,
   readCapturedInteractiveClaudeCalls,
   removeFakeInteractiveClaudeFixture,
   type FakeInteractiveClaudeFixture,
@@ -52,7 +53,7 @@ describe('runInteractive — S3-T2', () => {
         FAKE_CLAUDE_EXIT_CODE: '1',
         FAKE_CLAUDE_EXIT_DELAY_MS: '10',
       },
-      fastFailureGraceMs: 2_000,
+      fastFailureGraceMs: FAKE_CLAUDE_FAST_FAILURE_GRACE_MS,
     });
     expect(result.exitCode).toBe(1);
     expect(result.failedFast).toBe(true);
@@ -86,7 +87,7 @@ describe('runInteractive — S3-T2', () => {
       args: ['--resume', 'some-id', 'a prompt'],
       cwd: process.cwd(),
       env: process.env,
-      fastFailureGraceMs: 2_000,
+      fastFailureGraceMs: FAKE_CLAUDE_FAST_FAILURE_GRACE_MS,
     });
     expect(result.exitCode).toBe(-1);
     expect(result.failedFast).toBe(true);

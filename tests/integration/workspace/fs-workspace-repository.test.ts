@@ -12,6 +12,7 @@ import { FsWorkspaceRepository } from '@seeya-ai/engine/adapters/workspace/index
 import { runGit } from '@seeya-ai/engine/adapters/git/run-git.js';
 import { buildProjectSkeleton } from '@seeya-ai/engine/core/project-skeleton.js';
 import { buildProjectCommitMessage } from '@seeya-ai/engine/core/project-commit.js';
+import { removeTempDir } from '../../_remove-temp-dir.js';
 
 const FORK_SESSION_ID = '22222222-2222-4222-8222-222222222222';
 const OTHER_SESSION_ID = '33333333-3333-4333-8333-333333333333';
@@ -25,7 +26,7 @@ describe('FsWorkspaceRepository', () => {
 
   afterEach(async () => {
     if (root !== undefined) {
-      await rm(root, { recursive: true, force: true });
+      await removeTempDir(root);
       root = undefined;
     }
   });

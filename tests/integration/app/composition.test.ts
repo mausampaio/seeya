@@ -245,7 +245,7 @@ describe('buildAppContext', () => {
     if (context.daemonOwner.kind === 'app') {
       expect(typeof context.daemonOwner.launchPath).toBe('string');
     }
-  }, 15_000);
+  });
 
   it('checkDaemonOwnershipTransitionOffer resolves to a boolean without throwing', async () => {
     fixture = await createDiscoveryFixture();

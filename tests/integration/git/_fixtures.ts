@@ -11,9 +11,10 @@
  * whatever "now" the host happens to be at.
  */
 import { spawn } from 'node:child_process';
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { removeTempDir } from '../../_remove-temp-dir.js';
 
 function run(cwd: string, args: string[], env?: NodeJS.ProcessEnv): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -52,7 +53,7 @@ export async function createGitFixture(): Promise<GitFixture> {
 }
 
 export async function removeGitFixture(fixture: GitFixture): Promise<void> {
-  await rm(fixture.root, { recursive: true, force: true });
+  await removeTempDir(fixture.root);
 }
 
 /** Writes `fileName` with `content` inside `dir` and stages it — a plain filesystem write, no

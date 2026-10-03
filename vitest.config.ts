@@ -220,6 +220,45 @@ const SERIALIZED_RESOURCE_HEAVY_FILES = [
 ];
 
 /**
+ * V2-T85: the deadline (`testTimeout` and `hookTimeout`) of the two integration projects, whose
+ * tests launch real processes (git, the compiled CLI, a fake `claude`, test daemons) — set ONCE
+ * here instead of per file (V2-T78 had given a single file 20s, others carried their own 30s/60s).
+ * `unit` keeps vitest's default 5000ms: no unit test launches a process.
+ *
+ * Measured 2026-10-02 on this 8-core machine, `integration` + `integration-process` together
+ * (575 tests; the full table is in the V2-T85 task's implementation notes in `backlog/`):
+ * - unloaded: 90s wall, slowest single test 3.1s (a real detached daemon start/stop), the git
+ *   workspace cases 1-2.3s each — already 20-60% of the old 5000ms default with zero contention;
+ * - 12 busy-loop processes alongside (the load the V2-T80 measurement used; five agents running
+ *   `npm run verificar` at once is the real-world version of it): 575-590s wall, 3 runs out of 3
+ *   with 32-38 tests dying at exactly the 5000ms default (every `fs-workspace-repository` and
+ *   `changed-file-stats` case, plus single cases in `app/composition`, `deep-generator` and
+ *   `spawn-interactive`), and the slowest test that had an explicit 30s budget finishing at 21.8s.
+ *   With a 30s deadline, same load, 3 runs out of 3: 0 failures; the slowest test is 23.0s
+ *   (`commit-msg-hook`, which it already survived) and the slowest of the cases that used to die
+ *   at 5s is 13.8s (`fs-workspace-repository`).
+ * - the whole `npm run cobertura` step (all four projects and v8 coverage in ONE vitest process,
+ *   which is what `npm run verificar` runs, and heavier than the integration-only runs above
+ *   because the guards' ESLint/dependency-cruiser children compete with it) with only 6 busy-loop
+ *   processes: 1244s wall, and a 30s deadline was NOT enough — `app/daemon-launch` (2 cases,
+ *   31.8s/32.0s, explicit 20s before, 30s after) and `commit-msg-hook` (32.4s) ran out of time.
+ *   Nothing in those cases was stuck: the operation (a real detached daemon, a real `git commit`
+ *   through a hook that starts the compiled CLI) just takes that long when the process table is
+ *   that contended.
+ * 60_000ms is that worst observed case (32.4s) with ~1.8x margin. It is a ceiling for a stuck
+ * process, not a wait: a passing test never spends it, so the suite is no slower when the machine
+ * is idle. Still far short of "never times out" (AGENTS.md: don't trade away the ability to catch
+ * a real hang) — a test that hangs still fails, 60s later, instead of 5s.
+ * What is deliberately NOT widened by this number, each with its own reason (`docs/QUESTOES.md`
+ * Q-112 lists the residual failures measured under the same loads): the `termination` cases,
+ * whose budget is internal-operation + slack and exists to catch a target that never reacts
+ * (`docs/TESTES.md` § S4-T10); the two `*-concurrent-write` cases, an explicit 30s on real fs I/O
+ * (Q-056/Q-058); and the `guards` project, which has its own budget (`guards/_support.ts`).
+ */
+const INTEGRATION_TEST_TIMEOUT_MS = 60_000;
+const INTEGRATION_HOOK_TIMEOUT_MS = 60_000;
+
+/**
  * Per-directory coverage (docs/TESTES.md): `core/` 95%, every other production directory 80%.
  * One glob key PER directory, not a catch-all `'src/**'` for "everything but core" (S1-T12): a
  * catch-all glob matches every instrumented file, so it computes the exact same number as the
@@ -450,6 +489,8 @@ export default defineConfig({
         test: {
           name: 'integration',
           include: ['tests/integration/**/*.test.ts'],
+          testTimeout: INTEGRATION_TEST_TIMEOUT_MS,
+          hookTimeout: INTEGRATION_HOOK_TIMEOUT_MS,
           // guards/ has its own project (see below) because it writes fixtures into the real
           // src/ tree. `SERIALIZED_RESOURCE_HEAVY_FILES` (S4-T10, extended S4-T11) has its own
           // project too, for a different reason: those files either launch a real subprocess
@@ -508,6 +549,8 @@ export default defineConfig({
           // S4-T10's Q-063 already recorded, still open.
           name: 'integration-process',
           include: SERIALIZED_RESOURCE_HEAVY_FILES,
+          testTimeout: INTEGRATION_TEST_TIMEOUT_MS,
+          hookTimeout: INTEGRATION_HOOK_TIMEOUT_MS,
           fileParallelism: false,
         },
       },

@@ -16,18 +16,34 @@
  * the same global-setup treatment applies then, not speculatively now.
  */
 import { existsSync } from 'node:fs';
-import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { removeTempDir } from '../../_remove-temp-dir.js';
 
 const execFileAsync = promisify(execFile);
 
 const FAKE_CLAUDE_SCRIPT = fileURLToPath(
   new URL('../../fixtures/resumption/fake-claude-interactive.mjs', import.meta.url),
 );
+
+/**
+ * The `fastFailureGraceMs` every test here passes when it needs a fake `claude` that exits
+ * immediately to count as a FAST failure (V2-T85). The fake is a real `node` process, and the
+ * grace window starts BEFORE that process is even running: `runInteractive` measures spawn to
+ * `close`, so node's own startup is inside the window. Measured (2026-10-02, 12 busy-loop
+ * processes on 8 cores, ~6.5x the unloaded suite wall time): spawn-to-close exceeded the old
+ * 2_000ms, so a fake told to exit after 10ms was classified as a slow exit and the fast-failure
+ * assertions flipped (4 resumer cases + 1 spawn-interactive case, 3 runs out of 3).
+ * 20_000 is wide enough for that, and costs nothing when the machine is idle (the window is an
+ * upper bound that a quick exit never waits for); it stays far below the integration project's
+ * 30_000ms test deadline so a real hang still fails as a hang. Tests that prove the OPPOSITE
+ * (a slow exit is not a fast failure) keep their own tiny grace — they cannot flip under load.
+ */
+export const FAKE_CLAUDE_FAST_FAILURE_GRACE_MS = 20_000;
 
 export interface FakeInteractiveClaudeFixture {
   readonly dir: string;
@@ -181,7 +197,7 @@ export async function createFakeInteractiveClaudeFixture(): Promise<FakeInteract
 export async function removeFakeInteractiveClaudeFixture(
   fixture: FakeInteractiveClaudeFixture,
 ): Promise<void> {
-  await rm(fixture.dir, { recursive: true, force: true });
+  await removeTempDir(fixture.dir);
 }
 
 export interface CapturedInteractiveClaudeCall {

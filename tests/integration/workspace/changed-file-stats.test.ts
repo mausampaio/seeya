@@ -10,6 +10,7 @@ import path from 'node:path';
 import { FsWorkspaceRepository } from '@seeya-ai/engine/adapters/workspace/index.js';
 import { runGit } from '@seeya-ai/engine/adapters/git/run-git.js';
 import { buildProjectSkeleton } from '@seeya-ai/engine/core/project-skeleton.js';
+import { removeTempDir } from '../../_remove-temp-dir.js';
 
 async function makeTmpDir(): Promise<string> {
   return mkdtemp(path.join(tmpdir(), 'seeya-changed-file-stats-'));
@@ -20,7 +21,7 @@ describe('FsWorkspaceRepository.listChangedFilesWithStats', () => {
 
   afterEach(async () => {
     if (root !== undefined) {
-      await rm(root, { recursive: true, force: true });
+      await removeTempDir(root);
       root = undefined;
     }
   });

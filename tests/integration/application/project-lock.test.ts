@@ -8,7 +8,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
@@ -20,6 +20,7 @@ import { FsProjectLock } from '@seeya-ai/engine/adapters/workspace/project-lock.
 import { processControl } from '@seeya-ai/engine/adapters/process/index.js';
 import { captureObservedProcStart } from '@seeya-ai/engine/adapters/process/proc-start.js';
 import { processExists } from '@seeya-ai/engine/adapters/process/existence.js';
+import { removeTempDir } from '../../_remove-temp-dir.js';
 
 const CHILD_SCRIPT = fileURLToPath(
   new URL('../../fixtures/process/graceful-child.mjs', import.meta.url),
@@ -52,7 +53,7 @@ afterEach(async () => {
   }
   spawned = [];
   if (root !== undefined) {
-    await rm(root, { recursive: true, force: true });
+    await removeTempDir(root);
     root = undefined;
   }
 });

@@ -146,7 +146,6 @@ describe('AppContext#startDaemon / #stopDaemon — real subprocess, seen by the 
       expect(statusAfterStop.exitCode, `stderr: ${statusAfterStop.stderr}`).toBe(0);
       expect(statusAfterStop.stdout).toContain('Daemon: not running');
     },
-    20_000,
   );
 
   it('startDaemon refuses (no spawn) when a daemon this home already holds a live lock for', async () => {
@@ -168,5 +167,5 @@ describe('AppContext#startDaemon / #stopDaemon — real subprocess, seen by the 
     expect(stopResult).toContain('Stopped');
     await waitUntilGone(firstPid, 10_000);
     lastDaemonPid = undefined;
-  }, 20_000);
+  });
 });

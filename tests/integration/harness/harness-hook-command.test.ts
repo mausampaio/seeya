@@ -22,10 +22,11 @@
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
-import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { buildHarnessSettingsJson } from '@seeya-ai/engine/core/harness-hook-config.js';
+import { removeTempDir } from '../../_remove-temp-dir.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -102,11 +103,11 @@ describe('the harness PreToolUse hook command — real execution', () => {
 
   beforeAll(async () => {
     shExecutable = await resolveShExecutable();
-  }, 30_000);
+  });
 
   afterEach(async () => {
     if (dir !== undefined) {
-      await rm(dir, { recursive: true, force: true });
+      await removeTempDir(dir);
       dir = undefined;
     }
   });
@@ -132,7 +133,7 @@ describe('the harness PreToolUse hook command — real execution', () => {
     expect(attempt.exitCode).toBe(2); // PreToolUse: only exit 2 blocks
     expect(attempt.stderr).toContain(missingNodePath);
     expect(attempt.stderr).toContain('seeya project open');
-  }, 30_000);
+  });
 
   it('lets an allowed command through when cliEntryPath is inside a real .asar FILE (V2-T34 production defect, PO review 2026-09-25)', async () => {
     const scratch = await makeTmpDir();
@@ -172,5 +173,5 @@ describe('the harness PreToolUse hook command — real execution', () => {
     // exit 2 — the existence check ran against the full, never-real inner path.
     expect(attempt.stderr).not.toContain("can't find its seeya binary");
     expect(attempt.exitCode).toBe(0);
-  }, 30_000);
+  });
 });

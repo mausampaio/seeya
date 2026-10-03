@@ -6,13 +6,14 @@
  * project surfaces, both degrade to the least-specific value each function's return type allows.
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { readBranch } from '@seeya-ai/engine/adapters/git/branch.js';
 import { readModifiedFiles } from '@seeya-ai/engine/adapters/git/status.js';
 import { readCommitsToday } from '@seeya-ai/engine/adapters/git/commits.js';
 import { createGitFixture, removeGitFixture, type GitFixture } from './_fixtures.js';
+import { removeTempDir } from '../../_remove-temp-dir.js';
 
 const NOW = new Date(2026, 7, 29, 12, 0, 0);
 
@@ -66,7 +67,7 @@ describe('a plain, empty directory (never `git init`ed at all)', () => {
     try {
       await expect(readModifiedFiles(root)).resolves.toStrictEqual([]);
     } finally {
-      await rm(root, { recursive: true, force: true });
+      await removeTempDir(root);
     }
   });
 });

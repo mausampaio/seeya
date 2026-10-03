@@ -6,9 +6,9 @@
  * answer, not a fake). No commit is made, so no commit-msg hook (and no built CLI) is involved.
  */
 import path from 'node:path';
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { runGit } from '@seeya-ai/engine/adapters/git/run-git.js';
 import { buildProjectSkeleton } from '@seeya-ai/engine/core/project-skeleton.js';
 import { buildAppContext } from '../../../packages/app/src/composition/index.js';
@@ -19,12 +19,13 @@ import {
   removeDiscoveryFixture,
   type DiscoveryFixture,
 } from '../discovery/_fixtures.js';
+import { removeTempDir } from '../../_remove-temp-dir.js';
 
 // Each case builds a real workspace repository and `buildAppContext`; the lock case also
 // captures this process's own `procStart` — a real `powershell.exe` on Windows, ~3s the first
 // time (the same cost `tests/integration/app/composition.test.ts` documents for
-// `resolveProcessIdentity`).
-vi.setConfig({ testTimeout: 30_000 });
+// `resolveProcessIdentity`). The deadline for that is the integration project's own
+// (vitest.config.ts#INTEGRATION_TEST_TIMEOUT_MS, V2-T85), not a per-file override.
 
 const IDENTITY = { host: 'example.com', owner: 'acme', repository: 'api' };
 
@@ -37,7 +38,7 @@ afterEach(async () => {
     fixture = undefined;
   }
   if (extraDir !== undefined) {
-    await rm(extraDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    await removeTempDir(extraDir);
     extraDir = undefined;
   }
 });

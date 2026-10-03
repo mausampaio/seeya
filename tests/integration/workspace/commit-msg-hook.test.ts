@@ -15,7 +15,7 @@
  */
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { spawn } from 'node:child_process';
-import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,6 +25,7 @@ import { runGit } from '@seeya-ai/engine/adapters/git/run-git.js';
 import { buildProjectSkeleton } from '@seeya-ai/engine/core/project-skeleton.js';
 import { buildProjectCommitMessage } from '@seeya-ai/engine/core/project-commit.js';
 import { buildCommitMsgHookScript } from '@seeya-ai/engine/core/workspace-hooks.js';
+import { removeTempDir } from '../../_remove-temp-dir.js';
 
 // `tests/integration/` runs from the monorepo root — `packages/cli/dist/index.js` is the exact
 // entry `packages/cli/src/composition.ts#resolveCliEntryPath` resolves in production, built by
@@ -151,11 +152,11 @@ describe('the workspace commit-msg hook — real execution', () => {
           '"npm run verificar" already does).',
       );
     });
-  }, 30_000);
+  });
 
   afterEach(async () => {
     if (root !== undefined) {
-      await rm(root, { recursive: true, force: true });
+      await removeTempDir(root);
       root = undefined;
     }
   });
@@ -175,7 +176,7 @@ describe('the workspace commit-msg hook — real execution', () => {
     const message = await headMessage(dir);
     expect(message).toContain('Seeya-Project-Id: auth-hardening');
     expect(message).toContain('Seeya-Session-Id: unknown');
-  }, 30_000);
+  });
 
   it('completes trailers with the real CLAUDE_CODE_SESSION_ID from the environment', async () => {
     const { root: dir } = await setUpWorkspaceWithProject();
@@ -189,7 +190,7 @@ describe('the workspace commit-msg hook — real execution', () => {
     expect(attempt.exitCode).toBe(0);
     const message = await headMessage(dir);
     expect(message).toContain('Seeya-Session-Id: session-real-123');
-  }, 30_000);
+  });
 
   it('refuses a commit staging files from two projects', async () => {
     const { root: dir } = await setUpWorkspaceWithProject();
@@ -204,7 +205,7 @@ describe('the workspace commit-msg hook — real execution', () => {
     expect(attempt.exitCode).not.toBe(0);
     expect(attempt.stderr).toContain('one project per commit');
     expect(await headHash(dir)).toBe(beforeHash); // nothing landed
-  }, 30_000);
+  });
 
   it('refuses a commit staging the project lock file', async () => {
     const { root: dir } = await setUpWorkspaceWithProject();
@@ -220,7 +221,7 @@ describe('the workspace commit-msg hook — real execution', () => {
     expect(attempt.exitCode).not.toBe(0);
     expect(attempt.stderr).toContain('.seeya-lock');
     expect(await headHash(dir)).toBe(beforeHash);
-  }, 30_000);
+  });
 
   it('refuses a commit message with a project trailer that contradicts the real project', async () => {
     const { root: dir } = await setUpWorkspaceWithProject();
@@ -238,7 +239,7 @@ describe('the workspace commit-msg hook — real execution', () => {
     expect(attempt.exitCode).not.toBe(0);
     expect(attempt.stderr).toContain('some-other-project');
     expect(await headHash(dir)).toBe(beforeHash);
-  }, 30_000);
+  });
 
   it('refuses a commit into a project locked by a DIFFERENT, live session (real child process)', async () => {
     const { root: dir } = await setUpWorkspaceWithProject();
@@ -275,7 +276,7 @@ describe('the workspace commit-msg hook — real execution', () => {
     } finally {
       child.kill();
     }
-  }, 30_000);
+  });
 
   it('refuses with a clear message (never a raw shell error) when the recorded seeya binary is missing (V2-T34, PO review defect 2)', async () => {
     const dir = await makeTmpDir();
@@ -312,7 +313,7 @@ describe('the workspace commit-msg hook — real execution', () => {
     expect(attempt.stderr).toContain('seeya project open');
     expect(attempt.stderr).not.toContain('No such file or directory');
     expect(await headHash(dir)).toBe(beforeHash);
-  }, 30_000);
+  });
 
   it('lets a real commit through when cliEntryPath is inside a real .asar FILE (V2-T34 production defect, PO review 2026-09-25)', async () => {
     const dir = await makeTmpDir();
@@ -363,7 +364,7 @@ describe('the workspace commit-msg hook — real execution', () => {
     // actually calls the (stand-in) verifier, which approves.
     expect(attempt.stderr).not.toContain("can't find its seeya binary");
     expect(attempt.exitCode).toBe(0);
-  }, 30_000);
+  });
 });
 
 /**
@@ -381,7 +382,7 @@ describe("the workspace's own manifest-ownership guard — real execution (V2-T7
 
   afterEach(async () => {
     if (root !== undefined) {
-      await rm(root, { recursive: true, force: true });
+      await removeTempDir(root);
       root = undefined;
     }
   });
@@ -416,7 +417,7 @@ describe("the workspace's own manifest-ownership guard — real execution (V2-T7
     );
 
     expect(await headMessage(dir)).toContain('Seeya-Session-Id: unknown');
-  }, 30_000);
+  });
 
   it('refuses a real commit staging seeya.json from a session, with no lock at all', async () => {
     const { root: dir } = await setUpWorkspaceWithProject();
@@ -435,7 +436,7 @@ describe("the workspace's own manifest-ownership guard — real execution (V2-T7
     expect(attempt.stderr).toContain('auth-hardening/seeya.json');
     expect(attempt.stderr).toContain('maintained by seeya itself');
     expect(await headHash(dir)).toBe(beforeHash);
-  }, 30_000);
+  });
 
   it('refuses a real commit staging seeya.json even from the session that legitimately holds the project lock (real child process)', async () => {
     const { root: dir } = await setUpWorkspaceWithProject();
@@ -467,7 +468,7 @@ describe("the workspace's own manifest-ownership guard — real execution (V2-T7
     } finally {
       child.kill();
     }
-  }, 30_000);
+  });
 });
 
 /**
@@ -488,7 +489,7 @@ describe('same-process lock-holder authorization — real execution (V2-T34 hotf
 
   afterEach(async () => {
     if (root !== undefined) {
-      await rm(root, { recursive: true, force: true });
+      await removeTempDir(root);
       root = undefined;
     }
   });
@@ -529,7 +530,6 @@ describe('same-process lock-holder authorization — real execution (V2-T34 hotf
 
       expect(await headMessage(dir)).toContain('Seeya-Session-Id: fork-session-uuid');
     },
-    30_000,
   );
 
   it.each(ENV_SCENARIOS)(
@@ -567,39 +567,34 @@ describe('same-process lock-holder authorization — real execution (V2-T34 hotf
       expect(finalMessage).toContain('Seeya-Session-Id: unknown');
       expect(finalMessage).not.toContain('launched-session-uuid');
     },
-    30_000,
   );
 
-  it.each(ENV_SCENARIOS)(
-    'removeProject-shaped commit — %s',
-    async (_label, envSessionId) => {
-      const { root: dir, workspace } = await setUpWorkspaceWithProject();
-      root = dir;
-      // A GENUINE finding while writing this test, worth keeping (not the same-process fix at
-      // all): `removeProjectDirectory` (`adapters/workspace/index.ts`) `rm -rf`s the WHOLE project
-      // directory BEFORE `commitAll` runs — `.seeya-lock` lives inside it, so by the time the
-      // commit-msg hook reads the lock, it is already gone (`lock === null`), the exact same "no
-      // lock at all" path `createProject`/`addRepository` take. `removeProject`'s own commit was
-      // never actually broken by the lock-vs-session defect (item 1) — it just needs its trailer
-      // (`deps.sessionId`) to match `currentSessionId` (the SAME env var, read once at the same
-      // composition root), which real code already guarantees by construction.
-      await rm(path.join(dir, 'auth-hardening'), { recursive: true, force: true });
-      const message = buildProjectCommitMessage(
-        'Remove project auth-hardening',
-        'auth-hardening',
-        envSessionId,
-      );
+  it.each(ENV_SCENARIOS)('removeProject-shaped commit — %s', async (_label, envSessionId) => {
+    const { root: dir, workspace } = await setUpWorkspaceWithProject();
+    root = dir;
+    // A GENUINE finding while writing this test, worth keeping (not the same-process fix at
+    // all): `removeProjectDirectory` (`adapters/workspace/index.ts`) `rm -rf`s the WHOLE project
+    // directory BEFORE `commitAll` runs — `.seeya-lock` lives inside it, so by the time the
+    // commit-msg hook reads the lock, it is already gone (`lock === null`), the exact same "no
+    // lock at all" path `createProject`/`addRepository` take. `removeProject`'s own commit was
+    // never actually broken by the lock-vs-session defect (item 1) — it just needs its trailer
+    // (`deps.sessionId`) to match `currentSessionId` (the SAME env var, read once at the same
+    // composition root), which real code already guarantees by construction.
+    await removeTempDir(path.join(dir, 'auth-hardening'));
+    const message = buildProjectCommitMessage(
+      'Remove project auth-hardening',
+      'auth-hardening',
+      envSessionId,
+    );
 
-      // V2-T73 item 1: `removeProjectDirectory` deletes `seeya.json` along with the rest of the
-      // project — one of seeya's own four legitimate manifest writes.
-      await withSessionIdEnv(envSessionId, () =>
-        workspace.commitAll(dir, 'auth-hardening', message, undefined, true),
-      );
+    // V2-T73 item 1: `removeProjectDirectory` deletes `seeya.json` along with the rest of the
+    // project — one of seeya's own four legitimate manifest writes.
+    await withSessionIdEnv(envSessionId, () =>
+      workspace.commitAll(dir, 'auth-hardening', message, undefined, true),
+    );
 
-      expect(await headMessage(dir)).toContain(`Seeya-Session-Id: ${envSessionId ?? 'unknown'}`);
-    },
-    30_000,
-  );
+    expect(await headMessage(dir)).toContain(`Seeya-Session-Id: ${envSessionId ?? 'unknown'}`);
+  });
 
   it.each(ENV_SCENARIOS)(
     'removeRepository-shaped commit is accepted while holding the lock under an unidentified session — %s',
@@ -634,7 +629,6 @@ describe('same-process lock-holder authorization — real execution (V2-T34 hotf
 
       expect(await headMessage(dir)).toContain('Seeya-Session-Id: unknown');
     },
-    30_000,
   );
 
   it.each(ENV_SCENARIOS)(
@@ -692,7 +686,6 @@ describe('same-process lock-holder authorization — real execution (V2-T34 hotf
       expect(outcome.kind).toBe('committed');
       expect(await headMessage(dir)).toContain(`Seeya-Session-Id: ${envSessionId ?? 'unknown'}`);
     },
-    30_000,
   );
 
   it.each(ENV_SCENARIOS)(
@@ -726,7 +719,6 @@ describe('same-process lock-holder authorization — real execution (V2-T34 hotf
 
       expect(await headMessage(dir)).toContain(`Seeya-Session-Id: ${envSessionId ?? 'unknown'}`);
     },
-    30_000,
   );
 
   it('still refuses an outsider process, holding neither the session nor the process identity, against a DIFFERENT live session (the forbidden case stays forbidden)', async () => {
@@ -763,5 +755,5 @@ describe('same-process lock-holder authorization — real execution (V2-T34 hotf
     } finally {
       child.kill();
     }
-  }, 30_000);
+  });
 });

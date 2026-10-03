@@ -9,7 +9,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,6 +27,7 @@ import { DEFAULT_TEST_CONFIG, FakeStorage } from '../../unit/application/_fakes.
 import { InMemoryDaemonStorage } from '../../unit/scheduler/_fakes.js';
 import type { DaemonLockInfo } from '@seeya-ai/engine/core/daemon-lock.js';
 import type { ProcessControl } from '@seeya-ai/engine/core/ports.js';
+import { removeTempDir } from '../../_remove-temp-dir.js';
 
 const FIXTURE_PATH = fileURLToPath(
   new URL('../../fixtures/process/graceful-child.mjs', import.meta.url),
@@ -103,7 +104,7 @@ describe('runDaemonLauncher — real spawn path', () => {
           // Already gone.
         }
       }
-      await rm(tmp, { recursive: true, force: true });
+      await removeTempDir(tmp);
     }
   });
 });
@@ -180,7 +181,7 @@ async function setUpRealDaemonFixture(): Promise<RealDaemonFixture> {
     } catch {
       // Already gone — test cleanup, not the product's own path.
     }
-    await rm(tmp, { recursive: true, force: true });
+    await removeTempDir(tmp);
   };
   return { child, pid, shutdownMarker, storage, deps, cleanup };
 }
@@ -209,7 +210,6 @@ describe.skipIf(process.platform === 'win32')(
           await fixture.cleanup();
         }
       },
-      20_000, // real SIGTERM to a fixture that responds almost immediately — generous, not tight
     );
   },
 );

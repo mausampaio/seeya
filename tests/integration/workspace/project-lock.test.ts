@@ -5,13 +5,14 @@
  * documents for `FsWorkspaceRepository`.
  */
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
   FsProjectLock,
   PROJECT_LOCK_FILE_NAME,
 } from '@seeya-ai/engine/adapters/workspace/project-lock.js';
+import { removeTempDir } from '../../_remove-temp-dir.js';
 
 async function makeTmpDir(): Promise<string> {
   return mkdtemp(path.join(tmpdir(), 'seeya-project-lock-'));
@@ -22,7 +23,7 @@ describe('FsProjectLock', () => {
 
   afterEach(async () => {
     if (root !== undefined) {
-      await rm(root, { recursive: true, force: true });
+      await removeTempDir(root);
       root = undefined;
     }
   });

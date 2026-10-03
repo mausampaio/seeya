@@ -14,7 +14,7 @@
  * that this in-process test structurally cannot cover.
  */
 import { describe, expect, it } from 'vitest';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,6 +23,7 @@ import {
   spawnDetachedDaemon,
 } from '@seeya-ai/engine/adapters/process/daemon-launch.js';
 import { processExists } from '@seeya-ai/engine/adapters/process/existence.js';
+import { removeTempDir } from '../../_remove-temp-dir.js';
 
 const FIXTURE_PATH = fileURLToPath(
   new URL('../../fixtures/process/graceful-child.mjs', import.meta.url),
@@ -102,7 +103,7 @@ describe('spawnDetachedDaemon', () => {
         await sleep(50);
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await removeTempDir(tmp);
     }
   });
 
@@ -139,7 +140,7 @@ describe('spawnDetachedDaemon', () => {
         // Already exited.
       }
     } finally {
-      await rm(tmp, { recursive: true, force: true });
+      await removeTempDir(tmp);
     }
   });
 
@@ -183,7 +184,7 @@ describe('spawnDetachedDaemon', () => {
       } else {
         process.env.SEEYA_TEST_ONLY_IN_PARENT_ENV = previousParentOnlyVar;
       }
-      await rm(tmp, { recursive: true, force: true });
+      await removeTempDir(tmp);
     }
   });
 });
