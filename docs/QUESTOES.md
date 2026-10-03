@@ -9624,10 +9624,19 @@ padrão do vitest, e a operação deles (um `git init`/`commit` real, o CLI comp
 custa 20-60% dele sem contenção nenhuma.
 
 **Decisão aplicada.** `vitest.config.ts#INTEGRATION_TEST_TIMEOUT_MS`/`INTEGRATION_HOOK_TIMEOUT_MS`
-= 30 000ms nos dois projetos de integração (um número só, justificado pela medição, no lugar de
-prazo por arquivo). Os prazos que SÃO "operação + folga" (`termination.test.ts`, 8 000/5 000)
-ficam como estavam, de propósito — o parágrafo de `docs/TESTES.md` continua verdadeiro para eles.
-Depois: 3 rodadas de 3 sem nenhuma falha, mesma carga; o mais lento 23,0s. Também: o
+= 60 000ms nos dois projetos de integração (um número só, justificado pela medição, no lugar de
+prazo por arquivo; 30 000ms zerou as falhas só no `integration` isolado, e ficou curto dentro do
+`npm run cobertura` inteiro, onde `daemon-launch`/`commit-msg-hook` chegaram a 32s com 6 laços de
+CPU). Os prazos que SÃO "operação + folga" (`termination.test.ts`, 8 000/5 000) ficam como
+estavam, de propósito — o parágrafo de `docs/TESTES.md` continua verdadeiro para eles. Também
+ficaram de fora o 30s explícito dos dois `*-concurrent-write` (I/O real, Q-056/Q-058) e o projeto
+`guards`, salvo o filho do `dependency-cruiser` sobre a árvore inteira (3,9s sem carga, morto pelo
+orçamento de 30s do filho em 4 de 4 `cobertura` com carga; agora 90s, constante própria em
+`guards/_support.ts`). **Resíduo medido, não corrigido:** com 6-12 laços de CPU o `cobertura`
+inteiro ainda reprova `termination` (os dois casos de orçamento apertado: 8,3s/5,2s), os dois
+`*-concurrent-write` (30s) e, com 12, também ganchos do `guards`; com 4 laços passou 2 de 2
+(exit 0), e sem carga 1 de 1. Depois (o `integration` isolado, 12 laços): 3 rodadas de 3 sem
+nenhuma falha, contra 3 de 3 com 32-38 falhas antes; o mais lento 23,0s. Também: o
 `fastFailureGraceMs` de 2 000ms dos testes de retomada (`resumption/`) era a janela de
 classificação "falha rápida", que inclui a partida do próprio `node` do falso `claude` — sob carga
 ela estourava e invertia a asserção (não era timeout); virou 20 000ms numa constante nomeada.
