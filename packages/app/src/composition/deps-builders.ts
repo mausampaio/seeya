@@ -1,0 +1,224 @@
+/**
+ * The `Deps` assemblers of the interface's own end-day and project actions (V2-T5a, V2-T30, V2-T83,
+ * V2-T84; V2-T51: split out of `composition/index.ts`, which still re-exports them) — pure
+ * fiação over an `AppContext`.
+ */
+import { PROJECT_LOCK_FILE_NAME } from '@seeya-ai/engine/adapters/workspace/project-lock.js';
+import { FsProjectAuditMarker } from '@seeya-ai/engine/adapters/workspace/project-audit-marker.js';
+import type { HarnessLauncher, SessionAdoptionLauncher } from '@seeya-ai/engine/core/ports.js';
+import type { ProjectOpenDeps } from '@seeya-ai/engine/application/project-open.js';
+import type { AdoptSessionDeps } from '@seeya-ai/engine/application/project-adopt.js';
+import type { WorkspaceCommandDeps } from '@seeya-ai/engine/application/workspace.js';
+import type { AddRepositoryDeps } from '@seeya-ai/engine/application/repository-association.js';
+import type { RemoveRepositoryDeps } from '@seeya-ai/engine/application/project-remove-repo.js';
+import type { ArchiveProjectDeps } from '@seeya-ai/engine/application/project-archive.js';
+import type { RemoveProjectDeps } from '@seeya-ai/engine/application/project-remove.js';
+import type { RevertAdoptionDeps } from '@seeya-ai/engine/application/project-revert-adoption.js';
+import type { EndDayDeps } from '@seeya-ai/engine/application/types.js';
+import type { AppContext } from './app-context.js';
+import { resolveCliDaemonScriptPath } from './cli-daemon-script.js';
+
+/**
+ * V2-T5a item 5: assembles the `EndDayDeps` `application/end-day.ts#endDay` needs from an
+ * `AppContext` — pure fiação (no I/O of its own), pulled out into its own function so
+ * `electron/main.ts`'s IPC handlers (excluded from this package's coverage floor) never carry
+ * logic worth testing on their own; this mapping does, via `tests/integration/app/composition.test.ts`.
+ */
+export function toEndDayDeps(context: AppContext): EndDayDeps {
+  return {
+    sessionProvider: context.sessionProvider,
+    transcriptReader: context.transcriptReader,
+    gitReader: context.gitReader,
+    leanGenerator: context.leanGenerator,
+    deepGenerator: context.deepGenerator,
+    storage: context.storage,
+    processControl: context.processControl,
+    clock: context.clock,
+    forkCleanup: context.forkCleanup,
+  };
+}
+
+/**
+ * V2-T30: `seeya project create`/`list`/`show`'s own `WorkspaceCommandDeps`, assembled from an
+ * `AppContext` — mirrors `packages/cli/src/composition.ts#buildProjectContext`'s own shape, pure
+ * fiação (no I/O of its own), so `electron/project-ipc.ts` (excluded from this package's coverage
+ * floor) never carries a mapping worth testing on its own; this one does, via
+ * `tests/integration/app/composition.test.ts`.
+ */
+export function buildProjectWorkspaceDeps(context: AppContext): WorkspaceCommandDeps {
+  return {
+    storage: context.storage,
+    workspace: context.workspace,
+    projectLock: context.projectLock,
+    processControl: context.processControl,
+    seeyaHome: context.home.seeyaHome,
+    sessionId: context.sessionId,
+    ...projectHookIdentity(),
+  };
+}
+
+/**
+ * V2-T34 item 1: the interface's own `nodePath`/`cliEntryPath`/`hookEnv` for the workspace's
+ * `commit-msg` hook — `resolveCliDaemonScriptPath()` already resolves `@seeya-ai/cli`'s own compiled
+ * entry point for the daemon launch target above (`daemonLaunchTarget.scriptPath`); the SAME file
+ * also dispatches `project verify-commit` (it's the whole `seeya` CLI, not a daemon-only script), so
+ * reusing it here is calling back into a working `seeya`, not a second resolution mechanism. Runs
+ * under `process.execPath` — Electron's own binary — so `ELECTRON_RUN_AS_NODE=1` has to travel with
+ * it (`core/workspace-hooks.ts#buildCommitMsgHookScript`'s own docstring on why), the identical
+ * pairing `daemonLaunchTarget.env` already carries for the same reason.
+ */
+function projectHookIdentity(): {
+  readonly nodePath: string;
+  readonly cliEntryPath: string;
+  readonly hookEnv: Readonly<Record<string, string>>;
+} {
+  return {
+    nodePath: process.execPath,
+    cliEntryPath: resolveCliDaemonScriptPath(),
+    hookEnv: { ELECTRON_RUN_AS_NODE: '1' },
+  };
+}
+
+/** This invocation's own `pid`/`procStart` — see `AppContext#resolveProcessIdentity`'s own
+ * docstring for why it's a separate, lazily-resolved value rather than a plain field here. */
+export interface AppProcessIdentity {
+  readonly pid: number;
+  readonly procStart: string | undefined;
+}
+
+/**
+ * `seeya project open`'s own `ProjectOpenDeps` (V2-T30 item 3), assembled from an `AppContext` plus
+ * this invocation's own `processIdentity` (`AppContext#resolveProcessIdentity`, Q-087 item 3: the
+ * app's own main process, not a per-open capture) and a fresh `HarnessLauncher`
+ * (`resume/project-tab-launcher.ts#ProjectOpenTabLauncher`, constructed by the caller with this
+ * open's own tab label — never reused from `cli/`'s `ClaudeHarnessLauncher`, D-043).
+ * `launchedSessionId` is generated by the caller (`electron/project-ipc.ts`, `node:crypto
+ * #randomUUID` — randomness stays out of `core/`/`application/`, same V2-T35 item 4 reasoning the
+ * CLI's own `buildProjectOpenDeps` already follows).
+ */
+export function buildProjectOpenDeps(
+  context: AppContext,
+  processIdentity: AppProcessIdentity,
+  harnessLauncher: HarnessLauncher,
+  launchedSessionId: string,
+): ProjectOpenDeps {
+  return {
+    storage: context.storage,
+    workspace: context.workspace,
+    directoryExistence: context.directoryExistence,
+    harnessLauncher,
+    projectLock: context.projectLock,
+    processControl: context.processControl,
+    clock: context.clock,
+    seeyaHome: context.home.seeyaHome,
+    sessionId: context.sessionId,
+    pid: processIdentity.pid,
+    procStart: processIdentity.procStart,
+    launchedSessionId,
+    ...projectHookIdentity(),
+    auditMarker: new FsProjectAuditMarker(),
+    lockFileName: PROJECT_LOCK_FILE_NAME,
+    platformHint: context.platformHint,
+  };
+}
+
+/**
+ * `seeya project adopt`'s own `AdoptSessionDeps` (V2-T30 item 5) — same shape as
+ * `buildProjectOpenDeps` above, for `application/project-adopt.ts#adoptSession` instead.
+ * `idleMinutes` is read fresh by the caller (`context.storage.readConfig()`, same "never a startup
+ * snapshot" discipline `electron/main.ts`'s own settings-aware handlers already follow) rather than
+ * cached on `AppContext` itself.
+ */
+export function buildProjectAdoptDeps(
+  context: AppContext,
+  processIdentity: AppProcessIdentity,
+  adoptionLauncher: SessionAdoptionLauncher,
+  forkSessionId: string,
+  idleMinutes: number,
+): AdoptSessionDeps {
+  return {
+    storage: context.storage,
+    workspace: context.workspace,
+    projectLock: context.projectLock,
+    processControl: context.processControl,
+    clock: context.clock,
+    forkRegistration: context.forkRegistration,
+    forkCleanup: context.forkCleanup,
+    adoptionLauncher,
+    seeyaHome: context.home.seeyaHome,
+    idleMinutes,
+    sessionId: context.sessionId,
+    pid: processIdentity.pid,
+    procStart: processIdentity.procStart,
+    forkSessionId,
+    ...projectHookIdentity(),
+  };
+}
+
+/**
+ * V2-T83: `seeya project add-repo`'s own `AddRepositoryDeps`, assembled from an `AppContext` — the
+ * "Project details" dialog's `Add repository…`. No lock is taken (the engine's `addRepository`
+ * never takes one), so no process identity either.
+ */
+export function buildAddRepositoryDeps(context: AppContext): AddRepositoryDeps {
+  return {
+    storage: context.storage,
+    workspace: context.workspace,
+    gitReader: context.gitReader,
+    directoryExistence: context.directoryExistence,
+    seeyaHome: context.home.seeyaHome,
+    sessionId: context.sessionId,
+  };
+}
+
+/** V2-T83: the lock-taking `Deps` the three writing project actions share — this window's own
+ * `pid`/`procStart` is the lock holder for the whole synchronous operation, same as the CLI's own
+ * `capturePidAndProcStart` for `remove`/`remove-repo`/`revert-adoption`. */
+function buildProjectLockHolderDeps(
+  context: AppContext,
+  processIdentity: AppProcessIdentity,
+): RemoveRepositoryDeps & RemoveProjectDeps & ArchiveProjectDeps {
+  return {
+    storage: context.storage,
+    workspace: context.workspace,
+    projectLock: context.projectLock,
+    processControl: context.processControl,
+    clock: context.clock,
+    seeyaHome: context.home.seeyaHome,
+    sessionId: context.sessionId,
+    pid: processIdentity.pid,
+    procStart: processIdentity.procStart,
+  };
+}
+
+export function buildRemoveRepositoryDeps(
+  context: AppContext,
+  processIdentity: AppProcessIdentity,
+): RemoveRepositoryDeps {
+  return buildProjectLockHolderDeps(context, processIdentity);
+}
+
+/** V2-T84: `archiveProject`/`unarchiveProject` — the same lock-taking shape as the other writes. */
+export function buildArchiveProjectDeps(
+  context: AppContext,
+  processIdentity: AppProcessIdentity,
+): ArchiveProjectDeps {
+  return buildProjectLockHolderDeps(context, processIdentity);
+}
+
+export function buildRemoveProjectDeps(
+  context: AppContext,
+  processIdentity: AppProcessIdentity,
+): RemoveProjectDeps {
+  return buildProjectLockHolderDeps(context, processIdentity);
+}
+
+export function buildRevertAdoptionDeps(
+  context: AppContext,
+  processIdentity: AppProcessIdentity,
+): RevertAdoptionDeps {
+  return {
+    ...buildProjectLockHolderDeps(context, processIdentity),
+    forkCleanup: context.forkCleanup,
+  };
+}
