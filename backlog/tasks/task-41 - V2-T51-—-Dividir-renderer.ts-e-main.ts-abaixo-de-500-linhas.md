@@ -4,7 +4,7 @@ title: V2-T51 — Dividir renderer.ts e main.ts abaixo de 500 linhas
 status: Review
 assignee: []
 created_date: '2026-09-25 03:41'
-updated_date: '2026-09-30 13:06'
+updated_date: '2026-10-05 13:44'
 labels: []
 milestone: m-2
 dependencies: []
@@ -74,6 +74,16 @@ usar a janela normalmente um dia e não notar diferença nenhuma.
 
 **Limites:** funções de ~20 linhas não foram aplicadas aos handlers movidos (código verbatim); mudou o tamanho dos arquivos e a responsabilidade de cada módulo. Comentários genéricos que citam `electron/main.ts` (renome antigo) em ipc/ e composition/ ficaram como estavam, exceto os que apontavam para funções que mudaram de lugar. docs/ARQUITETURA.md não foi tocado (exige aprovação).
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: PO
+created: 2026-10-05 13:44
+---
+Revisão do PO (2026-10-05): aprovada numa rodada. main.ts 3622→75 (ciclo de vida só), handlers de IPC em módulos próprios, toda a instrumentação SEEYA_APP_* em main/verification/ com um único ponto de entrada; ipc/channels.ts 974→310, composition/index.ts 829→234, text/messages.ts 660→57, sem mudar import de nenhum chamador. Guard novo app-file-size (500 linhas, caso permitido testado). A/B na mesma sessão sem piora (subida, memória, CPU parado dentro do ruído; bundle +0,9%). Instrumentações rodadas antes/depois com saídas iguais salvo horário. Achado pré-existente para seguimento: a captura 04-result-failure da instrumentação de adoção com falha de commit mostra o passo 1, não o resultado. Fora do escopo, ainda acima de 500: ports.ts, types.ts, cli/composition.ts, project-open.ts, cli/index.ts, config-schema.ts, storage/index.ts. Processo: scripts de verificação movidos para arquivos no scratchpad para fugir de recusa de comando composto — limite do que o despacho aceita; registrado. Mesclada no po-gate; portão do zero e npm test sem identidade git verdes (3995 testes). Agente Sonnet 5.5 (53 min).
+---
+<!-- COMMENTS:END -->
 
 <!-- COMMENTS:BEGIN -->
 author: PO
