@@ -4,7 +4,7 @@
  * `Storage.readActiveProtocolScheme()` (D-025, reshaped from a boolean by V2-T10 item 2 — always
  * `'seeya'` on Linux, never `'seeya-dev'`, see this file's own docstring below).
  *
- * **Why this can't be the same mechanism as Windows.** `electron/main.ts#registerProtocolHandler`
+ * **Why this can't be the same mechanism as Windows.** `main/protocol-registration.ts#registerProtocolHandler`
  * calls `app.setAsDefaultProtocolClient(scheme)` and trusts its own boolean return — Electron
  * itself performs the registration AND reports whether it worked. On Linux, Electron's own docs
  * are explicit that this method "is only implemented on macOS and Windows"; registration there

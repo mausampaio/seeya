@@ -4,7 +4,7 @@
  * on every platform (this app never draws its own window chrome, D-042); what varies is only the
  * menu BAR Electron would otherwise add above it.
  *
- * **Windows/Linux: no menu at all** (`{ kind: 'none' }`) — `main/main.ts#applyApplicationMenuPolicy`
+ * **Windows/Linux: no menu at all** (`{ kind: 'none' }`) — `main/application-menu.ts#applyApplicationMenuPolicy`
  * answers this with `Menu.setApplicationMenu(null)`, which removes the bar entirely rather than
  * just hiding it behind Alt (`autoHideMenuBar` would do that instead; this task's own aceite asks
  * for the bar to be gone, not hidden).
@@ -29,7 +29,7 @@
  * `no-restricted-imports` rule (D-052) confines `electron` to `packages/app/src/main/**` — even a
  * type-only import is restricted, so the template below uses `MenuEntry`/`MenuSection`, a small
  * structural shape of this module's own, instead of Electron's `MenuItemConstructorOptions`.
- * `main/main.ts#applyApplicationMenuPolicy` is the one place that maps it onto the real Electron
+ * `main/application-menu.ts#applyApplicationMenuPolicy` is the one place that maps it onto the real Electron
  * type when calling `Menu.buildFromTemplate`.
  *
  * @example
@@ -51,7 +51,7 @@ export interface MenuSeparatorEntry {
 }
 
 /** Discriminated on `kind` (D-024: "nothing flattened"), not on whether `role` happens to be
- * present — `main/main.ts#toElectronMenuItem` switches on it before ever reading `role`. */
+ * present — `main/application-menu.ts#toElectronMenuItem` switches on it before ever reading `role`. */
 export type MenuEntry = MenuRoleEntry | MenuSeparatorEntry;
 
 /** One top-level entry of the menu bar (e.g. the app menu, or "Edit"), with its own `submenu`. */

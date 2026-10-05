@@ -33,7 +33,7 @@ export interface BuildAppContextOverrides {
    * V2-T69: verification-only, same spirit as the two fields above — lets a screenshot script
    * exercise End day's real "em andamento"/"resultado" views (`renderer/features/end-day/`)
    * through the real `endDay()` pipeline without ever spawning a real, billed `claude -p` process.
-   * `electron/main.ts`'s own `SEEYA_APP_VERIFY_END_DAY_FAKE` is the ONE real caller — see
+   * `main/verification/context-overrides.ts`'s own `SEEYA_APP_VERIFY_END_DAY_FAKE` is the ONE real caller — see
    * `composition/verification-fake-generator.ts`'s own docstring for the fake implementation.
    * Every other caller (a real window) omits both and gets the real adapters, as always.
    */

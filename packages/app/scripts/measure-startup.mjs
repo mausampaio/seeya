@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // V2-T17 item 1(a) measurement tooling — spawns the real dev bundle (dist/electron/main.js) three
 // times against a disposable home directory and reports how long each launch took from process
-// spawn to the first `sessionsUpdate` IPC send. `electron/main.ts#writeStartupTiming`'s own
+// spawn to the first `sessionsUpdate` IPC send. `main/verification/hooks.ts#writeStartupTiming`'s own
 // docstring has the exact definition (send time, not paint time) and the reasoning behind why
 // that is close enough to "the session list is on screen" for this budget — this script is the
 // other half of that instrumentation: it records its own launch instant with `Date.now()` (fine

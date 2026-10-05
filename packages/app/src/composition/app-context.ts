@@ -195,7 +195,7 @@ export interface AppContext {
    * V2-T70: verification-only, same spirit as `leanGenerator`/`deepGenerator` above — lets a
    * screenshot script exercise the real "Adopt…" flow (`renderer/features/adoption/`) through the
    * real `adoptSession()` pipeline without ever spawning a real `claude` session.
-   * `main/main.ts`'s own `SEEYA_APP_VERIFY_ADOPTION_FAKE` is the ONE real caller — see
+   * `main/verification/context-overrides.ts`'s own `SEEYA_APP_VERIFY_ADOPTION_FAKE` is the ONE real caller — see
    * `composition/verification-fake-adoption-launcher.ts`'s own docstring for the fake
    * implementation. Every real window leaves this `undefined` and `main/project-ipc.ts` builds
    * the real `ProjectAdoptTabLauncher`, exactly as before this task.
@@ -204,7 +204,7 @@ export interface AppContext {
   /**
    * V2-T82: verification-only, same spirit as `adoptionLauncherOverride` — lets a screenshot script
    * click the adoption result's real **Open project** button without ever spawning `claude`.
-   * `main/main.ts`'s own `SEEYA_APP_VERIFY_FAKE_HARNESS_LOG` is the ONE real caller.
+   * `main/verification/context-overrides.ts`'s own `SEEYA_APP_VERIFY_FAKE_HARNESS_LOG` is the ONE real caller.
    */
   readonly harnessLauncherOverride: HarnessLauncher | undefined;
   /**
